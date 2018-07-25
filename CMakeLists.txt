@@ -199,7 +199,7 @@ int main() {
    fstat(fd, &s);
    size_t len = s.st_size;
    void *ptr = mmap(0, len, PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
-   munmap(ptr, len);   
+   munmap(ptr, len);
 }
 " HAVE_MMAP )
 if ( HAVE_MMAP )
@@ -364,6 +364,12 @@ SET_PROPERTY(TARGET Ptex_static ptxinfo halftest ftest rtest wtest PROPERTY FOLD
 INCLUDE_DIRECTORIES ( src/ext/ptex/src/ptex )
 
 ###########################################################################
+# Protobuf
+
+ADD_SUBDIRECTORY(src/messages)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/src/messages)
+
+###########################################################################
 # On to pbrt...
 
 SET ( PBRT_CORE_SOURCE
@@ -461,6 +467,7 @@ FILE ( GLOB PBRT_SOURCE
   src/shapes/*
   src/textures/*
   src/media/*
+  src/messages/*
   )
 
 INCLUDE_DIRECTORIES ( src )
@@ -524,7 +531,7 @@ ADD_SANITIZERS ( pbrt_exe )
 
 SET_TARGET_PROPERTIES ( pbrt_exe PROPERTIES OUTPUT_NAME pbrt )
 TARGET_COMPILE_FEATURES ( pbrt_exe PRIVATE ${PBRT_CXX11_FEATURES} )
-TARGET_LINK_LIBRARIES ( pbrt_exe ${ALL_PBRT_LIBS} )
+TARGET_LINK_LIBRARIES ( pbrt_exe ${ALL_PBRT_LIBS} ${PROTOBUF_LIBRARY} )
 
 # Tools
 ADD_EXECUTABLE ( bsdftest src/tools/bsdftest.cpp )

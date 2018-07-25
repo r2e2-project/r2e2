@@ -1,0 +1,14 @@
+syntax = 'proto3';
+
+package pbrt.protobuf;
+
+message Point3f {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message Bounds3f {
+  Point3f point_min = 1;
+  Point3f point_max = 2;
+}
