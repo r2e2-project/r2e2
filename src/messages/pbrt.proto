@@ -12,3 +12,10 @@ message Bounds3f {
   Point3f point_min = 1;
   Point3f point_max = 2;
 }
+
+message BVHNode {
+  Bounds3f bounds = 1;
+  uint64 left_ref = 2;
+  uint64 right_ref = 3;
+  uint32 axis = 4;
+}
