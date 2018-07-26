@@ -367,7 +367,7 @@ INCLUDE_DIRECTORIES ( src/ext/ptex/src/ptex )
 # Protobuf
 
 ADD_SUBDIRECTORY(src/messages)
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/src/messages)
+INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR}/src/messages)
 
 ###########################################################################
 # On to pbrt...
@@ -468,7 +468,7 @@ FILE ( GLOB PBRT_SOURCE
   src/textures/*
   src/media/*
   src/messages/*
-  )
+ )
 
 INCLUDE_DIRECTORIES ( src )
 INCLUDE_DIRECTORIES ( src/core )
@@ -516,13 +516,18 @@ IF (WIN32)
   SET_TARGET_PROPERTIES ( pbrt PROPERTIES OUTPUT_NAME libpbrt )
 ENDIF()
 
+INCLUDE(FindProtobuf)
+FIND_PACKAGE(Protobuf REQUIRED)
+
 SET(ALL_PBRT_LIBS
   pbrt
+  pbrt_messages
   ${CMAKE_THREAD_LIBS_INIT}
   ${OPENEXR_LIBS}
   glog
   Ptex_static
   ${ZLIB_LIBRARY}
+  ${Protobuf_LIBRARIES}
 )
 
 # Main renderer
@@ -531,7 +536,7 @@ ADD_SANITIZERS ( pbrt_exe )
 
 SET_TARGET_PROPERTIES ( pbrt_exe PROPERTIES OUTPUT_NAME pbrt )
 TARGET_COMPILE_FEATURES ( pbrt_exe PRIVATE ${PBRT_CXX11_FEATURES} )
-TARGET_LINK_LIBRARIES ( pbrt_exe ${ALL_PBRT_LIBS} ${PROTOBUF_LIBRARY} )
+TARGET_LINK_LIBRARIES ( pbrt_exe ${ALL_PBRT_LIBS} )
 
 # Tools
 ADD_EXECUTABLE ( bsdftest src/tools/bsdftest.cpp )
