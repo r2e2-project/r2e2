@@ -26,12 +26,50 @@ private:
     google::protobuf::io::CodedOutputStream coded_output_ { &raw_output_ };
 };
 
+class RecordReader {
+public:
+    RecordReader(const std::string & filename);
+
+    template<class ProtobufType>
+    bool read(ProtobufType & record);
+    bool eof() const { return eof_; }
+
+private:
+    FileDescriptor fin_;
+    google::protobuf::io::FileInputStream raw_input_ { fin_.fd_num() };
+    google::protobuf::io::CodedInputStream coded_input_ { &raw_input_ };
+
+    google::protobuf::uint32 next_size_;
+    bool eof_ {false};
+};
+
 template<class ProtobufType>
 void RecordWriter::write(const ProtobufType & proto) {
     coded_output_.WriteLittleEndian32(proto.ByteSize());
     if (not proto.SerializeToCodedStream(&coded_output_)) {
         throw std::runtime_error("write: write protobuf error");
     }
+}
+
+template<class ProtobufType>
+bool RecordReader::read(ProtobufType & record) {
+    if (eof) { return false; }
+
+    if (next_size_ == 0) {
+        return false;
+    }
+
+    google::protobuf::io::CodedInputStream::Limit message_limit =
+        coded_input_.PushLimit(next_size_);
+
+    if (record.ParseFromCodedStream(&record)) {
+        coded_input_.PopLimit(message_limit);
+        eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
+        return true;
+    }
+
+    eof_ = true;
+    return false;
 }
 
 }
