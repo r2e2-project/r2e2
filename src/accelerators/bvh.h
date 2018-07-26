@@ -43,6 +43,8 @@
 #include "primitive.h"
 #include <atomic>
 
+#include "messages/serialization.h"
+
 namespace pbrt {
 struct BVHBuildNode;
 
@@ -50,6 +52,7 @@ struct BVHBuildNode;
 struct BVHPrimitiveInfo;
 struct MortonPrimitive;
 struct LinearBVHNode;
+struct TreeletNode;
 
 // BVHAccel Declarations
 class BVHAccel : public Aggregate {
@@ -65,6 +68,10 @@ class BVHAccel : public Aggregate {
     ~BVHAccel();
     bool Intersect(const Ray &ray, SurfaceInteraction *isect) const;
     bool IntersectP(const Ray &ray) const;
+
+    void Dump(const std::string &path, const size_t max_treelet_nodes) const;
+    void DumpTreelet(const std::shared_ptr<TreeletNode> root,
+                     protobuf::RecordWriter & writer) const;
 
   private:
     // BVHAccel Private Methods

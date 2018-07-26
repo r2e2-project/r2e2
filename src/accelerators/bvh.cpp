@@ -38,6 +38,12 @@
 #include "stats.h"
 #include "parallel.h"
 #include <algorithm>
+#include <vector>
+#include <queue>
+#include <fstream>
+
+#include "pbrt.pb.h"
+#include "messages/utils.h"
 
 namespace pbrt {
 
@@ -756,7 +762,148 @@ std::shared_ptr<BVHAccel> CreateBVHAccelerator(
     }
 
     int maxPrimsInNode = ps.FindOneInt("maxnodeprims", 4);
-    return std::make_shared<BVHAccel>(std::move(prims), maxPrimsInNode, splitMethod);
+    auto res = std::make_shared<BVHAccel>(std::move(prims), maxPrimsInNode, splitMethod);
+
+    std::string dump_path = ps.FindOneString("dumppath", "");
+
+    if (dump_path.length()) {
+        res->Dump(dump_path, 50000);
+    }
+
+    return res;
 }
+
+struct TreeletNode {
+    const int idx;
+    std::shared_ptr<TreeletNode> left {};
+    std::shared_ptr<TreeletNode> right {};
+
+    TreeletNode(const int node_idx)
+        : idx(node_idx) {}
+};
+
+void BVHAccel::DumpTreelet(const std::shared_ptr<TreeletNode> root,
+                           protobuf::RecordWriter & writer) const {
+    if (root == nullptr) {
+        writer.write_empty();
+        return;
+    }
+
+    const LinearBVHNode * node = &nodes[root->idx];
+    protobuf::BVHNode proto_node;
+
+    *proto_node.mutable_bounds() = to_protobuf(node->bounds);
+    proto_node.set_axis(node->axis);
+
+    if (node->nPrimitives > 0) { /* it's a leaf */
+        return;
+    }
+
+    if (root->left == nullptr) {
+        proto_node.set_left_ref(root->idx + 1);
+    }
+
+    if (root->right) {
+        proto_node.set_right_ref(node->secondChildOffset);
+    }
+
+    writer.write(proto_node);
+
+    DumpTreelet(root->left, writer);
+    DumpTreelet(root->right, writer);
+}
+
+void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) const {
+    std::cerr << "Dumping BVH... ";
+
+    std::queue<int> top_queue;
+    top_queue.push(0);
+
+    while (not top_queue.empty()) {
+        const int current_root = top_queue.front(); top_queue.pop();
+
+        std::vector<std::shared_ptr<TreeletNode>> treelet_nodes;
+        std::queue<std::pair<int, std::shared_ptr<TreeletNode> *>> queue;
+        queue.push(std::make_pair(current_root, nullptr));
+
+        while(not queue.empty()) {
+            const auto node_data = queue.front();
+            const int node_index = node_data.first;
+            std::shared_ptr<TreeletNode> * node_parent = node_data.second;
+
+            queue.pop();
+            const LinearBVHNode *node = &nodes[node_index];
+
+            treelet_nodes.push_back(std::make_shared<TreeletNode>(node_index));
+            std::shared_ptr<TreeletNode> parent = treelet_nodes.back();
+
+            if (node_parent != nullptr) {
+                *node_parent = parent;
+            }
+
+            if (node->nPrimitives == 0) {
+                const LinearBVHNode *left_child = &nodes[node_index + 1];
+                const LinearBVHNode *right_child = &nodes[node->secondChildOffset];
+
+                if (left_child->nPrimitives > 0) {
+                    treelet_nodes.push_back(std::make_shared<TreeletNode>(node_index + 1));
+                    parent->left = treelet_nodes.back();
+                }
+                else {
+                    queue.push(std::make_pair(node_index + 1, &parent->left));
+                }
+
+                if (right_child->nPrimitives > 0) {
+                    treelet_nodes.push_back(std::make_shared<TreeletNode>(node->secondChildOffset));
+                    parent->right = treelet_nodes.back();
+                }
+                else {
+                    queue.push(std::make_pair(node->secondChildOffset, &parent->right));
+                }
+            }
+
+            if (treelet_nodes.size() >= max_treelet_nodes) {
+                break;
+            }
+        }
+
+        /* (1) save the treelet */
+        protobuf::RecordWriter writer(path + "/" + std::to_string(current_root));
+        DumpTreelet(treelet_nodes[0], writer);
+
+        /* (2) update the queue */
+        while(not queue.empty()) {
+            top_queue.push(queue.front().first);
+            queue.pop();
+        }
+    }
+
+    std::cerr << "done." << std::endl;
+}
+
+// message BVHNode {
+//   Bounds3f bounds = 1;
+//
+//   uint64 left_ref = 3;
+//
+//   oneof right {
+//     uint64 right_index = 4;
+//     uint64 right_ref = 5;
+//   }
+//
+//   uint32 axis = 6;
+// }
+
+
+// struct LinearBVHNode {
+//     Bounds3f bounds;
+//     union {
+//         int primitivesOffset;   // leaf
+//         int secondChildOffset;  // interior
+//     };
+//     uint16_t nPrimitives;  // 0 -> interior node
+//     uint8_t axis;          // interior node: xyz
+//     uint8_t pad[1];        // ensure 32 byte total size
+// };
 
 }  // namespace pbrt
