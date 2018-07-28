@@ -41,6 +41,7 @@
 #include <vector>
 #include <queue>
 #include <fstream>
+#include <tuple>
 
 #include "pbrt.pb.h"
 #include "messages/utils.h"
@@ -767,7 +768,7 @@ std::shared_ptr<BVHAccel> CreateBVHAccelerator(
     std::string dump_path = ps.FindOneString("dumppath", "");
 
     if (dump_path.length()) {
-        res->Dump(dump_path, 50000);
+        res->Dump(dump_path, 10000);
     }
 
     return res;
@@ -795,16 +796,18 @@ void BVHAccel::DumpTreelet(const std::shared_ptr<TreeletNode> root,
     *proto_node.mutable_bounds() = to_protobuf(node->bounds);
     proto_node.set_axis(node->axis);
 
-    if (node->nPrimitives > 0) { /* it's a leaf */
-        return;
-    }
-
-    if (root->left == nullptr) {
+    if (root->left == nullptr and node->nPrimitives == 0) {
         proto_node.set_left_ref(root->idx + 1);
     }
+    else {
+        proto_node.set_left_ref(-1);
+    }
 
-    if (root->right) {
+    if (root->right == nullptr and node->nPrimitives == 0) {
         proto_node.set_right_ref(node->secondChildOffset);
+    }
+    else {
+        proto_node.set_right_ref(-1);
     }
 
     writer.write(proto_node);
@@ -823,13 +826,13 @@ void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) con
         const int current_root = top_queue.front(); top_queue.pop();
 
         std::vector<std::shared_ptr<TreeletNode>> treelet_nodes;
-        std::queue<std::pair<int, std::shared_ptr<TreeletNode> *>> queue;
-        queue.push(std::make_pair(current_root, nullptr));
+        std::queue<std::tuple<int, std::shared_ptr<TreeletNode>, bool>> queue;
+        queue.push(std::make_tuple(current_root, nullptr, false));
 
         while(not queue.empty()) {
             const auto node_data = queue.front();
-            const int node_index = node_data.first;
-            std::shared_ptr<TreeletNode> * node_parent = node_data.second;
+            const int node_index = std::get<0>(node_data);
+            std::shared_ptr<TreeletNode> node_parent = std::get<1>(node_data);
 
             queue.pop();
             const LinearBVHNode *node = &nodes[node_index];
@@ -838,7 +841,10 @@ void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) con
             std::shared_ptr<TreeletNode> parent = treelet_nodes.back();
 
             if (node_parent != nullptr) {
-                *node_parent = parent;
+                if (std::get<2>(node_data))
+                    node_parent->left = parent;
+                else
+                    node_parent->right = parent;
             }
 
             if (node->nPrimitives == 0) {
@@ -850,7 +856,7 @@ void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) con
                     parent->left = treelet_nodes.back();
                 }
                 else {
-                    queue.push(std::make_pair(node_index + 1, &parent->left));
+                    queue.push(std::make_tuple(node_index + 1, parent, true));
                 }
 
                 if (right_child->nPrimitives > 0) {
@@ -858,7 +864,7 @@ void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) con
                     parent->right = treelet_nodes.back();
                 }
                 else {
-                    queue.push(std::make_pair(node->secondChildOffset, &parent->right));
+                    queue.push(std::make_tuple(node->secondChildOffset, parent, false));
                 }
             }
 
@@ -873,7 +879,7 @@ void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) con
 
         /* (2) update the queue */
         while(not queue.empty()) {
-            top_queue.push(queue.front().first);
+            top_queue.push(std::get<0>(queue.front()));
             queue.pop();
         }
     }

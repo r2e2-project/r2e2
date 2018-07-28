@@ -42,6 +42,7 @@
 
 // API Additional Headers
 #include "accelerators/bvh.h"
+#include "accelerators/cloudbvh.h"
 #include "accelerators/kdtreeaccel.h"
 #include "cameras/environment.h"
 #include "cameras/orthographic.h"
@@ -780,6 +781,8 @@ std::shared_ptr<Primitive> MakeAccelerator(
         accel = CreateBVHAccelerator(std::move(prims), paramSet);
     else if (name == "kdtree")
         accel = CreateKdTreeAccelerator(std::move(prims), paramSet);
+    else if (name == "cloudbvh")
+        accel = CreateCloudBVH(paramSet);
     else
         Warning("Accelerator \"%s\" unknown.", name.c_str());
     paramSet.ReportUnused();

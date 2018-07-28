@@ -20,7 +20,6 @@ void RecordWriter::write_empty() {
 
 RecordReader::RecordReader(const std::string & filename)
     : fin_(CheckSystemCall(filename, open(filename.c_str(), O_RDONLY, 0))) {
-
     eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
 }
 

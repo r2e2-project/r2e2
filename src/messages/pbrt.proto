@@ -15,7 +15,7 @@ message Bounds3f {
 
 message BVHNode {
   Bounds3f bounds = 1;
-  uint64 left_ref = 2;
-  uint64 right_ref = 3;
+  int64 left_ref = 2;
+  int64 right_ref = 3;
   uint32 axis = 4;
 }

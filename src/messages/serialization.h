@@ -2,6 +2,7 @@
 #define PBRT_MESSAGES_SERIALIZATION_H
 
 #include <string>
+#include <iostream>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
@@ -31,7 +32,7 @@ public:
     RecordReader(const std::string & filename);
 
     template<class ProtobufType>
-    bool read(ProtobufType & record);
+    bool read(ProtobufType * record);
     bool eof() const { return eof_; }
 
 private:
@@ -52,17 +53,18 @@ void RecordWriter::write(const ProtobufType & proto) {
 }
 
 template<class ProtobufType>
-bool RecordReader::read(ProtobufType & record) {
-    if (eof) { return false; }
+bool RecordReader::read(ProtobufType * record) {
+    if (eof_) { return false; }
 
     if (next_size_ == 0) {
+        eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
         return false;
     }
 
     google::protobuf::io::CodedInputStream::Limit message_limit =
         coded_input_.PushLimit(next_size_);
 
-    if (record.ParseFromCodedStream(&record)) {
+    if (record->ParseFromCodedStream(&coded_input_)) {
         coded_input_.PopLimit(message_limit);
         eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
         return true;
