@@ -886,30 +886,3 @@ void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) con
 
     std::cerr << "done." << std::endl;
 }
-
-// message BVHNode {
-//   Bounds3f bounds = 1;
-//
-//   uint64 left_ref = 3;
-//
-//   oneof right {
-//     uint64 right_index = 4;
-//     uint64 right_ref = 5;
-//   }
-//
-//   uint32 axis = 6;
-// }
-
-
-// struct LinearBVHNode {
-//     Bounds3f bounds;
-//     union {
-//         int primitivesOffset;   // leaf
-//         int secondChildOffset;  // interior
-//     };
-//     uint16_t nPrimitives;  // 0 -> interior node
-//     uint8_t axis;          // interior node: xyz
-//     uint8_t pad[1];        // ensure 32 byte total size
-// };
-
-}  // namespace pbrt
