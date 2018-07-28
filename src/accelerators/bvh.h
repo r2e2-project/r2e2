@@ -70,8 +70,6 @@ class BVHAccel : public Aggregate {
     bool IntersectP(const Ray &ray) const;
 
     void Dump(const std::string &path, const size_t max_treelet_nodes) const;
-    void DumpTreelet(const std::shared_ptr<TreeletNode> root,
-                     protobuf::RecordWriter & writer) const;
 
   private:
     // BVHAccel Private Methods
@@ -93,6 +91,9 @@ class BVHAccel : public Aggregate {
                                 std::vector<BVHBuildNode *> &treeletRoots,
                                 int start, int end, int *totalNodes) const;
     int flattenBVHTree(BVHBuildNode *node, int *offset);
+
+    void DumpTreelet(const std::shared_ptr<TreeletNode> root,
+                     protobuf::RecordWriter & writer) const;
 
     // BVHAccel Private Data
     const int maxPrimsInNode;
