@@ -886,3 +886,5 @@ void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) con
 
     std::cerr << "done." << std::endl;
 }
+
+}
