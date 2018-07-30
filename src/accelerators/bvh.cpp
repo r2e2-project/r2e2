@@ -202,6 +202,7 @@ BVHAccel::BVHAccel(std::vector<std::shared_ptr<Primitive>> p,
         primitiveInfo[i] = {i, primitives[i]->WorldBound()};
 
     // Build BVH tree for primitives using _primitiveInfo_
+    int totalNodes = 0;
     MemoryArena arena(1024 * 1024);
     std::vector<std::shared_ptr<Primitive>> orderedPrims;
     orderedPrims.reserve(primitives.size());
@@ -226,6 +227,7 @@ BVHAccel::BVHAccel(std::vector<std::shared_ptr<Primitive>> p,
                  primitives.size() * sizeof(primitives[0]);
     nodes = AllocAligned<LinearBVHNode>(totalNodes);
     int offset = 0;
+    nodeCount = totalNodes;
     flattenBVHTree(root, &offset);
     CHECK_EQ(totalNodes, offset);
 }
@@ -767,122 +769,119 @@ std::shared_ptr<BVHAccel> CreateBVHAccelerator(
     std::string dump_path = ps.FindOneString("dumppath", "");
 
     if (dump_path.length()) {
-        res->Dump(dump_path, 10000);
+        res->Dump(dump_path, 50000);
     }
 
     return res;
 }
 
-struct TreeletNode {
-    const int idx;
-    std::shared_ptr<TreeletNode> left {};
-    std::shared_ptr<TreeletNode> right {};
+void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const {
+    uint32_t current_treelet = 0;
+    uint32_t current_treelet_size = 0;
 
-    TreeletNode(const int node_idx)
-        : idx(node_idx) {}
-};
+    for (int node_index = 0; node_index < nodeCount; node_index++) {
+        if (labels[node_index]) {
+            continue; /* already assigned to a treelet */
+        }
 
-void BVHAccel::DumpTreelet(const std::shared_ptr<TreeletNode> root,
+        current_treelet++;
+        std::queue<int> queue;
+        queue.push(node_index);
+        current_treelet_size = 0;
+
+        while(not queue.empty()) {
+            const int current = queue.front();
+            queue.pop();
+
+            labels[current] = current_treelet;
+            current_treelet_size++;
+            const LinearBVHNode & node = nodes[current];
+
+            if (not node.nPrimitives) {
+                if (not labels[current + 1]) {
+                    queue.push(current + 1);
+                }
+
+                if (not labels[node.secondChildOffset]) {
+                    queue.push(node.secondChildOffset);
+                }
+            }
+
+            if (current_treelet_size >= max_nodes) {
+                break;
+            }
+        }
+    }
+}
+
+void BVHAccel::dumpTreelet(const int root_index, uint32_t * labels,
                            protobuf::RecordWriter & writer) const {
-    if (root == nullptr) {
+    protobuf::BVHNode proto_node;
+    const LinearBVHNode & node = nodes[root_index];
+    const uint32_t current_treelet = labels[root_index];
+
+    labels[root_index] = 0;
+
+    *proto_node.mutable_bounds() = to_protobuf(node.bounds);
+    proto_node.set_axis(node.axis);
+
+    if (node.nPrimitives > 0) {
+        writer.write(proto_node);
+        writer.write_empty();
         writer.write_empty();
         return;
     }
 
-    const LinearBVHNode * node = &nodes[root->idx];
-    protobuf::BVHNode proto_node;
-
-    *proto_node.mutable_bounds() = to_protobuf(node->bounds);
-    proto_node.set_axis(node->axis);
-
-    if (root->left == nullptr and node->nPrimitives == 0) {
-        proto_node.set_left_ref(root->idx + 1);
-    }
-    else {
-        proto_node.set_left_ref(-1);
+    if (labels[root_index + 1] != current_treelet) {
+        proto_node.set_left_ref(root_index + 1);
     }
 
-    if (root->right == nullptr and node->nPrimitives == 0) {
-        proto_node.set_right_ref(node->secondChildOffset);
-    }
-    else {
-        proto_node.set_right_ref(-1);
+    if (labels[node.secondChildOffset] != current_treelet) {
+        proto_node.set_right_ref(node.secondChildOffset);
     }
 
     writer.write(proto_node);
 
-    DumpTreelet(root->left, writer);
-    DumpTreelet(root->right, writer);
+    if (labels[root_index + 1] != current_treelet) {
+        writer.write_empty();
+    }
+    else {
+        dumpTreelet(root_index + 1, labels, writer);
+    }
+
+    if (labels[node.secondChildOffset] != current_treelet) {
+        writer.write_empty();
+    }
+    else {
+        dumpTreelet(node.secondChildOffset, labels, writer);
+    }
+
+}
+
+void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels) const {
+    for (int node_index = 0; node_index < nodeCount; node_index++) {
+        if (not labels[node_index]) {
+            continue; /* we've already written this node to disk */
+        }
+
+        uint32_t current_treelet = labels[node_index];
+
+        /* now we dump the nodes in preorder */
+        protobuf::RecordWriter writer(path + "/" + std::to_string(node_index));
+        dumpTreelet(node_index, labels, writer);
+    }
 }
 
 void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) const {
     std::cerr << "Dumping BVH... ";
 
-    std::queue<int> top_queue;
-    top_queue.push(0);
+    /* (1) assign each node to a treelet */
+    std::unique_ptr<uint32_t[]> treelet_labels {new uint32_t[nodeCount]};
+    memset(treelet_labels.get(), 0, nodeCount * sizeof(uint32_t));
+    assignTreelets(treelet_labels.get(), max_treelet_nodes);
 
-    while (not top_queue.empty()) {
-        const int current_root = top_queue.front(); top_queue.pop();
-
-        std::vector<std::shared_ptr<TreeletNode>> treelet_nodes;
-        std::queue<std::tuple<int, std::shared_ptr<TreeletNode>, bool>> queue;
-        queue.push(std::make_tuple(current_root, nullptr, false));
-
-        while(not queue.empty()) {
-            const auto node_data = queue.front();
-            const int node_index = std::get<0>(node_data);
-            std::shared_ptr<TreeletNode> node_parent = std::get<1>(node_data);
-
-            queue.pop();
-            const LinearBVHNode *node = &nodes[node_index];
-
-            treelet_nodes.push_back(std::make_shared<TreeletNode>(node_index));
-            std::shared_ptr<TreeletNode> parent = treelet_nodes.back();
-
-            if (node_parent != nullptr) {
-                if (std::get<2>(node_data))
-                    node_parent->left = parent;
-                else
-                    node_parent->right = parent;
-            }
-
-            if (node->nPrimitives == 0) {
-                const LinearBVHNode *left_child = &nodes[node_index + 1];
-                const LinearBVHNode *right_child = &nodes[node->secondChildOffset];
-
-                if (left_child->nPrimitives > 0) {
-                    treelet_nodes.push_back(std::make_shared<TreeletNode>(node_index + 1));
-                    parent->left = treelet_nodes.back();
-                }
-                else {
-                    queue.push(std::make_tuple(node_index + 1, parent, true));
-                }
-
-                if (right_child->nPrimitives > 0) {
-                    treelet_nodes.push_back(std::make_shared<TreeletNode>(node->secondChildOffset));
-                    parent->right = treelet_nodes.back();
-                }
-                else {
-                    queue.push(std::make_tuple(node->secondChildOffset, parent, false));
-                }
-            }
-
-            if (treelet_nodes.size() >= max_treelet_nodes) {
-                break;
-            }
-        }
-
-        /* (1) save the treelet */
-        protobuf::RecordWriter writer(path + "/" + std::to_string(current_root));
-        DumpTreelet(treelet_nodes[0], writer);
-
-        /* (2) update the queue */
-        while(not queue.empty()) {
-            top_queue.push(std::get<0>(queue.front()));
-            queue.pop();
-        }
-    }
-
+    /* (2) dump the treelets to disk */
+    dumpTreelets(path, treelet_labels.get());
     std::cerr << "done." << std::endl;
 }
 

@@ -52,7 +52,6 @@ struct BVHBuildNode;
 struct BVHPrimitiveInfo;
 struct MortonPrimitive;
 struct LinearBVHNode;
-struct TreeletNode;
 
 // BVHAccel Declarations
 class BVHAccel : public Aggregate {
@@ -92,7 +91,9 @@ class BVHAccel : public Aggregate {
                                 int start, int end, int *totalNodes) const;
     int flattenBVHTree(BVHBuildNode *node, int *offset);
 
-    void DumpTreelet(const std::shared_ptr<TreeletNode> root,
+    void assignTreelets(uint32_t * labels, const uint32_t max_nodes) const;
+    void dumpTreelets(const std::string & path, uint32_t * labels) const;
+    void dumpTreelet(const int root_index, uint32_t * labels,
                      protobuf::RecordWriter & writer) const;
 
     // BVHAccel Private Data
@@ -100,7 +101,7 @@ class BVHAccel : public Aggregate {
     const SplitMethod splitMethod;
     std::vector<std::shared_ptr<Primitive>> primitives;
     LinearBVHNode *nodes = nullptr;
-    int totalNodes;
+    int nodeCount;
 };
 
 std::shared_ptr<BVHAccel> CreateBVHAccelerator(
