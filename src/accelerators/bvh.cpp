@@ -203,7 +203,6 @@ BVHAccel::BVHAccel(std::vector<std::shared_ptr<Primitive>> p,
 
     // Build BVH tree for primitives using _primitiveInfo_
     MemoryArena arena(1024 * 1024);
-    int totalNodes = 0;
     std::vector<std::shared_ptr<Primitive>> orderedPrims;
     orderedPrims.reserve(primitives.size());
     BVHBuildNode *root;
