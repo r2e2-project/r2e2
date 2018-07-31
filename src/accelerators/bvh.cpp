@@ -40,6 +40,7 @@
 #include <algorithm>
 #include <vector>
 #include <queue>
+#include <stack>
 #include <fstream>
 #include <tuple>
 
@@ -816,46 +817,44 @@ void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const
 
 void BVHAccel::dumpTreelet(const int root_index, uint32_t * labels,
                            protobuf::RecordWriter & writer) const {
-    protobuf::BVHNode proto_node;
-    const LinearBVHNode & node = nodes[root_index];
     const uint32_t current_treelet = labels[root_index];
+    std::stack<int> q;
+    q.push(root_index);
 
-    labels[root_index] = 0;
+    while (not q.empty()) {
+        const int node_index = q.top();
+        q.pop();
 
-    *proto_node.mutable_bounds() = to_protobuf(node.bounds);
-    proto_node.set_axis(node.axis);
+        const LinearBVHNode & node = nodes[node_index];
+        labels[node_index] = 0; /* it's dumped */
 
-    if (node.nPrimitives > 0) {
+        protobuf::BVHNode proto_node;
+        *proto_node.mutable_bounds() = to_protobuf(node.bounds);
+        proto_node.set_axis(node.axis);
+
+        if (node.nPrimitives > 0) {
+            writer.write(proto_node);
+            writer.write_empty();
+            writer.write_empty();
+            continue;
+        }
+
+        if (labels[node.secondChildOffset] != current_treelet) {
+            proto_node.set_right_ref(node.secondChildOffset);
+        }
+        else {
+            q.push(node.secondChildOffset);
+        }
+
+        if (labels[node_index + 1] != current_treelet) {
+            proto_node.set_left_ref(node_index + 1);
+        }
+        else {
+            q.push(node_index + 1);
+        }
+
         writer.write(proto_node);
-        writer.write_empty();
-        writer.write_empty();
-        return;
     }
-
-    if (labels[root_index + 1] != current_treelet) {
-        proto_node.set_left_ref(root_index + 1);
-    }
-
-    if (labels[node.secondChildOffset] != current_treelet) {
-        proto_node.set_right_ref(node.secondChildOffset);
-    }
-
-    writer.write(proto_node);
-
-    if (labels[root_index + 1] != current_treelet) {
-        writer.write_empty();
-    }
-    else {
-        dumpTreelet(root_index + 1, labels, writer);
-    }
-
-    if (labels[node.secondChildOffset] != current_treelet) {
-        writer.write_empty();
-    }
-    else {
-        dumpTreelet(node.secondChildOffset, labels, writer);
-    }
-
 }
 
 void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels) const {
@@ -863,8 +862,6 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels) const {
         if (not labels[node_index]) {
             continue; /* we've already written this node to disk */
         }
-
-        uint32_t current_treelet = labels[node_index];
 
         /* now we dump the nodes in preorder */
         protobuf::RecordWriter writer(path + "/" + std::to_string(node_index));
