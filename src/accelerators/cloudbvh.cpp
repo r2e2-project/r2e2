@@ -1,5 +1,7 @@
 #include "accelerators/cloudbvh.h"
 
+#include <stack>
+
 #include "paramset.h"
 #include "pbrt.pb.h"
 #include "primitive.h"
@@ -13,109 +15,128 @@ namespace pbrt {
 CloudBVH::CloudBVH(const std::string & bvh_root)
     : bvh_root_(bvh_root) {}
 
-int CloudBVH::LoadTreelet(const int root_id,
-                          protobuf::RecordReader & reader) const {
-    protobuf::BVHNode proto_node;
-    if (not reader.read(&proto_node)) {
-        return -1;
-    }
-
-    Bounds3f bounds = from_protobuf(proto_node.bounds());
-    uint8_t axis = proto_node.axis();
-    trees_[root_id].push_back(std::move(std::make_shared<XTreeletNode>(bounds, axis)));
-    const int index = trees_[root_id].size() - 1;
-    std::shared_ptr<XTreeletNode> node(trees_[root_id].back());
-
-    node->left_ref = proto_node.left_ref();
-    node->right_ref = proto_node.right_ref();
-    node->left = LoadTreelet(root_id, reader);
-    node->right = LoadTreelet(root_id, reader);
-
-    if (node->left == -1 and node->right == -1 and
-        node->left_ref == -1 and node->right_ref == -1) {
-
-        std::pair<int, int> cache_key = std::make_pair(root_id, index);
-
-        if (loaded_prims_.count(cache_key)) {
-            node->primitivesOffset = loaded_prims_[cache_key].first;
-            node->nPrimitives = loaded_prims_[cache_key].second;
-            return index;
-        }
-
-        const Bounds3f bb = node->bounds;
-
-        /* let's make the primitives... */
-        node->primitivesOffset = primitives_.size();
-
-        const Point3f vertices[] = {
-            bb.pMin,
-            {bb.pMax.x, bb.pMin.y, bb.pMin.z},
-            {bb.pMax.x, bb.pMax.y, bb.pMin.z},
-            {bb.pMin.x, bb.pMax.y, bb.pMin.z},
-            {bb.pMin.x, bb.pMin.y, bb.pMax.z},
-            {bb.pMax.x, bb.pMin.y, bb.pMax.z},
-            bb.pMax,
-            {bb.pMin.x, bb.pMax.y, bb.pMax.z}
-        };
-
-        const int triangles[] = {
-                    0, 1, 2,    0, 2, 3,
-                    4, 5, 6,    4, 6, 7,
-                    2, 3, 6,    3, 6, 7,
-                    0, 3, 4,    3, 4, 7,
-                    1, 5, 6,    1, 2, 6,
-                    0, 1, 5,    0, 4, 5
-                };
-
-        auto shapes = CreateTriangleMesh(&identity_transform_, &identity_transform_,
-                                         false, 12, triangles, 8, vertices, nullptr,
-                                         nullptr, nullptr, nullptr, nullptr);
-
-        std::unique_ptr<Float[]> color(new Float[3]);
-        color[0] = ((root_id * 1) % 9) / 8.f;
-        color[1] = ((root_id * 7 + 101) % 9) / 8.f;
-        color[2] = ((root_id * 19 + 2138) % 9) / 8.f;
-
-        ParamSet emptyParams;
-        ParamSet params;
-        params.AddRGBSpectrum("Kd", move(color), 3);
-        MediumInterface mediumInterface;
-
-        std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
-        std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
-        TextureParams textureParams(params, emptyParams, fTex, sTex);
-        std::shared_ptr<Material> material(CreateMatteMaterial(textureParams));
-
-        for (auto shape : shapes) {
-            primitives_.push_back(std::make_shared<GeometricPrimitive>(shape, material, nullptr, mediumInterface));
-        }
-
-        node->nPrimitives = shapes.size();
-
-        loaded_prims_[cache_key] = std::make_pair(node->primitivesOffset, node->nPrimitives);
-    }
-
-    return index;
-}
-
 Bounds3f CloudBVH::WorldBound() const {
     static bool got_it = false;
 
     if (not got_it) {
-        LoadTreelet(0);
+        loadTreelet(0);
         got_it = true;
     }
 
-    return trees_[0][0]->bounds;
+    return trees_[0][0].bounds;
 }
 
-void CloudBVH::LoadTreelet(const int root_id) const {
+void CloudBVH::createPrimitives(const int tree_id, TreeletNode & node) const {
+    auto & primitives = primitives_[tree_id];
+    const Bounds3f & bb = node.bounds;
+
+    /* let's make the primitives... */
+    node.primitives_offset = primitives.size();
+
+    const Point3f vertices[] = {
+        bb.pMin,
+        {bb.pMax.x, bb.pMin.y, bb.pMin.z},
+        {bb.pMax.x, bb.pMax.y, bb.pMin.z},
+        {bb.pMin.x, bb.pMax.y, bb.pMin.z},
+        {bb.pMin.x, bb.pMin.y, bb.pMax.z},
+        {bb.pMax.x, bb.pMin.y, bb.pMax.z},
+        bb.pMax,
+        {bb.pMin.x, bb.pMax.y, bb.pMax.z}
+    };
+
+    const int triangles[] = {
+        0, 1, 2,    0, 2, 3,    4, 5, 6,    4, 6, 7,    2, 3, 6,    3, 6, 7,
+        0, 3, 4,    3, 4, 7,    1, 5, 6,    1, 2, 6,    0, 1, 5,    0, 4, 5
+    };
+
+    auto shapes = CreateTriangleMesh(&identity_transform_, &identity_transform_,
+                                     false, 12, triangles, 8, vertices, nullptr,
+                                     nullptr, nullptr, nullptr, nullptr);
+
+    std::unique_ptr<Float[]> color(new Float[3]);
+    color[0] = ((tree_id * 1) % 9) / 8.f;
+    color[1] = ((tree_id * 7 + 101) % 9) / 8.f;
+    color[2] = ((tree_id * 19 + 2138) % 9) / 8.f;
+
+    ParamSet emptyParams;
+    ParamSet params;
+    params.AddRGBSpectrum("Kd", move(color), 3);
+    MediumInterface mediumInterface;
+
+    std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
+    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
+    TextureParams textureParams(params, emptyParams, fTex, sTex);
+    std::shared_ptr<Material> material(CreateMatteMaterial(textureParams));
+
+    for (auto shape : shapes) {
+        primitives.push_back(std::move(std::make_shared<GeometricPrimitive>(shape, material, nullptr, mediumInterface)));
+    }
+
+    node.primitives_count = shapes.size();
+}
+
+void CloudBVH::loadTreelet(const int root_id) const {
     if (trees_.count(root_id)) {
-        return;
+        return; /* this tree is already loaded */
     }
 
     protobuf::RecordReader reader(bvh_root_ + "/" + std::to_string(root_id));
-    LoadTreelet(root_id, reader);
+    std::vector<TreeletNode> & nodes = trees_[root_id];
+
+    std::stack<std::pair<int, Child>> q;
+
+    while(not reader.eof()) {
+        protobuf::BVHNode proto_node;
+        if (not reader.read(&proto_node)) {
+            auto parent = q.top();
+            q.pop();
+
+            if (not nodes[parent.first].has[parent.second] and
+                nodes[parent.first].child[parent.second]) {
+                continue;
+            }
+
+            nodes[parent.first].has[parent.second] = false;
+            nodes[parent.first].child[parent.second] = 0;
+
+            if (not nodes[parent.first].has[LEFT] and
+                not nodes[parent.first].has[RIGHT] and
+                not nodes[parent.first].child[LEFT] and
+                not nodes[parent.first].child[RIGHT]) {
+                /* this is a terminal node, we create the primitives now */
+                createPrimitives(root_id, nodes[parent.first]);
+            }
+
+            continue;
+        }
+
+        TreeletNode node(from_protobuf(proto_node.bounds()), proto_node.axis());
+
+        if (proto_node.left_ref()) {
+            node.has[LEFT] = false;
+            node.child[LEFT] = proto_node.left_ref();
+        }
+
+        if (proto_node.right_ref()) {
+            node.has[RIGHT] = false;
+            node.child[RIGHT] = proto_node.right_ref();
+        }
+
+        /* XXX not thread-safe */
+        const int index = nodes.size();
+        nodes.push_back(node);
+
+        if (not q.empty()) {
+            auto parent = q.top();
+            q.pop();
+
+            nodes[parent.first].has[parent.second] = true;
+            nodes[parent.first].child[parent.second] = index;
+        }
+
+        q.emplace(index, RIGHT);
+        q.emplace(index, LEFT);
+    }
 }
 
 bool CloudBVH::Intersect(const Ray &ray, SurfaceInteraction *isect) const {
@@ -124,68 +145,44 @@ bool CloudBVH::Intersect(const Ray &ray, SurfaceInteraction *isect) const {
     int dirIsNeg[3] = {invDir.x < 0, invDir.y < 0, invDir.z < 0};
 
     // Follow ray through BVH nodes to find primitive intersections
-    int toVisitOffset = 0, currentNodeIndex = 0;
-    std::pair<int, int> nodesToVisit[64];
+    std::pair<int, int> toVisit[64];
+    int toVisitOffset = 0;
 
-    std::pair<int, int> current = std::make_pair<int, int>(0, 0);
+    std::pair<int, int> current(0, 0);
 
     while (true) {
-        const int current_root = current.first;
-        LoadTreelet(current_root);
-        // std::cerr << trees_[current_root].size() << " " << current.second << std::endl;
-        auto node = trees_[current_root][current.second];
-        // std::cerr << node->left << "(" << node->left_ref << ") " << node->right << "(" << node->right_ref << ") <- " << current.second << std::endl;
+        loadTreelet(current.first);
+        auto & node = trees_[current.first][current.second];
 
         // Check ray against BVH node
-        if (node->bounds.IntersectP(ray, invDir, dirIsNeg)) {
-            if (node->nPrimitives > 0) {
-                for (int i = 0; i < node->nPrimitives; ++i)
-                    if (primitives_[node->primitivesOffset + i]->Intersect(ray, isect))
+        if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
+            if (node.primitives_count > 0) {
+                auto & primitives = primitives_[current.first];
+                for (int i = 0; i < node.primitives_count; ++i)
+                    if (primitives[node.primitives_offset + i]->Intersect(ray, isect))
                         hit = true;
 
                 if (toVisitOffset == 0) break;
-                current = nodesToVisit[--toVisitOffset];
+                current = toVisit[--toVisitOffset];
             } else {
-                // Put far BVH node on _nodesToVisit_ stack, advance to near
-                // node
-                if (dirIsNeg[node->axis]) {
-                    if (node->left == -1) {
-                        nodesToVisit[toVisitOffset++] =
-                            std::make_pair(node->left_ref, 0);
-                    }
-                    else {
-                        nodesToVisit[toVisitOffset++] =
-                            std::make_pair(current_root, node->left);
-                    }
+                std::pair<int, int> children[2];
+                for(int i = 0; i < 2; i++) {
+                    children[i].first = node.has[i] ? current.first : node.child[i];
+                    children[i].second = node.has[i] ? node.child[i] : 0;
+                }
 
-                    if (node->right == -1) {
-                        current = std::make_pair(node->right_ref, 0);
-                    }
-                    else {
-                        current = std::make_pair(current_root, node->right);
-                    }
-
-                } else {
-                    if (node->right == -1) {
-                        current = std::make_pair(node->right_ref, 0);
-                    }
-                    else {
-                        current = std::make_pair(current_root, node->right);
-                    }
-
-                    if (node->left == -1) {
-                        nodesToVisit[toVisitOffset++] =
-                            std::make_pair(node->left_ref, 0);
-                    }
-                    else {
-                        nodesToVisit[toVisitOffset++] =
-                            std::make_pair(current_root, node->left);
-                    }
+                if (dirIsNeg[node.axis]) {
+                    toVisit[toVisitOffset++] = children[LEFT];
+                    current = children[RIGHT];
+                }
+                else {
+                    toVisit[toVisitOffset++] = children[RIGHT];
+                    current = children[LEFT];
                 }
             }
         } else {
             if (toVisitOffset == 0) break;
-            current = nodesToVisit[--toVisitOffset];
+            current = toVisit[--toVisitOffset];
         }
     }
 
@@ -193,77 +190,52 @@ bool CloudBVH::Intersect(const Ray &ray, SurfaceInteraction *isect) const {
 }
 
 bool CloudBVH::IntersectP(const Ray &ray) const {
-    bool hit = false;
     Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
     int dirIsNeg[3] = {invDir.x < 0, invDir.y < 0, invDir.z < 0};
 
     // Follow ray through BVH nodes to find primitive intersections
     int toVisitOffset = 0, currentNodeIndex = 0;
-    std::pair<int, int> nodesToVisit[64];
+    std::pair<int, int> toVisit[64];
 
     std::pair<int, int> current = std::make_pair<int, int>(0, 0);
 
     while (true) {
         const int current_root = current.first;
-        LoadTreelet(current_root);
-        // std::cerr << trees_[current_root].size() << " " << current.second << std::endl;
-        auto node = trees_[current_root][current.second];
-        // std::cerr << node->left << "(" << node->left_ref << ") " << node->right << "(" << node->right_ref << ") <- " << current.second << std::endl;
+        loadTreelet(current_root);
+        auto & node = trees_[current_root][current.second];
 
         // Check ray against BVH node
-        if (node->bounds.IntersectP(ray, invDir, dirIsNeg)) {
-            if (node->nPrimitives > 0) {
-                for (int i = 0; i < node->nPrimitives; ++i)
-                    if (primitives_[node->primitivesOffset + i]->IntersectP(ray))
-                        hit = true;
+        if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
+            if (node.primitives_count > 0) {
+                for (int i = 0; i < node.primitives_count; ++i)
+                    if (primitives_[current_root][node.primitives_offset + i]->IntersectP(ray))
+                        return true;
 
                 if (toVisitOffset == 0) break;
-                current = nodesToVisit[--toVisitOffset];
+                current = toVisit[--toVisitOffset];
             } else {
-                // Put far BVH node on _nodesToVisit_ stack, advance to near
-                // node
-                if (dirIsNeg[node->axis]) {
-                    if (node->left == -1) {
-                        nodesToVisit[toVisitOffset++] =
-                            std::make_pair(node->left_ref, 0);
-                    }
-                    else {
-                        nodesToVisit[toVisitOffset++] =
-                            std::make_pair(current_root, node->left);
-                    }
+                std::pair<int, int> children[2];
+                for(int i = 0; i < 2; i++) {
+                    children[i].first = node.has[i] ? current_root : node.child[i];
+                    children[i].second = node.has[i] ? node.child[i] : 0;
+                }
 
-                    if (node->right == -1) {
-                        current = std::make_pair(node->right_ref, 0);
-                    }
-                    else {
-                        current = std::make_pair(current_root, node->right);
-                    }
-
-                } else {
-                    if (node->right == -1) {
-                        current = std::make_pair(node->right_ref, 0);
-                    }
-                    else {
-                        current = std::make_pair(current_root, node->right);
-                    }
-
-                    if (node->left == -1) {
-                        nodesToVisit[toVisitOffset++] =
-                            std::make_pair(node->left_ref, 0);
-                    }
-                    else {
-                        nodesToVisit[toVisitOffset++] =
-                            std::make_pair(current_root, node->left);
-                    }
+                if (dirIsNeg[node.axis]) {
+                    toVisit[toVisitOffset++] = children[LEFT];
+                    current = children[RIGHT];
+                }
+                else {
+                    toVisit[toVisitOffset++] = children[RIGHT];
+                    current = children[LEFT];
                 }
             }
         } else {
             if (toVisitOffset == 0) break;
-            current = nodesToVisit[--toVisitOffset];
+            current = toVisit[--toVisitOffset];
         }
     }
 
-    return hit;
+    return false;
 }
 
 std::shared_ptr<CloudBVH> CreateCloudBVH(const ParamSet &ps) {

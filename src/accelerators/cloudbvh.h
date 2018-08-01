@@ -11,22 +11,7 @@
 
 namespace pbrt {
 
-struct XTreeletNode {
-
-    Bounds3f bounds;
-    int left {-1};
-    int right {-1};
-
-    int left_ref {0};
-    int right_ref {0};
-
-    int primitivesOffset {0};
-    int nPrimitives {0};
-    uint8_t axis;
-
-    XTreeletNode(const Bounds3f & bounds, const uint8_t axis)
-        : bounds(bounds), axis(axis) {}
-};
+struct TreeletNode;
 
 class CloudBVH : public Aggregate {
 public:
@@ -38,15 +23,31 @@ public:
     bool IntersectP(const Ray &ray) const;
 
 private:
+    enum Child {
+        LEFT = 0, RIGHT = 1
+    };
+
+    struct TreeletNode {
+        Bounds3f bounds;
+        uint8_t axis;
+
+        bool has[2] = {true, true};
+        int child[2] = {0};
+
+        int primitives_offset {0};
+        uint16_t primitives_count {0};
+
+        TreeletNode(const Bounds3f & bounds, const uint8_t axis)
+            : bounds(bounds), axis(axis) {}
+    };
+
     const std::string bvh_root_;
 
-    mutable std::vector<std::shared_ptr<Primitive>> primitives_ {};
-    mutable std::map<int, std::vector<std::shared_ptr<XTreeletNode>>> trees_;
-    mutable std::map<std::pair<int, int>, std::pair<int, int>> loaded_prims_;
+    mutable std::map<int, std::vector<std::shared_ptr<Primitive>>> primitives_ {};
+    mutable std::map<int, std::vector<TreeletNode>> trees_;
 
-    int LoadTreelet(const int root_id,
-                    protobuf::RecordReader & reader) const;
-    void LoadTreelet(const int root_id) const;
+    void loadTreelet(const int root_id) const;
+    void createPrimitives(const int tree_id, TreeletNode & node) const;
 
     Transform identity_transform_;
 };
