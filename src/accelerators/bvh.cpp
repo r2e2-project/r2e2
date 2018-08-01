@@ -825,6 +825,11 @@ void BVHAccel::dumpTreelet(const int root_index, uint32_t * labels,
         const int node_index = q.top();
         q.pop();
 
+        if (node_index == -1) {
+            writer.write_empty();
+            continue;
+        }
+
         const LinearBVHNode & node = nodes[node_index];
         labels[node_index] = 0; /* it's dumped */
 
@@ -841,6 +846,7 @@ void BVHAccel::dumpTreelet(const int root_index, uint32_t * labels,
 
         if (labels[node.secondChildOffset] != current_treelet) {
             proto_node.set_right_ref(node.secondChildOffset);
+            q.push(-1);
         }
         else {
             q.push(node.secondChildOffset);
@@ -848,6 +854,7 @@ void BVHAccel::dumpTreelet(const int root_index, uint32_t * labels,
 
         if (labels[node_index + 1] != current_treelet) {
             proto_node.set_left_ref(node_index + 1);
+            q.push(-1);
         }
         else {
             q.push(node_index + 1);
