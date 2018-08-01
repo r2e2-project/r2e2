@@ -3,6 +3,7 @@
 
 #include <string>
 #include <iostream>
+#include <stdexcept>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
@@ -54,7 +55,7 @@ void RecordWriter::write(const ProtobufType & proto) {
 
 template<class ProtobufType>
 bool RecordReader::read(ProtobufType * record) {
-    if (eof_) { return false; }
+    if (eof_) { throw std::runtime_error("RecordReader: end of file reached"); }
 
     if (next_size_ == 0) {
         eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
