@@ -18,6 +18,9 @@ public:
     CloudBVH(const std::string & bvh_root);
     ~CloudBVH() {}
 
+    CloudBVH(const CloudBVH &) = delete;
+    CloudBVH & operator=(const CloudBVH &) = delete;
+
     Bounds3f WorldBound() const;
     bool Intersect(const Ray &ray, SurfaceInteraction *isect) const;
     bool IntersectP(const Ray &ray) const;
@@ -34,16 +37,13 @@ private:
         bool has[2] = {true, true};
         int child[2] = {0};
 
-        int primitives_offset {0};
-        uint16_t primitives_count {0};
+        std::vector<GeometricPrimitive> primitives {};
 
         TreeletNode(const Bounds3f & bounds, const uint8_t axis)
             : bounds(bounds), axis(axis) {}
     };
 
     const std::string bvh_root_;
-
-    mutable std::map<int, std::vector<std::shared_ptr<Primitive>>> primitives_ {};
     mutable std::map<int, std::vector<TreeletNode>> trees_;
 
     void loadTreelet(const int root_id) const;
