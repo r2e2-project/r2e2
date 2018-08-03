@@ -14,7 +14,7 @@ Sampler "halton" "integer pixelsamples" [8]
 
 Integrator "path"
 
-Accelerator "cloudbvh" "string loadpath" ["/tmp/bvh"]
+Accelerator "cloudbvh" "string loadpath" ["/tmp/killeroo-bvh"]
 
 WorldBegin
 

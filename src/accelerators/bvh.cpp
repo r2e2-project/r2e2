@@ -43,6 +43,8 @@
 #include <stack>
 #include <fstream>
 #include <tuple>
+#include <limits>
+#include <set>
 
 #include "pbrt.pb.h"
 #include "messages/utils.h"
@@ -770,49 +772,145 @@ std::shared_ptr<BVHAccel> CreateBVHAccelerator(
     std::string dump_path = ps.FindOneString("dumppath", "");
 
     if (dump_path.length()) {
-        res->Dump(dump_path, 50000);
+        res->Dump(dump_path, 10000);
     }
 
     return res;
 }
 
 void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const {
-    uint32_t current_treelet = 0;
-    uint32_t current_treelet_size = 0;
+    /* pass one */
+    std::unique_ptr<uint32_t []> subtree_footprint(new uint32_t[nodeCount]);
+    std::unique_ptr<float []> best_costs(new float[nodeCount]);
 
-    for (int node_index = 0; node_index < nodeCount; node_index++) {
-        if (labels[node_index]) {
-            continue; /* already assigned to a treelet */
+    for (int root_index = nodeCount - 1; root_index >= 0; root_index--) {
+        const LinearBVHNode & root_node = nodes[root_index];
+
+        if (root_node.nPrimitives) { /* leaf */
+            subtree_footprint[root_index] = 1;
+        }
+        else {
+            subtree_footprint[root_index] = 1 + subtree_footprint[root_index + 1]
+                                              + subtree_footprint[root_node.secondChildOffset];
         }
 
-        current_treelet++;
-        std::queue<int> queue;
-        queue.push(node_index);
-        current_treelet_size = 0;
+        std::set<int> cut;
+        cut.insert(root_index);
+        uint32_t remaining_size = max_nodes;
+        best_costs[root_index] = std::numeric_limits<float>::max();
 
-        while(not queue.empty()) {
-            const int current = queue.front();
-            queue.pop();
+        while (true) {
+            int best_node_index = -1;
+            float best_score = std::numeric_limits<float>::lowest();
 
-            labels[current] = current_treelet;
-            current_treelet_size++;
-            const LinearBVHNode & node = nodes[current];
-
-            if (not node.nPrimitives) {
-                if (not labels[current + 1]) {
-                    queue.push(current + 1);
-                }
-
-                if (not labels[node.secondChildOffset]) {
-                    queue.push(node.secondChildOffset);
+            if (remaining_size > 0) {
+                for (const auto n : cut) {
+                    const float gain = nodes[n].bounds.SurfaceArea();
+                    const uint32_t price = std::min(subtree_footprint[n], remaining_size);
+                    const float score = gain / price;
+                    if (score > best_score) {
+                        best_score = score;
+                        best_node_index = n;
+                    }
                 }
             }
 
-            if (current_treelet_size >= max_nodes) {
+            if (best_node_index == -1) {
+                break;
+            }
+
+            const LinearBVHNode & best_node = nodes[best_node_index];
+            cut.erase(best_node_index);
+            if (not best_node.nPrimitives) {
+                cut.insert(best_node_index + 1);
+                cut.insert(best_node.secondChildOffset);
+            }
+
+            remaining_size--;
+            float this_cost = root_node.bounds.SurfaceArea();
+            for (const auto n : cut) {
+                this_cost += best_costs[n];
+            }
+            best_costs[root_index] = std::min(best_costs[root_index], this_cost);
+        }
+    }
+
+    auto float_equals = [](const float a, const float b) {
+        return fabs(a - b) < 1e-4;
+    };
+
+    uint32_t current_treelet = 0;
+
+    std::stack<int> q;
+    q.push(0);
+
+    int node_count = 0;
+
+    while (not q.empty()) {
+        const int root_index = q.top();
+        q.pop();
+
+        current_treelet++;
+
+        const LinearBVHNode & root_node = nodes[root_index];
+        std::set<int> cut;
+        cut.insert(root_index);
+
+        uint32_t remaining_size = max_nodes;
+        const float best_cost = best_costs[root_index];
+
+        float cost = 0;
+        while (true) {
+            int best_node_index = -1;
+            float best_score = std::numeric_limits<float>::lowest();
+
+            if (remaining_size > 0) {
+                for (const auto n : cut) {
+                    const float gain = nodes[n].bounds.SurfaceArea();
+                    const uint32_t price = std::min(subtree_footprint[n], remaining_size);
+                    const float score = gain / price;
+                    if (score > best_score) {
+                        best_score = score;
+                        best_node_index = n;
+                    }
+                }
+            }
+
+            if (best_node_index == -1) {
+                break;
+            }
+
+            const LinearBVHNode & best_node = nodes[best_node_index];
+            cut.erase(best_node_index);
+            if (not best_node.nPrimitives) {
+                cut.insert(best_node_index + 1);
+                cut.insert(best_node.secondChildOffset);
+            }
+
+            labels[best_node_index] = current_treelet;
+            remaining_size--;
+
+            float this_cost = root_node.bounds.SurfaceArea();
+            for (const auto n : cut) {
+                this_cost += best_costs[n];
+            }
+
+            if (float_equals(this_cost, best_cost)) {
                 break;
             }
         }
+
+        for (const auto n : cut) {
+            q.push(n);
+        }
     }
+
+    /* make sure all of the nodes have a treelet */
+    /* for (int i = 0; i < nodeCount; i++) {
+        if (not labels[i]) {
+            throw std::runtime_error("unassigned node");
+        }
+    } */
 }
 
 void BVHAccel::dumpTreelet(const int root_index, uint32_t * labels,

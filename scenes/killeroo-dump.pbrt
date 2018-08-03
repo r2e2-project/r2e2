@@ -14,7 +14,7 @@ Sampler "halton" "integer pixelsamples" [8]
 
 Integrator "path"
 
-Accelerator "bvh" "string dumppath" ["/tmp/bvh"]
+Accelerator "bvh" "string dumppath" ["/tmp/killeroo-bvh"]
 
 WorldBegin
 
