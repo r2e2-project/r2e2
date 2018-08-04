@@ -783,6 +783,8 @@ void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const
     std::unique_ptr<uint32_t []> subtree_footprint(new uint32_t[nodeCount]);
     std::unique_ptr<float []> best_costs(new float[nodeCount]);
 
+    const float AREA_EPSILON = nodes[0].bounds.SurfaceArea() * max_nodes / (nodeCount * 10);
+
     for (int root_index = nodeCount - 1; root_index >= 0; root_index--) {
         const LinearBVHNode & root_node = nodes[root_index];
 
@@ -805,7 +807,7 @@ void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const
 
             if (remaining_size > 0) {
                 for (const auto n : cut) {
-                    const float gain = nodes[n].bounds.SurfaceArea();
+                    const float gain = nodes[n].bounds.SurfaceArea() + AREA_EPSILON;
                     const uint32_t price = std::min(subtree_footprint[n], remaining_size);
                     const float score = gain / price;
                     if (score > best_score) {
@@ -827,7 +829,7 @@ void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const
             }
 
             remaining_size--;
-            float this_cost = root_node.bounds.SurfaceArea();
+            float this_cost = root_node.bounds.SurfaceArea() + AREA_EPSILON;
             for (const auto n : cut) {
                 this_cost += best_costs[n];
             }
@@ -866,7 +868,7 @@ void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const
 
             if (remaining_size > 0) {
                 for (const auto n : cut) {
-                    const float gain = nodes[n].bounds.SurfaceArea();
+                    const float gain = nodes[n].bounds.SurfaceArea() + AREA_EPSILON;
                     const uint32_t price = std::min(subtree_footprint[n], remaining_size);
                     const float score = gain / price;
                     if (score > best_score) {
@@ -890,7 +892,7 @@ void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const
             labels[best_node_index] = current_treelet;
             remaining_size--;
 
-            float this_cost = root_node.bounds.SurfaceArea();
+            float this_cost = root_node.bounds.SurfaceArea() + AREA_EPSILON;
             for (const auto n : cut) {
                 this_cost += best_costs[n];
             }
