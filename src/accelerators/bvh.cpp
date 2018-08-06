@@ -769,10 +769,11 @@ std::shared_ptr<BVHAccel> CreateBVHAccelerator(
     int maxPrimsInNode = ps.FindOneInt("maxnodeprims", 4);
     auto res = std::make_shared<BVHAccel>(std::move(prims), maxPrimsInNode, splitMethod);
 
-    std::string dump_path = ps.FindOneString("dumppath", "");
+    const std::string dump_path = ps.FindOneString("dumppath", "");
+    const bool root_bvh = ps.FindOneBool("sceneaccelerator", false);
 
-    if (dump_path.length()) {
-        res->Dump(dump_path, 10000);
+    if (root_bvh and dump_path.length()) {
+        res->Dump(dump_path, 50000);
     }
 
     return res;

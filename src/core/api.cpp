@@ -1656,8 +1656,16 @@ void pbrtWorldEnd() {
 }
 
 Scene *RenderOptions::MakeScene() {
+    ParamSet allAcceleratorParams = AcceleratorParams;
+
+    /* SADJAD: add a flag, so the constructor can know this is the root
+    accelerator. used for dumping the BVH */
+    std::unique_ptr<bool[]> scene_accelerator_val(new bool[1]);
+    scene_accelerator_val[0] = true;
+    allAcceleratorParams.AddBool("sceneaccelerator", std::move(scene_accelerator_val), 1);
+
     std::shared_ptr<Primitive> accelerator =
-        MakeAccelerator(AcceleratorName, std::move(primitives), AcceleratorParams);
+        MakeAccelerator(AcceleratorName, std::move(primitives), allAcceleratorParams);
     if (!accelerator) accelerator = std::make_shared<BVHAccel>(primitives);
     Scene *scene = new Scene(accelerator, lights);
     // Erase primitives and lights from _RenderOptions_
