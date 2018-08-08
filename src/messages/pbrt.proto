@@ -19,3 +19,14 @@ message BVHNode {
   int64 right_ref = 3;
   uint32 axis = 4;
 }
+
+message Transform {
+  repeated float m = 1;
+}
+
+message AnimatedTransform {
+  Transform start_transform = 1;
+  Transform end_transform = 2;
+  float start_time = 3;
+  float end_time = 4;
+}
