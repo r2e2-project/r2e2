@@ -44,6 +44,8 @@
 #include "geometry.h"
 #include "quaternion.h"
 
+#include "pbrt.pb.h"
+
 namespace pbrt {
 
 // Matrix4x4 Declarations
@@ -446,6 +448,8 @@ class AnimatedTransform {
         }
     };
     DerivativeTerm c1[3], c2[3], c3[3], c4[3], c5[3];
+
+    friend protobuf::AnimatedTransform to_protobuf(const AnimatedTransform &);
 };
 
 }  // namespace pbrt

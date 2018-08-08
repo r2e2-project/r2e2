@@ -8,6 +8,17 @@ message Point3f {
   float z = 3;
 }
 
+message Matrix {
+  repeated float m = 1;
+}
+
+message AnimatedTransform {
+  Matrix start_transform = 1;
+  Matrix end_transform = 2;
+  float start_time = 3;
+  float end_time = 4;
+}
+
 message Bounds3f {
   Point3f point_min = 1;
   Point3f point_max = 2;
@@ -18,15 +29,8 @@ message BVHNode {
   int64 left_ref = 2;
   int64 right_ref = 3;
   uint32 axis = 4;
-}
 
-message Transform {
-  repeated float m = 1;
-}
-
-message AnimatedTransform {
-  Transform start_transform = 1;
-  Transform end_transform = 2;
-  float start_time = 3;
-  float end_time = 4;
+  oneof Transformed {
+    AnimatedTransform transform = 5;
+  }
 }
