@@ -20,6 +20,8 @@ WorldBegin
 
 LightSource "distant" "point from" [ 350 150 100 ] "blackbody L" [5000 2.5]
 
+Include "geometry/killeroo-object.pbrt"
+
 AttributeBegin
   Material "matte" "color Kd" [.5 .5 .8]
   Translate 0 0 -140
@@ -37,11 +39,11 @@ Rotate -60 0 0 1
     Material "plastic" "color Kd" [.4 .2 .2] "color Ks" [.5 .5 .5]
         "float roughness" [.025]
 Translate 100 200 -140
-    Include "geometry/killeroo.pbrt"
+    ObjectInstance "killeroo"
     Material "plastic" "color Ks" [.3 .3 .3] "color Kd" [.4 .5 .4]
         "float roughness" [.15]
 Translate -200 0 0
-    Include "geometry/killeroo.pbrt"
+    ObjectInstance "killeroo"
 AttributeEnd
 
 WorldEnd
