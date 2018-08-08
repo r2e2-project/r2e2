@@ -47,6 +47,12 @@
 
 namespace pbrt {
 
+enum class PrimitiveType {
+    Geometric,
+    Transformed,
+    Aggregate
+};
+
 // Primitive Declarations
 class Primitive {
   public:
@@ -61,6 +67,8 @@ class Primitive {
                                             MemoryArena &arena,
                                             TransportMode mode,
                                             bool allowMultipleLobes) const = 0;
+
+    virtual PrimitiveType GetType() const = 0;
 };
 
 // GeometricPrimitive Declarations
@@ -79,6 +87,8 @@ class GeometricPrimitive : public Primitive {
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
                                     MemoryArena &arena, TransportMode mode,
                                     bool allowMultipleLobes) const;
+
+    PrimitiveType GetType() const { return PrimitiveType::Geometric; }
 
   private:
     // GeometricPrimitive Private Data
@@ -109,6 +119,8 @@ class TransformedPrimitive : public Primitive {
         return PrimitiveToWorld.MotionBounds(primitive->WorldBound());
     }
 
+    PrimitiveType GetType() const { return PrimitiveType::Transformed; }
+
   private:
     // TransformedPrimitive Private Data
     std::shared_ptr<Primitive> primitive;
@@ -124,6 +136,8 @@ class Aggregate : public Primitive {
     void ComputeScatteringFunctions(SurfaceInteraction *isect,
                                     MemoryArena &arena, TransportMode mode,
                                     bool allowMultipleLobes) const;
+
+    PrimitiveType GetType() const { return PrimitiveType::Aggregate; }
 };
 
 }  // namespace pbrt
