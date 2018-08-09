@@ -917,68 +917,110 @@ void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const
     } */
 }
 
-void BVHAccel::dumpTreelet(const int root_index, uint32_t * labels,
-                           protobuf::RecordWriter & writer) const {
-    const uint32_t current_treelet = labels[root_index];
-    std::stack<int> q;
-    q.push(root_index);
+void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
+                            const size_t max_treelet_nodes,
+                            const size_t index_offset) const {
 
-    while (not q.empty()) {
-        const int node_index = q.top();
-        q.pop();
+    uint32_t nested_tree_offset = nodeCount;
+    std::map<BVHAccel *, size_t> bvh_instances;
 
-        if (node_index == -1) {
-            writer.write_empty();
-            continue;
-        }
-
-        const LinearBVHNode & node = nodes[node_index];
-        labels[node_index] = 0; /* it's dumped */
-
-        protobuf::BVHNode proto_node;
-        *proto_node.mutable_bounds() = to_protobuf(node.bounds);
-        proto_node.set_axis(node.axis);
-
-        if (node.nPrimitives > 0) {
-            writer.write(proto_node);
-            writer.write_empty();
-            writer.write_empty();
-            continue;
-        }
-
-        if (labels[node.secondChildOffset] != current_treelet) {
-            proto_node.set_right_ref(node.secondChildOffset);
-            q.push(-1);
-        }
-        else {
-            q.push(node.secondChildOffset);
-        }
-
-        if (labels[node_index + 1] != current_treelet) {
-            proto_node.set_left_ref(node_index + 1);
-            q.push(-1);
-        }
-        else {
-            q.push(node_index + 1);
-        }
-
-        writer.write(proto_node);
-    }
-}
-
-void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels) const {
-    for (int node_index = 0; node_index < nodeCount; node_index++) {
-        if (not labels[node_index]) {
+    for (int root_index = 0; root_index < nodeCount; root_index++) {
+        if (not labels[root_index]) {
             continue; /* we've already written this node to disk */
         }
 
-        /* now we dump the nodes in preorder */
-        protobuf::RecordWriter writer(path + "/" + std::to_string(node_index));
-        dumpTreelet(node_index, labels, writer);
+        protobuf::RecordWriter writer(path + "/" + std::to_string(root_index + index_offset));
+
+        const uint32_t current_treelet = labels[root_index];
+        std::stack<int> q;
+        q.push(root_index);
+
+        while (not q.empty()) {
+            const int node_index = q.top();
+            q.pop();
+
+            if (node_index == -1) {
+                writer.write_empty();
+                continue;
+            }
+
+            const LinearBVHNode & node = nodes[node_index];
+            labels[node_index] = 0; /* it's dumped */
+
+            protobuf::BVHNode proto_node;
+            *proto_node.mutable_bounds() = to_protobuf(node.bounds);
+            proto_node.set_axis(node.axis);
+
+            if (node.nPrimitives > 0) {
+                bool found_bvh = false;
+
+                /* sorry about the disgusting code */
+                for (int i = 0; i < node.nPrimitives; i++) {
+                    if (primitives[node.primitivesOffset + i]->GetType() == PrimitiveType::Transformed) {
+                        std::shared_ptr<TransformedPrimitive> tp =
+                            std::dynamic_pointer_cast<TransformedPrimitive>(primitives[node.primitivesOffset + i]);
+
+                        if (tp != nullptr and tp->GetBaseType() == PrimitiveType::Aggregate) {
+                            if (found_bvh) {
+                                throw std::runtime_error("only one aggregate primitive per node is supported");
+                            }
+
+                            if (index_offset != 0) {
+                                throw std::runtime_error("only one level of bvh instances is supported");
+                            }
+
+                            std::shared_ptr<BVHAccel> bvh =
+                                std::dynamic_pointer_cast<BVHAccel>(tp->GetPrimitive());
+
+                            if (bvh == nullptr) {
+                                throw std::runtime_error("primitive is not a BVH");
+                            }
+
+                            found_bvh = true;
+
+                            if (not bvh_instances.count(bvh.get())) {
+                                bvh->Dump(path, max_treelet_nodes, nested_tree_offset);
+                                bvh_instances[bvh.get()] = nested_tree_offset;
+                            }
+
+                            *proto_node.mutable_transform() = to_protobuf(tp->GetTransform());
+                            proto_node.set_root_ref(bvh_instances[bvh.get()]);
+
+                            nested_tree_offset += bvh->nodeCount;
+                        }
+                    }
+                }
+
+                writer.write(proto_node);
+                writer.write_empty();
+                writer.write_empty();
+                continue;
+            }
+
+            if (labels[node.secondChildOffset] != current_treelet) {
+                proto_node.set_right_ref(index_offset + node.secondChildOffset);
+                q.push(-1);
+            }
+            else {
+                q.push(node.secondChildOffset);
+            }
+
+            if (labels[node_index + 1] != current_treelet) {
+                proto_node.set_left_ref(index_offset + node_index + 1);
+                q.push(-1);
+            }
+            else {
+                q.push(node_index + 1);
+            }
+
+            writer.write(proto_node);
+        }
     }
 }
 
-void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) const {
+void BVHAccel::Dump(const std::string &path,
+                    const size_t max_treelet_nodes,
+                    const size_t index_offset) const {
     std::cerr << "Dumping BVH... ";
 
     /* (1) assign each node to a treelet */
@@ -987,7 +1029,7 @@ void BVHAccel::Dump(const std::string &path, const size_t max_treelet_nodes) con
     assignTreelets(treelet_labels.get(), max_treelet_nodes);
 
     /* (2) dump the treelets to disk */
-    dumpTreelets(path, treelet_labels.get());
+    dumpTreelets(path, treelet_labels.get(), max_treelet_nodes, index_offset);
     std::cerr << "done." << std::endl;
 }
 

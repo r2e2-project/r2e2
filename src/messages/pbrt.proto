@@ -30,7 +30,6 @@ message BVHNode {
   int64 right_ref = 3;
   uint32 axis = 4;
 
-  oneof Transformed {
-    AnimatedTransform transform = 5;
-  }
+  AnimatedTransform transform = 5;
+  int64 root_ref = 6;
 }

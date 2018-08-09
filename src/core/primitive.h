@@ -120,6 +120,10 @@ class TransformedPrimitive : public Primitive {
     }
 
     PrimitiveType GetType() const { return PrimitiveType::Transformed; }
+    PrimitiveType GetBaseType() const { return primitive->GetType(); }
+
+    std::shared_ptr<Primitive> GetPrimitive() const { return primitive; }
+    const AnimatedTransform & GetTransform() const { return PrimitiveToWorld; }
 
   private:
     // TransformedPrimitive Private Data
