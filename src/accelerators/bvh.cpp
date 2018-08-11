@@ -981,12 +981,11 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
                             if (not bvh_instances.count(bvh.get())) {
                                 bvh->Dump(path, max_treelet_nodes, nested_tree_offset);
                                 bvh_instances[bvh.get()] = nested_tree_offset;
+                                nested_tree_offset += bvh->nodeCount;
                             }
 
                             *proto_node.mutable_transform() = to_protobuf(tp->GetTransform());
                             proto_node.set_root_ref(bvh_instances[bvh.get()]);
-
-                            nested_tree_offset += bvh->nodeCount;
                         }
                     }
                 }
