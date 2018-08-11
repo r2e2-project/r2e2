@@ -24,12 +24,16 @@ message Bounds3f {
   Point3f point_max = 2;
 }
 
+message TransformedPrimitive {
+  AnimatedTransform transform = 1;
+  int64 root_ref = 2;
+}
+
 message BVHNode {
   Bounds3f bounds = 1;
   int64 left_ref = 2;
   int64 right_ref = 3;
   uint32 axis = 4;
 
-  AnimatedTransform transform = 5;
-  int64 root_ref = 6;
+  repeated TransformedPrimitive transformed_primitives = 7;
 }

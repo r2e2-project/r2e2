@@ -952,8 +952,6 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
             proto_node.set_axis(node.axis);
 
             if (node.nPrimitives > 0) {
-                bool found_bvh = false;
-
                 /* sorry about the disgusting code */
                 for (int i = 0; i < node.nPrimitives; i++) {
                     if (primitives[node.primitivesOffset + i]->GetType() == PrimitiveType::Transformed) {
@@ -961,10 +959,6 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
                             std::dynamic_pointer_cast<TransformedPrimitive>(primitives[node.primitivesOffset + i]);
 
                         if (tp != nullptr and tp->GetBaseType() == PrimitiveType::Aggregate) {
-                            if (found_bvh) {
-                                throw std::runtime_error("only one aggregate primitive per node is supported");
-                            }
-
                             if (index_offset != 0) {
                                 throw std::runtime_error("only one level of bvh instances is supported");
                             }
@@ -976,16 +970,17 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
                                 throw std::runtime_error("primitive is not a BVH");
                             }
 
-                            found_bvh = true;
-
                             if (not bvh_instances.count(bvh.get())) {
                                 bvh->Dump(path, max_treelet_nodes, nested_tree_offset);
                                 bvh_instances[bvh.get()] = nested_tree_offset;
                                 nested_tree_offset += bvh->nodeCount;
                             }
 
-                            *proto_node.mutable_transform() = to_protobuf(tp->GetTransform());
-                            proto_node.set_root_ref(bvh_instances[bvh.get()]);
+                            protobuf::TransformedPrimitive proto_tp;
+                            proto_tp.set_root_ref(bvh_instances[bvh.get()]);
+                            *proto_tp.mutable_transform() = to_protobuf(tp->GetTransform());
+
+                            *proto_node.add_transformed_primitives() = proto_tp;
                         }
                     }
                 }

@@ -39,7 +39,7 @@ private:
         int child[2] = {0};
 
         std::vector<GeometricPrimitive> primitives {};
-        std::unique_ptr<TransformedPrimitive> transformed_primitive {nullptr};
+        std::vector<TransformedPrimitive> transformed_primitives {};
 
         TreeletNode(const Bounds3f & bounds, const uint8_t axis)
             : bounds(bounds), axis(axis) {}
