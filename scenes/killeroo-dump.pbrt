@@ -14,7 +14,7 @@ Sampler "halton" "integer pixelsamples" [8]
 
 Integrator "path"
 
-Accelerator "bvh" "string dumppath" ["/tmp/killeroo-bvh"]
+Accelerator "bvh" "string dumppath" ["/tmp/killeroo-bvh"] "integer dumptreeletsize" [150000]
 
 WorldBegin
 
@@ -40,10 +40,12 @@ Rotate -60 0 0 1
         "float roughness" [.025]
 Translate 100 200 -140
     ObjectInstance "killeroo"
+    #Include "geometry/killeroo.pbrt"
     Material "plastic" "color Ks" [.3 .3 .3] "color Kd" [.4 .5 .4]
         "float roughness" [.15]
 Translate -200 0 0
     ObjectInstance "killeroo"
+    #Include "geometry/killeroo.pbrt"
 AttributeEnd
 
 WorldEnd
