@@ -35,11 +35,15 @@ private:
         Bounds3f bounds;
         uint8_t axis;
 
+        bool leaf {false};
         bool has[2] = {true, true};
-        int child[2] = {0};
-
-        std::vector<GeometricPrimitive> primitives {};
-        std::vector<TransformedPrimitive> transformed_primitives {};
+        union {
+            int child[2] = {0};
+            struct {
+                int primitive_offset;
+                int primitive_count;
+            };
+        };
 
         TreeletNode(const Bounds3f & bounds, const uint8_t axis)
             : bounds(bounds), axis(axis) {}
@@ -49,7 +53,9 @@ private:
     const int bvh_root_;
     mutable std::map<int, std::vector<TreeletNode>> trees_;
     mutable std::map<int, std::shared_ptr<Primitive>> bvh_instances_;
+
     mutable std::vector<std::unique_ptr<Transform>> transforms_;
+    mutable std::vector<std::unique_ptr<Primitive>> primitives_;
 
     void loadTreelet(const int root_id) const;
     void createPrimitives(const int tree_id, TreeletNode & node) const;

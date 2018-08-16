@@ -68,9 +68,16 @@ void CloudBVH::createPrimitives(const int tree_id, TreeletNode & node) const {
     TextureParams textureParams(params, emptyParams, fTex, sTex);
     std::shared_ptr<Material> material(CreateMatteMaterial(textureParams));
 
-    node.primitives.reserve(shapes.size());
+    if ( node.primitive_offset == 0 ) {
+        node.primitive_offset = primitives_.size();
+    }
+
+    node.leaf = true;
+    node.primitive_count += shapes.size();
+
     for (auto shape : shapes) {
-        node.primitives.emplace_back(move(shape), material, nullptr, mediumInterface);
+        primitives_.push_back(std::move(
+            std::make_unique<GeometricPrimitive>(move(shape), material, nullptr, mediumInterface)));
     }
 }
 
@@ -90,21 +97,21 @@ void CloudBVH::loadTreelet(const int root_id) const {
             auto parent = q.top();
             q.pop();
 
-            if ((not nodes[parent.first].has[parent.second] and
-                 nodes[parent.first].child[parent.second])) {
+            auto & node = nodes[parent.first];
+
+            if ((not node.has[parent.second] and
+                 node.child[parent.second])) {
                 continue;
             }
 
-            nodes[parent.first].has[parent.second] = false;
-            nodes[parent.first].child[parent.second] = 0;
+            node.has[parent.second] = false;
+            node.child[parent.second] = 0;
 
-            if (not nodes[parent.first].has[LEFT] and
-                not nodes[parent.first].has[RIGHT] and
-                not nodes[parent.first].child[LEFT] and
-                not nodes[parent.first].child[RIGHT] and
-                not nodes[parent.first].transformed_primitives.size()) {
+            if ((not node.has[LEFT] and not node.has[RIGHT] and
+                 not node.child[LEFT] and not node.child[RIGHT]) or
+                (node.leaf and not node.primitive_count)) {
                 /* this is a terminal node, we create the primitives now */
-                createPrimitives(root_id, nodes[parent.first]);
+                createPrimitives(root_id, node);
             }
 
             continue;
@@ -122,30 +129,38 @@ void CloudBVH::loadTreelet(const int root_id) const {
             node.child[RIGHT] = proto_node.right_ref();
         }
 
-        for (int i = 0; i < proto_node.transformed_primitives_size(); i++) {
-            /* this node is a reference to another bvh */
-            auto & proto_tp = proto_node.transformed_primitives(i);
+        if (proto_node.transformed_primitives_size()) {
+            node.leaf = true;
+            node.has[LEFT] = node.has[RIGHT] = false;
+            node.child[LEFT] = node.child[RIGHT] = 0;
 
-            transforms_.push_back(std::move(std::make_unique<Transform>(
-                from_protobuf(proto_tp.transform().start_transform()))));
-            const Transform * start = transforms_.back().get();
+            node.primitive_offset = primitives_.size();
+            node.primitive_count = proto_node.transformed_primitives_size();
 
-            transforms_.push_back(std::move(std::make_unique<Transform>(
-                from_protobuf(proto_tp.transform().end_transform()))));
-            const Transform * end = transforms_.back().get();
+            for (int i = 0; i < proto_node.transformed_primitives_size(); i++) {
+                auto & proto_tp = proto_node.transformed_primitives(i);
 
-            const AnimatedTransform primitive_to_world {start,
-                                                        proto_tp.transform().start_time(),
-                                                        end,
-                                                        proto_tp.transform().end_time()};
+                transforms_.push_back(std::move(
+                    std::make_unique<Transform>(from_protobuf(proto_tp.transform().start_transform()))));
+                const Transform * start = transforms_.back().get();
 
-            if (not bvh_instances_.count(proto_tp.root_ref())) {
-                bvh_instances_[proto_tp.root_ref()] =
-                    std::make_shared<CloudBVH>(bvh_path_, proto_tp.root_ref());
+                transforms_.push_back(std::move(std::make_unique<Transform>(
+                    from_protobuf(proto_tp.transform().end_transform()))));
+                const Transform * end = transforms_.back().get();
+
+                const AnimatedTransform primitive_to_world {start,
+                                                            proto_tp.transform().start_time(),
+                                                            end,
+                                                            proto_tp.transform().end_time()};
+
+                if (not bvh_instances_.count(proto_tp.root_ref())) {
+                    bvh_instances_[proto_tp.root_ref()] =
+                        std::make_shared<CloudBVH>(bvh_path_, proto_tp.root_ref());
+                }
+
+                primitives_.push_back(std::move(
+                    std::make_unique<TransformedPrimitive>(bvh_instances_[proto_tp.root_ref()], primitive_to_world)));
             }
-
-            node.transformed_primitives.emplace_back(bvh_instances_[proto_tp.root_ref()],
-                                                     primitive_to_world);
         }
 
         const int index = nodes.size();
@@ -183,17 +198,9 @@ bool CloudBVH::Intersect(const Ray &ray, SurfaceInteraction *isect) const {
 
         // Check ray against BVH node
         if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
-            if (node.primitives.size() > 0) {
-                for (auto & primitive : node.primitives)
-                    if (primitive.Intersect(ray, isect))
-                        hit = true;
-
-                if (toVisitOffset == 0) break;
-                current = toVisit[--toVisitOffset];
-            }
-            else if (node.transformed_primitives.size() > 0) {
-                for (auto & primitive : node.transformed_primitives)
-                    if (primitive.Intersect(ray, isect))
+            if (node.leaf) {
+                for (int i = node.primitive_offset; i < node.primitive_offset + node.primitive_count; i++)
+                    if (primitives_[i]->Intersect(ray, isect))
                         hit = true;
 
                 if (toVisitOffset == 0) break;
@@ -240,17 +247,9 @@ bool CloudBVH::IntersectP(const Ray &ray) const {
 
         // Check ray against BVH node
         if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
-            if (node.primitives.size() > 0) {
-                for (auto & primitive : node.primitives)
-                    if (primitive.IntersectP(ray))
-                        return true;
-
-                if (toVisitOffset == 0) break;
-                current = toVisit[--toVisitOffset];
-            }
-            else if (node.transformed_primitives.size() > 0) {
-                for (auto & primitive : node.transformed_primitives)
-                    if (primitive.IntersectP(ray))
+            if (node.leaf) {
+                for (int i = node.primitive_offset; i < node.primitive_offset + node.primitive_count; i++)
+                    if (primitives_[i]->IntersectP(ray))
                         return true;
 
                 if (toVisitOffset == 0) break;
