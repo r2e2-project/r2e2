@@ -57,6 +57,8 @@ class Paraboloid : public Shape {
     Float Area() const;
     Interaction Sample(const Point2f &u, Float *pdf) const;
 
+    ShapeType GetType() const { return ShapeType::Paraboloid; }
+
   protected:
     // Paraboloid Private Data
     const Float radius, zMin, zMax, phiMax;

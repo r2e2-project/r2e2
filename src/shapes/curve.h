@@ -75,6 +75,8 @@ class Curve : public Shape {
     Float Area() const;
     Interaction Sample(const Point2f &u, Float *pdf) const;
 
+    ShapeType GetType() const { return ShapeType::Curve; }
+
   private:
     // Curve Private Methods
     bool recursiveIntersect(const Ray &r, Float *tHit,

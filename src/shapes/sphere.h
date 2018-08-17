@@ -68,6 +68,8 @@ class Sphere : public Shape {
     Float Pdf(const Interaction &ref, const Vector3f &wi) const;
     Float SolidAngle(const Point3f &p, int nSamples) const;
 
+    ShapeType GetType() const { return ShapeType::Sphere; }
+
   private:
     // Sphere Private Data
     const Float radius;

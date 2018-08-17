@@ -47,6 +47,17 @@
 
 namespace pbrt {
 
+enum class ShapeType {
+    Cone,
+    Curve,
+    Cylinder,
+    Disk,
+    Hyperboloid,
+    Paraboloid,
+    Sphere,
+    Triangle
+};
+
 // Shape Declarations
 class Shape {
   public:
@@ -81,6 +92,8 @@ class Shape {
     // integration; the nSamples parameter determines how many samples are
     // used in this case.
     virtual Float SolidAngle(const Point3f &p, int nSamples = 512) const;
+
+    virtual ShapeType GetType() const = 0;
 
     // Shape Public Data
     const Transform *ObjectToWorld, *WorldToObject;

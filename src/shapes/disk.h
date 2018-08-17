@@ -62,6 +62,8 @@ class Disk : public Shape {
     Float Area() const;
     Interaction Sample(const Point2f &u, Float *pdf) const;
 
+    ShapeType GetType() const { return ShapeType::Disk; }
+
   private:
     // Disk Private Data
     const Float height, radius, innerRadius, phiMax;

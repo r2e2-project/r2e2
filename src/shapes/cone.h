@@ -56,6 +56,8 @@ class Cone : public Shape {
     Float Area() const;
     Interaction Sample(const Point2f &u, Float *pdf) const;
 
+    ShapeType GetType() const { return ShapeType::Cone; }
+
   protected:
     // Cone Private Data
     const Float radius, height, phiMax;

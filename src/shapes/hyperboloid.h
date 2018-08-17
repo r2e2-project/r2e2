@@ -56,6 +56,8 @@ class Hyperboloid : public Shape {
     Float Area() const;
     Interaction Sample(const Point2f &u, Float *pdf) const;
 
+    ShapeType GetType() const { return ShapeType::Hyperboloid; }
+
   protected:
     // Hyperboloid Private Data
     Point3f p1, p2;
