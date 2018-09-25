@@ -60,7 +60,7 @@ void CloudBVH::createPrimitives(TreeletNode & node) const {
         {bb.pMin.x, bb.pMax.y, bb.pMax.z}
     };
 
-    const int triangles[] = {
+    constexpr int triangles[] = {
         0, 1, 2,    0, 2, 3,    4, 5, 6,    4, 6, 7,    2, 3, 6,    3, 6, 7,
         0, 3, 4,    3, 4, 7,    1, 5, 6,    1, 2, 6,    0, 1, 5,    0, 4, 5
     };
