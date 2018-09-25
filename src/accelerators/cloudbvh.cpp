@@ -45,7 +45,7 @@ Bounds3f CloudBVH::WorldBound() const {
     return trees_[bvh_root_][0].bounds;
 }
 
-void CloudBVH::createPrimitives(const int tree_id, TreeletNode & node) const {
+void CloudBVH::createPrimitives(TreeletNode & node) const {
     const Bounds3f & bb = node.bounds;
 
     /* let's make the primitives... */
@@ -113,7 +113,7 @@ void CloudBVH::loadTreelet(const int root_id) const {
                  not node.child[LEFT] and not node.child[RIGHT]) or
                 (node.leaf and not node.primitive_count)) {
                 /* this is a terminal node, we create the primitives now */
-                createPrimitives(root_id, node);
+                createPrimitives(node);
             }
 
             continue;

@@ -60,7 +60,7 @@ private:
     std::shared_ptr<Material> default_material_;
 
     void loadTreelet(const int root_id) const;
-    void createPrimitives(const int tree_id, TreeletNode & node) const;
+    void createPrimitives(TreeletNode & node) const;
 
     Transform identity_transform_;
 };
