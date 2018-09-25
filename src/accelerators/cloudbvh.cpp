@@ -15,7 +15,24 @@
 namespace pbrt {
 
 CloudBVH::CloudBVH(const std::string & bvh_path, const int bvh_root)
-    : bvh_path_(bvh_path), bvh_root_(bvh_root) {}
+    : bvh_path_(bvh_path), bvh_root_(bvh_root) {
+    srand(1337);
+    const int tree_id = rand();
+
+    std::unique_ptr<Float[]> color(new Float[3]);
+    color[0] = ((tree_id) % 9) / 8.f;
+    color[1] = ((tree_id * 117 + 101) % 9) / 8.f;
+    color[2] = ((tree_id * 23 + 2138) % 9) / 8.f;
+
+    ParamSet emptyParams;
+    ParamSet params;
+    params.AddRGBSpectrum("Kd", move(color), 3);
+
+    std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
+    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
+    TextureParams textureParams(params, emptyParams, fTex, sTex);
+    default_material_.reset( CreateMatteMaterial(textureParams) );
+}
 
 Bounds3f CloudBVH::WorldBound() const {
     static bool got_it = false;
@@ -53,21 +70,6 @@ void CloudBVH::createPrimitives(const int tree_id, TreeletNode & node) const {
                                      sizeof(vertices) / sizeof(vertices[0]), vertices,
                                      nullptr, nullptr, nullptr, nullptr, nullptr);
 
-    std::unique_ptr<Float[]> color(new Float[3]);
-    color[0] = ((tree_id) % 9) / 8.f;
-    color[1] = ((tree_id * 7 + 101) % 9) / 8.f;
-    color[2] = ((tree_id * 23 + 2138) % 9) / 8.f;
-
-    ParamSet emptyParams;
-    ParamSet params;
-    params.AddRGBSpectrum("Kd", move(color), 3);
-    MediumInterface mediumInterface;
-
-    std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
-    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
-    TextureParams textureParams(params, emptyParams, fTex, sTex);
-    std::shared_ptr<Material> material(CreateMatteMaterial(textureParams));
-
     if ( node.primitive_offset == 0 ) {
         node.primitive_offset = primitives_.size();
     }
@@ -77,7 +79,7 @@ void CloudBVH::createPrimitives(const int tree_id, TreeletNode & node) const {
 
     for (auto shape : shapes) {
         primitives_.push_back(std::move(
-            std::make_unique<GeometricPrimitive>(move(shape), material, nullptr, mediumInterface)));
+            std::make_unique<GeometricPrimitive>(move(shape), default_material_, nullptr, MediumInterface {})));
     }
 }
 

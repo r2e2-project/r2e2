@@ -57,6 +57,8 @@ private:
     mutable std::vector<std::unique_ptr<Transform>> transforms_;
     mutable std::vector<std::unique_ptr<Primitive>> primitives_;
 
+    std::shared_ptr<Material> default_material_;
+
     void loadTreelet(const int root_id) const;
     void createPrimitives(const int tree_id, TreeletNode & node) const;
 
