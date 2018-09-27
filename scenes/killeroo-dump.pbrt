@@ -3,7 +3,7 @@ LookAt 400 20 30   0 63 -110   0 0 1
 Rotate -5 0 0 1
 Camera "perspective" "float fov" [39]
 Film "image"
-"integer xresolution" [700] "integer yresolution" [700]
+"integer xresolution" [1024] "integer yresolution" [600]
     "string filename" "killeroo-simple.png"
 
 # zoom in by feet
@@ -38,14 +38,31 @@ Scale .5 .5 .5
 Rotate -60 0 0 1
     Material "plastic" "color Kd" [.4 .2 .2] "color Ks" [.5 .5 .5]
         "float roughness" [.025]
-Translate 100 200 -140
+Translate 400 200 -140
     ObjectInstance "killeroo"
     #Include "geometry/killeroo.pbrt"
     Material "plastic" "color Ks" [.3 .3 .3] "color Kd" [.4 .5 .4]
         "float roughness" [.15]
-Translate -200 0 0
+Translate -100 0 0
     ObjectInstance "killeroo"
-    #Include "geometry/killeroo.pbrt"
+Translate -100 0 0
+    ObjectInstance "killeroo"
+Translate -100 0 0
+    ObjectInstance "killeroo"
+Translate -100 0 0
+    ObjectInstance "killeroo"
+Translate -100 0 0
+    #ObjectInstance "killeroo"
+    Include "geometry/killeroo.pbrt"
+Translate -100 0 0
+    #ObjectInstance "killeroo"
+    Include "geometry/killeroo.pbrt"
+Translate -100 0 0
+    #ObjectInstance "killeroo"
+    Include "geometry/killeroo.pbrt"
+Translate -100 0 0
+    #ObjectInstance "killeroo"
+    Include "geometry/killeroo.pbrt"
 AttributeEnd
 
 WorldEnd

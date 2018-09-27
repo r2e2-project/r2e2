@@ -14,9 +14,8 @@
 
 namespace pbrt {
 
-CloudBVH::CloudBVH(const std::string & bvh_path, const int bvh_root)
-    : bvh_path_(bvh_path), bvh_root_(bvh_root) {
-    srand(1337);
+CloudBVH::Treelet::Treelet() {
+    /* srand(1337); */
     const int tree_id = rand();
 
     std::unique_ptr<Float[]> color(new Float[3]);
@@ -31,8 +30,11 @@ CloudBVH::CloudBVH(const std::string & bvh_path, const int bvh_root)
     std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
     TextureParams textureParams(params, emptyParams, fTex, sTex);
-    default_material_.reset( CreateMatteMaterial(textureParams) );
+    material.reset( CreateMatteMaterial(textureParams) );
 }
+
+CloudBVH::CloudBVH(const std::string & bvh_path, const int bvh_root)
+    : bvh_path_(bvh_path), bvh_root_(bvh_root) {}
 
 Bounds3f CloudBVH::WorldBound() const {
     static bool got_it = false;
@@ -42,7 +44,7 @@ Bounds3f CloudBVH::WorldBound() const {
         got_it = true;
     }
 
-    return trees_[bvh_root_][0].bounds;
+    return treelets_[bvh_root_].nodes[0].bounds;
 }
 
 void CloudBVH::createPrimitives(TreeletNode & node,
@@ -72,7 +74,7 @@ void CloudBVH::createPrimitives(TreeletNode & node,
 }
 
 void CloudBVH::loadTreelet(const int root_id) const {
-    if (trees_.count(root_id)) {
+    if (treelets_.count(root_id)) {
         return; /* this tree is already loaded */
     }
 
@@ -81,7 +83,8 @@ void CloudBVH::loadTreelet(const int root_id) const {
 
     std::stack<std::pair<int, Child>> q;
 
-    auto & tree_primitives = tree_primitives_[root_id];
+    auto & treelet = treelets_[root_id];
+    auto & tree_primitives = treelet.primitives;
     size_t current_primitives_offset = 0;
     std::vector<Point3f> vertices;
     std::vector<int> triangles;
@@ -183,7 +186,7 @@ void CloudBVH::loadTreelet(const int root_id) const {
         q.emplace(index, LEFT);
     }
 
-    trees_[root_id] = std::move(nodes);
+    treelet.nodes = std::move(nodes);
 
     auto shapes = CreateTriangleMesh(&identity_transform_, &identity_transform_, false,
                                      triangles.size() / 3, triangles.data(),
@@ -200,7 +203,7 @@ void CloudBVH::loadTreelet(const int root_id) const {
         }
         else {
             tree_primitives.push_back(std::move(
-                std::make_unique<GeometricPrimitive>(std::move(shapes[shape_index]), default_material_,
+                std::make_unique<GeometricPrimitive>(std::move(shapes[shape_index]), treelet.material,
                                                      nullptr, MediumInterface {})));
             shape_index++;
         }
@@ -220,12 +223,13 @@ bool CloudBVH::Intersect(const Ray &ray, SurfaceInteraction *isect) const {
 
     while (true) {
         loadTreelet(current.first);
-        auto & node = trees_[current.first][current.second];
+        auto & treelet = treelets_[current.first];
+        auto & node = treelet.nodes[current.second];
 
         // Check ray against BVH node
         if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
             if (node.leaf) {
-                auto & primitives = tree_primitives_[current.first];
+                auto & primitives = treelet.primitives;
                 for (int i = node.primitive_offset; i < node.primitive_offset + node.primitive_count; i++)
                     if (primitives[i]->Intersect(ray, isect))
                         hit = true;
@@ -270,12 +274,13 @@ bool CloudBVH::IntersectP(const Ray &ray) const {
 
     while (true) {
         loadTreelet(current.first);
-        auto & node = trees_[current.first][current.second];
+        auto & treelet = treelets_[current.first];
+        auto & node = treelet.nodes[current.second];
 
         // Check ray against BVH node
         if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
             if (node.leaf) {
-                auto & primitives = tree_primitives_[current.first];
+                auto & primitives = treelet.primitives;
                 for (int i = node.primitive_offset; i < node.primitive_offset + node.primitive_count; i++)
                     if (primitives[i]->IntersectP(ray))
                         return true;
