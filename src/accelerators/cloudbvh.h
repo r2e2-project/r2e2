@@ -53,14 +53,15 @@ private:
     const int bvh_root_;
     mutable std::map<int, std::vector<TreeletNode>> trees_;
     mutable std::map<int, std::shared_ptr<Primitive>> bvh_instances_;
+    mutable std::map<int, std::vector<std::unique_ptr<Primitive>>> tree_primitives_;
 
     mutable std::vector<std::unique_ptr<Transform>> transforms_;
-    mutable std::vector<std::unique_ptr<Primitive>> primitives_;
 
     std::shared_ptr<Material> default_material_;
 
     void loadTreelet(const int root_id) const;
-    void createPrimitives(TreeletNode & node) const;
+    void createPrimitives(TreeletNode & node, std::vector<Point3f> & vertices,
+                          std::vector<int> & triangles) const;
 
     Transform identity_transform_;
 };
