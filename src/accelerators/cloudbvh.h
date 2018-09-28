@@ -52,9 +52,6 @@ private:
     struct Treelet {
         std::vector<TreeletNode> nodes {};
         std::vector<std::unique_ptr<Primitive>> primitives {};
-        std::shared_ptr<Material> material {};
-
-        Treelet();
     };
 
     const std::string bvh_path_;
@@ -64,10 +61,10 @@ private:
     mutable std::map<int, std::shared_ptr<Primitive>> bvh_instances_;
     mutable std::vector<std::unique_ptr<Transform>> transforms_;
 
+    mutable std::shared_ptr<Primitive> unit_cube;
+    mutable std::shared_ptr<Primitive> unit_plane;
 
     void loadTreelet(const int root_id) const;
-    void createPrimitives(TreeletNode & node, std::vector<Point3f> & vertices,
-                          std::vector<int> & triangles) const;
 
     Transform identity_transform_;
 };

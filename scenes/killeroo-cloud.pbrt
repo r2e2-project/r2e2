@@ -3,7 +3,7 @@ LookAt 400 20 30   0 63 -110   0 0 1
 Rotate -5 0 0 1
 Camera "perspective" "float fov" [39]
 Film "image"
-"integer xresolution" [1024] "integer yresolution" [768]
+"integer xresolution" [1024] "integer yresolution" [600]
     "string filename" "killeroo-simple.png"
 
 # zoom in by feet
