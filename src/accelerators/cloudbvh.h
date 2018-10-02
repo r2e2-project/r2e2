@@ -65,6 +65,7 @@ private:
     mutable std::shared_ptr<Primitive> unit_plane;
 
     void loadTreelet(const int root_id) const;
+    void clear() const;
 
     Transform identity_transform_;
 };

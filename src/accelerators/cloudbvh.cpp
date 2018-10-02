@@ -356,6 +356,13 @@ bool CloudBVH::IntersectP(const Ray &ray) const {
     return false;
 }
 
+void CloudBVH::clear() const
+{
+    treelets_.clear();
+    bvh_instances_.clear();
+    transforms_.clear();
+}
+
 std::shared_ptr<CloudBVH> CreateCloudBVH(const ParamSet &ps) {
     const std::string path = ps.FindOneString("loadpath", "");
 
