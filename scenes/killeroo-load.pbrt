@@ -12,7 +12,7 @@ Film "image"
 
 Sampler "halton" "integer pixelsamples" [8]
 
-Integrator "cloud"
+Integrator "path"
 
 Accelerator "cloudbvh" "string loadpath" ["/tmp/killeroo-bvh"]
 
