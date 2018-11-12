@@ -470,6 +470,7 @@ FILE ( GLOB PBRT_SOURCE
   src/shapes/*
   src/textures/*
   src/media/*
+  src/cloud/*
   src/messages/*
   src/util/*
  )
