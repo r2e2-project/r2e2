@@ -8,6 +8,7 @@
 #include "pbrt.pb.h"
 #include "primitive.h"
 #include "bvh.h"
+#include "core/parallel.h"
 #include "materials/matte.h"
 #include "shapes/triangle.h"
 #include "messages/utils.h"
@@ -17,6 +18,10 @@ namespace pbrt {
 
 CloudBVH::CloudBVH(const std::string & bvh_path, const int bvh_root)
     : bvh_path_(bvh_path), bvh_root_(bvh_root) {
+    if (MaxThreadIndex() > 1) {
+        throw std::runtime_error("Cannot use CloudBVH with multiple threads");
+    }
+
     /* let's create the base cube */
     /* (1) create the material for the cube */
     const int tree_id = rand();
