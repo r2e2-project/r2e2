@@ -1,10 +1,18 @@
 #include "integrator.h"
 
+#include <cmath>
 #include <cstdlib>
 
 using namespace std;
 
 namespace pbrt {
+
+struct RayState {
+    CameraSample sample;
+    RayDifferential ray;
+    Float weight;
+    Spectrum L;
+};
 
 void CloudIntegrator::Render(const Scene &scene) {
     Preprocess(scene, *sampler);
@@ -17,30 +25,37 @@ void CloudIntegrator::Render(const Scene &scene) {
     std::unique_ptr<FilmTile> filmTile =
         camera->film->GetFilmTile(sampleBounds);
 
-    vector<CameraSample> samples;
+    vector<RayState> rayStates;
 
+    /* Generate all the samples */
     for (Point2i pixel : sampleBounds) {
         sampler->StartPixel(pixel);
 
         if (!InsideExclusive(pixel, pixelBounds)) continue;
 
+        RayState state;
         do {
-            samples.push_back(sampler->GetCameraSample(pixel));
+            state.sample = sampler->GetCameraSample(pixel);
         } while (sampler->StartNextSample());
+
+        rayStates.push_back(move(state));
     }
 
-    for (const CameraSample sample : samples) {
-        RayDifferential ray;
-        Float rayWeight = camera->GenerateRayDifferential(sample, &ray);
-        ray.ScaleDifferentials(1 / std::sqrt((Float)sampler->samplesPerPixel));
+    /* Generate all the rays */
+    for (RayState &state : rayStates) {
+        state.weight =
+            camera->GenerateRayDifferential(state.sample, &state.ray);
+        state.ray.ScaleDifferentials(1 / sqrt((Float)sampler->samplesPerPixel));
+    }
 
-        Spectrum L(0.f);
-        if (rayWeight > 0) L = Li(ray, scene, *sampler, arena);
-
-        filmTile->AddSample(sample.pFilm, L, rayWeight);
+    /* Find the radiance for all the rays */
+    for (RayState &state : rayStates) {
+        if (state.weight > 0) state.L = Li(state.ray, scene, *sampler, arena);
+        filmTile->AddSample(state.sample.pFilm, state.L, state.weight);
         arena.Reset();
     }
 
+    /* Create the final output */
     camera->film->MergeFilmTile(std::move(filmTile));
     camera->film->WriteImage();
 }
@@ -50,9 +65,9 @@ Spectrum CloudIntegrator::Li(const RayDifferential &ray, const Scene &scene,
                              int depth) const {
     static size_t n = 0;
     n++;
-    const Float color[] = {(Float)((n + 200) % 600) / 600,
+    const Float color[] = {(Float)((n + 200) % 509) / 509,
                            (Float)(n % 512) / 512,
-                           (Float)((n + 400) % 300) / 300};
+                           (Float)((n + 400) % 287) / 287};
     return RGBSpectrum::FromRGB(color);
 }
 
