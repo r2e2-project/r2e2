@@ -14,6 +14,8 @@ class CloudIntegrator : public Integrator {
         : camera(camera), sampler(sampler), pixelBounds(pixelBounds) {}
     void Preprocess(const Scene &scene, Sampler &sampler) {}
     void Render(const Scene &scene);
+    Spectrum Li(const RayDifferential &ray, const Scene &scene,
+                Sampler &sampler, MemoryArena &arena, int depth = 0) const;
 
   protected:
     std::shared_ptr<const Camera> camera;
