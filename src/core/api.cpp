@@ -42,7 +42,6 @@
 
 // API Additional Headers
 #include "accelerators/bvh.h"
-#include "accelerators/cloudbvh.h"
 #include "accelerators/kdtreeaccel.h"
 #include "cameras/environment.h"
 #include "cameras/orthographic.h"
@@ -61,7 +60,6 @@
 #include "integrators/sppm.h"
 #include "integrators/volpath.h"
 #include "integrators/whitted.h"
-#include "cloud/integrator.h"
 #include "lights/diffuse.h"
 #include "lights/distant.h"
 #include "lights/goniometric.h"
@@ -116,6 +114,8 @@
 #include "textures/wrinkled.h"
 #include "media/grid.h"
 #include "media/homogeneous.h"
+#include "cloud/integrator.h"
+#include "cloud/bvh.h"
 
 #include <map>
 #include <stdio.h>

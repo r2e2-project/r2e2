@@ -1,4 +1,4 @@
-#include "accelerators/cloudbvh.h"
+#include "cloud/bvh.h"
 
 #include <stack>
 #include <thread>
@@ -7,7 +7,7 @@
 #include "paramset.h"
 #include "pbrt.pb.h"
 #include "primitive.h"
-#include "bvh.h"
+#include "accelerators/bvh.h"
 #include "core/parallel.h"
 #include "materials/matte.h"
 #include "shapes/triangle.h"
