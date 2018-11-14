@@ -4,38 +4,36 @@
 #include <map>
 #include <memory>
 
+#include "messages/serialization.h"
+#include "messages/utils.h"
 #include "pbrt.h"
 #include "primitive.h"
 #include "transform.h"
-#include "messages/utils.h"
-#include "messages/serialization.h"
 
 namespace pbrt {
 
 struct TreeletNode;
 
 class CloudBVH : public Aggregate {
-public:
-    CloudBVH(const std::string & bvh_path, const int bvh_root = 0);
+  public:
+    CloudBVH(const std::string &bvh_path, const int bvh_root = 0);
     ~CloudBVH() {}
 
     CloudBVH(const CloudBVH &) = delete;
-    CloudBVH & operator=(const CloudBVH &) = delete;
+    CloudBVH &operator=(const CloudBVH &) = delete;
 
     Bounds3f WorldBound() const;
     bool Intersect(const Ray &ray, SurfaceInteraction *isect) const;
     bool IntersectP(const Ray &ray) const;
 
-private:
-    enum Child {
-        LEFT = 0, RIGHT = 1
-    };
+  private:
+    enum Child { LEFT = 0, RIGHT = 1 };
 
     struct TreeletNode {
         Bounds3f bounds;
         uint8_t axis;
 
-        bool leaf {false};
+        bool leaf{false};
         bool has[2] = {true, true};
         union {
             int child[2] = {0};
@@ -45,13 +43,13 @@ private:
             };
         };
 
-        TreeletNode(const Bounds3f & bounds, const uint8_t axis)
+        TreeletNode(const Bounds3f &bounds, const uint8_t axis)
             : bounds(bounds), axis(axis) {}
     };
 
     struct Treelet {
-        std::vector<TreeletNode> nodes {};
-        std::vector<std::unique_ptr<Primitive>> primitives {};
+        std::vector<TreeletNode> nodes{};
+        std::vector<std::unique_ptr<Primitive>> primitives{};
     };
 
     const std::string bvh_path_;
@@ -72,6 +70,6 @@ private:
 
 std::shared_ptr<CloudBVH> CreateCloudBVH(const ParamSet &ps);
 
-}
+}  // namespace pbrt
 
 #endif /* PBRT_ACCELERATORS_CLOUD_BVH_H */
