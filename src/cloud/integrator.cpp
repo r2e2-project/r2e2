@@ -20,7 +20,6 @@ void CloudIntegrator::Render(const Scene &scene) {
     MemoryArena arena;
 
     Bounds2i sampleBounds = camera->film->GetSampleBounds();
-    Vector2i sampleExtent = sampleBounds.Diagonal();
 
     std::unique_ptr<FilmTile> filmTile =
         camera->film->GetFilmTile(sampleBounds);
