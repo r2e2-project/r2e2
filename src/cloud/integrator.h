@@ -1,6 +1,7 @@
 #ifndef PBRT_CLOUD_INTEGRATOR_H
 #define PBRT_CLOUD_INTEGRATOR_H
 
+#include "cloud/raystate.h"
 #include "core/camera.h"
 #include "core/integrator.h"
 

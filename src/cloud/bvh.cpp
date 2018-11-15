@@ -247,6 +247,62 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
     treelet.nodes = move(nodes);
 }
 
+void CloudBVH::Trace(RayState &rayState) {
+    const auto &ray = rayState.ray;
+
+    Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
+    int dirIsNeg[3] = {invDir.x < 0, invDir.y < 0, invDir.z < 0};
+
+    // Follow ray through BVH nodes to find primitive intersections
+    auto current = rayState.toVisit.top();
+
+    const uint32_t currentTreelet = current.first;
+    loadTreelet(currentTreelet); /* we don't load any other treelets */
+
+    SurfaceInteraction isect;
+
+    while (currentTreelet == current.first) {
+        rayState.toVisit.pop();
+
+        auto &treelet = treelets_[current.first];
+        auto &node = treelet.nodes[current.second];
+
+        // Check ray against BVH node
+        if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
+            if (node.leaf) {
+                auto &primitives = treelet.primitives;
+                for (int i = node.primitive_offset;
+                     i < node.primitive_offset + node.primitive_count; i++)
+                    if (primitives[i]->Intersect(ray, &isect))
+                        rayState.interaction.reset(move(isect));
+
+                if (rayState.toVisit.size() == 0) break;
+                current = rayState.toVisit.top();
+            } else {
+                std::pair<uint32_t, uint32_t> children[2];
+                for (int i = 0; i < 2; i++) {
+                    children[i].first =
+                        node.has[i] ? current.first : node.child[i];
+                    children[i].second = node.has[i] ? node.child[i] : 0;
+                }
+
+                if (dirIsNeg[node.axis]) {
+                    rayState.toVisit.push(children[LEFT]);
+                    rayState.toVisit.push(children[RIGHT]);
+                    current = rayState.toVisit.top();
+                } else {
+                    rayState.toVisit.push(children[RIGHT]);
+                    rayState.toVisit.push(children[LEFT]);
+                    current = rayState.toVisit.top();
+                }
+            }
+        } else {
+            if (rayState.toVisit.size() == 0) break;
+            current = rayState.toVisit.top();
+        }
+    }
+}
+
 bool CloudBVH::Intersect(const Ray &ray, SurfaceInteraction *isect) const {
     bool hit = false;
     Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);

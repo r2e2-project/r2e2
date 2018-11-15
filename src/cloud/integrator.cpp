@@ -2,17 +2,11 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <stack>
 
 using namespace std;
 
 namespace pbrt {
-
-struct RayState {
-    CameraSample sample;
-    RayDifferential ray;
-    Float weight;
-    Spectrum L;
-};
 
 void CloudIntegrator::Render(const Scene &scene) {
     Preprocess(scene, *sampler);

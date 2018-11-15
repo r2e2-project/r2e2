@@ -4,11 +4,13 @@
 #include <map>
 #include <memory>
 
+#include "cloud/raystate.h"
 #include "messages/serialization.h"
 #include "messages/utils.h"
 #include "pbrt.h"
 #include "primitive.h"
 #include "transform.h"
+#include "util/optional.h"
 
 namespace pbrt {
 
@@ -25,6 +27,8 @@ class CloudBVH : public Aggregate {
     Bounds3f WorldBound() const;
     bool Intersect(const Ray &ray, SurfaceInteraction *isect) const;
     bool IntersectP(const Ray &ray) const;
+
+    void Trace(RayState &rayState);
 
   private:
     enum Child { LEFT = 0, RIGHT = 1 };
