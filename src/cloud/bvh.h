@@ -16,7 +16,7 @@ struct TreeletNode;
 
 class CloudBVH : public Aggregate {
   public:
-    CloudBVH(const std::string &bvh_path, const int bvh_root = 0);
+    CloudBVH(const std::string &bvh_path, const uint32_t bvh_root = 0);
     ~CloudBVH() {}
 
     CloudBVH(const CloudBVH &) = delete;
@@ -36,10 +36,10 @@ class CloudBVH : public Aggregate {
         bool leaf{false};
         bool has[2] = {true, true};
         union {
-            int child[2] = {0};
+            uint32_t child[2] = {0};
             struct {
-                int primitive_offset;
-                int primitive_count;
+                uint32_t primitive_offset;
+                uint32_t primitive_count;
             };
         };
 
@@ -53,16 +53,16 @@ class CloudBVH : public Aggregate {
     };
 
     const std::string bvh_path_;
-    const int bvh_root_;
+    const uint32_t bvh_root_;
 
-    mutable std::map<int, Treelet> treelets_;
-    mutable std::map<int, std::shared_ptr<Primitive>> bvh_instances_;
+    mutable std::map<uint32_t, Treelet> treelets_;
+    mutable std::map<uint32_t, std::shared_ptr<Primitive>> bvh_instances_;
     mutable std::vector<std::unique_ptr<Transform>> transforms_;
 
     mutable std::shared_ptr<Primitive> unit_cube;
     mutable std::shared_ptr<Primitive> unit_plane;
 
-    void loadTreelet(const int root_id) const;
+    void loadTreelet(const uint32_t root_id) const;
     void clear() const;
 
     Transform identity_transform_;
