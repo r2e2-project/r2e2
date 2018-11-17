@@ -13,13 +13,14 @@ void CloudIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
     if (bvh == nullptr) {
         throw runtime_error("Top-level primitive must be a CloudBVH");
     }
+
+    lightDistribution = CreateLightSampleDistribution("spatial", scene);
 }
 
 void CloudIntegrator::Render(const Scene &scene) {
     Preprocess(scene, *sampler);
 
     MemoryArena arena;
-
     Bounds2i sampleBounds = camera->film->GetSampleBounds();
 
     std::unique_ptr<FilmTile> filmTile =
@@ -35,7 +36,8 @@ void CloudIntegrator::Render(const Scene &scene) {
 
         RayState state;
         do {
-            state.sample = sampler->GetCameraSample(pixel);
+            state.sampler = sampler->Clone(0);
+            state.sample = state.sampler->GetCameraSample(pixel);
         } while (sampler->StartNextSample());
 
         rayStates.push_back(move(state));
@@ -49,9 +51,10 @@ void CloudIntegrator::Render(const Scene &scene) {
     }
 
     /* Find the radiance for all the rays */
-    for (RayState &state : rayStates) {
-        if (state.weight > 0) state.L = Li(state.ray, scene, *sampler, arena);
-        filmTile->AddSample(state.sample.pFilm, state.L, state.weight);
+    for (RayState &rayState : rayStates) {
+        if (rayState.weight > 0)
+            rayState.L = Li(rayState, scene, *rayState.sampler, arena);
+        filmTile->AddSample(rayState.sample.pFilm, rayState.L, rayState.weight);
         arena.Reset();
     }
 
@@ -60,15 +63,51 @@ void CloudIntegrator::Render(const Scene &scene) {
     camera->film->WriteImage();
 }
 
-Spectrum CloudIntegrator::Li(const RayDifferential &ray, const Scene &scene,
+Spectrum CloudIntegrator::Li(RayState &rayState, const Scene &scene,
                              Sampler &sampler, MemoryArena &arena,
                              int depth) const {
-    static size_t n = 0;
+    Spectrum beta{1.f};
+    rayState.StartTrace();
+
+    while (not rayState.toVisit.empty()) {
+        bvh->Trace(rayState);
+    }
+
+    bool foundIntersection = rayState.isect.initialized();
+
+    if (!foundIntersection) {
+        for (const auto &light : scene.infiniteLights) {
+            rayState.L += beta * light->Le(rayState.ray);
+        }
+    }
+
+    if (!foundIntersection) return rayState.L;
+
+    rayState.isect->ComputeScatteringFunctions(rayState.ray, arena, true);
+    if (!rayState.isect->bsdf) {
+        throw runtime_error("!isect.bsdf");
+    }
+
+    const Distribution1D *distrib =
+        lightDistribution->Lookup(rayState.isect->p);
+
+    if (rayState.isect->bsdf->NumComponents(
+            BxDFType(BSDF_ALL & ~BSDF_SPECULAR)) > 0) {
+        Spectrum Ld =
+            beta * UniformSampleOneLight(*rayState.isect, scene, arena, sampler,
+                                         false, distrib);
+        CHECK_GE(Ld.y(), 0.f);
+        rayState.L += Ld;
+    }
+
+    return rayState.L;
+
+    /* static size_t n = 0;
     n++;
     const Float color[] = {(Float)((n + 200) % 509) / 509,
                            (Float)(n % 512) / 512,
                            (Float)((n + 400) % 287) / 287};
-    return RGBSpectrum::FromRGB(color);
+    return RGBSpectrum::FromRGB(color); */
 }
 
 CloudIntegrator *CreateCloudIntegrator(const ParamSet &params,

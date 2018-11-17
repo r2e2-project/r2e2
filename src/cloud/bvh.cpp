@@ -274,7 +274,7 @@ void CloudBVH::Trace(RayState &rayState) {
                 for (int i = node.primitive_offset;
                      i < node.primitive_offset + node.primitive_count; i++)
                     if (primitives[i]->Intersect(ray, &isect))
-                        rayState.interaction.reset(move(isect));
+                        rayState.isect.reset(move(isect));
 
                 if (rayState.toVisit.size() == 0) break;
                 current = rayState.toVisit.top();

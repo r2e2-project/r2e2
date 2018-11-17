@@ -5,6 +5,7 @@
 #include "cloud/raystate.h"
 #include "core/camera.h"
 #include "core/integrator.h"
+#include "core/lightdistrib.h"
 #include "core/scene.h"
 
 namespace pbrt {
@@ -26,6 +27,7 @@ class CloudIntegrator : public Integrator {
   private:
     std::shared_ptr<Sampler> sampler;
     std::shared_ptr<CloudBVH> bvh;
+    std::unique_ptr<LightDistribution> lightDistribution;
     const Bounds2i pixelBounds;
 };
 
