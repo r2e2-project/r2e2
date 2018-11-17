@@ -72,10 +72,10 @@ class Scene {
     // Store infinite light sources separately for cases where we only want
     // to loop over them.
     std::vector<std::shared_ptr<Light>> infiniteLights;
+    std::shared_ptr<Primitive> aggregate;
 
   private:
     // Scene Private Data
-    std::shared_ptr<Primitive> aggregate;
     Bounds3f worldBound;
 };
 
