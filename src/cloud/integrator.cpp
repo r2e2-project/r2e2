@@ -8,6 +8,13 @@ using namespace std;
 
 namespace pbrt {
 
+void CloudIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
+    bvh = dynamic_pointer_cast<CloudBVH>(scene.aggregate);
+    if (bvh == nullptr) {
+        throw runtime_error("Top-level primitive must be a CloudBVH");
+    }
+}
+
 void CloudIntegrator::Render(const Scene &scene) {
     Preprocess(scene, *sampler);
 
