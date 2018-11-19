@@ -18,8 +18,9 @@ class CloudIntegrator : public Integrator {
         : camera(camera), sampler(sampler), pixelBounds(pixelBounds) {}
     void Preprocess(const Scene &scene, Sampler &sampler);
     void Render(const Scene &scene);
-    Spectrum Li(RayState &ray, const Scene &scene, Sampler &sampler,
-                MemoryArena &arena, int depth = 0) const;
+
+    static std::vector<RayState> Trace(const std::shared_ptr<CloudBVH> &treelet,
+                                       RayState &&rayState);
 
   protected:
     std::shared_ptr<const Camera> camera;
