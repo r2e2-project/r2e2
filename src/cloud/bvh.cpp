@@ -250,6 +250,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
 void CloudBVH::Trace(RayState &rayState) {
     const auto &ray = rayState.ray;
 
+    SurfaceInteraction isect;
     Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
     int dirIsNeg[3] = {invDir.x < 0, invDir.y < 0, invDir.z < 0};
 
@@ -271,7 +272,7 @@ void CloudBVH::Trace(RayState &rayState) {
                 auto &primitives = treelet.primitives;
                 for (int i = node.primitive_offset;
                      i < node.primitive_offset + node.primitive_count; i++)
-                    if (primitives[i]->IntersectP(ray))
+                    if (primitives[i]->Intersect(ray, &isect))
                         rayState.hit.reset(current.first, current.second);
 
                 if (rayState.toVisit.size() == 0) break;
