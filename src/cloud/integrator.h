@@ -16,6 +16,7 @@ class CloudIntegrator : public Integrator {
                     std::shared_ptr<Sampler> sampler,
                     const Bounds2i &pixelBounds)
         : camera(camera), sampler(sampler), pixelBounds(pixelBounds) {}
+
     void Preprocess(const Scene &scene, Sampler &sampler);
     void Render(const Scene &scene);
 

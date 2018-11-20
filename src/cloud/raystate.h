@@ -13,14 +13,13 @@ namespace pbrt {
 
 struct RayState {
     std::unique_ptr<Sampler> sampler;
-    CameraSample sample;
+    size_t sampleIdx;
     RayDifferential ray;
 
     /* Traversing the BVH */
     std::stack<std::pair<uint32_t, uint32_t>> toVisit;
     Optional<std::pair<uint32_t, uint32_t>> hit;
 
-    Float weight;
     Spectrum beta{1.f};
     Spectrum Ld{0.f};
 

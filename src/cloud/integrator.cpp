@@ -35,8 +35,6 @@ vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
     const auto bsdfFlags = BxDFType(BSDF_ALL & ~BSDF_SPECULAR);
 
     if (rayState.remainingBounces) {
-        RayState newRay;
-
         Vector3f wo = -rayState.ray.d, wi;
         Float pdf;
         BxDFType flags;
@@ -44,12 +42,12 @@ vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
                                        BSDF_ALL, &flags);
 
         if (!f.IsBlack() && pdf > 0.f) {
+            RayState newRay;
             newRay.beta = rayState.beta * f * AbsDot(wi, it.shading.n) / pdf;
             newRay.ray = it.SpawnRay(wi);
-            newRay.weight = rayState.weight;
             newRay.remainingBounces = rayState.remainingBounces - 1;
             newRay.sampler = rayState.sampler->Clone(0);
-            newRay.sample = rayState.sample;
+            newRay.sampleIdx = rayState.sampleIdx;
             newRay.StartTrace();
             newRays.push_back(move(newRay));
         }
@@ -101,6 +99,12 @@ void CloudIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
 }
 
 void CloudIntegrator::Render(const Scene &scene) {
+    struct SampleData {
+        CameraSample sample;
+        Spectrum L{0.f};
+        Float weight{1.f};
+    };
+
     Preprocess(scene, *sampler);
 
     MemoryArena arena;
@@ -109,26 +113,31 @@ void CloudIntegrator::Render(const Scene &scene) {
     unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
     deque<RayState> rayQueue;
+    vector<SampleData> cameraSamples;
 
     /* Generate all the samples */
+    size_t i = 0;
     for (Point2i pixel : sampleBounds) {
         sampler->StartPixel(pixel);
 
         if (!InsideExclusive(pixel, pixelBounds)) continue;
 
-        RayState state;
         do {
+            RayState state;
+            SampleData sampleData;
             state.sampler = sampler->Clone(0);
-            state.sample = state.sampler->GetCameraSample(pixel);
+            sampleData.sample = state.sampler->GetCameraSample(pixel);
+            cameraSamples.emplace_back(move(sampleData));
+            state.sampleIdx = i++;
+            rayQueue.push_back(move(state));
         } while (sampler->StartNextSample());
-
-        rayQueue.push_back(move(state));
     }
 
     /* Generate all the rays */
     for (RayState &state : rayQueue) {
-        state.weight =
-            camera->GenerateRayDifferential(state.sample, &state.ray);
+        auto &sampleData = cameraSamples[state.sampleIdx];
+        sampleData.weight =
+            camera->GenerateRayDifferential(sampleData.sample, &state.ray);
         state.ray.ScaleDifferentials(1 / sqrt((Float)sampler->samplesPerPixel));
         state.StartTrace();
     }
@@ -150,7 +159,7 @@ void CloudIntegrator::Render(const Scene &scene) {
                 L = Spectrum(0.f);
             }
 
-            filmTile->AddSample(state.sample.pFilm, L, state.weight);
+            cameraSamples[state.sampleIdx].L += L;
             arena.Reset();
         } else if (state.hit.initialized()) {
             newRays = Shade(bvh, move(state), scene.lights, arena);
@@ -159,6 +168,11 @@ void CloudIntegrator::Render(const Scene &scene) {
         for (auto &newRay : newRays) {
             rayQueue.push_back(move(newRay));
         }
+    }
+
+    for (const auto &sampleData : cameraSamples) {
+        filmTile->AddSample(sampleData.sample.pFilm, sampleData.L,
+                            sampleData.weight);
     }
 
     /* Create the final output */
