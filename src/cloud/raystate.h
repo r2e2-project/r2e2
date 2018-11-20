@@ -15,13 +15,22 @@ struct RayState {
     std::unique_ptr<Sampler> sampler;
     CameraSample sample;
     RayDifferential ray;
-    Optional<SurfaceInteraction> isect;
+
+    /* Traversing the BVH */
     std::stack<std::pair<uint32_t, uint32_t>> toVisit;
+    Optional<std::pair<uint32_t, uint32_t>> hit;
+
+    Float lightSelectPdf;
+    Float lightPdf;
+    Float f;
+    Float Li;
     Float weight;
     Spectrum L{0.f};
 
+    bool isShadowRay{false};
+
     void StartTrace() {
-        isect.clear();
+        hit.clear();
         toVisit.emplace(0, 0);
     }
 };

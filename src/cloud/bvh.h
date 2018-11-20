@@ -29,6 +29,7 @@ class CloudBVH : public Aggregate {
     bool IntersectP(const Ray &ray) const;
 
     void Trace(RayState &rayState);
+    bool Intersect(RayState &rayState, SurfaceInteraction *isect) const;
 
   private:
     enum Child { LEFT = 0, RIGHT = 1 };

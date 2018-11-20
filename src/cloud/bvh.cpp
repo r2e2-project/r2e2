@@ -259,8 +259,6 @@ void CloudBVH::Trace(RayState &rayState) {
     const uint32_t currentTreelet = current.first;
     loadTreelet(currentTreelet); /* we don't load any other treelets */
 
-    SurfaceInteraction isect;
-
     while (currentTreelet == current.first) {
         rayState.toVisit.pop();
 
@@ -273,8 +271,8 @@ void CloudBVH::Trace(RayState &rayState) {
                 auto &primitives = treelet.primitives;
                 for (int i = node.primitive_offset;
                      i < node.primitive_offset + node.primitive_count; i++)
-                    if (primitives[i]->Intersect(ray, &isect))
-                        rayState.isect.reset(move(isect));
+                    if (primitives[i]->IntersectP(ray))
+                        rayState.hit.reset(current.first, current.second);
 
                 if (rayState.toVisit.size() == 0) break;
                 current = rayState.toVisit.top();
@@ -301,6 +299,29 @@ void CloudBVH::Trace(RayState &rayState) {
             current = rayState.toVisit.top();
         }
     }
+}
+
+bool CloudBVH::Intersect(RayState &rayState, SurfaceInteraction *isect) const {
+    if (!rayState.hit.initialized()) {
+        return false;
+    }
+
+    auto &hit = *rayState.hit;
+    loadTreelet(hit.first);
+
+    auto &treelet = treelets_[hit.first];
+    auto &node = treelet.nodes[hit.second];
+    auto &primitives = treelet.primitives;
+
+    if (!node.leaf) {
+        return false;
+    }
+
+    for (int i = node.primitive_offset;
+         i < node.primitive_offset + node.primitive_count; i++)
+        primitives[i]->Intersect(rayState.ray, isect);
+
+    return true;
 }
 
 bool CloudBVH::Intersect(const Ray &ray, SurfaceInteraction *isect) const {

@@ -22,13 +22,16 @@ class CloudIntegrator : public Integrator {
     static std::vector<RayState> Trace(const std::shared_ptr<CloudBVH> &treelet,
                                        RayState &&rayState);
 
+    static std::vector<RayState> Shade(
+        const std::shared_ptr<CloudBVH> &treelet, RayState &&rayState,
+        std::vector<std::shared_ptr<Light>> &lights);
+
   protected:
     std::shared_ptr<const Camera> camera;
 
   private:
     std::shared_ptr<Sampler> sampler;
     std::shared_ptr<CloudBVH> bvh;
-    std::unique_ptr<LightDistribution> lightDistribution;
     const Bounds2i pixelBounds;
 };
 

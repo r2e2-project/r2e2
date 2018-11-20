@@ -10,10 +10,66 @@ namespace pbrt {
 
 vector<RayState> CloudIntegrator::Trace(const shared_ptr<CloudBVH> &treelet,
                                         RayState &&rayState) {
-    vector<RayState> result;
+    vector<RayState> newRays;
     treelet->Trace(rayState);
-    result.push_back(move(rayState));
-    return result;
+    newRays.push_back(move(rayState));
+    return newRays;
+}
+
+vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
+                                        RayState &&rayState,
+                                        vector<shared_ptr<Light>> &lights,
+                                        MemoryArena &arena) {
+    vector<RayState> newRays;
+    SurfaceInteraction it;
+    treelet->Intersect(rayState, &it);
+
+    it.ComputeScatteringFunctions(rayState.ray, arena, true);
+    if (!it.bsdf) {
+        throw runtime_error("!it.bsdf");
+    }
+
+    const Distribution1D *distrib = lightDistribution->Lookup(it.p);
+    auto &sampler = rayState.sampler;
+
+    if (it.bsdf->NumComponents(BxDFType(BSDF_ALL & ~BSDF_SPECULAR)) > 0) {
+        /* Let's pick a light at random */
+        int nLights = (int)lights.size();
+        int lightNum;
+        Float lightSelectPdf;
+        if (nLights > 0) {
+            lightNum = std::min((int)(sampler.Get1D() * nLights), nLights - 1);
+            lightSelectPdf = Float(1) / nLights;
+        }
+
+        const std::shared_ptr<Light> &light = lights[lightNum];
+        Point2f uLight = sampler.Get2D();
+        Point2f uScattering = sampler.Get2D();
+
+        Vector3f wi;
+        Float lightPdf;
+        VisibilityTester visibility;
+        Spectrum Li = light.Sample_Li(it, uLight, &wi, &lightPdf, &visibility);
+
+        if (lightPdf > 0 && !Li.isBlack()) {
+            Spectrum f;
+            f = it.bsdf->f(it.wo, wi, bsdfFlags) * AbsDot(wi, it.shading.n);
+
+            if (!f.isBlack()) {
+                /* now we have to shoot the ray to the light source */
+                RayState shadowRay{move(rayState)};
+                shadowRay.ray = visibility.P0().SpawnRayTo(visibility.P1());
+                shadowRay.lightSelectPdf = lightSelectPdf;
+                shadowRay.lightPdf = lightPdf;
+                shadowRay.f = f;
+                shadowRay.Li = Li;
+                shadowRay.isShadowRay = true;
+                newRays.push_back(move(shadowRay));
+            }
+        }
+    }
+
+    return newRays;
 }
 
 void CloudIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
@@ -21,8 +77,6 @@ void CloudIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
     if (bvh == nullptr) {
         throw runtime_error("Top-level primitive must be a CloudBVH");
     }
-
-    lightDistribution = CreateLightSampleDistribution("spatial", scene);
 }
 
 void CloudIntegrator::Render(const Scene &scene) {
@@ -63,6 +117,13 @@ void CloudIntegrator::Render(const Scene &scene) {
         RayState state = move(rayQueue.front());
         rayQueue.pop_front();
 
+        if (state.isDone) {
+            filmTile->AddSample(state.sample.pFilm, state.L, state.weight);
+        }
+        else if (state.isShadowRay) {
+
+        }
+
         if (not state.toVisit.empty()) {
             vector<RayState> newRays = Trace(bvh, move(state));
             for (auto &newRay : newRays) {
@@ -90,7 +151,7 @@ void CloudIntegrator::Render(const Scene &scene) {
                 }
             }
 
-            filmTile->AddSample(state.sample.pFilm, state.L, state.weight);
+
             arena.Reset();
         }
     }
