@@ -20,17 +20,16 @@ struct RayState {
     std::stack<std::pair<uint32_t, uint32_t>> toVisit;
     Optional<std::pair<uint32_t, uint32_t>> hit;
 
-    Float lightSelectPdf;
-    Float lightPdf;
-    Float f;
-    Float Li;
     Float weight;
+    Spectrum Ld{0.f};
     Spectrum L{0.f};
 
     bool isShadowRay{false};
+    bool isDone{false};
 
     void StartTrace() {
         hit.clear();
+        toVisit = {};
         toVisit.emplace(0, 0);
     }
 };

@@ -18,10 +18,12 @@ vector<RayState> CloudIntegrator::Trace(const shared_ptr<CloudBVH> &treelet,
 
 vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
                                         RayState &&rayState,
-                                        vector<shared_ptr<Light>> &lights,
+                                        const vector<shared_ptr<Light>> &lights,
                                         MemoryArena &arena) {
     vector<RayState> newRays;
+
     SurfaceInteraction it;
+    rayState.ray.tMax = Infinity;
     treelet->Intersect(rayState, &it);
 
     it.ComputeScatteringFunctions(rayState.ray, arena, true);
@@ -29,41 +31,39 @@ vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
         throw runtime_error("!it.bsdf");
     }
 
-    const Distribution1D *distrib = lightDistribution->Lookup(it.p);
     auto &sampler = rayState.sampler;
+    const auto bsdfFlags = BxDFType(BSDF_ALL & ~BSDF_SPECULAR);
 
-    if (it.bsdf->NumComponents(BxDFType(BSDF_ALL & ~BSDF_SPECULAR)) > 0) {
+    if (it.bsdf->NumComponents(bsdfFlags) > 0) {
         /* Let's pick a light at random */
         int nLights = (int)lights.size();
         int lightNum;
         Float lightSelectPdf;
-        if (nLights > 0) {
-            lightNum = std::min((int)(sampler.Get1D() * nLights), nLights - 1);
-            lightSelectPdf = Float(1) / nLights;
+        if (nLights == 0) {
+            return newRays;
         }
 
-        const std::shared_ptr<Light> &light = lights[lightNum];
-        Point2f uLight = sampler.Get2D();
-        Point2f uScattering = sampler.Get2D();
+        lightSelectPdf = Float(1) / nLights;
+        lightNum = min((int)(sampler->Get1D() * nLights), nLights - 1);
+        const shared_ptr<Light> &light = lights[lightNum];
 
+        Point2f uLight = sampler->Get2D();
         Vector3f wi;
         Float lightPdf;
         VisibilityTester visibility;
-        Spectrum Li = light.Sample_Li(it, uLight, &wi, &lightPdf, &visibility);
+        Spectrum Li = light->Sample_Li(it, uLight, &wi, &lightPdf, &visibility);
 
-        if (lightPdf > 0 && !Li.isBlack()) {
+        if (lightPdf > 0 && !Li.IsBlack()) {
             Spectrum f;
             f = it.bsdf->f(it.wo, wi, bsdfFlags) * AbsDot(wi, it.shading.n);
 
-            if (!f.isBlack()) {
+            if (!f.IsBlack()) {
                 /* now we have to shoot the ray to the light source */
                 RayState shadowRay{move(rayState)};
                 shadowRay.ray = visibility.P0().SpawnRayTo(visibility.P1());
-                shadowRay.lightSelectPdf = lightSelectPdf;
-                shadowRay.lightPdf = lightPdf;
-                shadowRay.f = f;
-                shadowRay.Li = Li;
+                shadowRay.Ld = (f * Li / lightPdf) / lightSelectPdf;
                 shadowRay.isShadowRay = true;
+                shadowRay.StartTrace();
                 newRays.push_back(move(shadowRay));
             }
         }
@@ -85,8 +85,7 @@ void CloudIntegrator::Render(const Scene &scene) {
     MemoryArena arena;
     Bounds2i sampleBounds = camera->film->GetSampleBounds();
 
-    std::unique_ptr<FilmTile> filmTile =
-        camera->film->GetFilmTile(sampleBounds);
+    unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
     deque<RayState> rayQueue;
 
@@ -116,48 +115,36 @@ void CloudIntegrator::Render(const Scene &scene) {
     while (not rayQueue.empty()) {
         RayState state = move(rayQueue.front());
         rayQueue.pop_front();
-
-        if (state.isDone) {
-            filmTile->AddSample(state.sample.pFilm, state.L, state.weight);
-        }
-        else if (state.isShadowRay) {
-
-        }
+        vector<RayState> newRays;
 
         if (not state.toVisit.empty()) {
-            vector<RayState> newRays = Trace(bvh, move(state));
-            for (auto &newRay : newRays) {
-                rayQueue.push_back(move(newRay));
-            }
-        } else {
-            bool foundIntersection = state.isect.initialized();
-
-            if (foundIntersection) {
-                state.isect->ComputeScatteringFunctions(state.ray, arena, true);
-                if (!state.isect->bsdf) {
-                    throw runtime_error("!isect.bsdf");
-                }
-
-                const Distribution1D *distrib =
-                    lightDistribution->Lookup(state.isect->p);
-
-                if (state.isect->bsdf->NumComponents(
-                        BxDFType(BSDF_ALL & ~BSDF_SPECULAR)) > 0) {
-                    Spectrum Ld =
-                        UniformSampleOneLight(*state.isect, scene, arena,
-                                              *state.sampler, false, distrib);
-                    CHECK_GE(Ld.y(), 0.f);
-                    state.L += Ld;
-                }
+            newRays = Trace(bvh, move(state));
+        } else if (state.isDone) {
+            if (state.L.HasNaNs() || state.L.y() < -1e-5 ||
+                isinf(state.L.y())) {
+                state.L = Spectrum(0.f);
             }
 
-
+            filmTile->AddSample(state.sample.pFilm, state.L, state.weight);
             arena.Reset();
+        } else if (state.isShadowRay) {
+            if (!state.hit.initialized()) {
+                state.L += state.Ld;
+            }
+
+            state.isDone = true;
+            newRays.push_back(move(state));
+        } else if (state.hit.initialized()) {
+            newRays = Shade(bvh, move(state), scene.lights, arena);
+        }
+
+        for (auto &newRay : newRays) {
+            rayQueue.push_back(move(newRay));
         }
     }
 
     /* Create the final output */
-    camera->film->MergeFilmTile(std::move(filmTile));
+    camera->film->MergeFilmTile(move(filmTile));
     camera->film->WriteImage();
 }
 

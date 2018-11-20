@@ -24,7 +24,7 @@ class CloudIntegrator : public Integrator {
 
     static std::vector<RayState> Shade(
         const std::shared_ptr<CloudBVH> &treelet, RayState &&rayState,
-        std::vector<std::shared_ptr<Light>> &lights);
+        const std::vector<std::shared_ptr<Light>> &lights, MemoryArena &arena);
 
   protected:
     std::shared_ptr<const Camera> camera;
