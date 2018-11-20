@@ -34,6 +34,27 @@ vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
     auto &sampler = rayState.sampler;
     const auto bsdfFlags = BxDFType(BSDF_ALL & ~BSDF_SPECULAR);
 
+    if (rayState.remainingBounces) {
+        RayState newRay;
+
+        Vector3f wo = -rayState.ray.d, wi;
+        Float pdf;
+        BxDFType flags;
+        Spectrum f = it.bsdf->Sample_f(wo, &wi, rayState.sampler->Get2D(), &pdf,
+                                       BSDF_ALL, &flags);
+
+        if (!f.IsBlack() && pdf > 0.f) {
+            newRay.beta = rayState.beta * f * AbsDot(wi, it.shading.n) / pdf;
+            newRay.ray = it.SpawnRay(wi);
+            newRay.weight = rayState.weight;
+            newRay.remainingBounces = rayState.remainingBounces - 1;
+            newRay.sampler = rayState.sampler->Clone(0);
+            newRay.sample = rayState.sample;
+            newRay.StartTrace();
+            newRays.push_back(move(newRay));
+        }
+    }
+
     if (it.bsdf->NumComponents(bsdfFlags) > 0) {
         /* Let's pick a light at random */
         int nLights = (int)lights.size();
@@ -119,21 +140,18 @@ void CloudIntegrator::Render(const Scene &scene) {
 
         if (not state.toVisit.empty()) {
             newRays = Trace(bvh, move(state));
-        } else if (state.isDone) {
-            if (state.L.HasNaNs() || state.L.y() < -1e-5 ||
-                isinf(state.L.y())) {
-                state.L = Spectrum(0.f);
-            }
-
-            filmTile->AddSample(state.sample.pFilm, state.L, state.weight);
-            arena.Reset();
         } else if (state.isShadowRay) {
+            Spectrum L{0.f};
             if (!state.hit.initialized()) {
-                state.L += state.Ld;
+                L += state.beta * state.Ld;
             }
 
-            state.isDone = true;
-            newRays.push_back(move(state));
+            if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
+                L = Spectrum(0.f);
+            }
+
+            filmTile->AddSample(state.sample.pFilm, L, state.weight);
+            arena.Reset();
         } else if (state.hit.initialized()) {
             newRays = Shade(bvh, move(state), scene.lights, arena);
         }

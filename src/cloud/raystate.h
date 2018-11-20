@@ -21,11 +21,11 @@ struct RayState {
     Optional<std::pair<uint32_t, uint32_t>> hit;
 
     Float weight;
+    Spectrum beta{1.f};
     Spectrum Ld{0.f};
-    Spectrum L{0.f};
 
+    uint8_t remainingBounces{3};
     bool isShadowRay{false};
-    bool isDone{false};
 
     void StartTrace() {
         hit.clear();
