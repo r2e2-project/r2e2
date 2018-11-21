@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <deque>
 
+#include "core/paramset.h"
+
 using namespace std;
 
 namespace pbrt {
@@ -129,6 +131,7 @@ void CloudIntegrator::Render(const Scene &scene) {
             sampleData.sample = state.sampler->GetCameraSample(pixel);
             cameraSamples.emplace_back(move(sampleData));
             state.sampleIdx = i++;
+            state.remainingBounces = maxDepth;
             rayQueue.push_back(move(state));
         } while (sampler->StartNextSample());
     }
@@ -183,8 +186,9 @@ void CloudIntegrator::Render(const Scene &scene) {
 CloudIntegrator *CreateCloudIntegrator(const ParamSet &params,
                                        shared_ptr<Sampler> sampler,
                                        shared_ptr<const Camera> camera) {
+    const int maxDepth = params.FindOneInt("maxdepth", 5);
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
-    return new CloudIntegrator(camera, sampler, pixelBounds);
+    return new CloudIntegrator(maxDepth, camera, sampler, pixelBounds);
 }
 
 }  // namespace pbrt

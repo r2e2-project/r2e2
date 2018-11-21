@@ -12,10 +12,13 @@ namespace pbrt {
 
 class CloudIntegrator : public Integrator {
   public:
-    CloudIntegrator(std::shared_ptr<const Camera> camera,
+    CloudIntegrator(const int maxDepth, std::shared_ptr<const Camera> camera,
                     std::shared_ptr<Sampler> sampler,
                     const Bounds2i &pixelBounds)
-        : camera(camera), sampler(sampler), pixelBounds(pixelBounds) {}
+        : maxDepth(maxDepth),
+          camera(camera),
+          sampler(sampler),
+          pixelBounds(pixelBounds) {}
 
     void Preprocess(const Scene &scene, Sampler &sampler);
     void Render(const Scene &scene);
@@ -27,10 +30,9 @@ class CloudIntegrator : public Integrator {
         const std::shared_ptr<CloudBVH> &treelet, RayState &&rayState,
         const std::vector<std::shared_ptr<Light>> &lights, MemoryArena &arena);
 
-  protected:
-    std::shared_ptr<const Camera> camera;
-
   private:
+    const int maxDepth;
+    std::shared_ptr<const Camera> camera;
     std::shared_ptr<Sampler> sampler;
     std::shared_ptr<CloudBVH> bvh;
     const Bounds2i pixelBounds;
