@@ -7,18 +7,25 @@
 #include "core/geometry.h"
 #include "core/interaction.h"
 #include "core/sampler.h"
+#include "core/transform.h"
 #include "util/optional.h"
 
 namespace pbrt {
 
 struct RayState {
+    struct TreeletNode {
+        uint32_t treelet{0};
+        uint32_t node{0};
+        std::shared_ptr<Transform> transform{nullptr};
+    };
+
     std::unique_ptr<Sampler> sampler;
     size_t sampleIdx;
     RayDifferential ray;
 
     /* Traversing the BVH */
-    std::stack<std::pair<uint32_t, uint32_t>> toVisit;
-    Optional<std::pair<uint32_t, uint32_t>> hit;
+    std::stack<TreeletNode> toVisit;
+    Optional<TreeletNode> hit;
 
     Spectrum beta{1.f};
     Spectrum Ld{0.f};
@@ -29,7 +36,7 @@ struct RayState {
     void StartTrace() {
         hit.clear();
         toVisit = {};
-        toVisit.emplace(0, 0);
+        toVisit.push({});
     }
 };
 

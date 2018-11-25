@@ -254,17 +254,20 @@ void CloudBVH::Trace(RayState &rayState) {
     Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
     int dirIsNeg[3] = {invDir.x < 0, invDir.y < 0, invDir.z < 0};
 
-    // Follow ray through BVH nodes to find primitive intersections
-    auto current = rayState.toVisit.top();
-
-    const uint32_t currentTreelet = current.first;
+    const uint32_t currentTreelet = rayState.toVisit.top().treelet;
     loadTreelet(currentTreelet); /* we don't load any other treelets */
 
-    while (currentTreelet == current.first) {
+    while (true) {
+        auto &top = rayState.toVisit.top();
+        if (currentTreelet != top.treelet) {
+            break;
+        }
+
+        auto current = move(top);
         rayState.toVisit.pop();
 
-        auto &treelet = treelets_[current.first];
-        auto &node = treelet.nodes[current.second];
+        auto &treelet = treelets_[current.treelet];
+        auto &node = treelet.nodes[current.node];
 
         // Check ray against BVH node
         if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
@@ -273,31 +276,28 @@ void CloudBVH::Trace(RayState &rayState) {
                 for (int i = node.primitive_offset;
                      i < node.primitive_offset + node.primitive_count; i++)
                     if (primitives[i]->Intersect(ray, &isect))
-                        rayState.hit.reset(current.first, current.second);
+                        rayState.hit.reset(move(current));
 
                 if (rayState.toVisit.size() == 0) break;
-                current = rayState.toVisit.top();
             } else {
-                std::pair<uint32_t, uint32_t> children[2];
+                RayState::TreeletNode children[2];
                 for (int i = 0; i < 2; i++) {
-                    children[i].first =
-                        node.has[i] ? current.first : node.child[i];
-                    children[i].second = node.has[i] ? node.child[i] : 0;
+                    children[i].treelet =
+                        node.has[i] ? current.treelet : node.child[i];
+                    children[i].node = node.has[i] ? node.child[i] : 0;
+                    children[i].transform = current.transform;
                 }
 
                 if (dirIsNeg[node.axis]) {
-                    rayState.toVisit.push(children[LEFT]);
-                    rayState.toVisit.push(children[RIGHT]);
-                    current = rayState.toVisit.top();
+                    rayState.toVisit.push(move(children[LEFT]));
+                    rayState.toVisit.push(move(children[RIGHT]));
                 } else {
-                    rayState.toVisit.push(children[RIGHT]);
-                    rayState.toVisit.push(children[LEFT]);
-                    current = rayState.toVisit.top();
+                    rayState.toVisit.push(move(children[RIGHT]));
+                    rayState.toVisit.push(move(children[LEFT]));
                 }
             }
         } else {
             if (rayState.toVisit.size() == 0) break;
-            current = rayState.toVisit.top();
         }
     }
 }
@@ -308,10 +308,10 @@ bool CloudBVH::Intersect(RayState &rayState, SurfaceInteraction *isect) const {
     }
 
     auto &hit = *rayState.hit;
-    loadTreelet(hit.first);
+    loadTreelet(hit.treelet);
 
-    auto &treelet = treelets_[hit.first];
-    auto &node = treelet.nodes[hit.second];
+    auto &treelet = treelets_[hit.treelet];
+    auto &node = treelet.nodes[hit.node];
     auto &primitives = treelet.primitives;
 
     if (!node.leaf) {
