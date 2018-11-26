@@ -270,15 +270,12 @@ void CloudBVH::Trace(RayState &rayState) {
         auto &node = treelet.nodes[current.node];
 
         if (current.transform) {
-            Transform InterpolatedPrimToWorld;
-            current.transform->Interpolate(ray.time, &InterpolatedPrimToWorld);
-            ray = Inverse(InterpolatedPrimToWorld)(rayState.ray);
+            ray = Inverse(*current.transform)(rayState.ray);
             invDir = Vector3f{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
             dirIsNeg[0] = invDir.x < 0;
             dirIsNeg[1] = invDir.y < 0;
             dirIsNeg[2] = invDir.z < 0;
-        }
-        else {
+        } else {
             ray = rayState.ray;
             invDir = Vector3f{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
             dirIsNeg[0] = invDir.x < 0;
@@ -302,12 +299,13 @@ void CloudBVH::Trace(RayState &rayState) {
                             dynamic_pointer_cast<CloudBVH>(tp->GetPrimitive());
 
                         if (cbvh) {
+                            Transform t;
+                            tp->GetTransform().Interpolate(ray.time, &t);
+
                             RayState::TreeletNode next;
                             next.treelet = cbvh->bvh_root_;
                             next.node = 0;
-                            next.transform =
-                                make_shared<const AnimatedTransform>(
-                                    tp->GetTransform());
+                            next.transform = make_shared<Transform>(move(t));
                             rayState.toVisit.push(move(next));
                             continue; /* to the next primitive */
                         }
@@ -359,11 +357,9 @@ bool CloudBVH::Intersect(RayState &rayState, SurfaceInteraction *isect) const {
     }
 
     Ray ray = rayState.ray;
-    Transform InterpolatedPrimToWorld;
 
     if (hit.transform) {
-        hit.transform->Interpolate(ray.time, &InterpolatedPrimToWorld);
-        ray = Inverse(InterpolatedPrimToWorld)(ray);
+        ray = Inverse(*hit.transform)(ray);
     }
 
     for (int i = node.primitive_offset;
@@ -372,8 +368,8 @@ bool CloudBVH::Intersect(RayState &rayState, SurfaceInteraction *isect) const {
 
     rayState.ray.tMax = ray.tMax;
 
-    if (hit.transform && !InterpolatedPrimToWorld.IsIdentity()) {
-        *isect = InterpolatedPrimToWorld(*isect);
+    if (hit.transform && !hit.transform->IsIdentity()) {
+        *isect = (*hit.transform)(*isect);
     }
 
     return true;
