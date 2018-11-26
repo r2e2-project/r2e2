@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <deque>
+#include <iterator>
 
 #include "core/paramset.h"
 
@@ -18,10 +19,10 @@ vector<RayState> CloudIntegrator::Trace(const shared_ptr<CloudBVH> &treelet,
     return newRays;
 }
 
-vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
-                                        RayState &&rayState,
-                                        const vector<shared_ptr<Light>> &lights,
-                                        MemoryArena &arena) {
+vector<RayState> CloudIntegrator::Shade(
+    const shared_ptr<CloudBVH> &treelet, RayState &&rayState,
+    const vector<shared_ptr<Light>> &lights) {
+    MemoryArena arena;
     vector<RayState> newRays;
 
     SurfaceInteraction it;
@@ -109,7 +110,6 @@ void CloudIntegrator::Render(const Scene &scene) {
 
     Preprocess(scene, *sampler);
 
-    MemoryArena arena;
     Bounds2i sampleBounds = camera->film->GetSampleBounds();
 
     unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
@@ -154,6 +154,7 @@ void CloudIntegrator::Render(const Scene &scene) {
             newRays = Trace(bvh, move(state));
         } else if (state.isShadowRay) {
             Spectrum L{0.f};
+
             if (!state.hit.initialized()) {
                 L += state.beta * state.Ld;
             }
@@ -163,14 +164,12 @@ void CloudIntegrator::Render(const Scene &scene) {
             }
 
             cameraSamples[state.sampleIdx].L += L;
-            arena.Reset();
         } else if (state.hit.initialized()) {
-            newRays = Shade(bvh, move(state), scene.lights, arena);
+            newRays = Shade(bvh, move(state), scene.lights);
         }
 
-        for (auto &newRay : newRays) {
-            rayQueue.push_back(move(newRay));
-        }
+        rayQueue.insert(rayQueue.end(), make_move_iterator(newRays.begin()),
+                        make_move_iterator(newRays.end()));
     }
 
     for (const auto &sampleData : cameraSamples) {
