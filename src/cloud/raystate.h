@@ -16,7 +16,7 @@ struct RayState {
     struct TreeletNode {
         uint32_t treelet{0};
         uint32_t node{0};
-        std::shared_ptr<Transform> transform{nullptr};
+        std::shared_ptr<const AnimatedTransform> transform{nullptr};
     };
 
     std::unique_ptr<Sampler> sampler;
