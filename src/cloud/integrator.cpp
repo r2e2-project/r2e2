@@ -146,8 +146,8 @@ void CloudIntegrator::Render(const Scene &scene) {
     }
 
     while (not rayQueue.empty()) {
-        RayState state = move(rayQueue.front());
-        rayQueue.pop_front();
+        RayState state = move(rayQueue.back());
+        rayQueue.pop_back();
         vector<RayState> newRays;
 
         if (not state.toVisit.empty()) {
