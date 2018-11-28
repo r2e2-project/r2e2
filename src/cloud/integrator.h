@@ -23,8 +23,8 @@ class CloudIntegrator : public Integrator {
     void Preprocess(const Scene &scene, Sampler &sampler);
     void Render(const Scene &scene);
 
-    static std::vector<RayState> Trace(const std::shared_ptr<CloudBVH> &treelet,
-                                       RayState &&rayState);
+    static RayState Trace(const std::shared_ptr<CloudBVH> &treelet,
+                          RayState &&rayState);
 
     static std::vector<RayState> Shade(
         const std::shared_ptr<CloudBVH> &treelet, RayState &&rayState,

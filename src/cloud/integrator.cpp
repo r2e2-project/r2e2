@@ -11,12 +11,11 @@ using namespace std;
 
 namespace pbrt {
 
-vector<RayState> CloudIntegrator::Trace(const shared_ptr<CloudBVH> &treelet,
-                                        RayState &&rayState) {
-    vector<RayState> newRays;
-    treelet->Trace(rayState);
-    newRays.push_back(move(rayState));
-    return newRays;
+RayState CloudIntegrator::Trace(const shared_ptr<CloudBVH> &treelet,
+                                RayState &&rayState) {
+    RayState result{move(rayState)};
+    treelet->Trace(result);
+    return result;
 }
 
 vector<RayState> CloudIntegrator::Shade(
@@ -151,7 +150,7 @@ void CloudIntegrator::Render(const Scene &scene) {
         vector<RayState> newRays;
 
         if (not state.toVisit.empty()) {
-            newRays = Trace(bvh, move(state));
+            newRays.push_back(move(Trace(bvh, move(state))));
         } else if (state.isShadowRay) {
             Spectrum L{0.f};
 
