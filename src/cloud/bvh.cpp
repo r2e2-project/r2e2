@@ -271,17 +271,14 @@ void CloudBVH::Trace(RayState &rayState) {
 
         if (current.transform) {
             ray = Inverse(*current.transform)(rayState.ray);
-            invDir = Vector3f{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
-            dirIsNeg[0] = invDir.x < 0;
-            dirIsNeg[1] = invDir.y < 0;
-            dirIsNeg[2] = invDir.z < 0;
         } else {
             ray = rayState.ray;
-            invDir = Vector3f{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
-            dirIsNeg[0] = invDir.x < 0;
-            dirIsNeg[1] = invDir.y < 0;
-            dirIsNeg[2] = invDir.z < 0;
         }
+
+        invDir = Vector3f{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
+        dirIsNeg[0] = invDir.x < 0;
+        dirIsNeg[1] = invDir.y < 0;
+        dirIsNeg[2] = invDir.z < 0;
 
         // Check ray against BVH node
         if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
