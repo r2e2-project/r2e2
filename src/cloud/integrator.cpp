@@ -150,7 +150,10 @@ void CloudIntegrator::Render(const Scene &scene) {
         vector<RayState> newRays;
 
         if (not state.toVisit.empty()) {
-            newRays.push_back(move(Trace(bvh, move(state))));
+            auto newRay = Trace(bvh, move(state));
+            if (!newRay.isShadowRay || !newRay.hit.initialized()) {
+                newRays.push_back(move(newRay));
+            }
         } else if (state.isShadowRay) {
             Spectrum L{0.f};
 
