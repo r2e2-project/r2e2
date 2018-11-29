@@ -248,11 +248,13 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
 }
 
 void CloudBVH::Trace(RayState &rayState) {
-    auto ray = rayState.ray;
-
     SurfaceInteraction isect;
-    Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
+
+    RayDifferential ray = rayState.ray;
+    Vector3f invDir{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
     int dirIsNeg[3] = {invDir.x < 0, invDir.y < 0, invDir.z < 0};
+
+    Transform *lastTransform = nullptr;
 
     const uint32_t currentTreelet = rayState.toVisit.top().treelet;
     loadTreelet(currentTreelet); /* we don't load any other treelets */
@@ -269,16 +271,16 @@ void CloudBVH::Trace(RayState &rayState) {
         auto &treelet = treelets_[current.treelet];
         auto &node = treelet.nodes[current.node];
 
-        if (current.transform) {
-            ray = Inverse(*current.transform)(rayState.ray);
-        } else {
-            ray = rayState.ray;
+        /* prepare the ray */
+        if (current.transform.get() != lastTransform) {
+            lastTransform = current.transform.get();
+            ray = current.transform ? Inverse(*current.transform)(rayState.ray)
+                                    : rayState.ray;
+            invDir = Vector3f{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
+            dirIsNeg[0] = invDir.x < 0;
+            dirIsNeg[1] = invDir.y < 0;
+            dirIsNeg[2] = invDir.z < 0;
         }
-
-        invDir = Vector3f{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
-        dirIsNeg[0] = invDir.x < 0;
-        dirIsNeg[1] = invDir.y < 0;
-        dirIsNeg[2] = invDir.z < 0;
 
         // Check ray against BVH node
         if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
