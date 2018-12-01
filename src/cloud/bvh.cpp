@@ -315,7 +315,7 @@ void CloudBVH::Trace(RayState &rayState) {
                     }
                 }
 
-                if (rayState.toVisit.size() == 0) break;
+                if (rayState.toVisit.empty()) break;
             } else {
                 RayState::TreeletNode children[2];
                 for (int i = 0; i < 2; i++) {
@@ -334,7 +334,7 @@ void CloudBVH::Trace(RayState &rayState) {
                 }
             }
         } else {
-            if (rayState.toVisit.size() == 0) break;
+            if (rayState.toVisit.empty()) break;
         }
     }
 }

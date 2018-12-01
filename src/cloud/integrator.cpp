@@ -158,7 +158,7 @@ void CloudIntegrator::Render(const Scene &scene) {
             Spectrum L{0.f};
 
             if (!state.hit.initialized()) {
-                L += state.beta * state.Ld;
+                L = state.beta * state.Ld;
             }
 
             if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
