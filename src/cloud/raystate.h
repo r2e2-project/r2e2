@@ -40,7 +40,7 @@ struct RayState {
 
     void StartTrace() {
         hit.clear();
-        toVisit = {};
+        // toVisit = {};
         toVisit.push({});
     }
 };

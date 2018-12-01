@@ -107,9 +107,7 @@ void CloudIntegrator::Render(const Scene &scene) {
     };
 
     Preprocess(scene, *sampler);
-
     Bounds2i sampleBounds = camera->film->GetSampleBounds();
-
     unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
     deque<RayState> rayQueue;
