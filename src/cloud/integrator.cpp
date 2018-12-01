@@ -170,8 +170,9 @@ void CloudIntegrator::Render(const Scene &scene) {
             newRays = Shade(bvh, move(state), scene.lights);
         }
 
-        rayQueue.insert(rayQueue.end(), make_move_iterator(newRays.begin()),
-                        make_move_iterator(newRays.end()));
+        for (auto &&newRay : newRays) {
+            rayQueue.push_back(move(newRay));
+        }
     }
 
     for (const auto &sampleData : cameraSamples) {

@@ -19,6 +19,11 @@ struct RayState {
         std::shared_ptr<Transform> transform{nullptr};
     };
 
+    RayState &operator=(const RayState &) = delete;
+    RayState(const RayState &) = delete;
+    RayState() = default;
+    RayState(RayState &&) = default;
+
     std::unique_ptr<Sampler> sampler;
     size_t sampleIdx;
     RayDifferential ray;
