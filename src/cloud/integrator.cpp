@@ -20,8 +20,7 @@ RayState CloudIntegrator::Trace(const shared_ptr<CloudBVH> &treelet,
 
 vector<RayState> CloudIntegrator::Shade(
     const shared_ptr<CloudBVH> &treelet, RayState &&rayState,
-    const vector<shared_ptr<Light>> &lights) {
-    MemoryArena arena;
+    const vector<shared_ptr<Light>> &lights, MemoryArena &arena) {
     vector<RayState> newRays;
 
     SurfaceInteraction it;
@@ -167,7 +166,8 @@ void CloudIntegrator::Render(const Scene &scene) {
 
             cameraSamples[state.sampleIdx].L += L;
         } else if (state.hit.initialized()) {
-            newRays = Shade(bvh, move(state), scene.lights);
+            newRays = Shade(bvh, move(state), scene.lights, arena);
+            arena.Reset();
         }
 
         for (auto &&newRay : newRays) {

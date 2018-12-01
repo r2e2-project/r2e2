@@ -28,7 +28,7 @@ class CloudIntegrator : public Integrator {
 
     static std::vector<RayState> Shade(
         const std::shared_ptr<CloudBVH> &treelet, RayState &&rayState,
-        const std::vector<std::shared_ptr<Light>> &lights);
+        const std::vector<std::shared_ptr<Light>> &lights, MemoryArena &arena);
 
   private:
     const int maxDepth;
@@ -36,6 +36,8 @@ class CloudIntegrator : public Integrator {
     std::shared_ptr<Sampler> sampler;
     std::shared_ptr<CloudBVH> bvh;
     const Bounds2i pixelBounds;
+
+    MemoryArena arena;
 };
 
 CloudIntegrator *CreateCloudIntegrator(const ParamSet &params,
