@@ -110,7 +110,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
         return; /* this tree is already loaded */
     }
 
-    protobuf::RecordReader reader(bvh_path_ + "/" + to_string(root_id));
+    protobuf::RecordReader reader(bvh_path_ + "/T" + to_string(root_id));
     vector<TreeletNode> nodes;
 
     stack<pair<uint32_t, Child>> q;

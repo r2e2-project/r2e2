@@ -929,7 +929,7 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
             continue; /* we've already written this node to disk */
         }
 
-        protobuf::RecordWriter writer(path + "/" + std::to_string(root_index + index_offset));
+        protobuf::RecordWriter writer(path + "/T" + std::to_string(root_index + index_offset));
 
         const uint32_t current_treelet = labels[root_index];
         std::stack<int> q;
