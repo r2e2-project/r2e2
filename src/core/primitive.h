@@ -90,6 +90,8 @@ class GeometricPrimitive : public Primitive {
 
     PrimitiveType GetType() const { return PrimitiveType::Geometric; }
 
+    const Shape *GetShape() const { return shape.get(); }
+
   private:
     // GeometricPrimitive Private Data
     std::shared_ptr<Shape> shape;

@@ -19,6 +19,22 @@ protobuf::Point3f to_protobuf(const Point3f& point) {
     return proto_point;
 }
 
+protobuf::Vector3f to_protobuf(const Vector3f& vector) {
+    protobuf::Vector3f proto_vector;
+    proto_vector.set_x(vector.x);
+    proto_vector.set_y(vector.y);
+    proto_vector.set_z(vector.z);
+    return proto_vector;
+}
+
+protobuf::Normal3f to_protobuf(const Normal3f& normal) {
+    protobuf::Normal3f proto_normal;
+    proto_normal.set_x(normal.x);
+    proto_normal.set_y(normal.y);
+    proto_normal.set_z(normal.z);
+    return proto_normal;
+}
+
 protobuf::Bounds3f to_protobuf(const Bounds3f& bounds) {
     protobuf::Bounds3f proto_bounds;
     *proto_bounds.mutable_point_min() = to_protobuf(bounds.pMin);
@@ -62,15 +78,41 @@ protobuf::TriangleMesh to_protobuf(const TriangleMesh& tm) {
         *proto_tm.add_p() = to_protobuf(tm.p[i]);
     }
 
-    if (tm.uv != nullptr || tm.n != nullptr || tm.s != nullptr) {
-        throw std::runtime_error("TriangleMesh: uv, n and s are not supported");
+    if (tm.uv) {
+        for (size_t i = 0; i < tm.nVertices; i++) {
+            *proto_tm.add_uv() = to_protobuf(tm.uv[i]);
+        }
+    }
+
+    if (tm.n) {
+        for (size_t i = 0; i < tm.nVertices; i++) {
+            *proto_tm.add_n() = to_protobuf(tm.n[i]);
+        }
+    }
+
+    if (tm.s) {
+        for (size_t i = 0; i < tm.nVertices; i++) {
+            *proto_tm.add_s() = to_protobuf(tm.s[i]);
+        }
     }
 
     return proto_tm;
 }
 
+Point2f from_protobuf(const protobuf::Point2f& point) {
+    return {point.x(), point.y()};
+}
+
 Point3f from_protobuf(const protobuf::Point3f& point) {
     return {point.x(), point.y(), point.z()};
+}
+
+Normal3f from_protobuf(const protobuf::Normal3f& normal) {
+    return {normal.x(), normal.y(), normal.z()};
+}
+
+Vector3f from_protobuf(const protobuf::Vector3f& vector) {
+    return {vector.x(), vector.y(), vector.z()};
 }
 
 Bounds3f from_protobuf(const protobuf::Bounds3f& bounds) {
@@ -92,6 +134,9 @@ TriangleMesh from_protobuf(const protobuf::TriangleMesh& proto_tm) {
     Transform identity;
     std::vector<int> vertexIndices;
     std::vector<Point3f> p;
+    std::vector<Vector3f> s;
+    std::vector<Normal3f> n;
+    std::vector<Point2f> uv;
 
     vertexIndices.reserve(proto_tm.n_triangles() * 3);
     p.reserve(proto_tm.n_vertices());
@@ -106,14 +151,26 @@ TriangleMesh from_protobuf(const protobuf::TriangleMesh& proto_tm) {
         p.push_back(from_protobuf(proto_tm.p(i)));
     }
 
+    for (size_t i = 0; i < proto_tm.uv_size(); i++) {
+        uv.push_back(from_protobuf(proto_tm.uv(i)));
+    }
+
+    for (size_t i = 0; i < proto_tm.s_size(); i++) {
+        s.push_back(from_protobuf(proto_tm.s(i)));
+    }
+
+    for (size_t i = 0; i < proto_tm.n_size(); i++) {
+        n.push_back(from_protobuf(proto_tm.n(i)));
+    }
+
     return {identity,
             proto_tm.n_triangles(),
             vertexIndices.data(),
             proto_tm.n_vertices(),
             p.data(),
-            nullptr,
-            nullptr,
-            nullptr,
+            s.data(),
+            n.data(),
+            uv.data(),
             nullptr,
             nullptr,
             nullptr};

@@ -923,6 +923,7 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
 
     uint32_t nested_tree_offset = nodeCount;
     std::map<BVHAccel *, size_t> bvh_instances;
+    std::map<TriangleMesh *, size_t> triangle_meshes;
 
     for (int root_index = 0; root_index < nodeCount; root_index++) {
         if (not labels[root_index]) {
@@ -954,9 +955,11 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
             if (node.nPrimitives > 0) {
                 /* sorry about the disgusting code */
                 for (int i = 0; i < node.nPrimitives; i++) {
-                    if (primitives[node.primitivesOffset + i]->GetType() == PrimitiveType::Transformed) {
+                    auto &primitive = primitives[node.primitivesOffset + i];
+                    if (primitive->GetType() == PrimitiveType::Transformed) {
+                        /* it's an instance */
                         std::shared_ptr<TransformedPrimitive> tp =
-                            std::dynamic_pointer_cast<TransformedPrimitive>(primitives[node.primitivesOffset + i]);
+                            std::dynamic_pointer_cast<TransformedPrimitive>(primitive);
 
                         if (tp != nullptr and tp->GetBaseType() == PrimitiveType::Aggregate) {
                             if (index_offset != 0) {
@@ -982,6 +985,32 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
 
                             *proto_node.add_transformed_primitives() = proto_tp;
                         }
+                    }
+                    else if (primitive->GetType() == PrimitiveType::Geometric) {
+                        /* it's a shape+material */
+                        std::shared_ptr<GeometricPrimitive> gp =
+                            std::dynamic_pointer_cast<GeometricPrimitive>(primitive);
+
+                        const Shape *shape = gp->GetShape();
+                        if (shape->GetType() != ShapeType::Triangle) {
+                            throw std::runtime_error("only Triangles are supported");
+                        }
+
+                        const Triangle *triangle = dynamic_cast<const Triangle *>(shape);
+                        if (triangle_meshes.count(triangle->mesh.get()) == 0) {
+                            /* we need to dump this triangle mesh */
+                            auto &triangle_mesh = triangle->mesh;
+                            const int tm_id = triangle_meshes.size();
+                            triangle_meshes[triangle_mesh.get()] = tm_id;
+                            protobuf::RecordWriter tm_writer(path + "/TM" + std::to_string(tm_id));
+                            tm_writer.write(to_protobuf(*triangle_mesh));
+                        }
+
+                        const int tm_id = triangle_meshes[triangle->mesh.get()];
+                        protobuf::Triangle triangle_proto;
+                        triangle_proto.set_mesh_id(tm_id);
+                        triangle_proto.set_tri_number((triangle->mesh->vertexIndices.data() - triangle->v) / 3);
+                        *proto_node.add_triangles() = triangle_proto;
                     }
                 }
 

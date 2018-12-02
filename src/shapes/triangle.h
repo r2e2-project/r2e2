@@ -41,6 +41,7 @@
 // shapes/triangle.h*
 #include "shape.h"
 #include "stats.h"
+#include "accelerators/bvh.h"
 #include <map>
 
 namespace pbrt {
@@ -113,6 +114,8 @@ class Triangle : public Shape {
     std::shared_ptr<TriangleMesh> mesh;
     const int *v;
     int faceIndex;
+
+    friend BVHAccel;
 };
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
