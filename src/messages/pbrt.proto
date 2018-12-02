@@ -46,8 +46,8 @@ message BVHNode {
 // Shapes
 
 message TriangleMesh {
-    uint32 n_triangles = 1;
-    uint32 n_vertices = 2;
+    int32 n_triangles = 1;
+    int32 n_vertices = 2;
     repeated uint32 vertex_indices = 3;
     repeated Point3f p = 4;
     repeated Point3f n = 5; // Normal3f
