@@ -40,7 +40,7 @@ CloudBVH::CloudBVH(const string &bvh_path, const uint32_t bvh_root)
     map<string, shared_ptr<Texture<Float>>> fTex;
     map<string, shared_ptr<Texture<Spectrum>>> sTex;
     TextureParams textureParams(params, emptyParams, fTex, sTex);
-    shared_ptr<Material> material{CreateMatteMaterial(textureParams)};
+    default_material.reset(CreateMatteMaterial(textureParams));
 
     /* (2.1) let's create the unit cube */
     vector<Point3f> vertices{
@@ -64,7 +64,7 @@ CloudBVH::CloudBVH(const string &bvh_path, const uint32_t bvh_root)
 
     for (auto &shape : shapes) {
         primitives.emplace_back(move(make_shared<GeometricPrimitive>(
-            shape, material, nullptr, MediumInterface{})));
+            shape, default_material, nullptr, MediumInterface{})));
     }
 
     unit_cube = make_shared<BVHAccel>(primitives);
@@ -88,7 +88,7 @@ CloudBVH::CloudBVH(const string &bvh_path, const uint32_t bvh_root)
     primitives.reserve(shapes.size());
     for (auto &shape : shapes) {
         primitives.emplace_back(move(make_shared<GeometricPrimitive>(
-            shape, material, nullptr, MediumInterface{})));
+            shape, default_material, nullptr, MediumInterface{})));
     }
 
     unit_plane = make_shared<BVHAccel>(primitives);
@@ -226,6 +226,36 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
                     move(make_unique<TransformedPrimitive>(
                         bvh_instances_[proto_tp.root_ref()],
                         primitive_to_world)));
+            }
+        } else if (proto_node.triangles_size()) {
+            node.leaf = true;
+            node.has[LEFT] = node.has[RIGHT] = false;
+            node.child[LEFT] = node.child[RIGHT] = 0;
+
+            node.primitive_offset = tree_primitives.size();
+            node.primitive_count = proto_node.triangles_size();
+
+            for (int i = 0; i < proto_node.triangles_size(); i++) {
+                auto &proto_t = proto_node.triangles(i);
+                const auto tm_id = proto_t.mesh_id();
+
+                /* load the TriangleMesh if necessary */
+                if (triangle_meshes_.count(tm_id) == 0) {
+                    protobuf::RecordReader tm_reader(bvh_path_ + "/TM" +
+                                                     to_string(tm_id));
+                    protobuf::TriangleMesh tm;
+                    tm_reader.read(&tm);
+                    triangle_meshes_[tm_id] =
+                        make_shared<TriangleMesh>(move(from_protobuf(tm)));
+                }
+
+                auto shape = make_shared<Triangle>(
+                    &identity_transform_, &identity_transform_, false,
+                    triangle_meshes_[tm_id], proto_t.tri_number());
+
+                tree_primitives.emplace_back(
+                    move(make_unique<GeometricPrimitive>(
+                        shape, default_material, nullptr, MediumInterface{})));
             }
         }
 

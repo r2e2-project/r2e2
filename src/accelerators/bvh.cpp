@@ -1009,7 +1009,7 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
                         const int tm_id = triangle_meshes[triangle->mesh.get()];
                         protobuf::Triangle triangle_proto;
                         triangle_proto.set_mesh_id(tm_id);
-                        triangle_proto.set_tri_number((triangle->mesh->vertexIndices.data() - triangle->v) / 3);
+                        triangle_proto.set_tri_number((triangle->v - triangle->mesh->vertexIndices.data()) / 3);
                         *proto_node.add_triangles() = triangle_proto;
                     }
                 }
