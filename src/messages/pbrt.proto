@@ -51,7 +51,7 @@ message TransformedPrimitive {
 message TriangleMesh {
     int32 n_triangles = 1;
     int32 n_vertices = 2;
-    repeated uint32 vertex_indices = 3;
+    repeated int32 vertex_indices = 3;
     repeated Point3f p = 4;
     repeated Normal3f n = 5; // Normal3f
     repeated Vector3f s = 6; // Vector3f

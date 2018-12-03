@@ -20,7 +20,7 @@ void RecordWriter::write_empty() {
 
 RecordReader::RecordReader(const std::string & filename)
     : fin_(CheckSystemCall(filename, open(filename.c_str(), O_RDONLY, 0))) {
-    coded_input_.SetTotalBytesLimit( 268'435'456, 134'217'728 );
+    coded_input_.SetTotalBytesLimit( 536'870'912, 268'435'456 );
     eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
 }
 

@@ -141,10 +141,8 @@ TriangleMesh from_protobuf(const protobuf::TriangleMesh& proto_tm) {
     vertexIndices.reserve(proto_tm.n_triangles() * 3);
     p.reserve(proto_tm.n_vertices());
 
-    for (size_t i = 0; i < proto_tm.n_triangles(); i++) {
-        vertexIndices.push_back(proto_tm.vertex_indices(3 * i));
-        vertexIndices.push_back(proto_tm.vertex_indices(3 * i + 1));
-        vertexIndices.push_back(proto_tm.vertex_indices(3 * i + 2));
+    for (size_t i = 0; i < proto_tm.vertex_indices_size(); i++) {
+        vertexIndices.push_back(proto_tm.vertex_indices(i));
     }
 
     for (size_t i = 0; i < proto_tm.n_vertices(); i++) {

@@ -930,7 +930,8 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
             continue; /* we've already written this node to disk */
         }
 
-        protobuf::RecordWriter writer(path + "/T" + std::to_string(root_index + index_offset));
+        const size_t treelet_id = root_index + index_offset;
+        protobuf::RecordWriter writer(path + "/T" + std::to_string(treelet_id));
 
         const uint32_t current_treelet = labels[root_index];
         std::stack<int> q;
@@ -1000,16 +1001,23 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
                         if (triangle_meshes.count(triangle->mesh.get()) == 0) {
                             /* we need to dump this triangle mesh */
                             auto &triangle_mesh = triangle->mesh;
-                            const int tm_id = triangle_meshes.size();
+                            const int tm_id = triangle_meshes.size() + index_offset;
                             triangle_meshes[triangle_mesh.get()] = tm_id;
-                            protobuf::RecordWriter tm_writer(path + "/TM" + std::to_string(tm_id));
+                            protobuf::RecordWriter tm_writer(
+                                path + "/TM" + std::to_string(tm_id));
                             tm_writer.write(to_protobuf(*triangle_mesh));
                         }
 
                         const int tm_id = triangle_meshes[triangle->mesh.get()];
                         protobuf::Triangle triangle_proto;
                         triangle_proto.set_mesh_id(tm_id);
-                        triangle_proto.set_tri_number((triangle->v - triangle->mesh->vertexIndices.data()) / 3);
+                        const int tri_num = (triangle->v - triangle->mesh->vertexIndices.data()) / 3;
+
+                        if (tri_num < 0 || (tri_num * 3) >= triangle->mesh->vertexIndices.size()) {
+                            throw std::runtime_error("invalid triangle number");
+                        }
+
+                        triangle_proto.set_tri_number(tri_num);
                         *proto_node.add_triangles() = triangle_proto;
                     }
                 }
