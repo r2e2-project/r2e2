@@ -55,7 +55,7 @@ vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
             newRay.ray = it.SpawnRay(wi);
             newRay.bounces = rayState.bounces + 1;
             newRay.remainingBounces = rayState.remainingBounces - 1;
-            newRay.sampler = rayState.sampler->Clone(0);
+            newRay.sampler = rayState.sampler->Clone(rand());
             newRay.sampleIdx = rayState.sampleIdx;
             newRay.StartTrace();
             newRays.push_back(move(newRay));
@@ -139,7 +139,7 @@ void CloudIntegrator::Render(const Scene &scene) {
         do {
             RayState state;
             SampleData sampleData;
-            state.sampler = sampler->Clone(0);
+            state.sampler = sampler->Clone(rand());
             sampleData.sample = state.sampler->GetCameraSample(pixel);
             cameraSamples.emplace_back(move(sampleData));
             state.sampleIdx = i++;
