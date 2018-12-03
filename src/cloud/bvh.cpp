@@ -24,14 +24,10 @@ CloudBVH::CloudBVH(const string &bvh_path, const uint32_t bvh_root)
         throw runtime_error("Cannot use CloudBVH with multiple threads");
     }
 
-    /* let's create the base cube */
-    /* (1) create the material for the cube */
-    const int tree_id = rand();
-
     unique_ptr<Float[]> color(new Float[3]);
-    color[0] = ((tree_id) % 9) / 8.f;
-    color[1] = ((tree_id * 117 + 101) % 9) / 8.f;
-    color[2] = ((tree_id * 23 + 2138) % 9) / 8.f;
+    color[0] = 0.f;
+    color[1] = 0.5;
+    color[2] = 0.f;
 
     ParamSet emptyParams;
     ParamSet params;
@@ -41,57 +37,6 @@ CloudBVH::CloudBVH(const string &bvh_path, const uint32_t bvh_root)
     map<string, shared_ptr<Texture<Spectrum>>> sTex;
     TextureParams textureParams(params, emptyParams, fTex, sTex);
     default_material.reset(CreateMatteMaterial(textureParams));
-
-    /* (2.1) let's create the unit cube */
-    vector<Point3f> vertices{
-        {0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {1.f, 1.f, 0.f}, {0.f, 1.f, 0.f},
-        {0.f, 0.f, 1.f}, {1.f, 0.f, 1.f}, {1.f, 1.f, 1.f}, {0.f, 1.f, 1.f},
-    };
-
-    // clang-format off
-    vector<int> triangles{0, 1, 2,    0, 2, 3,    4, 5, 6,    4, 6, 7,
-                          2, 3, 6,    3, 6, 7,    0, 3, 4,    3, 4, 7,
-                          1, 5, 6,    1, 2, 6,    0, 1, 5,    0, 4, 5};
-    // clang-format on
-
-    auto shapes = CreateTriangleMesh(
-        &identity_transform_, &identity_transform_, false, triangles.size() / 3,
-        triangles.data(), vertices.size(), vertices.data(), nullptr, nullptr,
-        nullptr, nullptr, nullptr);
-
-    vector<shared_ptr<Primitive>> primitives;
-    primitives.reserve(shapes.size());
-
-    for (auto &shape : shapes) {
-        primitives.emplace_back(move(make_shared<GeometricPrimitive>(
-            shape, default_material, nullptr, MediumInterface{})));
-    }
-
-    unit_cube = make_shared<BVHAccel>(primitives);
-
-    /* (2.2) let's create the unit plane */
-    vertices.clear();
-    triangles.clear();
-    primitives.clear();
-
-    vertices.insert(
-        vertices.end(),
-        {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {1.f, 1.f, 0.f}, {0.f, 1.f, 0.f}});
-
-    triangles.insert(triangles.end(), {0, 1, 2, 0, 2, 3});
-
-    shapes = CreateTriangleMesh(&identity_transform_, &identity_transform_,
-                                false, triangles.size() / 3, triangles.data(),
-                                vertices.size(), vertices.data(), nullptr,
-                                nullptr, nullptr, nullptr, nullptr);
-
-    primitives.reserve(shapes.size());
-    for (auto &shape : shapes) {
-        primitives.emplace_back(move(make_shared<GeometricPrimitive>(
-            shape, default_material, nullptr, MediumInterface{})));
-    }
-
-    unit_plane = make_shared<BVHAccel>(primitives);
 }
 
 Bounds3f CloudBVH::WorldBound() const {
@@ -132,52 +77,6 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
 
             node.has[parent.second] = false;
             node.child[parent.second] = 0;
-
-            if ((not node.has[LEFT] and not node.has[RIGHT] and
-                 not node.child[LEFT] and not node.child[RIGHT]) or
-                (node.leaf and not node.primitive_count)) {
-                auto S = node.bounds.Diagonal();
-                const auto P = node.bounds.pMin;
-
-                if ((S.x == 0 and (S.y == 0 or S.z == 0)) or
-                    (S.y == 0 and S.z == 0)) {
-                    node.leaf = true;
-                    node.primitive_count = 0;
-                    node.primitive_offset = 0;
-                    continue;
-                }
-
-                auto &unit_shape =
-                    (S.x == 0 or S.y == 0 or S.z == 0) ? unit_plane : unit_cube;
-
-                Transform rotate = identity_transform_;
-
-                if (S.x == 0) {
-                    S.x = 1.f;
-                    rotate = RotateY(90);
-                } else if (S.y == 0) {
-                    S.y = 1.f;
-                    rotate = RotateX(90);
-                } else if (S.z == 0) {
-                    S.z = 1.f;
-                }
-
-                /* this is a terminal node, we create the primitives now */
-                node.leaf = true;
-                node.primitive_count = 1;
-                node.primitive_offset = tree_primitives.size();
-
-                transforms_.push_back(move(
-                    make_unique<Transform>(Translate(static_cast<Vector3f>(P)) *
-                                           Scale(S.x, S.y, S.z) * rotate)));
-
-                const Transform *transform = transforms_.back().get();
-
-                tree_primitives.push_back(
-                    move(make_unique<TransformedPrimitive>(
-                        const_cast<shared_ptr<Primitive> &>(unit_shape),
-                        AnimatedTransform{transform, 0, transform, 0})));
-            }
 
             continue;
         }

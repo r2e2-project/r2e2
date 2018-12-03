@@ -65,8 +65,6 @@ class CloudBVH : public Aggregate {
     mutable std::vector<std::unique_ptr<Transform>> transforms_;
     mutable std::map<uint32_t, std::shared_ptr<TriangleMesh>> triangle_meshes_;
 
-    mutable std::shared_ptr<Primitive> unit_cube;
-    mutable std::shared_ptr<Primitive> unit_plane;
     mutable std::shared_ptr<Material> default_material;
 
     void loadTreelet(const uint32_t root_id) const;
