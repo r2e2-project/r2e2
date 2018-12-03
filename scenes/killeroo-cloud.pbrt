@@ -4,7 +4,7 @@ Rotate -5 0 0 1
 Camera "perspective" "float fov" [39]
 Film "image"
 "integer xresolution" [1024] "integer yresolution" [600]
-    "string filename" "killeroo-simple.png"
+    "string filename" "killeroo-cloud.png"
 
 # zoom in by feet
 # "integer xresolution" [1500] "integer yresolution" [1500]
@@ -12,9 +12,9 @@ Film "image"
 
 Sampler "halton" "integer pixelsamples" [8]
 
-Integrator "cloud"
+Integrator "cloud" "integer maxdepth" [5]
 
-Accelerator "cloudbvh" "string loadpath" ["/tmp/killeroo-bvh"]
+Accelerator "cloudbvh" "string loadpath" ["killeroo-data"]
 
 WorldBegin
 

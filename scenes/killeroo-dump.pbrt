@@ -12,9 +12,9 @@ Film "image"
 
 Sampler "halton" "integer pixelsamples" [8]
 
-Integrator "path"
+Integrator "path" "integer maxdepth" [5]
 
-Accelerator "bvh" "string dumppath" ["/tmp/killeroo-bvh"] "integer dumptreeletsize" [150000]
+Accelerator "bvh" # "string dumppath" ["killeroo-data"] "integer dumptreeletsize" [150000]
 
 WorldBegin
 
