@@ -11,6 +11,12 @@ using namespace std;
 
 namespace pbrt {
 
+STAT_COUNTER("Integrator/Camera rays traced", nCameraRays);
+STAT_COUNTER("Intersections/Regular ray intersection tests",
+             nIntersectionTests);
+STAT_COUNTER("Intersections/Shadow ray intersection tests", nShadowTests);
+STAT_INT_DISTRIBUTION("Integrator/Path length", pathLength);
+
 RayState CloudIntegrator::Trace(const shared_ptr<CloudBVH> &treelet,
                                 RayState &&rayState) {
     RayState result{move(rayState)};
@@ -18,9 +24,10 @@ RayState CloudIntegrator::Trace(const shared_ptr<CloudBVH> &treelet,
     return result;
 }
 
-vector<RayState> CloudIntegrator::Shade(
-    const shared_ptr<CloudBVH> &treelet, RayState &&rayState,
-    const vector<shared_ptr<Light>> &lights, MemoryArena &arena) {
+vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
+                                        RayState &&rayState,
+                                        const vector<shared_ptr<Light>> &lights,
+                                        MemoryArena &arena) {
     vector<RayState> newRays;
 
     SurfaceInteraction it;
@@ -46,12 +53,19 @@ vector<RayState> CloudIntegrator::Shade(
             RayState newRay;
             newRay.beta = rayState.beta * f * AbsDot(wi, it.shading.n) / pdf;
             newRay.ray = it.SpawnRay(wi);
+            newRay.bounces = rayState.bounces + 1;
             newRay.remainingBounces = rayState.remainingBounces - 1;
             newRay.sampler = rayState.sampler->Clone(0);
             newRay.sampleIdx = rayState.sampleIdx;
             newRay.StartTrace();
             newRays.push_back(move(newRay));
+
+            ++nIntersectionTests;
         }
+    }
+    else {
+        /* we're done with this path */
+        ReportValue(pathLength, rayState.bounces);
     }
 
     if (it.bsdf->NumComponents(bsdfFlags) > 0) {
@@ -85,6 +99,8 @@ vector<RayState> CloudIntegrator::Shade(
                 shadowRay.isShadowRay = true;
                 shadowRay.StartTrace();
                 newRays.push_back(move(shadowRay));
+
+                ++nShadowTests;
             }
         }
     }
@@ -129,6 +145,9 @@ void CloudIntegrator::Render(const Scene &scene) {
             state.sampleIdx = i++;
             state.remainingBounces = maxDepth;
             rayQueue.push_back(move(state));
+
+            ++nIntersectionTests;
+            ++nCameraRays;
         } while (sampler->StartNextSample());
     }
 
@@ -166,6 +185,9 @@ void CloudIntegrator::Render(const Scene &scene) {
         } else if (state.hit.initialized()) {
             newRays = Shade(bvh, move(state), scene.lights, arena);
             arena.Reset();
+        }
+        else {
+            ReportValue(pathLength, state.bounces);
         }
 
         for (auto &&newRay : newRays) {

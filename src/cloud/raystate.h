@@ -35,6 +35,7 @@ struct RayState {
     Spectrum beta{1.f};
     Spectrum Ld{0.f};
 
+    uint8_t bounces{0};
     uint8_t remainingBounces{3};
     bool isShadowRay{false};
 
