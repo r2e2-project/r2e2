@@ -17,16 +17,17 @@ STAT_COUNTER("Intersections/Regular ray intersection tests",
 STAT_COUNTER("Intersections/Shadow ray intersection tests", nShadowTests);
 STAT_INT_DISTRIBUTION("Integrator/Path length", pathLength);
 
-RayState CloudIntegrator::Trace(const shared_ptr<CloudBVH> &treelet,
-                                RayState &&rayState) {
+RayState CloudIntegrator::Trace(RayState &&rayState,
+                                const shared_ptr<CloudBVH> &treelet) {
     RayState result{move(rayState)};
     treelet->Trace(result);
     return result;
 }
 
-vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
-                                        RayState &&rayState,
+vector<RayState> CloudIntegrator::Shade(RayState &&rayState,
+                                        const shared_ptr<CloudBVH> &treelet,
                                         const vector<shared_ptr<Light>> &lights,
+                                        shared_ptr<Sampler> &sampler,
                                         MemoryArena &arena) {
     vector<RayState> newRays;
 
@@ -39,14 +40,17 @@ vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
         throw runtime_error("!it.bsdf");
     }
 
-    auto &sampler = rayState.sampler;
+    /* setting the sampler */
+    sampler->StartPixel(rayState.sample.pixel);
+    sampler->SetSampleNumber(rayState.sample.num);
+
     const auto bsdfFlags = BxDFType(BSDF_ALL & ~BSDF_SPECULAR);
 
     if (rayState.remainingBounces) {
         Vector3f wo = -rayState.ray.d, wi;
         Float pdf;
         BxDFType flags;
-        Spectrum f = it.bsdf->Sample_f(wo, &wi, rayState.sampler->Get2D(), &pdf,
+        Spectrum f = it.bsdf->Sample_f(wo, &wi, sampler->Get2D(), &pdf,
                                        BSDF_ALL, &flags);
 
         if (!f.IsBlack() && pdf > 0.f) {
@@ -55,15 +59,13 @@ vector<RayState> CloudIntegrator::Shade(const shared_ptr<CloudBVH> &treelet,
             newRay.ray = it.SpawnRay(wi);
             newRay.bounces = rayState.bounces + 1;
             newRay.remainingBounces = rayState.remainingBounces - 1;
-            newRay.sampler = rayState.sampler->Clone(rand());
-            newRay.sampleIdx = rayState.sampleIdx;
+            newRay.sample = rayState.sample;
             newRay.StartTrace();
             newRays.push_back(move(newRay));
 
             ++nIntersectionTests;
         }
-    }
-    else {
+    } else {
         /* we're done with this path */
         ReportValue(pathLength, rayState.bounces);
     }
@@ -136,13 +138,16 @@ void CloudIntegrator::Render(const Scene &scene) {
 
         if (!InsideExclusive(pixel, pixelBounds)) continue;
 
+        size_t sample_num = 0;
         do {
-            RayState state;
             SampleData sampleData;
-            state.sampler = sampler->Clone(rand());
-            sampleData.sample = state.sampler->GetCameraSample(pixel);
+            sampleData.sample = sampler->GetCameraSample(pixel);
             cameraSamples.emplace_back(move(sampleData));
-            state.sampleIdx = i++;
+
+            RayState state;
+            state.sample.id = i++;
+            state.sample.num = sample_num++;
+            state.sample.pixel = pixel;
             state.remainingBounces = maxDepth;
             rayQueue.push_back(move(state));
 
@@ -153,7 +158,7 @@ void CloudIntegrator::Render(const Scene &scene) {
 
     /* Generate all the rays */
     for (RayState &state : rayQueue) {
-        auto &sampleData = cameraSamples[state.sampleIdx];
+        auto &sampleData = cameraSamples[state.sample.id];
         sampleData.weight =
             camera->GenerateRayDifferential(sampleData.sample, &state.ray);
         state.ray.ScaleDifferentials(1 / sqrt((Float)sampler->samplesPerPixel));
@@ -166,7 +171,7 @@ void CloudIntegrator::Render(const Scene &scene) {
         vector<RayState> newRays;
 
         if (not state.toVisit.empty()) {
-            auto newRay = Trace(bvh, move(state));
+            auto newRay = Trace(move(state), bvh);
             if (!newRay.isShadowRay || !newRay.hit.initialized()) {
                 newRays.push_back(move(newRay));
             }
@@ -181,12 +186,11 @@ void CloudIntegrator::Render(const Scene &scene) {
                 L = Spectrum(0.f);
             }
 
-            cameraSamples[state.sampleIdx].L += L;
+            cameraSamples[state.sample.id].L += L;
         } else if (state.hit.initialized()) {
-            newRays = Shade(bvh, move(state), scene.lights, arena);
+            newRays = Shade(move(state), bvh, scene.lights, sampler, arena);
             arena.Reset();
-        }
-        else {
+        } else {
             ReportValue(pathLength, state.bounces);
         }
 

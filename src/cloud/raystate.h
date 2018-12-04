@@ -19,18 +19,25 @@ struct RayState {
         std::shared_ptr<Transform> transform{nullptr};
     };
 
-    RayState &operator=(const RayState &) = delete;
-    RayState(const RayState &) = delete;
+    struct Sample {
+        size_t id;
+        int64_t num;
+        Point2i pixel;
+    };
+
     RayState() = default;
     RayState(RayState &&) = default;
 
-    std::unique_ptr<Sampler> sampler;
-    size_t sampleIdx;
+    /* disallow copying */
+    RayState(const RayState &) = delete;
+    RayState &operator=(const RayState &) = delete;
+
+    Sample sample;
     RayDifferential ray;
 
     /* Traversing the BVH */
-    std::stack<TreeletNode> toVisit;
-    Optional<TreeletNode> hit;
+    std::stack<TreeletNode> toVisit{};
+    Optional<TreeletNode> hit{};
 
     Spectrum beta{1.f};
     Spectrum Ld{0.f};
@@ -41,7 +48,6 @@ struct RayState {
 
     void StartTrace() {
         hit.clear();
-        // toVisit = {};
         toVisit.push({});
     }
 };

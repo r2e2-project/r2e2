@@ -23,12 +23,13 @@ class CloudIntegrator : public Integrator {
     void Preprocess(const Scene &scene, Sampler &sampler);
     void Render(const Scene &scene);
 
-    static RayState Trace(const std::shared_ptr<CloudBVH> &treelet,
-                          RayState &&rayState);
+    static RayState Trace(RayState &&rayState,
+                          const std::shared_ptr<CloudBVH> &treelet);
 
     static std::vector<RayState> Shade(
-        const std::shared_ptr<CloudBVH> &treelet, RayState &&rayState,
-        const std::vector<std::shared_ptr<Light>> &lights, MemoryArena &arena);
+        RayState &&rayState, const std::shared_ptr<CloudBVH> &treelet,
+        const std::vector<std::shared_ptr<Light>> &lights,
+        std::shared_ptr<Sampler> &sampler, MemoryArena &arena);
 
   private:
     const int maxDepth;
