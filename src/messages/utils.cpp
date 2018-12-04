@@ -4,6 +4,13 @@
 
 namespace pbrt {
 
+protobuf::Point2i to_protobuf(const Point2i& point) {
+    protobuf::Point2i proto_point;
+    proto_point.set_x(point.x);
+    proto_point.set_y(point.y);
+    return proto_point;
+}
+
 protobuf::Point2f to_protobuf(const Point2f& point) {
     protobuf::Point2f proto_point;
     proto_point.set_x(point.x);
@@ -97,6 +104,10 @@ protobuf::TriangleMesh to_protobuf(const TriangleMesh& tm) {
     }
 
     return proto_tm;
+}
+
+Point2i from_protobuf(const protobuf::Point2i& point) {
+    return {point.x(), point.y()};
 }
 
 Point2f from_protobuf(const protobuf::Point2f& point) {

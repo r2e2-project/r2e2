@@ -7,6 +7,11 @@ message Point2f {
     float y = 2;
 }
 
+message Point2i {
+    int32 x = 1;
+    int32 y = 2;
+}
+
 message Point3f {
   float x = 1;
   float y = 2;

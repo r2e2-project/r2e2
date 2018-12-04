@@ -8,6 +8,7 @@
 
 namespace pbrt {
 
+protobuf::Point2i to_protobuf(const Point2i& point);
 protobuf::Point2f to_protobuf(const Point2f& point);
 protobuf::Point3f to_protobuf(const Point3f& point);
 protobuf::Vector3f to_protobuf(const Vector3f& point);
@@ -17,6 +18,7 @@ protobuf::Matrix to_protobuf(const Matrix4x4& matrix);
 protobuf::AnimatedTransform to_protobuf(const AnimatedTransform& transform);
 protobuf::TriangleMesh to_protobuf(const TriangleMesh& triangleMesh);
 
+Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
 Point3f from_protobuf(const protobuf::Point3f& point);
 Vector3f from_protobuf(const protobuf::Vector3f& point);
