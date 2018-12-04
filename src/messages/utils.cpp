@@ -59,6 +59,14 @@ protobuf::Matrix to_protobuf(const Matrix4x4& matrix) {
     return proto_matrix;
 }
 
+protobuf::RGBSpectrum to_protobuf(const RGBSpectrum& spectrum) {
+    protobuf::RGBSpectrum proto_spectrum;
+    proto_spectrum.add_c(spectrum[0]);
+    proto_spectrum.add_c(spectrum[1]);
+    proto_spectrum.add_c(spectrum[2]);
+    return proto_spectrum;
+}
+
 protobuf::AnimatedTransform to_protobuf(const AnimatedTransform& transform) {
     protobuf::AnimatedTransform proto_transform;
     *proto_transform.mutable_start_transform() =
@@ -139,6 +147,10 @@ Matrix4x4 from_protobuf(const protobuf::Matrix& proto_matrix) {
         }
     }
     return matrix;
+}
+
+RGBSpectrum from_protobuf(const protobuf::RGBSpectrum& proto_spectrum) {
+    return RGBSpectrum::FromRGB(proto_spectrum.c().data());
 }
 
 TriangleMesh from_protobuf(const protobuf::TriangleMesh& proto_tm) {

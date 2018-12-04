@@ -77,3 +77,9 @@ message BVHNode {
   repeated TransformedPrimitive transformed_primitives = 7;
   repeated Triangle triangles = 8;
 }
+
+// RayState
+
+message RGBSpectrum {
+    repeated float c = 1;
+}
