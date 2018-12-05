@@ -1670,9 +1670,9 @@ Scene *RenderOptions::MakeScene() {
     const std::string dump_path =
         allAcceleratorParams.FindOneString("dumppath", "");
 
-    if (dump_path.length()) {
+    if (PbrtOptions.dumpScenePath.length()) {
         // let's dump the lights
-        protobuf::RecordWriter writer(dump_path + "/LIGHTS");
+        protobuf::RecordWriter writer(PbrtOptions.dumpScenePath + "/LIGHTS");
         for (const auto &light : lights) {
             writer.write(to_protobuf(light));
         }
