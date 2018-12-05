@@ -96,3 +96,23 @@ message RayDifferential {
     Vector3f rx_direction = 8;
     Vector3f ry_direction = 9;
 }
+
+message VisitNode {
+    uint32 treelet = 1;
+    uint32 node = 2;
+    Matrix transform = 3;
+}
+
+message RayState {
+    uint64 sample_id = 1;
+    int64 sample_num = 2;
+    Point2i sample_pixel = 3;
+    RayDifferential ray = 4;
+    repeated VisitNode to_visit = 5;
+    VisitNode hit = 6;
+    RGBSpectrum beta = 7;
+    RGBSpectrum Ld = 8;
+    uint32 bounces = 9;
+    uint32 remaining_bounces = 10;
+    bool is_shadow_ray = 11;
+}
