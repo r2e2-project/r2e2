@@ -64,6 +64,8 @@ class ProjectionLight : public Light {
     void Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
                 Float *pdfDir) const;
 
+    LightType GetType() const { return LightType::Projection; }
+
   private:
     // ProjectionLight Private Data
     std::unique_ptr<MIPMap<RGBSpectrum>> projectionMap;

@@ -68,6 +68,8 @@ class InfiniteAreaLight : public Light {
     void Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
                 Float *pdfDir) const;
 
+    LightType GetType() const { return LightType::Infinite; }
+
   private:
     // InfiniteAreaLight Private Data
     std::unique_ptr<MIPMap<RGBSpectrum>> Lmap;

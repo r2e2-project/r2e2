@@ -65,6 +65,8 @@ class DistantLight : public Light {
     void Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
                 Float *pdfDir) const;
 
+    LightType GetType() const { return LightType::Distant; }
+
   private:
     // DistantLight Private Data
     const Spectrum L;

@@ -62,6 +62,8 @@ class SpotLight : public Light {
     void Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
                 Float *pdfDir) const;
 
+    LightType GetType() const { return LightType::Spot; }
+
   private:
     // SpotLight Private Data
     const Point3f pLight;
