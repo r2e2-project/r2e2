@@ -15,6 +15,19 @@ void usage(const char *argv0) {
     cerr << argv0 << " RAYSTATES SCENE-DATA OUTPUT" << endl;
 }
 
+vector<shared_ptr<Light>> loadLights(const string &scenePath) {
+    vector<shared_ptr<Light>> lights;
+    protobuf::RecordReader reader{scenePath + "/LIGHTS"};
+
+    while (!reader.eof()) {
+        protobuf::Light proto_light;
+        reader.read(&proto_light);
+        lights.push_back(move(from_protobuf(proto_light)));
+    }
+
+    return lights;
+}
+
 int main(int argc, char const *argv[]) {
     try {
         if (argc <= 0) {
