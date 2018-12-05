@@ -83,3 +83,16 @@ message BVHNode {
 message RGBSpectrum {
     repeated float c = 1;
 }
+
+message RayDifferential {
+    Point3f o = 1;
+    Vector3f d = 2;
+    float t_max = 3;
+    float time = 4;
+
+    bool has_differentials = 5;
+    Point3f rx_origin = 6;
+    Point3f ry_origin = 7;
+    Vector3f rx_direction = 8;
+    Vector3f ry_direction = 9;
+}
