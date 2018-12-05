@@ -5,6 +5,7 @@
 #include "core/geometry.h"
 #include "core/light.h"
 #include "core/spectrum.h"
+#include "core/sampler.h"
 #include "core/transform.h"
 #include "lights/distant.h"
 #include "pbrt.pb.h"
@@ -27,6 +28,7 @@ protobuf::TriangleMesh to_protobuf(const TriangleMesh& triangleMesh);
 protobuf::VisitNode to_protobuf(const RayState::TreeletNode& node);
 protobuf::RayState to_protobuf(const RayState& state);
 protobuf::Light to_protobuf(const std::shared_ptr<Light>& light);
+protobuf::Sampler to_protobuf(const std::shared_ptr<Sampler>& sampler);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
@@ -42,6 +44,7 @@ TriangleMesh from_protobuf(const protobuf::TriangleMesh& mesh);
 RayState::TreeletNode from_protobuf(const protobuf::VisitNode& node);
 RayState from_protobuf(const protobuf::RayState& state);
 std::shared_ptr<Light> from_protobuf(const protobuf::Light& light);
+std::shared_ptr<Sampler> from_protobuf(const protobuf::Sampler& sampler);
 
 }  // namespace pbrt
 
