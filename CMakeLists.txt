@@ -561,12 +561,12 @@ ADD_EXECUTABLE ( cyhair2pbrt src/tools/cyhair2pbrt.cpp )
 ADD_SANITIZERS ( cyhair2pbrt )
 
 # Cloud rendering
-ADD_EXECUTABLE ( do_trace src/cloud/do_trace.cpp )
-ADD_SANITIZERS ( do_trace )
+ADD_EXECUTABLE ( pbrt_do src/cloud/do.cpp )
+ADD_SANITIZERS ( pbrt_do )
 
-SET_TARGET_PROPERTIES ( do_trace PROPERTIES OUTPUT_NAME do_trace )
-TARGET_COMPILE_FEATURES ( do_trace PRIVATE ${PBRT_CXX11_FEATURES} )
-TARGET_LINK_LIBRARIES ( do_trace ${ALL_PBRT_LIBS} )
+SET_TARGET_PROPERTIES ( pbrt_do PROPERTIES OUTPUT_NAME "pbrt-do" )
+TARGET_COMPILE_FEATURES ( pbrt_do PRIVATE ${PBRT_CXX11_FEATURES} )
+TARGET_LINK_LIBRARIES ( pbrt_do ${ALL_PBRT_LIBS} )
 
 # Unit test
 
