@@ -39,10 +39,10 @@
 #define PBRT_LIGHTS_DISTANT_H
 
 // lights/distant.h*
-#include "pbrt.h"
 #include "light.h"
-#include "shape.h"
+#include "pbrt.h"
 #include "scene.h"
+#include "shape.h"
 
 namespace pbrt {
 
@@ -66,6 +66,8 @@ class DistantLight : public Light {
                 Float *pdfDir) const;
 
     LightType GetType() const { return LightType::Distant; }
+
+    friend protobuf::Light to_protobuf(const std::shared_ptr<Light> &);
 
   private:
     // DistantLight Private Data

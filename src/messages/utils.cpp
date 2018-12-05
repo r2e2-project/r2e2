@@ -3,6 +3,8 @@
 #include <memory>
 #include <stdexcept>
 
+#include "lights/distant.h"
+
 namespace pbrt {
 
 protobuf::Point2i to_protobuf(const Point2i& point) {
@@ -169,6 +171,29 @@ protobuf::RayState to_protobuf(const RayState& state) {
     return proto_state;
 }
 
+protobuf::Light to_protobuf(const std::shared_ptr<Light>& light) {
+    protobuf::Light proto_light;
+
+    switch (light->GetType()) {
+    case LightType::Distant: {
+        proto_light.set_type(protobuf::LIGHT_DISTANT);
+        protobuf::DistantLight proto_distant;
+        auto distant = std::dynamic_pointer_cast<const DistantLight>(light);
+        *proto_distant.mutable_light_to_world() =
+            to_protobuf(light->LightToWorld.GetMatrix());
+        *proto_distant.mutable_l() = to_protobuf(distant->L);
+        *proto_distant.mutable_dir() = to_protobuf(distant->wLight);
+        proto_light.mutable_data()->PackFrom(proto_distant);
+        break;
+    }
+
+    default:
+        throw std::runtime_error("unsupported light");
+    }
+
+    return proto_light;
+}
+
 Point2i from_protobuf(const protobuf::Point2i& point) {
     return {point.x(), point.y()};
 }
@@ -307,6 +332,26 @@ RayState from_protobuf(const protobuf::RayState& proto_state) {
     state.isShadowRay = proto_state.is_shadow_ray();
 
     return state;
+}
+
+std::shared_ptr<Light> from_protobuf(const protobuf::Light& proto_light) {
+    std::shared_ptr<Light> light;
+
+    switch (proto_light.type()) {
+    case protobuf::LIGHT_DISTANT: {
+        protobuf::DistantLight proto_distant;
+        proto_light.data().UnpackTo(&proto_distant);
+        light = std::make_shared<DistantLight>(
+            from_protobuf(proto_distant.light_to_world()),
+            from_protobuf(proto_distant.l()),
+            from_protobuf(proto_distant.dir()));
+    }
+
+    default:
+        throw std::runtime_error("unsupported light type");
+    }
+
+    return light;
 }
 
 }  // namespace pbrt

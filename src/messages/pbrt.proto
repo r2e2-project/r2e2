@@ -1,5 +1,7 @@
 syntax = 'proto3';
 
+import "google/protobuf/any.proto";
+
 package pbrt.protobuf;
 
 message Point2f {
@@ -13,42 +15,42 @@ message Point2i {
 }
 
 message Point3f {
-  float x = 1;
-  float y = 2;
-  float z = 3;
+    float x = 1;
+    float y = 2;
+    float z = 3;
 }
 
 message Vector3f {
-  float x = 1;
-  float y = 2;
-  float z = 3;
+    float x = 1;
+    float y = 2;
+    float z = 3;
 }
 
 message Normal3f {
-  float x = 1;
-  float y = 2;
-  float z = 3;
+    float x = 1;
+    float y = 2;
+    float z = 3;
 }
 
 message Matrix {
-  repeated float m = 1;
+    repeated float m = 1;
 }
 
 message AnimatedTransform {
-  Matrix start_transform = 1;
-  Matrix end_transform = 2;
-  float start_time = 3;
-  float end_time = 4;
+    Matrix start_transform = 1;
+    Matrix end_transform = 2;
+    float start_time = 3;
+    float end_time = 4;
 }
 
 message Bounds3f {
-  Point3f point_min = 1;
-  Point3f point_max = 2;
+    Point3f point_min = 1;
+    Point3f point_max = 2;
 }
 
 message TransformedPrimitive {
-  AnimatedTransform transform = 1;
-  int64 root_ref = 2;
+    AnimatedTransform transform = 1;
+    int64 root_ref = 2;
 }
 
 // Shapes
@@ -58,8 +60,8 @@ message TriangleMesh {
     int32 n_vertices = 2;
     repeated int32 vertex_indices = 3;
     repeated Point3f p = 4;
-    repeated Normal3f n = 5; // Normal3f
-    repeated Vector3f s = 6; // Vector3f
+    repeated Normal3f n = 5;  // Normal3f
+    repeated Vector3f s = 6;  // Vector3f
     repeated Point2f uv = 7;
 }
 
@@ -69,13 +71,13 @@ message Triangle {
 }
 
 message BVHNode {
-  Bounds3f bounds = 1;
-  int64 left_ref = 2;
-  int64 right_ref = 3;
-  uint32 axis = 4;
+    Bounds3f bounds = 1;
+    int64 left_ref = 2;
+    int64 right_ref = 3;
+    uint32 axis = 4;
 
-  repeated TransformedPrimitive transformed_primitives = 7;
-  repeated Triangle triangles = 8;
+    repeated TransformedPrimitive transformed_primitives = 7;
+    repeated Triangle triangles = 8;
 }
 
 // RayState
@@ -115,4 +117,19 @@ message RayState {
     uint32 bounces = 9;
     uint32 remaining_bounces = 10;
     bool is_shadow_ray = 11;
+}
+
+// Lights
+
+message DistantLight {
+    Matrix light_to_world = 1;
+    RGBSpectrum L = 2;
+    Vector3f dir = 3;
+}
+
+enum LightType { LIGHT_DISTANT = 0; }
+
+message Light {
+    LightType type = 1;
+    google.protobuf.Any data = 2;
 }

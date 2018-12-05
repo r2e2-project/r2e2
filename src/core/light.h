@@ -39,9 +39,10 @@
 #define PBRT_CORE_LIGHT_H
 
 // core/light.h*
-#include "pbrt.h"
-#include "memory.h"
 #include "interaction.h"
+#include "memory.h"
+#include "pbrt.h"
+#include "pbrt.pb.h"
 
 namespace pbrt {
 
@@ -94,6 +95,8 @@ class Light {
     const int flags;
     const int nSamples;
     const MediumInterface mediumInterface;
+
+    friend protobuf::Light to_protobuf(const std::shared_ptr<Light> &);
 
   protected:
     // Light Protected Data
