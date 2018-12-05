@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "lights/distant.h"
+#include "samplers/halton.h"
 
 namespace pbrt {
 
@@ -195,10 +196,33 @@ protobuf::Light to_protobuf(const std::shared_ptr<Light>& light) {
     }
 
     default:
-        throw std::runtime_error("unsupported light");
+        throw std::runtime_error("unsupported light type");
     }
 
     return proto_light;
+}
+
+protobuf::Sampler to_protobuf(const std::shared_ptr<Sampler>& sampler,
+                              const Bounds2i& sampleBounds) {
+    protobuf::Sampler proto_sampler;
+
+    switch (sampler->GetType()) {
+    case SamplerType::Halton: {
+        proto_sampler.set_type(protobuf::SAMPLER_HALTON);
+        protobuf::HaltonSampler proto_halton;
+        auto halton = std::dynamic_pointer_cast<const HaltonSampler>(sampler);
+        proto_halton.set_samples_per_pixel(halton->samplesPerPixel);
+        proto_halton.set_sample_at_center(halton->sampleAtPixelCenter);
+        *proto_halton.mutable_sample_bounds() = to_protobuf(sampleBounds);
+        proto_sampler.mutable_data()->PackFrom(proto_halton);
+        break;
+    }
+
+    default:
+        throw std::runtime_error("unsupported sampler type");
+    }
+
+    return proto_sampler;
 }
 
 Point2i from_protobuf(const protobuf::Point2i& point) {
@@ -364,6 +388,27 @@ std::shared_ptr<Light> from_protobuf(const protobuf::Light& proto_light) {
     }
 
     return light;
+}
+
+std::shared_ptr<Sampler> from_protobuf(const protobuf::Sampler& proto_sampler) {
+    std::shared_ptr<Sampler> sampler;
+
+    switch (proto_sampler.type()) {
+    case protobuf::SAMPLER_HALTON: {
+        protobuf::HaltonSampler proto_halton;
+        proto_sampler.data().UnpackTo(&proto_halton);
+        sampler = std::make_shared<HaltonSampler>(
+            proto_halton.samples_per_pixel(),
+            from_protobuf(proto_halton.sample_bounds()),
+            proto_halton.sample_at_center());
+        break;
+    }
+
+    default:
+        throw std::runtime_error("unsupported sampler type");
+    }
+
+    return sampler;
 }
 
 }  // namespace pbrt

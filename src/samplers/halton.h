@@ -41,6 +41,7 @@
 // samplers/halton.h*
 #include "sampler.h"
 #include "lowdiscrepancy.h"
+#include "pbrt.pb.h"
 
 namespace pbrt {
 
@@ -55,6 +56,9 @@ class HaltonSampler : public GlobalSampler {
     std::unique_ptr<Sampler> Clone(int seed);
 
     SamplerType GetType() const { return SamplerType::Halton; }
+
+    friend protobuf::Sampler to_protobuf(const std::shared_ptr<Sampler> &,
+                                         const Bounds2i &);
 
   private:
     // HaltonSampler Private Data

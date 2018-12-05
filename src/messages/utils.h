@@ -4,8 +4,8 @@
 #include "cloud/raystate.h"
 #include "core/geometry.h"
 #include "core/light.h"
-#include "core/spectrum.h"
 #include "core/sampler.h"
+#include "core/spectrum.h"
 #include "core/transform.h"
 #include "lights/distant.h"
 #include "pbrt.pb.h"
@@ -28,7 +28,8 @@ protobuf::TriangleMesh to_protobuf(const TriangleMesh& triangleMesh);
 protobuf::VisitNode to_protobuf(const RayState::TreeletNode& node);
 protobuf::RayState to_protobuf(const RayState& state);
 protobuf::Light to_protobuf(const std::shared_ptr<Light>& light);
-protobuf::Sampler to_protobuf(const std::shared_ptr<Sampler>& sampler);
+protobuf::Sampler to_protobuf(const std::shared_ptr<Sampler>& sampler,
+                              const Bounds2i& sampleBounds);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
