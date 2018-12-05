@@ -43,6 +43,11 @@ message AnimatedTransform {
     float end_time = 4;
 }
 
+message Bounds2i {
+    Point2i point_min = 1;
+    Point2i point_max = 2;
+}
+
 message Bounds3f {
     Point3f point_min = 1;
     Point3f point_max = 2;

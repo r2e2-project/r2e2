@@ -45,6 +45,13 @@ protobuf::Normal3f to_protobuf(const Normal3f& normal) {
     return proto_normal;
 }
 
+protobuf::Bounds2i to_protobuf(const Bounds2i& bounds) {
+    protobuf::Bounds2i proto_bounds;
+    *proto_bounds.mutable_point_min() = to_protobuf(bounds.pMin);
+    *proto_bounds.mutable_point_max() = to_protobuf(bounds.pMax);
+    return proto_bounds;
+}
+
 protobuf::Bounds3f to_protobuf(const Bounds3f& bounds) {
     protobuf::Bounds3f proto_bounds;
     *proto_bounds.mutable_point_min() = to_protobuf(bounds.pMin);
@@ -212,6 +219,11 @@ Normal3f from_protobuf(const protobuf::Normal3f& normal) {
 
 Vector3f from_protobuf(const protobuf::Vector3f& vector) {
     return {vector.x(), vector.y(), vector.z()};
+}
+
+Bounds2i from_protobuf(const protobuf::Bounds2i& bounds) {
+    return {from_protobuf(bounds.point_min()),
+            from_protobuf(bounds.point_max())};
 }
 
 Bounds3f from_protobuf(const protobuf::Bounds3f& bounds) {
