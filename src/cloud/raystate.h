@@ -1,7 +1,7 @@
 #ifndef PBRT_CLOUD_RAYSTATE_H
 #define PBRT_CLOUD_RAYSTATE_H
 
-#include <stack>
+#include <deque>
 
 #include "core/camera.h"
 #include "core/geometry.h"
@@ -36,7 +36,7 @@ struct RayState {
     RayDifferential ray;
 
     /* Traversing the BVH */
-    std::stack<TreeletNode> toVisit{};
+    std::deque<TreeletNode> toVisit{};
     Optional<TreeletNode> hit{};
 
     Spectrum beta{1.f};
@@ -48,7 +48,7 @@ struct RayState {
 
     void StartTrace() {
         hit.clear();
-        toVisit.push({});
+        toVisit.push_back({});
     }
 };
 

@@ -185,17 +185,17 @@ void CloudBVH::Trace(RayState &rayState) {
 
     Transform *lastTransform = nullptr;
 
-    const uint32_t currentTreelet = rayState.toVisit.top().treelet;
+    const uint32_t currentTreelet = rayState.toVisit.back().treelet;
     loadTreelet(currentTreelet); /* we don't load any other treelets */
 
     while (true) {
-        auto &top = rayState.toVisit.top();
+        auto &top = rayState.toVisit.back();
         if (currentTreelet != top.treelet) {
             break;
         }
 
         auto current = move(top);
-        rayState.toVisit.pop();
+        rayState.toVisit.pop_back();
 
         auto &treelet = treelets_[current.treelet];
         auto &node = treelet.nodes[current.node];
@@ -234,7 +234,7 @@ void CloudBVH::Trace(RayState &rayState) {
                             next.treelet = cbvh->bvh_root_;
                             next.node = 0;
                             next.transform = make_shared<Transform>(move(t));
-                            rayState.toVisit.push(move(next));
+                            rayState.toVisit.push_back(move(next));
                             continue; /* to the next primitive */
                         }
                     }
@@ -255,11 +255,11 @@ void CloudBVH::Trace(RayState &rayState) {
                 }
 
                 if (dirIsNeg[node.axis]) {
-                    rayState.toVisit.push(move(children[LEFT]));
-                    rayState.toVisit.push(move(children[RIGHT]));
+                    rayState.toVisit.push_back(move(children[LEFT]));
+                    rayState.toVisit.push_back(move(children[RIGHT]));
                 } else {
-                    rayState.toVisit.push(move(children[RIGHT]));
-                    rayState.toVisit.push(move(children[LEFT]));
+                    rayState.toVisit.push_back(move(children[RIGHT]));
+                    rayState.toVisit.push_back(move(children[LEFT]));
                 }
             }
         } else {
