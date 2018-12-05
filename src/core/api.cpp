@@ -81,6 +81,7 @@
 #include "materials/subsurface.h"
 #include "materials/translucent.h"
 #include "materials/uber.h"
+#include "messages/utils.h"
 #include "samplers/halton.h"
 #include "samplers/maxmin.h"
 #include "samplers/random.h"
@@ -1664,6 +1665,18 @@ Scene *RenderOptions::MakeScene() {
     std::unique_ptr<bool[]> scene_accelerator_val(new bool[1]);
     scene_accelerator_val[0] = true;
     allAcceleratorParams.AddBool("sceneaccelerator", std::move(scene_accelerator_val), 1);
+
+    /* Do we need to dump the lights? */
+    const std::string dump_path =
+        allAcceleratorParams.FindOneString("dumppath", "");
+
+    if (dump_path.length()) {
+        // let's dump the lights
+        protobuf::RecordWriter writer(dump_path + "/LIGHTS");
+        for (const auto &light : lights) {
+            writer.write(to_protobuf(light));
+        }
+    }
 
     std::shared_ptr<Primitive> accelerator =
         MakeAccelerator(AcceleratorName, std::move(primitives), allAcceleratorParams);
