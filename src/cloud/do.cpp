@@ -12,7 +12,7 @@ using namespace std;
 using namespace pbrt;
 
 void usage(const char *argv0) {
-    cerr << argv0 << " RAYSTATES SCENE-DATA OUTPUT" << endl;
+    cerr << argv0 << " OP=<trace|shade> RAYSTATES SCENE-DATA OUTPUT" << endl;
 }
 
 vector<shared_ptr<Light>> loadLights(const string &scenePath) {
@@ -37,6 +37,8 @@ shared_ptr<Sampler> loadSampler(const string &scenePath) {
     return from_protobuf(proto_sampler);
 }
 
+enum class Operation { Trace, Shade };
+
 int main(int argc, char const *argv[]) {
     try {
         if (argc <= 0) {
@@ -48,14 +50,26 @@ int main(int argc, char const *argv[]) {
             return EXIT_FAILURE;
         }
 
-        const string scenePath{argv[2]};
-        const string output{argv[3]};
+        const string operationStr{argv[1]};
+        const string raysPath{argv[2]};
+        const string scenePath{argv[3]};
+        const string output{argv[4]};
+
+        Operation operation;
+        if (operationStr == "trace") {
+            operation = Operation::Trace;
+        } else if (operationStr == "shade") {
+            operation = Operation::Shade;
+        } else {
+            throw runtime_error("invalid operation mode");
+        }
 
         vector<RayState> rayStates;
         vector<RayState> outputRays;
 
+        /* loading all the rays */
         {
-            protobuf::RecordReader reader{argv[1]};
+            protobuf::RecordReader reader{raysPath};
             while (!reader.eof()) {
                 protobuf::RayState protoState;
                 if (!reader.read(&protoState)) {
@@ -72,16 +86,38 @@ int main(int argc, char const *argv[]) {
             return EXIT_SUCCESS;
         }
 
-        auto treelet = make_shared<CloudBVH>(
-            scenePath, rayStates.front().toVisit.back().treelet);
+        switch (operation) {
+        case Operation::Trace: {
+            auto treelet = make_shared<CloudBVH>(
+                scenePath, rayStates.front().toVisit.back().treelet);
 
-        for (auto &rayState : rayStates) {
-            auto newRay = CloudIntegrator::Trace(move(rayState), treelet);
-            if (!newRay.isShadowRay || !newRay.hit.initialized()) {
-                outputRays.push_back(move(newRay));
+            for (auto &rayState : rayStates) {
+                auto newRay = CloudIntegrator::Trace(move(rayState), treelet);
+                if (!newRay.isShadowRay || !newRay.hit.initialized()) {
+                    outputRays.push_back(move(newRay));
+                }
             }
+            break;
         }
 
+        case Operation::Shade: {
+            auto treelet = make_shared<CloudBVH>(
+                scenePath, rayStates.front().hit->treelet);
+
+            MemoryArena arena;
+            auto lights = loadLights(scenePath);
+            auto sampler = loadSampler(scenePath);
+
+            for (auto &rayState : rayStates) {
+                auto newRay = CloudIntegrator::Shade(move(rayState), treelet,
+                                                     lights, sampler, arena);
+            }
+
+            break;
+        }
+        }
+
+        /* writing all the output rays */
         {
             protobuf::RecordWriter writer{output};
             for (auto &rayState : outputRays) {
