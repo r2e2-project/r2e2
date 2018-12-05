@@ -1667,9 +1667,6 @@ Scene *RenderOptions::MakeScene() {
     allAcceleratorParams.AddBool("sceneaccelerator", std::move(scene_accelerator_val), 1);
 
     /* Do we need to dump the lights? */
-    const std::string dump_path =
-        allAcceleratorParams.FindOneString("dumppath", "");
-
     if (PbrtOptions.dumpScenePath.length()) {
         // let's dump the lights
         protobuf::RecordWriter writer(PbrtOptions.dumpScenePath + "/LIGHTS");
@@ -1700,6 +1697,12 @@ Integrator *RenderOptions::MakeIntegrator() const {
     if (!sampler) {
         Error("Unable to create sampler.");
         return nullptr;
+    }
+
+    if (PbrtOptions.dumpScenePath.length()) {
+        // let's dump the sampler
+        protobuf::RecordWriter writer(PbrtOptions.dumpScenePath + "/SAMPLER");
+        writer.write(to_protobuf(sampler, camera->film->GetSampleBounds()));
     }
 
     Integrator *integrator = nullptr;
