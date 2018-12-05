@@ -52,6 +52,8 @@ class RandomSampler : public Sampler {
     Point2f Get2D();
     std::unique_ptr<Sampler> Clone(int seed);
 
+    SamplerType GetType() const { return SamplerType::Random; }
+
   private:
     RNG rng;
 };

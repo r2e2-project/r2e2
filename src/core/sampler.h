@@ -46,6 +46,16 @@
 
 namespace pbrt {
 
+enum class SamplerType {
+    Halton,
+    MaxMin,
+    Random,
+    Sobol,
+    Stratified,
+    ZeroTwoSequence,
+    MLT,
+};
+
 // Sampler Declarations
 class Sampler {
   public:
@@ -72,6 +82,8 @@ class Sampler {
 
     // Sampler Public Data
     const int64_t samplesPerPixel;
+
+    virtual SamplerType GetType() const = 0;
 
   protected:
     // Sampler Protected Data

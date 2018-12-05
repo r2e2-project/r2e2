@@ -77,6 +77,8 @@ class MaxMinDistSampler : public PixelSampler {
         CPixel = CMaxMinDist[Cindex];
     }
 
+    SamplerType GetType() const { return SamplerType::MaxMin; }
+
   private:
     // MaxMinDistSampler Private Data
     const uint32_t *CPixel;

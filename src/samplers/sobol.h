@@ -63,6 +63,8 @@ class SobolSampler : public GlobalSampler {
     int64_t GetIndexForSample(int64_t sampleNum) const;
     Float SampleDimension(int64_t index, int dimension) const;
 
+    SamplerType GetType() const { return SamplerType::Sobol; }
+
   private:
     // SobolSampler Private Data
     const Bounds2i sampleBounds;

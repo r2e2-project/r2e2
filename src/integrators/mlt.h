@@ -69,6 +69,8 @@ class MLTSampler : public Sampler {
     void StartStream(int index);
     int GetNextIndex() { return streamIndex + streamCount * sampleIndex++; }
 
+    SamplerType GetType() const { return SamplerType::MLT; }
+
   protected:
     // MLTSampler Private Declarations
     struct PrimarySample {

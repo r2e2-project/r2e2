@@ -57,6 +57,8 @@ class StratifiedSampler : public PixelSampler {
     void StartPixel(const Point2i &);
     std::unique_ptr<Sampler> Clone(int seed);
 
+    SamplerType GetType() const { return SamplerType::Stratified; }
+
   private:
     // StratifiedSampler Private Data
     const int xPixelSamples, yPixelSamples;
