@@ -48,6 +48,11 @@ message Bounds2i {
     Point2i point_max = 2;
 }
 
+message Bounds2f {
+    Point2f point_min = 1;
+    Point2f point_max = 2;
+}
+
 message Bounds3f {
     Point3f point_min = 1;
     Point3f point_max = 2;
@@ -155,4 +160,27 @@ enum SamplerType {
 message Sampler {
     SamplerType type = 1;
     google.protobuf.Any data = 2;
+}
+
+// Camera
+
+message PerspectiveCamera {
+    AnimatedTransform camera_to_world = 1;
+    float fov = 2;
+    float frame_aspect_ratio = 3;
+    float lens_radius = 4;
+    float focal_distance = 5;
+    repeated float screen_window = 6;
+}
+
+enum CameraType {
+    CAMERA_PERSPECTIVE = 0;
+}
+
+message Camera {
+    CameraType type = 1;
+    google.protobuf.Any data = 2;
+
+    Point2f film_resolution = 3;
+    Bounds2f crop_window = 4;
 }

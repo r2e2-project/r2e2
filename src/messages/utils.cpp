@@ -53,6 +53,13 @@ protobuf::Bounds2i to_protobuf(const Bounds2i& bounds) {
     return proto_bounds;
 }
 
+protobuf::Bounds2f to_protobuf(const Bounds2f& bounds) {
+    protobuf::Bounds2f proto_bounds;
+    *proto_bounds.mutable_point_min() = to_protobuf(bounds.pMin);
+    *proto_bounds.mutable_point_max() = to_protobuf(bounds.pMax);
+    return proto_bounds;
+}
+
 protobuf::Bounds3f to_protobuf(const Bounds3f& bounds) {
     protobuf::Bounds3f proto_bounds;
     *proto_bounds.mutable_point_min() = to_protobuf(bounds.pMin);
@@ -246,6 +253,11 @@ Vector3f from_protobuf(const protobuf::Vector3f& vector) {
 }
 
 Bounds2i from_protobuf(const protobuf::Bounds2i& bounds) {
+    return {from_protobuf(bounds.point_min()),
+            from_protobuf(bounds.point_max())};
+}
+
+Bounds2f from_protobuf(const protobuf::Bounds2f& bounds) {
     return {from_protobuf(bounds.point_min()),
             from_protobuf(bounds.point_max())};
 }
