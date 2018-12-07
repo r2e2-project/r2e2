@@ -561,11 +561,11 @@ protobuf::Camera camera::to_protobuf(const string& name, const ParamSet& params,
     protobuf::Camera proto_camera;
 
     /* (1) the filter */
-    proto_filter.set_name(name);
+    proto_filter.set_name(filterName);
     *proto_filter.mutable_paramset() = pbrt::to_protobuf(filterParams);
 
     /* (2) the film */
-    proto_film.set_name(name);
+    proto_film.set_name(filmName);
     *proto_film.mutable_paramset() = pbrt::to_protobuf(filmParams);
     *proto_film.mutable_filter() = proto_filter;
 
@@ -599,7 +599,7 @@ shared_ptr<Camera> camera::from_protobuf(
     } else if (filter_name == "triangle") {
         filterPtr = CreateTriangleFilter(filter_paramset);
     } else {
-        throw runtime_error("unknown filter name");
+        throw runtime_error("unknown filter name: " + filter_name);
     }
 
     auto filter = unique_ptr<Filter>(filterPtr);
