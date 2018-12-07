@@ -3,6 +3,10 @@
 #include <memory>
 #include <stdexcept>
 
+#include "cameras/environment.h"
+#include "cameras/orthographic.h"
+#include "cameras/perspective.h"
+#include "cameras/realistic.h"
 #include "core/api.h"
 #include "lights/distant.h"
 #include "lights/goniometric.h"
@@ -16,6 +20,12 @@
 #include "samplers/sobol.h"
 #include "samplers/stratified.h"
 #include "samplers/zerotwosequence.h"
+#include "filters/box.h"
+#include "filters/gaussian.h"
+#include "filters/mitchell.h"
+#include "filters/sinc.h"
+#include "filters/triangle.h"
+
 
 using namespace std;
 
@@ -515,7 +525,7 @@ protobuf::Sampler sampler::to_protobuf(const string& name,
 }
 
 shared_ptr<Sampler> sampler::from_protobuf(const protobuf::Sampler& ps) {
-    Sampler * sampler;
+    Sampler* sampler;
 
     const string& name = ps.name();
     const ParamSet paramSet = pbrt::from_protobuf(ps.paramset());
@@ -538,6 +548,108 @@ shared_ptr<Sampler> sampler::from_protobuf(const protobuf::Sampler& ps) {
     }
 
     return shared_ptr<Sampler>(sampler);
+}
+
+protobuf::Camera camera::to_protobuf(const string& name, const ParamSet& params,
+                                     const AnimatedTransform& cam2world,
+                                     const string& filmName,
+                                     const ParamSet& filmParams,
+                                     const string& filterName,
+                                     const ParamSet& filterParams) {
+    protobuf::Camera_Film_Filter proto_filter;
+    protobuf::Camera_Film proto_film;
+    protobuf::Camera proto_camera;
+
+    /* (1) the filter */
+    proto_filter.set_name(name);
+    *proto_filter.mutable_paramset() = pbrt::to_protobuf(filterParams);
+
+    /* (2) the film */
+    proto_film.set_name(name);
+    *proto_film.mutable_paramset() = pbrt::to_protobuf(filmParams);
+    *proto_film.mutable_filter() = proto_filter;
+
+    /* (3) the camera */
+    proto_camera.set_name(name);
+    *proto_camera.mutable_paramset() = pbrt::to_protobuf(params);
+    *proto_camera.mutable_camera_to_world() = pbrt::to_protobuf(cam2world);
+    *proto_camera.mutable_film() = proto_film;
+
+    return proto_camera;
+}
+
+shared_ptr<Camera> camera::from_protobuf(
+    const protobuf::Camera& proto_camera,
+    vector<unique_ptr<Transform>>& transformCache) {
+    /* (1) create the filter */
+    Filter* filterPtr = nullptr;
+
+    const auto& proto_filter = proto_camera.film().filter();
+    const auto& filter_name = proto_filter.name();
+    const auto filter_paramset = pbrt::from_protobuf(proto_filter.paramset());
+
+    if (filter_name == "box") {
+        filterPtr = CreateBoxFilter(filter_paramset);
+    } else if (filter_name == "gaussian") {
+        filterPtr = CreateGaussianFilter(filter_paramset);
+    } else if (filter_name == "mitchell") {
+        filterPtr = CreateMitchellFilter(filter_paramset);
+    } else if (filter_name == "sinc") {
+        filterPtr = CreateSincFilter(filter_paramset);
+    } else if (filter_name == "triangle") {
+        filterPtr = CreateTriangleFilter(filter_paramset);
+    } else {
+        throw runtime_error("unknown filter name");
+    }
+
+    auto filter = unique_ptr<Filter>(filterPtr);
+
+    /* (2) create the film */
+    Film* film = nullptr;
+
+    const auto& proto_film = proto_camera.film();
+    const auto& film_name = proto_film.name();
+    const auto film_paramset = pbrt::from_protobuf(proto_film.paramset());
+
+    if (film_name == "image") {
+        film = CreateFilm(film_paramset, move(filter));
+    } else {
+        throw runtime_error("unknown film name");
+    }
+
+    /* (3) create the camera */
+    Camera* camera = nullptr;
+    MediumInterface mi;
+    Transform* cam2world[2];
+
+    const auto& name = proto_camera.name();
+    const auto paramset = pbrt::from_protobuf(proto_camera.paramset());
+    const auto& transform = proto_camera.camera_to_world();
+
+    transformCache.push_back(make_unique<Transform>(
+        pbrt::from_protobuf(transform.start_transform())));
+    cam2world[0] = transformCache.back().get();
+
+    transformCache.push_back(
+        make_unique<Transform>(pbrt::from_protobuf(transform.end_transform())));
+    cam2world[1] = transformCache.back().get();
+
+    AnimatedTransform ac2w(cam2world[0], transform.start_time(), cam2world[1],
+                           transform.end_time());
+
+    if (name == "perspective") {
+        camera = CreatePerspectiveCamera(paramset, ac2w, film, mi.outside);
+    } else if (name == "orthographic") {
+        camera = CreateOrthographicCamera(paramset, ac2w, film, mi.outside);
+    } else if (name == "realistic") {
+        camera = CreateRealisticCamera(paramset, ac2w, film, mi.outside);
+    } else if (name == "environment") {
+        camera = CreateEnvironmentCamera(paramset, ac2w, film, mi.outside);
+    } else {
+        throw runtime_error("unknown camera name");
+    }
+
+    return shared_ptr<Camera>(camera);
 }
 
 }  // namespace pbrt

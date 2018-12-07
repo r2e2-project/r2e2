@@ -1,7 +1,5 @@
 syntax = 'proto3';
 
-import "google/protobuf/any.proto";
-
 package pbrt.protobuf;
 
 message Point2f {
@@ -176,4 +174,24 @@ message Light {
     string name = 1;
     ParamSet paramset = 2;
     Matrix light_to_world = 3;
+}
+
+// Camera, Film & Filter
+
+message Camera {
+    message Film {
+        message Filter {
+            string name = 1;
+            ParamSet paramset = 2;
+        }
+
+        string name = 1;
+        ParamSet paramset = 2;
+        Filter filter = 3;
+    }
+
+    string name = 1;
+    ParamSet paramset = 2;
+    AnimatedTransform camera_to_world = 3;
+    Film film = 6;
 }

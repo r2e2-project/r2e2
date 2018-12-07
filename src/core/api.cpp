@@ -1767,6 +1767,17 @@ Camera *RenderOptions::MakeCamera() const {
     Camera *camera = pbrt::MakeCamera(CameraName, CameraParams, CameraToWorld,
                                   renderOptions->transformStartTime,
                                   renderOptions->transformEndTime, film);
+
+    if(!PbrtOptions.dumpScenePath.empty()) {
+        AnimatedTransform ac2w{
+            &CameraToWorld[0], renderOptions->transformStartTime,
+            &CameraToWorld[1], renderOptions->transformEndTime};
+        protobuf::RecordWriter writer(PbrtOptions.dumpScenePath + "/CAMERA");
+        writer.write(camera::to_protobuf(CameraName, CameraParams, ac2w,
+                                         FilmName, FilmParams, FilterName,
+                                         FilterParams));
+    }
+
     return camera;
 }
 
