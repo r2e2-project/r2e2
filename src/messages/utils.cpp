@@ -30,6 +30,13 @@ protobuf::Point3f to_protobuf(const Point3f& point) {
     return proto_point;
 }
 
+protobuf::Vector2f to_protobuf(const Vector2f& vector) {
+    protobuf::Vector2f proto_vector;
+    proto_vector.set_x(vector.x);
+    proto_vector.set_y(vector.y);
+    return proto_vector;
+}
+
 protobuf::Vector3f to_protobuf(const Vector3f& vector) {
     protobuf::Vector3f proto_vector;
     proto_vector.set_x(vector.x);
@@ -186,6 +193,59 @@ protobuf::RayState to_protobuf(const RayState& state) {
     return proto_state;
 }
 
+protobuf::ParamSet to_protobuf(const ParamSet& ps) {
+    protobuf::ParamSet proto_params;
+
+    auto ap = [](auto& proto_item, const auto& item) {
+        proto_item.set_name(item->name);
+        for (size_t i = 0; i < item->nValues; i++) {
+            proto_item.add_values(item->values[i]);
+        }
+    };
+
+    auto ao = [](auto& proto_item, const auto& item) {
+        proto_item.set_name(item->name);
+        for (size_t i = 0; i < item->nValues; i++) {
+            *proto_item.add_values() = to_protobuf(item->values[i]);
+        }
+    };
+
+    // clang-format off
+    for (const auto& i : ps.bools)     { ap(*proto_params.add_bools(), i); }
+    for (const auto& i : ps.ints)      { ap(*proto_params.add_ints(), i); }
+    for (const auto& i : ps.floats)    { ap(*proto_params.add_floats(), i); }
+    for (const auto& i : ps.point2fs)  { ao(*proto_params.add_point2fs(), i); }
+    for (const auto& i : ps.vector2fs) { ao(*proto_params.add_vector2fs(), i); }
+    for (const auto& i : ps.point3fs)  { ao(*proto_params.add_point3fs(), i); }
+    for (const auto& i : ps.vector3fs) { ao(*proto_params.add_vector3fs(), i); }
+    for (const auto& i : ps.point2fs)  { ao(*proto_params.add_point2fs(), i); }
+    for (const auto& i : ps.normals)   { ao(*proto_params.add_normals(), i); }
+    for (const auto& i : ps.spectra)   { ao(*proto_params.add_spectra(), i); }
+    for (const auto& i : ps.strings)   { ap(*proto_params.add_strings(), i); }
+    for (const auto& i : ps.textures)  { ap(*proto_params.add_textures(), i); }
+    // clang-format on
+
+    return proto_params;
+}
+
+template <class ValueType, class ProtoItem>
+std::unique_ptr<ValueType[]> p2v(const ProtoItem& item) {
+    auto values = std::make_unique<ValueType[]>(item.values_size());
+    for (size_t i = 0; i < item.values_size(); i++) {
+        values[i] = item.values(i);
+    }
+    return values;
+}
+
+template <class ValueType, class ProtoItem>
+std::unique_ptr<ValueType[]> p2vo(const ProtoItem& item) {
+    auto values = std::make_unique<ValueType[]>(item.values_size());
+    for (size_t i = 0; i < item.values_size(); i++) {
+        values[i] = std::move(from_protobuf(item.values(i)));
+    }
+    return values;
+}
+
 protobuf::Light to_protobuf(const std::shared_ptr<Light>& light) {
     protobuf::Light proto_light;
 
@@ -246,6 +306,10 @@ Point3f from_protobuf(const protobuf::Point3f& point) {
 
 Normal3f from_protobuf(const protobuf::Normal3f& normal) {
     return {normal.x(), normal.y(), normal.z()};
+}
+
+Vector2f from_protobuf(const protobuf::Vector2f& vector) {
+    return {vector.x(), vector.y()};
 }
 
 Vector3f from_protobuf(const protobuf::Vector3f& vector) {
@@ -380,6 +444,59 @@ RayState from_protobuf(const protobuf::RayState& proto_state) {
     state.isShadowRay = proto_state.is_shadow_ray();
 
     return state;
+}
+
+ParamSet from_protobuf(const protobuf::ParamSet& pp) {
+    ParamSet ps;
+
+    for (const auto& item : pp.bools()) {
+        ps.AddBool(item.name(), p2v<bool>(item), item.values_size());
+    }
+
+    for (const auto& item : pp.ints()) {
+        ps.AddInt(item.name(), p2v<int>(item), item.values_size());
+    }
+
+    for (const auto& item : pp.floats()) {
+        ps.AddFloat(item.name(), p2v<Float>(item), item.values_size());
+    }
+
+    for (const auto& item : pp.point2fs()) {
+        ps.AddPoint2f(item.name(), p2vo<Point2f>(item), item.values_size());
+    }
+
+    for (const auto& item : pp.vector2fs()) {
+        ps.AddVector2f(item.name(), p2vo<Vector2f>(item), item.values_size());
+    }
+
+    for (const auto& item : pp.point3fs()) {
+        ps.AddPoint3f(item.name(), p2vo<Point3f>(item), item.values_size());
+    }
+
+    for (const auto& item : pp.vector3fs()) {
+        ps.AddVector3f(item.name(), p2vo<Vector3f>(item), item.values_size());
+    }
+
+    for (const auto& item : pp.normals()) {
+        ps.AddNormal3f(item.name(), p2vo<Normal3f>(item), item.values_size());
+    }
+
+    for (const auto& item : pp.spectra()) {
+        ps.AddSpectrum(item.name(), p2vo<Spectrum>(item), item.values_size());
+    }
+
+    for (const auto& item : pp.strings()) {
+        ps.AddString(item.name(), p2v<std::string>(item), item.values_size());
+    }
+
+    for (const auto& item : pp.textures()) {
+        for (const auto& val : item.values()) {
+            ps.AddTexture(item.name(), val);
+            break; /* only one value for texture */
+        }
+    }
+
+    return ps;
 }
 
 std::shared_ptr<Light> from_protobuf(const protobuf::Light& proto_light) {

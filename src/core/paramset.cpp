@@ -107,6 +107,12 @@ void ParamSet::AddNormal3f(const std::string &name,
     ADD_PARAM_TYPE(Normal3f, normals);
 }
 
+void ParamSet::AddSpectrum(const std::string &name,
+                           std::unique_ptr<Spectrum[]> values, int nValues) {
+    EraseSpectrum(name);
+    ADD_PARAM_TYPE(Spectrum, spectra);
+}
+
 void ParamSet::AddRGBSpectrum(const std::string &name,
                               std::unique_ptr<Float[]> values, int nValues) {
     EraseSpectrum(name);

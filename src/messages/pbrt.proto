@@ -20,6 +20,11 @@ message Point3f {
     float z = 3;
 }
 
+message Vector2f {
+    float x = 1;
+    float y = 2;
+}
+
 message Vector3f {
     float x = 1;
     float y = 2;
@@ -144,6 +149,35 @@ message Light {
     google.protobuf.Any data = 2;
 }
 
+// ParamSet
+
+message ParamSet {
+    // clang-format off
+    message ItemBool     { string name = 1; repeated bool values = 2; }
+    message ItemInt      { string name = 1; repeated int32 values = 2; }
+    message ItemFloat    { string name = 1; repeated float values = 2; }
+    message ItemPoint2f  { string name = 1; repeated Point2f values = 2; }
+    message ItemVector2f { string name = 1; repeated Vector2f values = 2; }
+    message ItemPoint3f  { string name = 1; repeated Point3f values = 2; }
+    message ItemVector3f { string name = 1; repeated Vector3f values = 2; }
+    message ItemNormal3f { string name = 1; repeated Normal3f values = 2; }
+    message ItemSpectrum { string name = 1; repeated RGBSpectrum values = 2; }
+    message ItemString   { string name = 1; repeated string values = 2; }
+    // clang-format on
+
+    repeated ItemBool bools = 1;
+    repeated ItemInt ints = 2;
+    repeated ItemFloat floats = 3;
+    repeated ItemPoint2f point2fs = 4;
+    repeated ItemVector2f vector2fs = 5;
+    repeated ItemPoint3f point3fs = 6;
+    repeated ItemVector3f vector3fs = 7;
+    repeated ItemNormal3f normals = 8;
+    repeated ItemSpectrum spectra = 9;
+    repeated ItemString strings = 10;
+    repeated ItemString textures = 11;
+}
+
 // Sampler
 
 message HaltonSampler {
@@ -173,9 +207,7 @@ message PerspectiveCamera {
     repeated float screen_window = 6;
 }
 
-enum CameraType {
-    CAMERA_PERSPECTIVE = 0;
-}
+enum CameraType { CAMERA_PERSPECTIVE = 0; }
 
 message Camera {
     CameraType type = 1;
