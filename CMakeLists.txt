@@ -560,13 +560,23 @@ ADD_SANITIZERS ( obj2pbrt )
 ADD_EXECUTABLE ( cyhair2pbrt src/tools/cyhair2pbrt.cpp )
 ADD_SANITIZERS ( cyhair2pbrt )
 
-# Cloud rendering
+## Cloud rendering
+# pbrt-do
 ADD_EXECUTABLE ( pbrt_do src/cloud/do.cpp )
 ADD_SANITIZERS ( pbrt_do )
 
 SET_TARGET_PROPERTIES ( pbrt_do PROPERTIES OUTPUT_NAME "pbrt-do" )
 TARGET_COMPILE_FEATURES ( pbrt_do PRIVATE ${PBRT_CXX11_FEATURES} )
 TARGET_LINK_LIBRARIES ( pbrt_do ${ALL_PBRT_LIBS} )
+
+# pbrt-genrays
+ADD_EXECUTABLE ( pbrt_genrays src/cloud/genrays.cpp )
+ADD_SANITIZERS ( pbrt_genrays )
+
+SET_TARGET_PROPERTIES ( pbrt_genrays PROPERTIES OUTPUT_NAME "pbrt-genrays" )
+TARGET_COMPILE_FEATURES ( pbrt_genrays PRIVATE ${PBRT_CXX11_FEATURES} )
+TARGET_LINK_LIBRARIES ( pbrt_genrays ${ALL_PBRT_LIBS} )
+
 
 # Unit test
 
