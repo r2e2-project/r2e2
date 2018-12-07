@@ -29,9 +29,7 @@ vector<shared_ptr<Light>> loadLights(const string &scenePath) {
 }
 
 shared_ptr<Sampler> loadSampler(const string &scenePath) {
-    shared_ptr<Sampler> sampler;
     protobuf::RecordReader reader{scenePath + "/SAMPLER"};
-
     protobuf::Sampler proto_sampler;
     reader.read(&proto_sampler);
     return sampler::from_protobuf(proto_sampler);
