@@ -34,7 +34,7 @@ shared_ptr<Sampler> loadSampler(const string &scenePath) {
 
     protobuf::Sampler proto_sampler;
     reader.read(&proto_sampler);
-    return from_protobuf(proto_sampler);
+    return sampler::from_protobuf(proto_sampler);
 }
 
 enum class Operation { Trace, Shade };

@@ -1708,10 +1708,11 @@ Integrator *RenderOptions::MakeIntegrator() const {
         return nullptr;
     }
 
-    if (PbrtOptions.dumpScenePath.length()) {
+    if (!PbrtOptions.dumpScenePath.empty()) {
         // let's dump the sampler
         protobuf::RecordWriter writer(PbrtOptions.dumpScenePath + "/SAMPLER");
-        writer.write(to_protobuf(sampler, camera->film->GetSampleBounds()));
+        writer.write(sampler::to_protobuf(SamplerName, SamplerParams,
+                                          camera->film->GetSampleBounds()));
     }
 
     Integrator *integrator = nullptr;

@@ -8,12 +8,6 @@
 #include "core/sampler.h"
 #include "core/spectrum.h"
 #include "core/transform.h"
-#include "lights/distant.h"
-#include "lights/goniometric.h"
-#include "lights/infinite.h"
-#include "lights/point.h"
-#include "lights/projection.h"
-#include "lights/spot.h"
 
 #include "pbrt.pb.h"
 #include "shapes/triangle.h"
@@ -37,8 +31,6 @@ protobuf::TriangleMesh to_protobuf(const TriangleMesh& triangleMesh);
 protobuf::VisitNode to_protobuf(const RayState::TreeletNode& node);
 protobuf::RayState to_protobuf(const RayState& state);
 protobuf::ParamSet to_protobuf(const ParamSet& paramset);
-protobuf::Sampler to_protobuf(const std::shared_ptr<Sampler>& sampler,
-                              const Bounds2i& sampleBounds);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
@@ -56,7 +48,6 @@ TriangleMesh from_protobuf(const protobuf::TriangleMesh& mesh);
 RayState::TreeletNode from_protobuf(const protobuf::VisitNode& node);
 RayState from_protobuf(const protobuf::RayState& state);
 ParamSet from_protobuf(const protobuf::ParamSet& paramset);
-std::shared_ptr<Sampler> from_protobuf(const protobuf::Sampler& sampler);
 
 namespace light {
 
@@ -66,6 +57,15 @@ protobuf::Light to_protobuf(const std::string& name, const ParamSet& params,
 std::shared_ptr<Light> from_protobuf(const protobuf::Light& light);
 
 }  // namespace light
+
+namespace sampler {
+
+protobuf::Sampler to_protobuf(const std::string& name, const ParamSet& params,
+                              const Bounds2i& sampleBounds);
+
+std::shared_ptr<Sampler> from_protobuf(const protobuf::Sampler& sampler);
+
+}  // namespace sampler
 
 }  // namespace pbrt
 

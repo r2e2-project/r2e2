@@ -164,20 +164,10 @@ message ParamSet {
 
 // Sampler
 
-message HaltonSampler {
-    int32 samples_per_pixel = 1;
-    bool sample_at_center = 2;
-    Bounds2i sample_bounds = 3;
-}
-
-enum SamplerType {
-    SAMPLER_HALTON = 0;
-    SAMPLER_SOBOL = 1;
-}
-
 message Sampler {
-    SamplerType type = 1;
-    google.protobuf.Any data = 2;
+    string name = 1;
+    ParamSet paramset = 2;
+    Bounds2i sample_bounds = 3;
 }
 
 // Lights

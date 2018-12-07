@@ -5,7 +5,17 @@
 
 #include "core/api.h"
 #include "lights/distant.h"
+#include "lights/goniometric.h"
+#include "lights/infinite.h"
+#include "lights/point.h"
+#include "lights/projection.h"
+#include "lights/spot.h"
 #include "samplers/halton.h"
+#include "samplers/maxmin.h"
+#include "samplers/random.h"
+#include "samplers/sobol.h"
+#include "samplers/stratified.h"
+#include "samplers/zerotwosequence.h"
 
 using namespace std;
 
@@ -249,29 +259,6 @@ unique_ptr<ValueType[]> p2vo(const ProtoItem& item) {
     return values;
 }
 
-protobuf::Sampler to_protobuf(const shared_ptr<Sampler>& sampler,
-                              const Bounds2i& sampleBounds) {
-    protobuf::Sampler proto_sampler;
-
-    switch (sampler->GetType()) {
-    case SamplerType::Halton: {
-        proto_sampler.set_type(protobuf::SAMPLER_HALTON);
-        protobuf::HaltonSampler proto_halton;
-        auto halton = dynamic_pointer_cast<const HaltonSampler>(sampler);
-        proto_halton.set_samples_per_pixel(halton->samplesPerPixel);
-        proto_halton.set_sample_at_center(halton->sampleAtPixelCenter);
-        *proto_halton.mutable_sample_bounds() = to_protobuf(sampleBounds);
-        proto_sampler.mutable_data()->PackFrom(proto_halton);
-        break;
-    }
-
-    default:
-        throw runtime_error("unsupported sampler type");
-    }
-
-    return proto_sampler;
-}
-
 Point2i from_protobuf(const protobuf::Point2i& point) {
     return {point.x(), point.y()};
 }
@@ -479,34 +466,13 @@ ParamSet from_protobuf(const protobuf::ParamSet& pp) {
     return ps;
 }
 
-shared_ptr<Sampler> from_protobuf(const protobuf::Sampler& proto_sampler) {
-    shared_ptr<Sampler> sampler;
-
-    switch (proto_sampler.type()) {
-    case protobuf::SAMPLER_HALTON: {
-        protobuf::HaltonSampler proto_halton;
-        proto_sampler.data().UnpackTo(&proto_halton);
-        sampler = make_shared<HaltonSampler>(
-            proto_halton.samples_per_pixel(),
-            from_protobuf(proto_halton.sample_bounds()),
-            proto_halton.sample_at_center());
-        break;
-    }
-
-    default:
-        throw runtime_error("unsupported sampler type");
-    }
-
-    return sampler;
-}
-
 protobuf::Light light::to_protobuf(const string& name, const ParamSet& params,
                                    const Transform& light2world) {
     protobuf::Light proto_light;
     proto_light.set_name(name);
     *proto_light.mutable_paramset() = pbrt::to_protobuf(params);
     *proto_light.mutable_light_to_world() =
-        to_protobuf(light2world.GetMatrix());
+        pbrt::to_protobuf(light2world.GetMatrix());
     return proto_light;
 }
 
@@ -515,7 +481,8 @@ shared_ptr<Light> light::from_protobuf(const protobuf::Light& proto_light) {
 
     MediumInterface mi;
     const string& name = proto_light.name();
-    const Transform light2world = pbrt::from_protobuf(proto_light.light_to_world());
+    const Transform light2world =
+        pbrt::from_protobuf(proto_light.light_to_world());
     const ParamSet paramSet = pbrt::from_protobuf(proto_light.paramset());
 
     if (name == "point") {
@@ -535,6 +502,42 @@ shared_ptr<Light> light::from_protobuf(const protobuf::Light& proto_light) {
     }
 
     return light;
+}
+
+protobuf::Sampler sampler::to_protobuf(const string& name,
+                                       const ParamSet& params,
+                                       const Bounds2i& sampleBounds) {
+    protobuf::Sampler proto_sampler;
+    proto_sampler.set_name(name);
+    *proto_sampler.mutable_paramset() = pbrt::to_protobuf(params);
+    *proto_sampler.mutable_sample_bounds() = pbrt::to_protobuf(sampleBounds);
+    return proto_sampler;
+}
+
+shared_ptr<Sampler> sampler::from_protobuf(const protobuf::Sampler& ps) {
+    Sampler * sampler;
+
+    const string& name = ps.name();
+    const ParamSet paramSet = pbrt::from_protobuf(ps.paramset());
+    const Bounds2i sampleBounds = pbrt::from_protobuf(ps.sample_bounds());
+
+    if (name == "lowdiscrepancy" || name == "02sequence") {
+        sampler = CreateZeroTwoSequenceSampler(paramSet);
+    } else if (name == "maxmindist") {
+        sampler = CreateMaxMinDistSampler(paramSet);
+    } else if (name == "halton") {
+        sampler = CreateHaltonSampler(paramSet, sampleBounds);
+    } else if (name == "sobol") {
+        sampler = CreateSobolSampler(paramSet, sampleBounds);
+    } else if (name == "random") {
+        sampler = CreateRandomSampler(paramSet);
+    } else if (name == "stratified") {
+        sampler = CreateStratifiedSampler(paramSet);
+    } else {
+        throw runtime_error("unknown sampler name");
+    }
+
+    return shared_ptr<Sampler>(sampler);
 }
 
 }  // namespace pbrt

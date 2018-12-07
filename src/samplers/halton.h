@@ -57,9 +57,6 @@ class HaltonSampler : public GlobalSampler {
 
     SamplerType GetType() const { return SamplerType::Halton; }
 
-    friend protobuf::Sampler to_protobuf(const std::shared_ptr<Sampler> &,
-                                         const Bounds2i &);
-
   private:
     // HaltonSampler Private Data
     static std::vector<uint16_t> radicalInversePermutations;
