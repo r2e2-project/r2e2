@@ -96,8 +96,6 @@ class Light {
     const int nSamples;
     const MediumInterface mediumInterface;
 
-    friend protobuf::Light to_protobuf(const std::shared_ptr<Light> &);
-
   protected:
     // Light Protected Data
     const Transform LightToWorld, WorldToLight;

@@ -22,7 +22,7 @@ vector<shared_ptr<Light>> loadLights(const string &scenePath) {
     while (!reader.eof()) {
         protobuf::Light proto_light;
         reader.read(&proto_light);
-        lights.push_back(move(from_protobuf(proto_light)));
+        lights.push_back(move(light::from_protobuf(proto_light)));
     }
 
     return lights;

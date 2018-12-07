@@ -3,8 +3,11 @@
 #include <memory>
 #include <stdexcept>
 
+#include "core/api.h"
 #include "lights/distant.h"
 #include "samplers/halton.h"
+
+using namespace std;
 
 namespace pbrt {
 
@@ -229,8 +232,8 @@ protobuf::ParamSet to_protobuf(const ParamSet& ps) {
 }
 
 template <class ValueType, class ProtoItem>
-std::unique_ptr<ValueType[]> p2v(const ProtoItem& item) {
-    auto values = std::make_unique<ValueType[]>(item.values_size());
+unique_ptr<ValueType[]> p2v(const ProtoItem& item) {
+    auto values = make_unique<ValueType[]>(item.values_size());
     for (size_t i = 0; i < item.values_size(); i++) {
         values[i] = item.values(i);
     }
@@ -238,38 +241,15 @@ std::unique_ptr<ValueType[]> p2v(const ProtoItem& item) {
 }
 
 template <class ValueType, class ProtoItem>
-std::unique_ptr<ValueType[]> p2vo(const ProtoItem& item) {
-    auto values = std::make_unique<ValueType[]>(item.values_size());
+unique_ptr<ValueType[]> p2vo(const ProtoItem& item) {
+    auto values = make_unique<ValueType[]>(item.values_size());
     for (size_t i = 0; i < item.values_size(); i++) {
-        values[i] = std::move(from_protobuf(item.values(i)));
+        values[i] = move(from_protobuf(item.values(i)));
     }
     return values;
 }
 
-protobuf::Light to_protobuf(const std::shared_ptr<Light>& light) {
-    protobuf::Light proto_light;
-
-    switch (light->GetType()) {
-    case LightType::Distant: {
-        proto_light.set_type(protobuf::LIGHT_DISTANT);
-        protobuf::DistantLight proto_distant;
-        auto distant = std::dynamic_pointer_cast<const DistantLight>(light);
-        *proto_distant.mutable_light_to_world() =
-            to_protobuf(light->LightToWorld.GetMatrix());
-        *proto_distant.mutable_l() = to_protobuf(distant->L);
-        *proto_distant.mutable_dir() = to_protobuf(distant->wLight);
-        proto_light.mutable_data()->PackFrom(proto_distant);
-        break;
-    }
-
-    default:
-        throw std::runtime_error("unsupported light type");
-    }
-
-    return proto_light;
-}
-
-protobuf::Sampler to_protobuf(const std::shared_ptr<Sampler>& sampler,
+protobuf::Sampler to_protobuf(const shared_ptr<Sampler>& sampler,
                               const Bounds2i& sampleBounds) {
     protobuf::Sampler proto_sampler;
 
@@ -277,7 +257,7 @@ protobuf::Sampler to_protobuf(const std::shared_ptr<Sampler>& sampler,
     case SamplerType::Halton: {
         proto_sampler.set_type(protobuf::SAMPLER_HALTON);
         protobuf::HaltonSampler proto_halton;
-        auto halton = std::dynamic_pointer_cast<const HaltonSampler>(sampler);
+        auto halton = dynamic_pointer_cast<const HaltonSampler>(sampler);
         proto_halton.set_samples_per_pixel(halton->samplesPerPixel);
         proto_halton.set_sample_at_center(halton->sampleAtPixelCenter);
         *proto_halton.mutable_sample_bounds() = to_protobuf(sampleBounds);
@@ -286,7 +266,7 @@ protobuf::Sampler to_protobuf(const std::shared_ptr<Sampler>& sampler,
     }
 
     default:
-        throw std::runtime_error("unsupported sampler type");
+        throw runtime_error("unsupported sampler type");
     }
 
     return proto_sampler;
@@ -366,11 +346,11 @@ RayDifferential from_protobuf(const protobuf::RayDifferential& proto_ray) {
 
 TriangleMesh from_protobuf(const protobuf::TriangleMesh& proto_tm) {
     Transform identity;
-    std::vector<int> vertexIndices;
-    std::vector<Point3f> p;
-    std::vector<Vector3f> s;
-    std::vector<Normal3f> n;
-    std::vector<Point2f> uv;
+    vector<int> vertexIndices;
+    vector<Point3f> p;
+    vector<Vector3f> s;
+    vector<Normal3f> n;
+    vector<Point2f> uv;
 
     vertexIndices.reserve(proto_tm.n_triangles() * 3);
     p.reserve(proto_tm.n_vertices());
@@ -415,7 +395,7 @@ RayState::TreeletNode from_protobuf(const protobuf::VisitNode& proto_node) {
 
     if (proto_node.has_transform()) {
         node.transform =
-            std::make_shared<Transform>(from_protobuf(proto_node.transform()));
+            make_shared<Transform>(from_protobuf(proto_node.transform()));
     }
 
     return node;
@@ -486,7 +466,7 @@ ParamSet from_protobuf(const protobuf::ParamSet& pp) {
     }
 
     for (const auto& item : pp.strings()) {
-        ps.AddString(item.name(), p2v<std::string>(item), item.values_size());
+        ps.AddString(item.name(), p2v<string>(item), item.values_size());
     }
 
     for (const auto& item : pp.textures()) {
@@ -499,34 +479,14 @@ ParamSet from_protobuf(const protobuf::ParamSet& pp) {
     return ps;
 }
 
-std::shared_ptr<Light> from_protobuf(const protobuf::Light& proto_light) {
-    std::shared_ptr<Light> light;
-
-    switch (proto_light.type()) {
-    case protobuf::LIGHT_DISTANT: {
-        protobuf::DistantLight proto_distant;
-        proto_light.data().UnpackTo(&proto_distant);
-        light = std::make_shared<DistantLight>(
-            from_protobuf(proto_distant.light_to_world()),
-            from_protobuf(proto_distant.l()),
-            from_protobuf(proto_distant.dir()));
-    }
-
-    default:
-        throw std::runtime_error("unsupported light type");
-    }
-
-    return light;
-}
-
-std::shared_ptr<Sampler> from_protobuf(const protobuf::Sampler& proto_sampler) {
-    std::shared_ptr<Sampler> sampler;
+shared_ptr<Sampler> from_protobuf(const protobuf::Sampler& proto_sampler) {
+    shared_ptr<Sampler> sampler;
 
     switch (proto_sampler.type()) {
     case protobuf::SAMPLER_HALTON: {
         protobuf::HaltonSampler proto_halton;
         proto_sampler.data().UnpackTo(&proto_halton);
-        sampler = std::make_shared<HaltonSampler>(
+        sampler = make_shared<HaltonSampler>(
             proto_halton.samples_per_pixel(),
             from_protobuf(proto_halton.sample_bounds()),
             proto_halton.sample_at_center());
@@ -534,10 +494,47 @@ std::shared_ptr<Sampler> from_protobuf(const protobuf::Sampler& proto_sampler) {
     }
 
     default:
-        throw std::runtime_error("unsupported sampler type");
+        throw runtime_error("unsupported sampler type");
     }
 
     return sampler;
+}
+
+protobuf::Light light::to_protobuf(const string& name, const ParamSet& params,
+                                   const Transform& light2world) {
+    protobuf::Light proto_light;
+    proto_light.set_name(name);
+    *proto_light.mutable_paramset() = pbrt::to_protobuf(params);
+    *proto_light.mutable_light_to_world() =
+        to_protobuf(light2world.GetMatrix());
+    return proto_light;
+}
+
+shared_ptr<Light> light::from_protobuf(const protobuf::Light& proto_light) {
+    shared_ptr<Light> light;
+
+    MediumInterface mi;
+    const string& name = proto_light.name();
+    const Transform light2world = pbrt::from_protobuf(proto_light.light_to_world());
+    const ParamSet paramSet = pbrt::from_protobuf(proto_light.paramset());
+
+    if (name == "point") {
+        light = CreatePointLight(light2world, mi.outside, paramSet);
+    } else if (name == "spot") {
+        light = CreateSpotLight(light2world, mi.outside, paramSet);
+    } else if (name == "goniometric") {
+        light = CreateGoniometricLight(light2world, mi.outside, paramSet);
+    } else if (name == "projection") {
+        light = CreateProjectionLight(light2world, mi.outside, paramSet);
+    } else if (name == "distant") {
+        light = CreateDistantLight(light2world, paramSet);
+    } else if (name == "infinite" || name == "exinfinite") {
+        light = CreateInfiniteLight(light2world, paramSet);
+    } else {
+        throw runtime_error("unknown light name");
+    }
+
+    return light;
 }
 
 }  // namespace pbrt

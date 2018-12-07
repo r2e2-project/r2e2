@@ -185,6 +185,9 @@ struct RenderOptions {
     std::map<std::string, std::vector<std::shared_ptr<Primitive>>> instances;
     std::vector<std::shared_ptr<Primitive>> *currentInstance = nullptr;
     bool haveScatteringMedia = false;
+
+    // Dumping the scene data
+    std::vector<protobuf::Light> protoLights;
 };
 
 // MaterialInstance represents both an instance of a material as well as
@@ -1322,6 +1325,11 @@ void pbrtLightSource(const std::string &name, const ParamSet &params) {
         params.Print(catIndentCount);
         printf("\n");
     }
+
+    if (!PbrtOptions.dumpScenePath.empty()) {
+        renderOptions->protoLights.push_back(
+            light::to_protobuf(name, params, curTransform[0]));
+    }
 }
 
 void pbrtAreaLightSource(const std::string &name, const ParamSet &params) {
@@ -1667,12 +1675,13 @@ Scene *RenderOptions::MakeScene() {
     allAcceleratorParams.AddBool("sceneaccelerator", std::move(scene_accelerator_val), 1);
 
     /* Do we need to dump the lights? */
-    if (PbrtOptions.dumpScenePath.length()) {
+    if (!PbrtOptions.dumpScenePath.empty()) {
         // let's dump the lights
         protobuf::RecordWriter writer(PbrtOptions.dumpScenePath + "/LIGHTS");
-        for (const auto &light : lights) {
-            writer.write(to_protobuf(light));
+        for (const auto &light : renderOptions->protoLights) {
+            writer.write(light);
         }
+        renderOptions->protoLights.clear();
     }
 
     std::shared_ptr<Primitive> accelerator =

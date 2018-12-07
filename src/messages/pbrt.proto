@@ -133,22 +133,6 @@ message RayState {
     uint32 remaining_bounces = 10;
     bool is_shadow_ray = 11;
 }
-
-// Lights
-
-message DistantLight {
-    Matrix light_to_world = 1;
-    RGBSpectrum L = 2;
-    Vector3f dir = 3;
-}
-
-enum LightType { LIGHT_DISTANT = 0; }
-
-message Light {
-    LightType type = 1;
-    google.protobuf.Any data = 2;
-}
-
 // ParamSet
 
 message ParamSet {
@@ -196,23 +180,10 @@ message Sampler {
     google.protobuf.Any data = 2;
 }
 
-// Camera
+// Lights
 
-message PerspectiveCamera {
-    AnimatedTransform camera_to_world = 1;
-    float fov = 2;
-    float frame_aspect_ratio = 3;
-    float lens_radius = 4;
-    float focal_distance = 5;
-    repeated float screen_window = 6;
-}
-
-enum CameraType { CAMERA_PERSPECTIVE = 0; }
-
-message Camera {
-    CameraType type = 1;
-    google.protobuf.Any data = 2;
-
-    Point2f film_resolution = 3;
-    Bounds2f crop_window = 4;
+message Light {
+    string name = 1;
+    ParamSet paramset = 2;
+    Matrix light_to_world = 3;
 }

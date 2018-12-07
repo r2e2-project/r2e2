@@ -67,8 +67,6 @@ class DistantLight : public Light {
 
     LightType GetType() const { return LightType::Distant; }
 
-    friend protobuf::Light to_protobuf(const std::shared_ptr<Light> &);
-
   private:
     // DistantLight Private Data
     const Spectrum L;
