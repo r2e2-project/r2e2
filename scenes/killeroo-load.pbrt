@@ -14,7 +14,7 @@ Sampler "halton" "integer pixelsamples" [8]
 
 Integrator "path" "integer maxdepth" [5]
 
-Accelerator "cloudbvh" "string loadpath" ["killeroo-data"]
+Accelerator "cloudbvh"
 
 WorldBegin
 
