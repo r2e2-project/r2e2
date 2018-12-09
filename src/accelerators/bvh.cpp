@@ -46,8 +46,9 @@
 #include <limits>
 #include <set>
 
-#include "pbrt.pb.h"
+#include "cloud/manager.h"
 #include "messages/utils.h"
+#include "pbrt.pb.h"
 
 namespace pbrt {
 
@@ -770,9 +771,9 @@ std::shared_ptr<BVHAccel> CreateBVHAccelerator(
     auto res = std::make_shared<BVHAccel>(std::move(prims), maxPrimsInNode, splitMethod);
 
     const bool root_bvh = ps.FindOneBool("sceneaccelerator", false);
-    if (PbrtOptions.dumpScenePath.length() and root_bvh) {
+    if (PbrtOptions.dumpScene and root_bvh) {
         const int dump_node_size = ps.FindOneInt("dumptreeletsize", 50000);
-        res->Dump(PbrtOptions.dumpScenePath, dump_node_size);
+        res->Dump(dump_node_size);
     }
 
     return res;
@@ -915,7 +916,7 @@ void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const
     } */
 }
 
-void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
+void BVHAccel::dumpTreelets(uint32_t * labels,
                             const size_t max_treelet_nodes,
                             const size_t index_offset) const {
 
@@ -929,7 +930,8 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
         }
 
         const size_t treelet_id = root_index + index_offset;
-        protobuf::RecordWriter writer(path + "/T" + std::to_string(treelet_id));
+        auto writer =
+            global::manager.GetWriter(SceneManager::Type::Treelet, treelet_id);
 
         const uint32_t current_treelet = labels[root_index];
         std::stack<int> q;
@@ -940,7 +942,7 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
             q.pop();
 
             if (node_index == -1) {
-                writer.write_empty();
+                writer->write_empty();
                 continue;
             }
 
@@ -973,7 +975,7 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
                             }
 
                             if (not bvh_instances.count(bvh.get())) {
-                                bvh->Dump(path, max_treelet_nodes, nested_tree_offset);
+                                bvh->Dump(max_treelet_nodes, nested_tree_offset);
                                 bvh_instances[bvh.get()] = nested_tree_offset;
                                 nested_tree_offset += bvh->nodeCount;
                             }
@@ -1001,9 +1003,9 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
                             auto &triangle_mesh = triangle->mesh;
                             const int tm_id = triangle_meshes.size() + index_offset;
                             triangle_meshes[triangle_mesh.get()] = tm_id;
-                            protobuf::RecordWriter tm_writer(
-                                path + "/TM" + std::to_string(tm_id));
-                            tm_writer.write(to_protobuf(*triangle_mesh));
+                            auto tm_writer = global::manager.GetWriter(
+                                SceneManager::Type::TriangleMesh, tm_id);
+                            tm_writer->write(to_protobuf(*triangle_mesh));
                         }
 
                         const int tm_id = triangle_meshes[triangle->mesh.get()];
@@ -1020,9 +1022,9 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
                     }
                 }
 
-                writer.write(proto_node);
-                writer.write_empty();
-                writer.write_empty();
+                writer->write(proto_node);
+                writer->write_empty();
+                writer->write_empty();
                 continue;
             }
 
@@ -1042,13 +1044,12 @@ void BVHAccel::dumpTreelets(const std::string & path, uint32_t * labels,
                 q.push(node_index + 1);
             }
 
-            writer.write(proto_node);
+            writer->write(proto_node);
         }
     }
 }
 
-void BVHAccel::Dump(const std::string &path,
-                    const size_t max_treelet_nodes,
+void BVHAccel::Dump(const size_t max_treelet_nodes,
                     const size_t index_offset) const {
     std::cerr << "Dumping BVH... ";
 
@@ -1058,7 +1059,7 @@ void BVHAccel::Dump(const std::string &path,
     assignTreelets(treelet_labels.get(), max_treelet_nodes);
 
     /* (2) dump the treelets to disk */
-    dumpTreelets(path, treelet_labels.get(), max_treelet_nodes, index_offset);
+    dumpTreelets(treelet_labels.get(), max_treelet_nodes, index_offset);
     std::cerr << "done." << std::endl;
 }
 

@@ -15,7 +15,11 @@ namespace protobuf {
 
 class RecordWriter {
 public:
+    RecordWriter(RecordWriter &&) = default;
+    RecordWriter& operator=(RecordWriter &&) = default;
+
     RecordWriter(const std::string & filename);
+    RecordWriter(FileDescriptor && fd) : fd_(std::move(fd)) {}
 
     template<class ProtobufType>
     void write(const ProtobufType & proto);
@@ -30,7 +34,11 @@ private:
 
 class RecordReader {
 public:
+    RecordReader(RecordReader &&) = default;
+    RecordReader& operator=(RecordReader &&) = default;
+
     RecordReader(const std::string & filename);
+    RecordReader(FileDescriptor && fd);
 
     template<class ProtobufType>
     bool read(ProtobufType * record);

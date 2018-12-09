@@ -18,7 +18,7 @@ struct TreeletNode;
 
 class CloudBVH : public Aggregate {
   public:
-    CloudBVH(const std::string &bvh_path, const uint32_t bvh_root = 0);
+    CloudBVH(const uint32_t bvh_root = 0);
     ~CloudBVH() {}
 
     CloudBVH(const CloudBVH &) = delete;

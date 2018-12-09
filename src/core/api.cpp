@@ -117,6 +117,7 @@
 #include "media/homogeneous.h"
 #include "cloud/integrator.h"
 #include "cloud/bvh.h"
+#include "cloud/manager.h"
 
 #include <map>
 #include <stdio.h>
@@ -1326,7 +1327,7 @@ void pbrtLightSource(const std::string &name, const ParamSet &params) {
         printf("\n");
     }
 
-    if (!PbrtOptions.dumpScenePath.empty()) {
+    if (PbrtOptions.dumpScene) {
         renderOptions->protoLights.push_back(
             light::to_protobuf(name, params, curTransform[0]));
     }
@@ -1675,11 +1676,11 @@ Scene *RenderOptions::MakeScene() {
     allAcceleratorParams.AddBool("sceneaccelerator", std::move(scene_accelerator_val), 1);
 
     /* Do we need to dump the lights? */
-    if (!PbrtOptions.dumpScenePath.empty()) {
+    if (PbrtOptions.dumpScene) {
         // let's dump the lights
-        protobuf::RecordWriter writer(PbrtOptions.dumpScenePath + "/LIGHTS");
+        auto writer = global::manager.GetWriter(SceneManager::Type::Lights);
         for (const auto &light : renderOptions->protoLights) {
-            writer.write(light);
+            writer->write(light);
         }
         renderOptions->protoLights.clear();
     }
@@ -1708,10 +1709,10 @@ Integrator *RenderOptions::MakeIntegrator() const {
         return nullptr;
     }
 
-    if (!PbrtOptions.dumpScenePath.empty()) {
+    if (PbrtOptions.dumpScene) {
         // let's dump the sampler
-        protobuf::RecordWriter writer(PbrtOptions.dumpScenePath + "/SAMPLER");
-        writer.write(sampler::to_protobuf(SamplerName, SamplerParams,
+        auto writer = global::manager.GetWriter(SceneManager::Type::Sampler);
+        writer->write(sampler::to_protobuf(SamplerName, SamplerParams,
                                           camera->film->GetSampleBounds()));
     }
 
@@ -1768,12 +1769,12 @@ Camera *RenderOptions::MakeCamera() const {
                                   renderOptions->transformStartTime,
                                   renderOptions->transformEndTime, film);
 
-    if(!PbrtOptions.dumpScenePath.empty()) {
+    if(PbrtOptions.dumpScene) {
         AnimatedTransform ac2w{
             &CameraToWorld[0], renderOptions->transformStartTime,
             &CameraToWorld[1], renderOptions->transformEndTime};
-        protobuf::RecordWriter writer(PbrtOptions.dumpScenePath + "/CAMERA");
-        writer.write(camera::to_protobuf(CameraName, CameraParams, ac2w,
+        auto writer = global::manager.GetWriter(SceneManager::Type::Camera);
+        writer->write(camera::to_protobuf(CameraName, CameraParams, ac2w,
                                          FilmName, FilmParams, FilterName,
                                          FilterParams));
     }

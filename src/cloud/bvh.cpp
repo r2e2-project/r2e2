@@ -5,21 +5,22 @@
 #include <thread>
 
 #include "accelerators/bvh.h"
+#include "cloud/manager.h"
 #include "core/parallel.h"
+#include "core/paramset.h"
+#include "core/primitive.h"
 #include "materials/matte.h"
 #include "messages/serialization.h"
 #include "messages/utils.h"
-#include "paramset.h"
 #include "pbrt.pb.h"
-#include "primitive.h"
 #include "shapes/triangle.h"
 
 using namespace std;
 
 namespace pbrt {
 
-CloudBVH::CloudBVH(const string &bvh_path, const uint32_t bvh_root)
-    : bvh_path_(bvh_path), bvh_root_(bvh_root) {
+CloudBVH::CloudBVH(const uint32_t bvh_root)
+    : bvh_root_(bvh_root) {
     if (MaxThreadIndex() > 1) {
         throw runtime_error("Cannot use CloudBVH with multiple threads");
     }
@@ -55,17 +56,18 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
         return; /* this tree is already loaded */
     }
 
-    protobuf::RecordReader reader(bvh_path_ + "/T" + to_string(root_id));
     vector<TreeletNode> nodes;
+    auto reader =
+        global::manager.GetReader(SceneManager::Type::Treelet, root_id);
 
     stack<pair<uint32_t, Child>> q;
 
     auto &treelet = treelets_[root_id];
     auto &tree_primitives = treelet.primitives;
 
-    while (not reader.eof()) {
+    while (not reader->eof()) {
         protobuf::BVHNode proto_node;
-        if (not reader.read(&proto_node)) {
+        if (not reader->read(&proto_node)) {
             auto parent = q.top();
             q.pop();
 
@@ -118,7 +120,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
 
                 if (not bvh_instances_.count(proto_tp.root_ref())) {
                     bvh_instances_[proto_tp.root_ref()] =
-                        make_shared<CloudBVH>(bvh_path_, proto_tp.root_ref());
+                        make_shared<CloudBVH>(proto_tp.root_ref());
                 }
 
                 tree_primitives.emplace_back(
@@ -140,10 +142,10 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
 
                 /* load the TriangleMesh if necessary */
                 if (triangle_meshes_.count(tm_id) == 0) {
-                    protobuf::RecordReader tm_reader(bvh_path_ + "/TM" +
-                                                     to_string(tm_id));
+                    auto tm_reader = global::manager.GetReader(
+                        SceneManager::Type::TriangleMesh, tm_id);
                     protobuf::TriangleMesh tm;
-                    tm_reader.read(&tm);
+                    tm_reader->read(&tm);
                     triangle_meshes_[tm_id] =
                         make_shared<TriangleMesh>(move(from_protobuf(tm)));
                 }
@@ -411,13 +413,7 @@ void CloudBVH::clear() const {
 }
 
 shared_ptr<CloudBVH> CreateCloudBVH(const ParamSet &ps) {
-    const string path = ps.FindOneString("loadpath", "");
-
-    if (path.size() == 0) {
-        throw runtime_error("CloudBVH: loadpath is required");
-    }
-
-    return make_shared<CloudBVH>(path);
+    return make_shared<CloudBVH>();
 }
 
 }  // namespace pbrt

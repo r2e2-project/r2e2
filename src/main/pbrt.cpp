@@ -36,6 +36,7 @@
 #include "api.h"
 #include "parser.h"
 #include "parallel.h"
+#include "cloud/manager.h"
 #include <glog/logging.h>
 
 using namespace pbrt;
@@ -68,7 +69,11 @@ Reformatting options:
   --toply              Print a reformatted version of the input file(s) to
                        standard output and convert all triangle meshes to
                        PLY files. Does not render an image.
+
+Cloud:
   --dumpscene <dir>    Dump scene data to <dir>
+  --loadscene <dir>    Load scene data from <dir>
+
 )");
     exit(msg ? 1 : 0);
 }
@@ -128,19 +133,25 @@ int main(int argc, char *argv[]) {
             FLAGS_v = atoi(argv[++i]);
         } else if (!strncmp(argv[i], "--v=", 4)) {
           FLAGS_v = atoi(argv[i] + 4);
-        }
-        else if (!strcmp(argv[i], "--logtostderr")) {
-          FLAGS_logtostderr = true;
-        }
-        else if (!strcmp(argv[i], "--dumpscene") ||!strcmp(argv[i], "-dumpscene")) {
+        } else if (!strcmp(argv[i], "--logtostderr")) {
+            FLAGS_logtostderr = true;
+        } else if (!strcmp(argv[i], "--dumpscene") ||
+                   !strcmp(argv[i], "-dumpscene")) {
             if (i + 1 == argc)
                 usage("missing value after --dumpscene argument");
-            options.dumpScenePath = argv[++i];
-        }
-        else if (!strncmp(argv[i], "--dumpscene=", 12)) {
-            options.dumpScenePath = &argv[i][12];
-        }
-        else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-help") ||
+            options.dumpScene = true;
+            global::manager.init(argv[++i]);
+        } else if (!strncmp(argv[i], "--dumpscene=", 12)) {
+            options.dumpScene = true;
+            global::manager.init(&argv[i][12]);
+        } else if (!strcmp(argv[i], "--loadscene") ||
+                   !strcmp(argv[i], "-loadscene")) {
+            if (i + 1 == argc)
+                usage("missing value after --loadscene argument");
+            global::manager.init(argv[++i]);
+        } else if (!strncmp(argv[i], "--loadscene=", 12)) {
+            global::manager.init(&argv[i][12]);
+        } else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-help") ||
                    !strcmp(argv[i], "-h")) {
             usage();
             return 0;

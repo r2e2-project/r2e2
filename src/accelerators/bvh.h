@@ -68,7 +68,7 @@ class BVHAccel : public Aggregate {
     bool Intersect(const Ray &ray, SurfaceInteraction *isect) const;
     bool IntersectP(const Ray &ray) const;
 
-    void Dump(const std::string &path, const size_t max_treelet_nodes,
+    void Dump(const size_t max_treelet_nodes,
               const size_t index_offset = 0) const;
 
   private:
@@ -93,8 +93,7 @@ class BVHAccel : public Aggregate {
     int flattenBVHTree(BVHBuildNode *node, int *offset);
 
     void assignTreelets(uint32_t * labels, const uint32_t max_nodes) const;
-    void dumpTreelets(const std::string & path, uint32_t * labels,
-                      const size_t max_treelet_nodes,
+    void dumpTreelets(uint32_t *labels, const size_t max_treelet_nodes,
                       const size_t index_offset) const;
 
     // BVHAccel Private Data

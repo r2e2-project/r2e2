@@ -86,8 +86,8 @@ int main(int argc, char const *argv[]) {
 
         switch (operation) {
         case Operation::Trace: {
-            auto treelet = make_shared<CloudBVH>(
-                scenePath, rayStates.front().toVisit.back().treelet);
+            auto treelet =
+                make_shared<CloudBVH>(rayStates.front().toVisit.back().treelet);
 
             for (auto &rayState : rayStates) {
                 auto newRay = CloudIntegrator::Trace(move(rayState), treelet);
@@ -99,8 +99,8 @@ int main(int argc, char const *argv[]) {
         }
 
         case Operation::Shade: {
-            auto treelet = make_shared<CloudBVH>(
-                scenePath, rayStates.front().hit->treelet);
+            auto treelet =
+                make_shared<CloudBVH>(rayStates.front().hit->treelet);
 
             MemoryArena arena;
             auto lights = loadLights(scenePath);
