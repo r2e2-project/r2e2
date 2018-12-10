@@ -87,7 +87,7 @@ int main(int argc, char const *argv[]) {
             } while (sampler->StartNextSample());
         }
 
-        cout << i << " sample(s) were generated." << endl;
+        cerr << i << " sample(s) were generated." << endl;
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;
