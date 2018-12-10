@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "cloud/manager.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/transform.h"
@@ -16,16 +17,16 @@ void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA OUTPUT" << endl; }
 
 shared_ptr<Camera> loadCamera(const string &scenePath,
                               vector<unique_ptr<Transform>> &transformCache) {
-    protobuf::RecordReader reader{scenePath + "/CAMERA"};
+    auto reader = global::manager.GetReader(SceneManager::Type::Camera);
     protobuf::Camera proto_camera;
-    reader.read(&proto_camera);
+    reader->read(&proto_camera);
     return camera::from_protobuf(proto_camera, transformCache);
 }
 
 shared_ptr<Sampler> loadSampler(const string &scenePath) {
-    protobuf::RecordReader reader{scenePath + "/SAMPLER"};
+    auto reader = global::manager.GetReader(SceneManager::Type::Sampler);
     protobuf::Sampler proto_sampler;
-    reader.read(&proto_sampler);
+    reader->read(&proto_sampler);
     return sampler::from_protobuf(proto_sampler);
 }
 
@@ -44,6 +45,8 @@ int main(int argc, char const *argv[]) {
 
         const string scenePath{argv[1]};
         const string outputPath{argv[2]};
+
+        global::manager.init(scenePath);
 
         vector<unique_ptr<Transform>> transformCache;
         shared_ptr<Sampler> sampler = loadSampler(scenePath);

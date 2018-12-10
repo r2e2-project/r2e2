@@ -3,6 +3,7 @@
 
 #include "cloud/bvh.h"
 #include "cloud/integrator.h"
+#include "cloud/manager.h"
 #include "cloud/raystate.h"
 #include "messages/serialization.h"
 #include "messages/utils.h"
@@ -17,11 +18,11 @@ void usage(const char *argv0) {
 
 vector<shared_ptr<Light>> loadLights(const string &scenePath) {
     vector<shared_ptr<Light>> lights;
-    protobuf::RecordReader reader{scenePath + "/LIGHTS"};
+    auto reader = global::manager.GetReader(SceneManager::Type::Lights);
 
-    while (!reader.eof()) {
+    while (!reader->eof()) {
         protobuf::Light proto_light;
-        reader.read(&proto_light);
+        reader->read(&proto_light);
         lights.push_back(move(light::from_protobuf(proto_light)));
     }
 
@@ -29,9 +30,9 @@ vector<shared_ptr<Light>> loadLights(const string &scenePath) {
 }
 
 shared_ptr<Sampler> loadSampler(const string &scenePath) {
-    protobuf::RecordReader reader{scenePath + "/SAMPLER"};
+    auto reader = global::manager.GetReader(SceneManager::Type::Sampler);
     protobuf::Sampler proto_sampler;
-    reader.read(&proto_sampler);
+    reader->read(&proto_sampler);
     return sampler::from_protobuf(proto_sampler);
 }
 
@@ -52,6 +53,8 @@ int main(int argc, char const *argv[]) {
         const string raysPath{argv[2]};
         const string scenePath{argv[3]};
         const string output{argv[4]};
+
+        global::manager.init(scenePath);
 
         Operation operation;
         if (operationStr == "trace") {
