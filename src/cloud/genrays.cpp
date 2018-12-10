@@ -13,7 +13,9 @@
 using namespace std;
 using namespace pbrt;
 
-void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA OUTPUT" << endl; }
+void usage(const char *argv0) {
+    cerr << argv0 << " SCENE-DATA OUTPUT OUTPUT-SAMPLES" << endl;
+}
 
 shared_ptr<Camera> loadCamera(const string &scenePath,
                               vector<unique_ptr<Transform>> &transformCache) {
@@ -30,21 +32,20 @@ shared_ptr<Sampler> loadSampler(const string &scenePath) {
     return sampler::from_protobuf(proto_sampler);
 }
 
-enum class Operation { Trace, Shade };
-
 int main(int argc, char const *argv[]) {
     try {
         if (argc <= 0) {
             abort();
         }
 
-        if (argc != 3) {
+        if (argc != 4) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
 
         const string scenePath{argv[1]};
         const string outputPath{argv[2]};
+        const string samplesPath{argv[3]};
 
         global::manager.init(scenePath);
 
@@ -57,6 +58,7 @@ int main(int argc, char const *argv[]) {
         const float rayScale = 1 / sqrt((Float)sampler->samplesPerPixel);
 
         protobuf::RecordWriter rayWriter{outputPath};
+        protobuf::RecordWriter sampleWriter{samplesPath};
 
         /* Generate all the samples */
         size_t i = 0;
@@ -67,20 +69,25 @@ int main(int argc, char const *argv[]) {
 
             size_t sample_num = 0;
             do {
-                CameraSample cameraSample = sampler->GetCameraSample(pixel);
+                CloudIntegrator::SampleData sampleData;
+                sampleData.sample = sampler->GetCameraSample(pixel);
                 RayState state;
 
                 state.sample.id = i++;
                 state.sample.num = sample_num++;
                 state.sample.pixel = pixel;
                 state.remainingBounces = maxDepth;
-                camera->GenerateRayDifferential(cameraSample, &state.ray);
+                sampleData.weight = camera->GenerateRayDifferential(
+                    sampleData.sample, &state.ray);
                 state.ray.ScaleDifferentials(rayScale);
                 state.StartTrace();
 
                 rayWriter.write(to_protobuf(state));
+                sampleWriter.write(to_protobuf(sampleData));
             } while (sampler->StartNextSample());
         }
+
+        cout << i << " sample(s) were generated." << endl;
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;
