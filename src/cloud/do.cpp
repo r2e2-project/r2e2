@@ -13,7 +13,7 @@ using namespace std;
 using namespace pbrt;
 
 void usage(const char *argv0) {
-    cerr << argv0 << " OP=<trace|shade> RAYSTATES SCENE-DATA OUTPUT" << endl;
+    cerr << argv0 << " RAYSTATES SCENE-DATA OUTPUT OUTPUT-FINISHED" << endl;
 }
 
 vector<shared_ptr<Light>> loadLights(const string &scenePath) {
@@ -44,29 +44,21 @@ int main(int argc, char const *argv[]) {
             abort();
         }
 
-        if (argc != 4) {
+        if (argc != 5) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
 
-        const string operationStr{argv[1]};
-        const string raysPath{argv[2]};
-        const string scenePath{argv[3]};
-        const string output{argv[4]};
+        const string raysPath{argv[1]};
+        const string scenePath{argv[2]};
+        const string outputPath{argv[3]};
+        const string finishedPath{argv[4]};
 
         global::manager.init(scenePath);
 
-        Operation operation;
-        if (operationStr == "trace") {
-            operation = Operation::Trace;
-        } else if (operationStr == "shade") {
-            operation = Operation::Shade;
-        } else {
-            throw runtime_error("invalid operation mode");
-        }
-
         vector<RayState> rayStates;
         vector<RayState> outputRays;
+        vector<RayState> finishedRays;
 
         /* loading all the rays */
         {
@@ -87,46 +79,46 @@ int main(int argc, char const *argv[]) {
             return EXIT_SUCCESS;
         }
 
-        switch (operation) {
-        case Operation::Trace: {
-            auto treelet =
-                make_shared<CloudBVH>(rayStates.front().toVisit.back().treelet);
+        MemoryArena arena;
+        auto treelet = make_shared<CloudBVH>();
+        auto lights = loadLights(scenePath);
+        auto sampler = loadSampler(scenePath);
 
-            for (auto &rayState : rayStates) {
+        for (auto &rayState : rayStates) {
+            if (not rayState.toVisit.empty()) {
                 auto newRay = CloudIntegrator::Trace(move(rayState), treelet);
                 if (!newRay.isShadowRay || !newRay.hit.initialized()) {
                     outputRays.push_back(move(newRay));
                 }
+            } else if (rayState.isShadowRay && !rayState.hit.initialized()) {
+                finishedRays.push_back(move(rayState));
+            } else if (rayState.hit.initialized()) {
+                auto newRays = CloudIntegrator::Shade(move(rayState), treelet,
+                                                      lights, sampler, arena);
+                for (auto &newRay : newRays) {
+                    outputRays.push_back(move(newRay));
+                }
             }
-            break;
-        }
-
-        case Operation::Shade: {
-            auto treelet =
-                make_shared<CloudBVH>(rayStates.front().hit->treelet);
-
-            MemoryArena arena;
-            auto lights = loadLights(scenePath);
-            auto sampler = loadSampler(scenePath);
-
-            for (auto &rayState : rayStates) {
-                auto newRay = CloudIntegrator::Shade(move(rayState), treelet,
-                                                     lights, sampler, arena);
-            }
-
-            break;
-        }
         }
 
         /* writing all the output rays */
         {
-            protobuf::RecordWriter writer{output};
+            protobuf::RecordWriter writer{outputPath};
             for (auto &rayState : outputRays) {
                 writer.write(to_protobuf(rayState));
             }
         }
 
-        cerr << outputRays.size() << " RayState(s) written." << endl;
+        /* writing all the finished rays */
+        {
+            protobuf::RecordWriter writer{finishedPath};
+            for (auto &rayState : finishedRays) {
+                writer.write(to_protobuf(rayState));
+            }
+        }
+
+        cerr << outputRays.size() << " output ray(s) and "
+             << finishedRays.size() << " finished ray(s) were written." << endl;
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;
