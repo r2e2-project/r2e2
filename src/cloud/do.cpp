@@ -13,7 +13,7 @@ using namespace std;
 using namespace pbrt;
 
 void usage(const char *argv0) {
-    cerr << argv0 << " RAYSTATES SCENE-DATA OUTPUT OUTPUT-FINISHED" << endl;
+    cerr << argv0 << " SCENE-DATA RAYSTATES OUTPUT OUTPUT-FINISHED" << endl;
 }
 
 vector<shared_ptr<Light>> loadLights(const string &scenePath) {
@@ -49,8 +49,8 @@ int main(int argc, char const *argv[]) {
             return EXIT_FAILURE;
         }
 
-        const string raysPath{argv[1]};
-        const string scenePath{argv[2]};
+        const string scenePath{argv[1]};
+        const string raysPath{argv[2]};
         const string outputPath{argv[3]};
         const string finishedPath{argv[4]};
 
