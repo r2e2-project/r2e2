@@ -8,6 +8,11 @@
 #include "cameras/perspective.h"
 #include "cameras/realistic.h"
 #include "core/api.h"
+#include "filters/box.h"
+#include "filters/gaussian.h"
+#include "filters/mitchell.h"
+#include "filters/sinc.h"
+#include "filters/triangle.h"
 #include "lights/distant.h"
 #include "lights/goniometric.h"
 #include "lights/infinite.h"
@@ -20,12 +25,6 @@
 #include "samplers/sobol.h"
 #include "samplers/stratified.h"
 #include "samplers/zerotwosequence.h"
-#include "filters/box.h"
-#include "filters/gaussian.h"
-#include "filters/mitchell.h"
-#include "filters/sinc.h"
-#include "filters/triangle.h"
-
 
 using namespace std;
 
@@ -214,6 +213,13 @@ protobuf::RayState to_protobuf(const RayState& state) {
     proto_state.set_is_shadow_ray(state.isShadowRay);
 
     return proto_state;
+}
+
+protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample) {
+    protobuf::SampleData proto_sample;
+    *proto_sample.mutable_p_film() = to_protobuf(sample.sample.pFilm);
+    proto_sample.set_weight(sample.weight);
+    return proto_sample;
 }
 
 protobuf::ParamSet to_protobuf(const ParamSet& ps) {
@@ -421,6 +427,14 @@ RayState from_protobuf(const protobuf::RayState& proto_state) {
     state.isShadowRay = proto_state.is_shadow_ray();
 
     return state;
+}
+
+CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& proto_s) {
+    CloudIntegrator::SampleData sample;
+    sample.sample.pFilm = from_protobuf(proto_s.p_film());
+    sample.weight = proto_s.weight();
+    sample.L = 0.f;
+    return sample;
 }
 
 ParamSet from_protobuf(const protobuf::ParamSet& pp) {

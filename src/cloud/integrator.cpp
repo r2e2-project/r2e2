@@ -118,12 +118,6 @@ void CloudIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
 }
 
 void CloudIntegrator::Render(const Scene &scene) {
-    struct SampleData {
-        CameraSample sample;
-        Spectrum L{0.f};
-        Float weight{1.f};
-    };
-
     Preprocess(scene, *sampler);
     Bounds2i sampleBounds = camera->film->GetSampleBounds();
     unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);

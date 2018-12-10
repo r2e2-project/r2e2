@@ -195,3 +195,10 @@ message Camera {
     AnimatedTransform camera_to_world = 3;
     Film film = 6;
 }
+
+// Samples
+
+message SampleData {
+    Point2f p_film = 1;
+    float weight = 2;
+}

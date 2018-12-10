@@ -12,6 +12,12 @@ namespace pbrt {
 
 class CloudIntegrator : public Integrator {
   public:
+    struct SampleData {
+        CameraSample sample;
+        Spectrum L{0.f};
+        Float weight{1.f};
+    };
+
     CloudIntegrator(const int maxDepth, std::shared_ptr<const Camera> camera,
                     std::shared_ptr<Sampler> sampler,
                     const Bounds2i &pixelBounds)

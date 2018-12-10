@@ -1,6 +1,7 @@
 #ifndef PBRT_MESSAGES_UTILS_H
 #define PBRT_MESSAGES_UTILS_H
 
+#include "cloud/integrator.h"
 #include "cloud/raystate.h"
 #include "core/geometry.h"
 #include "core/light.h"
@@ -30,6 +31,7 @@ protobuf::AnimatedTransform to_protobuf(const AnimatedTransform& transform);
 protobuf::TriangleMesh to_protobuf(const TriangleMesh& triangleMesh);
 protobuf::VisitNode to_protobuf(const RayState::TreeletNode& node);
 protobuf::RayState to_protobuf(const RayState& state);
+protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample);
 protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
@@ -47,6 +49,7 @@ RayDifferential from_protobuf(const protobuf::RayDifferential& ray);
 TriangleMesh from_protobuf(const protobuf::TriangleMesh& mesh);
 RayState::TreeletNode from_protobuf(const protobuf::VisitNode& node);
 RayState from_protobuf(const protobuf::RayState& state);
+CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& sample);
 ParamSet from_protobuf(const protobuf::ParamSet& paramset);
 
 namespace light {

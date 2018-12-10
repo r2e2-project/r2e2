@@ -5,11 +5,11 @@
 #include <memory>
 
 #include "cloud/raystate.h"
+#include "core/pbrt.h"
+#include "core/primitive.h"
+#include "core/transform.h"
 #include "messages/serialization.h"
-#include "messages/utils.h"
-#include "pbrt.h"
-#include "primitive.h"
-#include "transform.h"
+#include "shapes/triangle.h"
 #include "util/optional.h"
 
 namespace pbrt {
