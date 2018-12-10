@@ -577,6 +577,14 @@ SET_TARGET_PROPERTIES ( pbrt_genrays PROPERTIES OUTPUT_NAME "pbrt-genrays" )
 TARGET_COMPILE_FEATURES ( pbrt_genrays PRIVATE ${PBRT_CXX11_FEATURES} )
 TARGET_LINK_LIBRARIES ( pbrt_genrays ${ALL_PBRT_LIBS} )
 
+# pbrt-aggregate
+ADD_EXECUTABLE ( pbrt_aggregate src/cloud/aggregate.cpp )
+ADD_SANITIZERS ( pbrt_aggregate )
+
+SET_TARGET_PROPERTIES ( pbrt_aggregate PROPERTIES OUTPUT_NAME "pbrt-aggregate" )
+TARGET_COMPILE_FEATURES ( pbrt_aggregate PRIVATE ${PBRT_CXX11_FEATURES} )
+TARGET_LINK_LIBRARIES ( pbrt_aggregate ${ALL_PBRT_LIBS} )
+
 
 # Unit test
 
