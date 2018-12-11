@@ -1625,6 +1625,11 @@ void pbrtWorldEnd() {
         std::unique_ptr<Integrator> integrator(renderOptions->MakeIntegrator());
         std::unique_ptr<Scene> scene(renderOptions->MakeScene());
 
+        if (PbrtOptions.dumpScene) {
+            auto writer = global::manager.GetWriter(SceneManager::Type::Scene);
+            writer->write(to_protobuf(*scene));
+        }
+
         // This is kind of ugly; we directly override the current profiler
         // state to switch from parsing/scene construction related stuff to
         // rendering stuff and then switch it back below. The underlying
