@@ -16,7 +16,7 @@ void usage(const char *argv0) {
     cerr << argv0 << " SCENE-DATA RAYSTATES OUTPUT OUTPUT-FINISHED" << endl;
 }
 
-vector<shared_ptr<Light>> loadLights(const string &scenePath) {
+vector<shared_ptr<Light>> loadLights() {
     vector<shared_ptr<Light>> lights;
     auto reader = global::manager.GetReader(SceneManager::Type::Lights);
 
@@ -29,11 +29,18 @@ vector<shared_ptr<Light>> loadLights(const string &scenePath) {
     return lights;
 }
 
-shared_ptr<Sampler> loadSampler(const string &scenePath) {
+shared_ptr<Sampler> loadSampler() {
     auto reader = global::manager.GetReader(SceneManager::Type::Sampler);
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);
     return sampler::from_protobuf(proto_sampler);
+}
+
+Scene loadFakeScene() {
+    auto reader = global::manager.GetReader(SceneManager::Type::Scene);
+    protobuf::Scene proto_scene;
+    reader->read(&proto_scene);
+    return from_protobuf(proto_scene);
 }
 
 enum class Operation { Trace, Shade };
@@ -82,8 +89,13 @@ int main(int argc, char const *argv[]) {
 
         MemoryArena arena;
         auto treelet = make_shared<CloudBVH>();
-        auto lights = loadLights(scenePath);
-        auto sampler = loadSampler(scenePath);
+        auto sampler = loadSampler();
+        auto lights = loadLights();
+        auto fakeScene = loadFakeScene();
+
+        for (auto & light : lights) {
+            light->Preprocess(fakeScene);
+        }
 
         for (auto &rayState : rayStates) {
             if (!rayState.toVisit.empty()) {
