@@ -8,7 +8,7 @@
 #include <map>
 
 #include "http_request.hh"
-#include "util/optional.hh"
+#include "util/optional.h"
 #include "util/util.hh"
 
 class AWS

@@ -17,9 +17,9 @@
 #include <errno.h>
 
 #include "path.hh"
-#include "exception.hh"
+#include "exception.h"
 #include "tokenize.hh"
-#include "file_descriptor.hh"
+#include "file_descriptor.h"
 #include "temp_file.hh"
 
 using namespace std;

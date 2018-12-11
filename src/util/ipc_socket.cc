@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "exception.hh"
+#include "exception.h"
 
 using namespace std;
 

@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "file_descriptor.hh"
+#include "file_descriptor.h"
 
 std::vector<char> to_mutable( const std::string & str );
 

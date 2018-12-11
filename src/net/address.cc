@@ -10,7 +10,7 @@
 #include "address.hh"
 #include "strict_conversions.hh"
 #include "util/util.hh"
-#include "util/exception.hh"
+#include "util/exception.h"
 
 using namespace std;
 

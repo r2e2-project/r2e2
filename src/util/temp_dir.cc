@@ -8,7 +8,7 @@
 #include <cassert>
 
 #include "temp_file.hh"
-#include "exception.hh"
+#include "exception.h"
 
 using namespace std;
 

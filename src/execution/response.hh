@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <sys/types.h>
 
-#include "util/optional.hh"
+#include "util/optional.h"
 
 class FetchDependenciesError : public std::exception {};
 class ExecutionError : public std::exception {};

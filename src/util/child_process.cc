@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 #include "child_process.hh"
-#include "exception.hh"
+#include "exception.h"
 #include "signalfd.hh"
 
 using namespace std;

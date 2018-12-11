@@ -6,7 +6,7 @@
 #include <sys/signalfd.h>
 #include <initializer_list>
 
-#include "file_descriptor.hh"
+#include "file_descriptor.h"
 
 /* wrapper class for Unix signal masks and signal file descriptor */
 

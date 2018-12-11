@@ -5,7 +5,7 @@
 #include <chrono>
 
 #include "poller.hh"
-#include "exception.hh"
+#include "exception.h"
 
 using namespace std;
 using namespace PollerShortNames;

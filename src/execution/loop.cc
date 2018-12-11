@@ -5,8 +5,8 @@
 #include <stdexcept>
 
 #include "net/http_response_parser.hh"
-#include "util/exception.hh"
-#include "util/optional.hh"
+#include "util/exception.h"
+#include "util/optional.h"
 
 using namespace std;
 using namespace PollerShortNames;

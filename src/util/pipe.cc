@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 #include "pipe.hh"
-#include "exception.hh"
+#include "exception.h"
 
 using namespace std;
 

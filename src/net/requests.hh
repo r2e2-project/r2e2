@@ -5,7 +5,7 @@
 
 #include <string>
 
-#include "util/optional.hh"
+#include "util/optional.h"
 #include "util/path.hh"
 
 namespace storage {

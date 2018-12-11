@@ -12,7 +12,7 @@
 #include "http_request.hh"
 #include "http_response_parser.hh"
 #include "awsv4_sig.hh"
-#include "util/exception.hh"
+#include "util/exception.h"
 #include "util/temp_file.hh"
 
 using namespace std;

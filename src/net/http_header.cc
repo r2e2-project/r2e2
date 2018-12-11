@@ -4,7 +4,7 @@
 #include <assert.h>
 
 #include "http_header.hh"
-#include "util/exception.hh"
+#include "util/exception.h"
 
 using namespace std;
 

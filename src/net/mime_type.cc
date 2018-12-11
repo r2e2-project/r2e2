@@ -1,7 +1,7 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
 #include "mime_type.hh"
-#include "util/exception.hh"
+#include "util/exception.h"
 #include "util/tokenize.hh"
 
 using namespace std;

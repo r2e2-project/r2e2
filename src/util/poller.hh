@@ -11,7 +11,7 @@
 #include <queue>
 #include <poll.h>
 
-#include "file_descriptor.hh"
+#include "file_descriptor.h"
 
 class NBSecureSocket;
 

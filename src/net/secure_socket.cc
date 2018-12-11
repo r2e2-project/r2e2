@@ -6,7 +6,7 @@
 #include <mutex>
 
 #include "secure_socket.hh"
-#include "util/exception.hh"
+#include "util/exception.h"
 
 using namespace std;
 

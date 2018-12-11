@@ -5,7 +5,7 @@
 
 #include <string>
 
-#include "file_descriptor.hh"
+#include "file_descriptor.h"
 
 /* Unix domain socket */
 class IPCSocket : public FileDescriptor

@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <string>
 
-#include "exception.hh"
+#include "exception.h"
 
 using namespace std;
 

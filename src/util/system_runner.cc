@@ -9,10 +9,10 @@
 
 #include "system_runner.hh"
 #include "child_process.hh"
-#include "exception.hh"
-#include "file_descriptor.hh"
+#include "exception.h"
+#include "file_descriptor.h"
 #include "pipe.hh"
-#include "optional.hh"
+#include "optional.h"
 
 using namespace std;
 

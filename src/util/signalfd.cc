@@ -4,7 +4,7 @@
 #include <cstring>
 
 #include "signalfd.hh"
-#include "exception.hh"
+#include "exception.h"
 
 using namespace std;
 

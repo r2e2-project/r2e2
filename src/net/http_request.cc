@@ -4,7 +4,7 @@
 
 #include "strict_conversions.hh"
 #include "http_request.hh"
-#include "util/exception.hh"
+#include "util/exception.h"
 
 using namespace std;
 

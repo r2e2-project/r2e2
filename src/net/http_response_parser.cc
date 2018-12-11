@@ -5,7 +5,7 @@
 
 #include "http_response_parser.hh"
 #include "http_response.hh"
-#include "util/exception.hh"
+#include "util/exception.h"
 
 using namespace std;
 

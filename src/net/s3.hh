@@ -13,7 +13,7 @@
 #include "http_request.hh"
 #include "requests.hh"
 #include "util/path.hh"
-#include "util/optional.hh"
+#include "util/optional.h"
 
 class S3
 {

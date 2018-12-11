@@ -6,7 +6,7 @@
 #include "mime_type.hh"
 #include "chunked_parser.hh"
 #include "strict_conversions.hh"
-#include "util/exception.hh"
+#include "util/exception.h"
 #include "util/tokenize.hh"
 
 using namespace std;

@@ -5,7 +5,7 @@
 
 #include <utility>
 
-#include "file_descriptor.hh"
+#include "file_descriptor.h"
 
 std::pair<FileDescriptor, FileDescriptor> make_pipe();
 

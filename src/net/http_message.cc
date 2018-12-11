@@ -3,7 +3,7 @@
 #include <cassert>
 
 #include "http_message.hh"
-#include "util/exception.hh"
+#include "util/exception.h"
 
 using namespace std;
 
