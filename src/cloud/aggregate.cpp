@@ -14,7 +14,7 @@ using namespace std;
 using namespace pbrt;
 
 void usage(const char *argv0) {
-    cerr << argv0 << " SCENE-DATA SAMPLES-INDEX FINISHED..." << endl;
+    cerr << argv0 << " SCENE-DATA SAMPLES-INDEX" << endl;
 }
 
 shared_ptr<Camera> loadCamera(const string &scenePath,
@@ -53,18 +53,18 @@ int main(int argc, char const *argv[]) {
             cameraSamples.push_back(from_protobuf(proto_sample));
         }
 
-        cerr << cameraSamples.size() << " sample(s) loaded." << endl;
-
+        size_t finishedRayCount = 0;
         for (string line; getline(cin, line);) {
             protobuf::RecordReader finishedReader{line};
 
             while(!finishedReader.eof()) {
+                ++finishedRayCount;
+
                 protobuf::RayState proto_ray;
                 finishedReader.read(&proto_ray);
                 auto rayState = from_protobuf(proto_ray);
 
-                Spectrum L{0.f};
-                L = rayState.Ld * rayState.beta;
+                Spectrum L{rayState.Ld * rayState.beta};
 
                 if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
                     L = Spectrum(0.f);
@@ -74,7 +74,7 @@ int main(int argc, char const *argv[]) {
             }
         }
 
-        Bounds2i sampleBounds = camera->film->GetSampleBounds();
+        const Bounds2i sampleBounds = camera->film->GetSampleBounds();
         unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
         for (const auto &sampleData : cameraSamples) {
@@ -86,7 +86,8 @@ int main(int argc, char const *argv[]) {
         camera->film->MergeFilmTile(move(filmTile));
         camera->film->WriteImage();
 
-        cout << "output written." << endl;
+        cerr << finishedRayCount << " finished ray(s)." << endl;
+        cerr << "output written." << endl;
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;

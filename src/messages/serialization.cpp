@@ -22,7 +22,7 @@ RecordReader::RecordReader(const std::string& filename)
           CheckSystemCall(filename, open(filename.c_str(), O_RDONLY, 0)))) {}
 
 RecordReader::RecordReader(FileDescriptor&& fd) : fin_(std::move(fd)) {
-    coded_input_.SetTotalBytesLimit(536'870'912, 268'435'456);
+    coded_input_.SetTotalBytesLimit(1'073'741'824, 536'870'912);
     eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
 }
 

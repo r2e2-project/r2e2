@@ -71,8 +71,8 @@ int main(int argc, char const *argv[]) {
             do {
                 CloudIntegrator::SampleData sampleData;
                 sampleData.sample = sampler->GetCameraSample(pixel);
-                RayState state;
 
+                RayState state;
                 state.sample.id = i++;
                 state.sample.num = sample_num++;
                 state.sample.pixel = pixel;

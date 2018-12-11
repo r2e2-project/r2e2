@@ -49,6 +49,9 @@ int main(int argc, char const *argv[]) {
             return EXIT_FAILURE;
         }
 
+        /* CloudBVH checks this */
+        PbrtOptions.nThreads = 1;
+
         const string scenePath{argv[1]};
         const string raysPath{argv[2]};
         const string outputPath{argv[3]};
@@ -65,11 +68,9 @@ int main(int argc, char const *argv[]) {
             protobuf::RecordReader reader{raysPath};
             while (!reader.eof()) {
                 protobuf::RayState protoState;
-                if (!reader.read(&protoState)) {
-                    continue;
+                if (reader.read(&protoState)) {
+                    rayStates.push_back(move(from_protobuf(protoState)));
                 }
-
-                rayStates.push_back(move(from_protobuf(protoState)));
             }
         }
 
@@ -85,13 +86,15 @@ int main(int argc, char const *argv[]) {
         auto sampler = loadSampler(scenePath);
 
         for (auto &rayState : rayStates) {
-            if (not rayState.toVisit.empty()) {
+            if (!rayState.toVisit.empty()) {
                 auto newRay = CloudIntegrator::Trace(move(rayState), treelet);
                 if (!newRay.isShadowRay || !newRay.hit.initialized()) {
                     outputRays.push_back(move(newRay));
                 }
-            } else if (rayState.isShadowRay && !rayState.hit.initialized()) {
-                finishedRays.push_back(move(rayState));
+            } else if (rayState.isShadowRay) {
+                if (!rayState.hit.initialized()) {
+                    finishedRays.push_back(move(rayState));
+                }
             } else if (rayState.hit.initialized()) {
                 auto newRays = CloudIntegrator::Shade(move(rayState), treelet,
                                                       lights, sampler, arena);

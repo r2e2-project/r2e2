@@ -433,7 +433,6 @@ CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& proto_s) {
     CloudIntegrator::SampleData sample;
     sample.sample.pFilm = from_protobuf(proto_s.p_film());
     sample.weight = proto_s.weight();
-    sample.L = 0.f;
     return sample;
 }
 
@@ -503,20 +502,19 @@ protobuf::Light light::to_protobuf(const string& name, const ParamSet& params,
 shared_ptr<Light> light::from_protobuf(const protobuf::Light& proto_light) {
     shared_ptr<Light> light;
 
-    MediumInterface mi;
     const string& name = proto_light.name();
     const Transform light2world =
         pbrt::from_protobuf(proto_light.light_to_world());
     const ParamSet paramSet = pbrt::from_protobuf(proto_light.paramset());
 
     if (name == "point") {
-        light = CreatePointLight(light2world, mi.outside, paramSet);
+        light = CreatePointLight(light2world, nullptr, paramSet);
     } else if (name == "spot") {
-        light = CreateSpotLight(light2world, mi.outside, paramSet);
+        light = CreateSpotLight(light2world, nullptr, paramSet);
     } else if (name == "goniometric") {
-        light = CreateGoniometricLight(light2world, mi.outside, paramSet);
+        light = CreateGoniometricLight(light2world, nullptr, paramSet);
     } else if (name == "projection") {
-        light = CreateProjectionLight(light2world, mi.outside, paramSet);
+        light = CreateProjectionLight(light2world, nullptr, paramSet);
     } else if (name == "distant") {
         light = CreateDistantLight(light2world, paramSet);
     } else if (name == "infinite" || name == "exinfinite") {
