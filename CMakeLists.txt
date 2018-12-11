@@ -475,6 +475,7 @@ FILE ( GLOB PBRT_SOURCE
   src/util/*
   src/net/*
   src/execution/*
+  src/execution/meow/*
  )
 
 INCLUDE_DIRECTORIES ( src )
@@ -526,6 +527,9 @@ ENDIF()
 INCLUDE(FindProtobuf)
 FIND_PACKAGE(Protobuf REQUIRED)
 
+INCLUDE(FindOpenSSL)
+FIND_PACKAGE(OpenSSL REQUIRED)
+
 SET(ALL_PBRT_LIBS
   pbrt
   pbrt_messages
@@ -535,6 +539,7 @@ SET(ALL_PBRT_LIBS
   Ptex_static
   ${ZLIB_LIBRARY}
   ${Protobuf_LIBRARIES}
+  ${OPENSSL_LIBRARIES}
 )
 
 # Main renderer
@@ -591,8 +596,7 @@ TARGET_LINK_LIBRARIES ( pbrt_aggregate ${ALL_PBRT_LIBS} )
 ADD_EXECUTABLE ( pbrt_lambda_worker src/cloud/lambda-worker.cpp )
 SET_TARGET_PROPERTIES ( pbrt_lambda_worker PROPERTIES OUTPUT_NAME "pbrt-lambda-worker" )
 TARGET_COMPILE_FEATURES ( pbrt_lambda_worker PRIVATE ${PBRT_CXX11_FEATURES} )
-TARGET_LINK_LIBRARIES ( pbrt_lambda_worker ${ALL_PBRT_LIBS} -static )
-
+TARGET_LINK_LIBRARIES ( pbrt_lambda_worker ${ALL_PBRT_LIBS} dl z unwind lzma -static -Wl,-allow-multiple-definition -s -Wl,--whole-archive -lpthread -Wl,--no-whole-archive)
 
 
 # Unit test
