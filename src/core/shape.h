@@ -55,7 +55,8 @@ enum class ShapeType {
     Hyperboloid,
     Paraboloid,
     Sphere,
-    Triangle
+    Triangle,
+    Fake
 };
 
 // Shape Declarations
