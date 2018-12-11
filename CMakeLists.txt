@@ -473,6 +473,8 @@ FILE ( GLOB PBRT_SOURCE
   src/cloud/*
   src/messages/*
   src/util/*
+  src/net/*
+  src/execution/*
  )
 
 INCLUDE_DIRECTORIES ( src )
