@@ -25,6 +25,7 @@
 #include "samplers/sobol.h"
 #include "samplers/stratified.h"
 #include "samplers/zerotwosequence.h"
+#include "shapes/fake.h"
 
 using namespace std;
 
@@ -257,6 +258,12 @@ protobuf::ParamSet to_protobuf(const ParamSet& ps) {
     return proto_params;
 }
 
+protobuf::Scene to_protobuf(const Scene& scene) {
+    protobuf::Scene proto_scene;
+    *proto_scene.mutable_world_bound() = to_protobuf(scene.WorldBound());
+    return proto_scene;
+}
+
 template <class ValueType, class ProtoItem>
 unique_ptr<ValueType[]> p2v(const ProtoItem& item) {
     auto values = make_unique<ValueType[]>(item.values_size());
@@ -487,6 +494,19 @@ ParamSet from_protobuf(const protobuf::ParamSet& pp) {
     }
 
     return ps;
+}
+
+Scene from_protobuf(const protobuf::Scene& proto_scene) {
+    /* we have to create a fake scene here */
+    auto worldBound = from_protobuf(proto_scene.world_bound());
+
+    /* create a shape */
+    shared_ptr<Shape> fakeShape = make_shared<FakeShape>(worldBound);
+    shared_ptr<Primitive> fakePrimitive = make_shared<GeometricPrimitive>(
+        fakeShape, nullptr, nullptr, MediumInterface{});
+
+    /* create the fake scene */
+    return {fakePrimitive, {}};
 }
 
 protobuf::Light light::to_protobuf(const string& name, const ParamSet& params,

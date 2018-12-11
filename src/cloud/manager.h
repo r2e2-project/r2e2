@@ -10,7 +10,7 @@ namespace pbrt {
 
 class SceneManager {
   public:
-    enum class Type { Treelet, TriangleMesh, Lights, Sampler, Camera };
+    enum class Type { Treelet, TriangleMesh, Lights, Sampler, Camera, Scene };
 
     SceneManager() {}
 

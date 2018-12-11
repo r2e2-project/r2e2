@@ -202,3 +202,10 @@ message SampleData {
     Point2f p_film = 1;
     float weight = 2;
 }
+
+
+// Scene
+
+message Scene {
+    Bounds3f world_bound = 1;
+}

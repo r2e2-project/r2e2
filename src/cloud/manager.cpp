@@ -54,6 +54,9 @@ string SceneManager::getFileName(const Type type, const uint32_t id) {
     case Type::Lights:
         return "LIGHTS";
 
+    case Type::Scene:
+        return "SCENE";
+
     default:
         throw runtime_error("invalid object type");
     }

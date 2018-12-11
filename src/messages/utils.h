@@ -33,6 +33,7 @@ protobuf::VisitNode to_protobuf(const RayState::TreeletNode& node);
 protobuf::RayState to_protobuf(const RayState& state);
 protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample);
 protobuf::ParamSet to_protobuf(const ParamSet& paramset);
+protobuf::Scene to_protobuf(const Scene& scene);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
@@ -51,6 +52,8 @@ RayState::TreeletNode from_protobuf(const protobuf::VisitNode& node);
 RayState from_protobuf(const protobuf::RayState& state);
 CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& sample);
 ParamSet from_protobuf(const protobuf::ParamSet& paramset);
+Scene from_protobuf(const protobuf::Scene& scene);
+
 
 namespace light {
 
