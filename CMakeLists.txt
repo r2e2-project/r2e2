@@ -592,6 +592,14 @@ SET_TARGET_PROPERTIES ( pbrt_aggregate PROPERTIES OUTPUT_NAME "pbrt-aggregate" )
 TARGET_COMPILE_FEATURES ( pbrt_aggregate PRIVATE ${PBRT_CXX11_FEATURES} )
 TARGET_LINK_LIBRARIES ( pbrt_aggregate ${ALL_PBRT_LIBS} )
 
+# pbrt-lambda-master
+ADD_EXECUTABLE ( pbrt_lambda_master src/cloud/lambda-master.cpp )
+ADD_SANITIZERS ( pbrt_lambda_master )
+
+SET_TARGET_PROPERTIES ( pbrt_lambda_master PROPERTIES OUTPUT_NAME "pbrt-lambda-master" )
+TARGET_COMPILE_FEATURES ( pbrt_lambda_master PRIVATE ${PBRT_CXX11_FEATURES} )
+TARGET_LINK_LIBRARIES ( pbrt_lambda_master ${ALL_PBRT_LIBS} )
+
 # pbrt-lambda-worker
 ADD_EXECUTABLE ( pbrt_lambda_worker src/cloud/lambda-worker.cpp )
 SET_TARGET_PROPERTIES ( pbrt_lambda_worker PROPERTIES OUTPUT_NAME "pbrt-lambda-worker" )

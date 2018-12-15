@@ -8,6 +8,7 @@
 #include "util/exception.h"
 
 using namespace std;
+using namespace meow;
 
 class ProgramFinished : public exception {};
 
@@ -26,15 +27,11 @@ int main(int argc, char const* argv[]) {
             return EXIT_FAILURE;
         }
 
-        int coordinatorPort = stoi(argv[2]);
-        if (coordinatorPort <= 0 or
-            coordinatorPort > numeric_limits<uint16_t>::max()) {
-            throw runtime_error("invalid port");
-        }
+        const uint16_t coordinatorPort = stoi(argv[2]);
 
         Address coordinatorAddr{argv[1], coordinatorPort};
         ExecutionLoop loop;
-        meow::MessageParser messageParser;
+        MessageParser messageParser;
 
         shared_ptr<TCPConnection> connection =
             loop.make_connection<TCPConnection>(
@@ -45,6 +42,18 @@ int main(int argc, char const* argv[]) {
                 },
                 []() { cerr << "Error." << endl; },
                 []() { throw ProgramFinished(); });
+
+        Message hello_message{Message::OpCode::Hey, ""};
+        connection->enqueue_write(hello_message.str());
+
+        while (loop.loop_once(-1).result == Poller::Result::Type::Success) {
+            while (!messageParser.empty()) {
+                Message message = move(messageParser.front());
+                messageParser.pop();
+
+                cerr << "message(" << (int)message.opcode() << ")\n" << endl;
+            }
+        }
 
     } catch (const ProgramFinished&) {
         return EXIT_SUCCESS;
