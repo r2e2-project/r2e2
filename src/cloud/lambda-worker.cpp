@@ -2,9 +2,9 @@
 #include <limits>
 #include <stdexcept>
 
-#include "execution/loop.hh"
-#include "execution/meow/message.hh"
-#include "net/address.hh"
+#include "execution/loop.h"
+#include "execution/meow/message.h"
+#include "net/address.h"
 #include "util/exception.h"
 
 using namespace std;

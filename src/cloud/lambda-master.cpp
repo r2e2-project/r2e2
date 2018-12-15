@@ -9,10 +9,10 @@
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/transform.h"
-#include "execution/loop.hh"
-#include "execution/meow/message.hh"
+#include "execution/loop.h"
+#include "execution/meow/message.h"
 #include "messages/utils.h"
-#include "net/socket.hh"
+#include "net/socket.h"
 #include "util/exception.h"
 
 using namespace std;
