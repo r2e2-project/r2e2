@@ -474,6 +474,7 @@ FILE ( GLOB PBRT_SOURCE
   src/messages/*
   src/util/*
   src/net/*
+  src/storage/*
   src/execution/*
   src/execution/meow/*
  )
