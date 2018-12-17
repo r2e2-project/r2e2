@@ -1,6 +1,7 @@
 #include <deque>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -14,6 +15,7 @@
 #include "messages/utils.h"
 #include "net/socket.h"
 #include "util/exception.h"
+#include "util/path.h"
 
 using namespace std;
 using namespace pbrt;
@@ -102,45 +104,58 @@ int main(int argc, char const *argv[]) {
                 : id(id), connection(move(connection)) {}
         };
 
+        ostringstream allSceneObjects;
+        for (string &filename : roost::get_directory_listing(scenePath)) {
+            allSceneObjects << filename << endl;
+        }
+
         ExecutionLoop loop;
         uint64_t current_lambda_id = 0;
         map<uint64_t, Lambda> lambdas;
         set<uint64_t> freeLambdas;
 
-        loop.make_listener(
-            {"0.0.0.0", listenPort},
-            [&current_lambda_id, &lambdas, &freeLambdas](ExecutionLoop &loop,
-                                                         TCPSocket &&socket) {
-                cerr << "Incoming connection from "
-                     << socket.peer_address().str() << endl;
+        loop.make_listener({"0.0.0.0", listenPort}, [&](ExecutionLoop &loop,
+                                                        TCPSocket &&socket) {
+            cerr << "Incoming connection from " << socket.peer_address().str()
+                 << endl;
 
-                auto messageParser = make_shared<MessageParser>();
-                auto connection = loop.add_connection<TCPSocket>(
-                    move(socket),
-                    [messageParser](shared_ptr<TCPConnection>, string &&data) {
-                        messageParser->parse(data);
+            auto messageParser = make_shared<MessageParser>();
+            auto connection = loop.add_connection<TCPSocket>(
+                move(socket),
+                [messageParser, &allSceneObjects](
+                    shared_ptr<TCPConnection> connection, string &&data) {
+                    messageParser->parse(data);
 
-                        while (!messageParser->empty()) {
-                            Message message = move(messageParser->front());
-                            messageParser->pop();
+                    while (!messageParser->empty()) {
+                        Message message = move(messageParser->front());
+                        messageParser->pop();
 
-                            cerr << "message(" << (int)message.opcode() << ")\n"
-                                 << endl;
+                        switch (message.opcode()) {
+                        case Message::OpCode::Hey: {
+                            Message getSceneMessage{Message::OpCode::Get,
+                                                    allSceneObjects.str()};
+                            connection->enqueue_write(getSceneMessage.str());
+                            break;
                         }
 
-                        return true;
-                    },
-                    []() { throw runtime_error("error occured"); },
-                    []() { throw runtime_error("worker died"); });
+                        default:
+                            throw runtime_error("unhandled message opcode");
+                        }
+                    }
 
-                lambdas.emplace(
-                    piecewise_construct, forward_as_tuple(current_lambda_id),
-                    forward_as_tuple(current_lambda_id, move(connection)));
-                freeLambdas.insert(current_lambda_id);
-                current_lambda_id++;
+                    return true;
+                },
+                []() { throw runtime_error("error occured"); },
+                []() { throw runtime_error("worker died"); });
 
-                return true;
-            });
+            lambdas.emplace(
+                piecewise_construct, forward_as_tuple(current_lambda_id),
+                forward_as_tuple(current_lambda_id, move(connection)));
+            freeLambdas.insert(current_lambda_id);
+            current_lambda_id++;
+
+            return true;
+        });
 
         while (true) {
             loop.loop_once(-1);

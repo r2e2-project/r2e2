@@ -16,13 +16,9 @@ namespace meow {
     enum class OpCode: uint8_t
     {
       Hey = 0x1,
-      Put,
-      Get,
       Ping,
       Pong,
-      Execute,
-      Executed,
-      ExecutionFailed,
+      Get,
       Bye,
     };
 
