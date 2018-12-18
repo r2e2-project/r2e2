@@ -21,22 +21,17 @@ using namespace std;
 using namespace pbrt;
 using namespace meow;
 
-shared_ptr<Camera> loadCamera(const string &scenePath,
-                              vector<unique_ptr<Transform>> &transformCache) {
-    auto reader = global::manager.GetReader(SceneManager::Type::Camera);
-    protobuf::Camera proto_camera;
-    reader->read(&proto_camera);
-    return camera::from_protobuf(proto_camera, transformCache);
-}
-
-shared_ptr<Sampler> loadSampler(const string &scenePath) {
-    auto reader = global::manager.GetReader(SceneManager::Type::Sampler);
-    protobuf::Sampler proto_sampler;
-    reader->read(&proto_sampler);
-    return sampler::from_protobuf(proto_sampler);
-}
-
 void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA PORT" << endl; }
+
+struct Lambda {
+    enum class State { Idle, Busy };
+    size_t id;
+    State state{State::Idle};
+    shared_ptr<TCPConnection> connection;
+
+    Lambda(const size_t id, shared_ptr<TCPConnection> &&connection)
+        : id(id), connection(move(connection)) {}
+};
 
 int main(int argc, char const *argv[]) {
     try {
@@ -52,62 +47,13 @@ int main(int argc, char const *argv[]) {
         const string scenePath{argv[1]};
         const uint16_t listenPort = stoi(argv[2]);
 
-        global::manager.init(scenePath);
-
-        vector<unique_ptr<Transform>> transformCache;
-        shared_ptr<Sampler> sampler = loadSampler(scenePath);
-        shared_ptr<Camera> camera = loadCamera(scenePath, transformCache);
-
-        const Bounds2i sampleBounds = camera->film->GetSampleBounds();
-        const uint8_t maxDepth = 5;
-        const float rayScale = 1 / sqrt((Float)sampler->samplesPerPixel);
-
-        deque<RayState> rayStates;
-        vector<CloudIntegrator::SampleData> cameraSamples;
-
-        /* Generate all the samples */
-        size_t i = 0;
-        for (Point2i pixel : sampleBounds) {
-            sampler->StartPixel(pixel);
-
-            if (!InsideExclusive(pixel, sampleBounds)) continue;
-
-            size_t sample_num = 0;
-            do {
-                CloudIntegrator::SampleData sampleData;
-                sampleData.sample = sampler->GetCameraSample(pixel);
-
-                RayState state;
-                state.sample.id = i++;
-                state.sample.num = sample_num++;
-                state.sample.pixel = pixel;
-                state.remainingBounces = maxDepth;
-                sampleData.weight = camera->GenerateRayDifferential(
-                    sampleData.sample, &state.ray);
-                state.ray.ScaleDifferentials(rayScale);
-                state.StartTrace();
-
-                rayStates.push_back(move(state));
-                cameraSamples.push_back(move(sampleData));
-            } while (sampler->StartNextSample());
-        }
-
-        cout << rayStates.size() << " samples generated." << endl;
-
-        struct Lambda {
-            enum class State { Idle, Busy };
-            size_t id;
-            State state{State::Idle};
-            shared_ptr<TCPConnection> connection;
-
-            Lambda(const size_t id, shared_ptr<TCPConnection> &&connection)
-                : id(id), connection(move(connection)) {}
-        };
-
+        /* create the get scene message */
         ostringstream allSceneObjects;
         for (string &filename : roost::get_directory_listing(scenePath)) {
             allSceneObjects << filename << endl;
         }
+        const string getSceneMessageStr =
+            Message(Message::OpCode::Get, allSceneObjects.str()).str();
 
         ExecutionLoop loop;
         uint64_t current_lambda_id = 0;
@@ -122,7 +68,7 @@ int main(int argc, char const *argv[]) {
             auto messageParser = make_shared<MessageParser>();
             auto connection = loop.add_connection<TCPSocket>(
                 move(socket),
-                [messageParser, &allSceneObjects](
+                [messageParser, &getSceneMessageStr](
                     shared_ptr<TCPConnection> connection, string &&data) {
                     messageParser->parse(data);
 
@@ -132,9 +78,7 @@ int main(int argc, char const *argv[]) {
 
                         switch (message.opcode()) {
                         case Message::OpCode::Hey: {
-                            Message getSceneMessage{Message::OpCode::Get,
-                                                    allSceneObjects.str()};
-                            connection->enqueue_write(getSceneMessage.str());
+                            connection->enqueue_write(getSceneMessageStr);
                             break;
                         }
 
