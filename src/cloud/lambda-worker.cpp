@@ -3,8 +3,15 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "cloud/manager.h"
+#include "core/camera.h"
+#include "core/geometry.h"
+#include "core/light.h"
+#include "core/sampler.h"
+#include "core/transform.h"
 #include "execution/loop.h"
 #include "execution/meow/message.h"
+#include "messages/utils.h"
 #include "net/address.h"
 #include "net/requests.h"
 #include "storage/backend.h"
@@ -16,6 +23,7 @@
 
 using namespace std;
 using namespace meow;
+using namespace pbrt;
 
 class ProgramFinished : public exception {};
 
@@ -30,15 +38,31 @@ class LambdaWorker {
     void process_message(shared_ptr<TCPConnection>& connection,
                          const Message& message);
 
+    void initializeScene();
+
   private:
-    unique_ptr<StorageBackend> storageBackend;
+    void loadCamera();
+    void loadSampler();
+    void loadLights();
+    void loadFakeScene();
+
     UniqueDirectory workingDirectory;
+    unique_ptr<StorageBackend> storageBackend;
+
+    vector<unique_ptr<Transform>> transformCache{};
+
+    bool initialized{false};
+    shared_ptr<Camera> camera{};
+    shared_ptr<Sampler> sampler{};
+    unique_ptr<Scene> fakeScene{};
+    vector<shared_ptr<Light>> lights{};
 };
 
 LambdaWorker::LambdaWorker(const string& storageBackendUri)
-    : storageBackend(StorageBackend::create_backend(storageBackendUri)),
-      workingDirectory("/tmp/pbrt-worker") {
+    : workingDirectory("/tmp/pbrt-worker"),
+      storageBackend(StorageBackend::create_backend(storageBackendUri)) {
     roost::chdir(workingDirectory.name());
+    global::manager.init(".");
 }
 
 void LambdaWorker::process_message(shared_ptr<TCPConnection>& connection,
@@ -74,6 +98,51 @@ void LambdaWorker::process_message(shared_ptr<TCPConnection>& connection,
     default:
         throw runtime_error("unhandled message opcode");
     }
+}
+
+void LambdaWorker::loadCamera() {
+    auto reader = global::manager.GetReader(SceneManager::Type::Camera);
+    protobuf::Camera proto_camera;
+    reader->read(&proto_camera);
+    camera = camera::from_protobuf(proto_camera, transformCache);
+}
+
+void LambdaWorker::loadSampler() {
+    auto reader = global::manager.GetReader(SceneManager::Type::Sampler);
+    protobuf::Sampler proto_sampler;
+    reader->read(&proto_sampler);
+    sampler = sampler::from_protobuf(proto_sampler);
+}
+
+void LambdaWorker::loadLights() {
+    auto reader = global::manager.GetReader(SceneManager::Type::Lights);
+    while (!reader->eof()) {
+        protobuf::Light proto_light;
+        reader->read(&proto_light);
+        lights.push_back(move(light::from_protobuf(proto_light)));
+    }
+}
+
+void LambdaWorker::loadFakeScene() {
+    auto reader = global::manager.GetReader(SceneManager::Type::Scene);
+    protobuf::Scene proto_scene;
+    reader->read(&proto_scene);
+    fakeScene = make_unique<Scene>(from_protobuf(proto_scene));
+}
+
+void LambdaWorker::initializeScene() {
+    if (initialized) return;
+
+    loadCamera();
+    loadSampler();
+    loadLights();
+    loadFakeScene();
+
+    for (auto& light : lights) {
+        light->Preprocess(*fakeScene);
+    }
+
+    initialized = true;
 }
 
 int main(int argc, char const* argv[]) {
