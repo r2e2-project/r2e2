@@ -45,6 +45,7 @@
 #include <tuple>
 #include <limits>
 #include <set>
+#include <memory>
 
 #include "cloud/manager.h"
 #include "messages/utils.h"
@@ -781,7 +782,10 @@ std::shared_ptr<BVHAccel> CreateBVHAccelerator(
 
 void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const {
     /* pass one */
-    std::unique_ptr<uint32_t []> subtree_footprint(new uint32_t[nodeCount]);
+    const uint32_t INSTANCE_SIZE = 1;
+    const uint32_t TRIANGLE_SIZE = 3;
+
+    std::unique_ptr<uint32_t[]> subtree_footprint(new uint32_t[nodeCount]);
     std::unique_ptr<float []> best_costs(new float[nodeCount]);
 
     const float AREA_EPSILON = nodes[0].bounds.SurfaceArea() * max_nodes / (nodeCount * 10);
@@ -790,9 +794,31 @@ void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const
         const LinearBVHNode & root_node = nodes[root_index];
 
         if (root_node.nPrimitives) { /* leaf */
-            subtree_footprint[root_index] = 1;
-        }
-        else {
+            /* determine the footprint of the node by adding up the size of all
+             * primitives */
+            uint32_t footprint = 0;
+            for (int i = 0; i < root_node.nPrimitives; i++) {
+                auto &primitive = primitives[root_node.primitivesOffset + i];
+                if (primitive->GetType() == PrimitiveType::Transformed) {
+                    /* it's an instance */
+                    footprint += INSTANCE_SIZE;
+                } else if (primitive->GetType() == PrimitiveType::Geometric) {
+                    /* it's a shape+material */
+                    std::shared_ptr<GeometricPrimitive> gp =
+                        std::dynamic_pointer_cast<GeometricPrimitive>(
+                            primitive);
+
+                    const Shape *shape = gp->GetShape();
+                    if (shape->GetType() != ShapeType::Triangle) {
+                        throw std::runtime_error(
+                            "only Triangles are supported");
+                    }
+
+                    footprint += TRIANGLE_SIZE;
+                }
+            }
+            subtree_footprint[root_index] = footprint;
+        } else {
             subtree_footprint[root_index] = 1 + subtree_footprint[root_index + 1]
                                               + subtree_footprint[root_node.secondChildOffset];
         }
@@ -922,14 +948,181 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
 
     uint32_t nested_tree_offset = nodeCount;
     std::map<BVHAccel *, size_t> bvh_instances;
-    std::map<TriangleMesh *, size_t> triangle_meshes;
-
     for (int root_index = 0; root_index < nodeCount; root_index++) {
         if (not labels[root_index]) {
             continue; /* we've already written this node to disk */
         }
 
         const size_t treelet_id = root_index + index_offset;
+
+        // For each triangle mesh in each treelet, determine the set of triangle
+        // idxs from that mesh which are in the treelet
+        // triangle mesh -> vec of triangle ids
+        std::map<TriangleMesh *, std::vector<size_t>> triangles_in_treelet;
+
+        // First pass through the treelet to determine which triangles we use
+        // from which meshes so that we can split the meshes into chunks.
+        {
+            const uint32_t current_treelet = labels[root_index];
+            std::stack<int> q;
+            q.push(root_index);
+
+            while (not q.empty()) {
+                const int node_index = q.top();
+                q.pop();
+
+                if (node_index == -1) {
+                    continue;
+                }
+
+                const LinearBVHNode &node = nodes[node_index];
+                labels[node_index] = 0; /* it's dumped */
+
+                if (node.nPrimitives > 0) {
+                    /* sorry about the disgusting code */
+                    for (int i = 0; i < node.nPrimitives; i++) {
+                        auto &primitive = primitives[node.primitivesOffset + i];
+                        if (primitive->GetType() ==
+                            PrimitiveType::Transformed) {
+                            /* it's an instance, ignore in first pass */
+                        } else if (primitive->GetType() ==
+                                   PrimitiveType::Geometric) {
+                            /* it's a shape+material */
+                            std::shared_ptr<GeometricPrimitive> gp =
+                                std::dynamic_pointer_cast<GeometricPrimitive>(
+                                    primitive);
+
+                            const Shape *shape = gp->GetShape();
+                            if (shape->GetType() != ShapeType::Triangle) {
+                                throw std::runtime_error(
+                                    "only Triangles are supported");
+                            }
+
+                            const Triangle *triangle =
+                                dynamic_cast<const Triangle *>(shape);
+
+                            TriangleMesh *mesh = triangle->mesh.get();
+
+                            const int tri_num =
+                                (triangle->v -
+                                 triangle->mesh->vertexIndices.data()) /
+                                3;
+
+                            if (tri_num < 0 ||
+                                (tri_num * 3) >=
+                                    triangle->mesh->vertexIndices.size()) {
+                                throw std::runtime_error(
+                                    "invalid triangle number");
+                            }
+
+                            triangles_in_treelet[mesh].push_back(tri_num);
+                        }
+                    }
+                    continue;
+                }
+
+                if (labels[node.secondChildOffset] != current_treelet) {
+                    q.push(-1);
+                } else {
+                    q.push(node.secondChildOffset);
+                }
+
+                if (labels[node_index + 1] != current_treelet) {
+                    q.push(-1);
+                } else {
+                    q.push(node_index + 1);
+                }
+            }
+        }
+
+        // Split triangle meshes up. Currently we only split the meshes so that all triangles in the
+        // treelet are included.
+        // TODO(apoms): Split triangle meshes up based on the footprint of the triangles + their textures
+        uint32_t next_id = treelet_id;
+        std::map<TriangleMesh *, std::map<size_t, uint32_t>> triangle_mesh_ids;
+        std::map<TriangleMesh *, std::map<size_t, std::shared_ptr<TriangleMesh>>> triangle_to_sub_mesh;
+        std::map<TriangleMesh *, std::map<size_t, size_t>> triangle_to_sub_mesh_triangle;
+        for (auto& kv : triangles_in_treelet) {
+          TriangleMesh* mesh = kv.first;
+          std::vector<size_t> &triangle_nums = kv.second;
+
+          /* assign this mesh a unique id */
+          const int tm_id = next_id++;
+          /* generate the sub-mesh */
+          std::shared_ptr<TriangleMesh> sub_mesh;
+          {
+            size_t num_triangles = triangle_nums.size();
+            // Determine number of vertices and assign contiguous unique ids to each
+            // vertex to use as vertex indices for new sub mesh
+            size_t next_triangle_id = 0;
+            size_t next_vertex_id = 0;
+            std::map<int, size_t> vertices_used;
+            for (size_t i = 0; i < num_triangles; ++i) {
+              size_t triangle_num = triangle_nums[i];
+              for (int j = 0; j < 3; ++j) {
+                int vertex_offset = mesh->vertexIndices[triangle_num * 3 + j];
+                if (vertices_used.count(vertex_offset) == 0) {
+                  vertices_used[vertex_offset] = next_vertex_id++;
+                }
+              }
+              triangle_to_sub_mesh_triangle[mesh][triangle_num] = next_triangle_id++;
+            }
+            size_t num_vertices = vertices_used.size();
+
+            // Fill in triangle mesh data for the sub mesh
+            std::vector<int> vertex_indices(num_triangles * 3);
+            std::vector<Point3f> P(num_vertices);
+            std::vector<Vector3f> S(num_vertices);
+            std::vector<Normal3f> N(num_vertices);
+            std::vector<Point2f> uv(num_vertices);
+            std::vector<int> face_indices(num_triangles);
+
+            for (size_t i = 0; i < num_triangles; ++i) {
+              size_t triangle_num = triangle_nums[i];
+              for (int j = 0; j < 3; ++j) {
+                  int orig_vertex_offset =
+                      mesh->vertexIndices[triangle_num * 3 + j];
+                  int new_vertex_offset = vertices_used.at(orig_vertex_offset);
+                  vertex_indices[i * 3 + j] = new_vertex_offset;
+              }
+              if (mesh->faceIndices.size() > 0) {
+                  face_indices[i] = mesh->faceIndices[triangle_num];
+              }
+            }
+            for (auto& kv : vertices_used) {
+              int orig_vertex_offset = kv.first;
+              int new_vertex_offset = kv.second;
+              P[new_vertex_offset] = mesh->p[orig_vertex_offset];
+              if (mesh->s.get()) {
+                  S[new_vertex_offset] = mesh->s[orig_vertex_offset];
+              }
+              if (mesh->n.get()) {
+                  N[new_vertex_offset] = mesh->n[orig_vertex_offset];
+              }
+              if (mesh->uv.get()) {
+                  uv[new_vertex_offset] = mesh->uv[orig_vertex_offset];
+              }
+            }
+            sub_mesh = std::make_shared<TriangleMesh>(
+                Transform(), num_triangles, vertex_indices.data(), num_vertices,
+                P.data(), mesh->s.get() ? S.data() : nullptr,
+                mesh->n.get() ? N.data() : nullptr,
+                mesh->uv.get() ? uv.data() : nullptr, mesh->alphaMask,
+                mesh->shadowAlphaMask,
+                mesh->faceIndices.size() > 0 ? face_indices.data() : nullptr);
+          }
+
+          for (size_t triangle_num : triangle_nums) {
+              triangle_mesh_ids[mesh][triangle_num] = tm_id;
+              triangle_to_sub_mesh[mesh][triangle_num] = sub_mesh;
+          }
+
+          // Write out the sub mesh 
+          auto tm_writer = global::manager.GetWriter(
+              SceneManager::Type::TriangleMesh, tm_id);
+          tm_writer->write(to_protobuf(*sub_mesh));
+        }
+
         auto writer =
             global::manager.GetWriter(SceneManager::Type::Treelet, treelet_id);
 
@@ -998,26 +1191,22 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
                         }
 
                         const Triangle *triangle = dynamic_cast<const Triangle *>(shape);
-                        if (triangle_meshes.count(triangle->mesh.get()) == 0) {
-                            /* we need to dump this triangle mesh */
-                            auto &triangle_mesh = triangle->mesh;
-                            const int tm_id = triangle_meshes.size() + index_offset;
-                            triangle_meshes[triangle_mesh.get()] = tm_id;
-                            auto tm_writer = global::manager.GetWriter(
-                                SceneManager::Type::TriangleMesh, tm_id);
-                            tm_writer->write(to_protobuf(*triangle_mesh));
-                        }
 
-                        const int tm_id = triangle_meshes[triangle->mesh.get()];
-                        protobuf::Triangle triangle_proto;
-                        triangle_proto.set_mesh_id(tm_id);
-                        const int tri_num = (triangle->v - triangle->mesh->vertexIndices.data()) / 3;
+                        TriangleMesh* mesh = triangle->mesh.get();
 
-                        if (tri_num < 0 || (tri_num * 3) >= triangle->mesh->vertexIndices.size()) {
+                        const int tri_num = (triangle->v - mesh->vertexIndices.data()) / 3;
+                        if (tri_num < 0 || (tri_num * 3) >= mesh->vertexIndices.size()) {
                             throw std::runtime_error("invalid triangle number");
                         }
 
-                        triangle_proto.set_tri_number(tri_num);
+                        const int tm_id = triangle_mesh_ids.at(mesh).at(tri_num);
+                        TriangleMesh* sub_mesh = triangle_to_sub_mesh.at(mesh).at(tri_num).get();
+
+                        const int sub_mesh_tri_num = triangle_to_sub_mesh_triangle.at(mesh).at(tri_num);
+
+                        protobuf::Triangle triangle_proto;
+                        triangle_proto.set_mesh_id(tm_id);
+                        triangle_proto.set_tri_number(sub_mesh_tri_num);
                         *proto_node.add_triangles() = triangle_proto;
                     }
                 }
@@ -1046,7 +1235,9 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
 
             writer->write(proto_node);
         }
+
     }
+
 }
 
 void BVHAccel::Dump(const size_t max_treelet_nodes,
