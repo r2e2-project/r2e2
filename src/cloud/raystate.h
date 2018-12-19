@@ -23,6 +23,8 @@ struct RayState {
         size_t id;
         int64_t num;
         Point2i pixel;
+        Point2f pFilm;
+        Float weight;
     };
 
     RayState() = default;

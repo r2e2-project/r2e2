@@ -122,14 +122,15 @@ message RayState {
     uint64 sample_id = 1;
     int64 sample_num = 2;
     Point2i sample_pixel = 3;
-    RayDifferential ray = 4;
-    repeated VisitNode to_visit = 5;
-    VisitNode hit = 6;
-    RGBSpectrum beta = 7;
-    RGBSpectrum Ld = 8;
-    uint32 bounces = 9;
-    uint32 remaining_bounces = 10;
-    bool is_shadow_ray = 11;
+    Point2f sample_p_film = 4;
+    RayDifferential ray = 5;
+    repeated VisitNode to_visit = 6;
+    VisitNode hit = 7;
+    RGBSpectrum beta = 8;
+    RGBSpectrum Ld = 9;
+    uint32 bounces = 10;
+    uint32 remaining_bounces = 11;
+    bool is_shadow_ray = 12;
 }
 // ParamSet
 
@@ -203,9 +204,14 @@ message SampleData {
     float weight = 2;
 }
 
-
 // Scene
 
 message Scene {
     Bounds3f world_bound = 1;
+}
+
+// LambdaCommands
+
+message GenerateRays {
+    Bounds2i crop_window = 1;
 }

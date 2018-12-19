@@ -13,6 +13,20 @@
 #include "pbrt.pb.h"
 #include "shapes/triangle.h"
 
+namespace protoutil {
+
+template <class ProtobufType>
+std::string to_string(const ProtobufType& proto) {
+    return proto.SerializeAsString();
+}
+
+template <class ProtobufType>
+void from_string(const std::string& data, ProtobufType& dest) {
+    dest.ParseFromString(data);
+}
+
+}  // namespace protoutil
+
 namespace pbrt {
 
 protobuf::Point2i to_protobuf(const Point2i& point);
@@ -53,7 +67,6 @@ RayState from_protobuf(const protobuf::RayState& state);
 CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& sample);
 ParamSet from_protobuf(const protobuf::ParamSet& paramset);
 Scene from_protobuf(const protobuf::Scene& scene);
-
 
 namespace light {
 

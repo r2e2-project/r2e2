@@ -1,9 +1,11 @@
+#include <deque>
 #include <iostream>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
 
 #include "cloud/manager.h"
+#include "cloud/raystate.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/light.h"
@@ -56,6 +58,8 @@ class LambdaWorker {
     shared_ptr<Sampler> sampler{};
     unique_ptr<Scene> fakeScene{};
     vector<shared_ptr<Light>> lights{};
+
+    deque<RayState> rayQueue;
 };
 
 LambdaWorker::LambdaWorker(const string& storageBackendUri)
@@ -88,6 +92,40 @@ void LambdaWorker::process_message(shared_ptr<TCPConnection>& connection,
         }
 
         storageBackend->get(getRequests);
+        break;
+    }
+
+    case Message::OpCode::GenerateRays: {
+        protobuf::GenerateRays data;
+        protoutil::from_string(message.payload(), data);
+
+        const auto& bounds = from_protobuf(data.crop_window());
+        const Bounds2i sampleBounds = camera->film->GetSampleBounds();
+        const uint8_t maxDepth = 5;
+        const float rayScale = 1 / sqrt((Float)sampler->samplesPerPixel);
+
+        for (const Point2i pixel : bounds) {
+            sampler->StartPixel(pixel);
+            if (!InsideExclusive(pixel, sampleBounds)) continue;
+
+            size_t sampleNum = 0;
+            do {
+                CameraSample cameraSample = sampler->GetCameraSample(pixel);
+
+                RayState state;
+                state.sample.num = sampleNum++;
+                state.sample.pixel = pixel;
+                state.sample.pFilm = cameraSample.pFilm;
+                state.sample.weight = camera->GenerateRayDifferential(
+                    cameraSample, &state.ray);
+                state.remainingBounces = maxDepth;
+                state.ray.ScaleDifferentials(rayScale);
+                state.StartTrace();
+
+                rayQueue.push_back(move(state));
+            } while (sampler->StartNextSample());
+        }
+
         break;
     }
 

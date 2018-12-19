@@ -197,6 +197,7 @@ protobuf::RayState to_protobuf(const RayState& state) {
     proto_state.set_sample_id(state.sample.id);
     proto_state.set_sample_num(state.sample.num);
     *proto_state.mutable_sample_pixel() = to_protobuf(state.sample.pixel);
+    *proto_state.mutable_sample_p_film() = to_protobuf(state.sample.pFilm);
     *proto_state.mutable_ray() = to_protobuf(state.ray);
 
     for (auto& tv : state.toVisit) {
@@ -417,6 +418,7 @@ RayState from_protobuf(const protobuf::RayState& proto_state) {
     state.sample.id = proto_state.sample_id();
     state.sample.num = proto_state.sample_num();
     state.sample.pixel = from_protobuf(proto_state.sample_pixel());
+    state.sample.pFilm = from_protobuf(proto_state.sample_p_film());
     state.ray = from_protobuf(proto_state.ray());
 
     for (size_t i = 0; i < proto_state.to_visit_size(); i++) {

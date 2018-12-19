@@ -19,6 +19,7 @@ namespace meow {
       Ping,
       Pong,
       Get,
+      GenerateRays,
       Bye,
     };
 
