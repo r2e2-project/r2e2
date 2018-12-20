@@ -1038,7 +1038,6 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
         // Split triangle meshes up. Currently we only split the meshes so that all triangles in the
         // treelet are included.
         // TODO(apoms): Split triangle meshes up based on the footprint of the triangles + their textures
-        uint32_t next_id = treelet_id;
         std::map<TriangleMesh *, std::map<size_t, uint32_t>> triangle_mesh_ids;
         std::map<TriangleMesh *, std::map<size_t, std::shared_ptr<TriangleMesh>>> triangle_to_sub_mesh;
         std::map<TriangleMesh *, std::map<size_t, size_t>> triangle_to_sub_mesh_triangle;
@@ -1047,7 +1046,8 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
           std::vector<size_t> &triangle_nums = kv.second;
 
           /* assign this mesh a unique id */
-          const int tm_id = next_id++;
+          const int tm_id =
+              global::manager.getNextId(SceneManager::Type::TriangleMesh);
           /* generate the sub-mesh */
           std::shared_ptr<TriangleMesh> sub_mesh;
           {
@@ -1117,7 +1117,7 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
               triangle_to_sub_mesh[mesh][triangle_num] = sub_mesh;
           }
 
-          // Write out the sub mesh 
+          // Write out the sub mesh
           auto tm_writer = global::manager.GetWriter(
               SceneManager::Type::TriangleMesh, tm_id);
           tm_writer->write(to_protobuf(*sub_mesh));
