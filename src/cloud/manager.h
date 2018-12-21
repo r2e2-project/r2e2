@@ -65,3 +65,4 @@ extern SceneManager manager;
 }  // namespace pbrt
 
 #endif /* PBRT_CLOUD_MANAGER_H */
+
