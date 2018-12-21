@@ -215,6 +215,14 @@ struct GraphicsState {
         TextureParams tp(empty, empty, *floatTextures, *spectrumTextures);
         std::shared_ptr<Material> mtl(CreateMatteMaterial(tp));
         currentMaterial = std::make_shared<MaterialInstance>("matte", mtl, ParamSet());
+
+        if (PbrtOptions.dumpScene) {
+          int id =
+              global::manager.getNextId(SceneManager::Type::Material, mtl.get());
+          auto writer =
+              global::manager.GetWriter(SceneManager::Type::Material, id);
+          writer->write(material::to_protobuf("matte", tp));
+        }
     }
     std::shared_ptr<Material> GetMaterialForShape(const ParamSet &geomParams);
     MediumInterface CreateMediumInterface();
