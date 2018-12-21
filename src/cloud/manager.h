@@ -5,7 +5,7 @@
 
 #include "messages/serialization.h"
 #include "util/optional.h"
-#include "util/util.hh"
+#include "util/util.h"
 #include <unordered_map>
 
 namespace pbrt {
@@ -65,4 +65,3 @@ extern SceneManager manager;
 }  // namespace pbrt
 
 #endif /* PBRT_CLOUD_MANAGER_H */
-
