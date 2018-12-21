@@ -71,8 +71,8 @@ Scene from_protobuf(const protobuf::Scene& scene);
 TextureParams from_protobuf(
     const protobuf::TextureParams& texture_params, ParamSet& geom_params,
     ParamSet& material_params,
-    std::map<std::string, std::shared_ptr<Texture<Float>>> fTexCache,
-    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTexCache);
+    std::map<std::string, std::shared_ptr<Texture<Float>>>& fTexCache,
+    std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTexCache);
 
 namespace light {
 
