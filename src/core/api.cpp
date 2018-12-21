@@ -614,6 +614,15 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
     mp.ReportUnused();
     if (!material) Error("Unable to create material \"%s\"", name.c_str());
     else ++nMaterialsCreated;
+
+    if (PbrtOptions.dumpScene) {
+        int id =
+            global::manager.getNextId(SceneManager::Type::Material, material);
+        auto writer =
+            global::manager.GetWriter(SceneManager::Type::Material, id);
+        writer->write(material::to_protobuf(name, mp));
+    }
+
     return std::shared_ptr<Material>(material);
 }
 
@@ -650,6 +659,14 @@ std::shared_ptr<Texture<Float>> MakeFloatTexture(const std::string &name,
     else
         Warning("Float texture \"%s\" unknown.", name.c_str());
     tp.ReportUnused();
+
+    if (PbrtOptions.dumpScene) {
+      int id = global::manager.getNextId(SceneManager::Type::FloatTexture, tex);
+      auto writer =
+          global::manager.GetWriter(SceneManager::Type::FloatTexture, id);
+      writer->write(float_texture::to_protobuf(name, tex2world, tp));
+    }
+
     return std::shared_ptr<Texture<Float>>(tex);
 }
 
@@ -686,6 +703,14 @@ std::shared_ptr<Texture<Spectrum>> MakeSpectrumTexture(
     else
         Warning("Spectrum texture \"%s\" unknown.", name.c_str());
     tp.ReportUnused();
+
+    if (PbrtOptions.dumpScene) {
+      int id = global::manager.getNextId(SceneManager::Type::SpectrumTexture, tex);
+      auto writer =
+          global::manager.GetWriter(SceneManager::Type::SpectrumTexture, id);
+      writer->write(spectrum_texture::to_protobuf(name, tex2world, tp));
+    }
+
     return std::shared_ptr<Texture<Spectrum>>(tex);
 }
 

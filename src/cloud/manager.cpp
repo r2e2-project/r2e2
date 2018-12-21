@@ -57,6 +57,15 @@ string SceneManager::getFileName(const Type type, const uint32_t id) {
     case Type::Scene:
         return "SCENE";
 
+    case Type::Material:
+      return "MAT" + to_string(id);
+
+    case Type::FloatTexture:
+      return "FTEX" + to_string(id);
+
+    case Type::SpectrumTexture:
+      return "STEX" + to_string(id);
+
     default:
         throw runtime_error("invalid object type");
     }

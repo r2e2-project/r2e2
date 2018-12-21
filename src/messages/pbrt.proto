@@ -76,6 +76,7 @@ message TriangleMesh {
     repeated Normal3f n = 5;  // Normal3f
     repeated Vector3f s = 6;  // Vector3f
     repeated Point2f uv = 7;
+    int64 material_id = 8;
 }
 
 message Triangle {
@@ -214,4 +215,33 @@ message Scene {
 
 message GenerateRays {
     Bounds2i crop_window = 1;
+}
+
+// Materials & Textures
+message TextureParams {
+  ParamSet geom_params = 1;
+  ParamSet material_params = 2;
+  map<string, int32> float_textures = 3;
+  map<string, int32> spectrum_textures = 4;
+}
+
+// Materials
+
+message Material {
+  string name = 1;
+  TextureParams texture_params = 2;
+}
+
+// Textures
+
+message FloatTexture {
+  string name = 1;
+  Matrix tex2world = 2;
+  TextureParams texture_params = 3;
+}
+
+message SpectrumTexture {
+  string name = 1;
+  Matrix tex2world = 2;
+  TextureParams texture_params = 3;
 }

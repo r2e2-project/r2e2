@@ -148,6 +148,19 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
                     tm_reader->read(&tm);
                     triangle_meshes_[tm_id] =
                         make_shared<TriangleMesh>(move(from_protobuf(tm)));
+                    triangle_mesh_material_ids_[tm_id] =
+                        tm.material_id();
+                }
+                const auto material_id =
+                    triangle_mesh_material_ids_[tm_id];
+                /* load the Material if necessary */
+                if (materials_.count(material_id) == 0) {
+                    auto material_reader = global::manager.GetReader(
+                        SceneManager::Type::Material, material_id);
+                    protobuf::Material material;
+                    material_reader->read(&material);
+                    materials_[material_id] =
+                        move(material::from_protobuf(material));
                 }
 
                 auto shape = make_shared<Triangle>(
@@ -156,7 +169,8 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
 
                 tree_primitives.emplace_back(
                     move(make_unique<GeometricPrimitive>(
-                        shape, default_material, nullptr, MediumInterface{})));
+                        shape, materials_[material_id], nullptr,
+                        MediumInterface{})));
             }
         }
 

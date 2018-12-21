@@ -959,6 +959,8 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
         // idxs from that mesh which are in the treelet
         // triangle mesh -> vec of triangle ids
         std::map<TriangleMesh *, std::vector<size_t>> triangles_in_treelet;
+        // Keep track of the materials for each triangle mesh
+        std::map<TriangleMesh *, const Material *> triangle_mesh_material;
 
         // First pass through the treelet to determine which triangles we use
         // from which meshes so that we can split the meshes into chunks.
@@ -1016,6 +1018,11 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
                             }
 
                             triangles_in_treelet[mesh].push_back(tri_num);
+
+                            if (triangle_mesh_material.count(mesh) == 0) {
+                                triangle_mesh_material[mesh] =
+                                    gp->GetMaterial();
+                            }
                         }
                     }
                     continue;
@@ -1035,9 +1042,20 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
             }
         }
 
-        // Split triangle meshes up. Currently we only split the meshes so that all triangles in the
-        // treelet are included.
-        // TODO(apoms): Split triangle meshes up based on the footprint of the triangles + their textures
+        /* get the material ids */
+        std::map<TriangleMesh *, int> triangle_mesh_material_ids;
+        for (auto& kv : triangle_mesh_material) {
+          TriangleMesh* mesh = kv.first;
+          const Material* material = kv.second;
+
+          const int material_id = global::manager.getId(SceneManager::Type::Material, material);
+          triangle_mesh_material_ids[mesh] = material_id;
+        }
+
+        /* Split up triangle meshes. Currently we only split the meshes so that
+         all triangles in the treelet are included.
+         TODO(apoms): Split triangle meshes up based on the footprint of the
+         triangles + their textures */
         std::map<TriangleMesh *, std::map<size_t, uint32_t>> triangle_mesh_ids;
         std::map<TriangleMesh *, std::map<size_t, std::shared_ptr<TriangleMesh>>> triangle_to_sub_mesh;
         std::map<TriangleMesh *, std::map<size_t, size_t>> triangle_to_sub_mesh_triangle;
@@ -1045,15 +1063,17 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
           TriangleMesh* mesh = kv.first;
           std::vector<size_t> &triangle_nums = kv.second;
 
-          /* assign this mesh a unique id */
+          int material_id = triangle_mesh_material_ids[mesh];
+
+          /* assign each mesh a unique id */
           const int tm_id =
               global::manager.getNextId(SceneManager::Type::TriangleMesh);
           /* generate the sub-mesh */
           std::shared_ptr<TriangleMesh> sub_mesh;
           {
             size_t num_triangles = triangle_nums.size();
-            // Determine number of vertices and assign contiguous unique ids to each
-            // vertex to use as vertex indices for new sub mesh
+            /* Determine number of vertices and assign contiguous unique ids to each
+               vertex to use as vertex indices for new sub mesh */
             size_t next_triangle_id = 0;
             size_t next_vertex_id = 0;
             std::map<int, size_t> vertices_used;
@@ -1069,7 +1089,7 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
             }
             size_t num_vertices = vertices_used.size();
 
-            // Fill in triangle mesh data for the sub mesh
+            /* Fill in triangle mesh data for the sub mesh */
             std::vector<int> vertex_indices(num_triangles * 3);
             std::vector<Point3f> P(num_vertices);
             std::vector<Vector3f> S(num_vertices);
@@ -1117,10 +1137,12 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
               triangle_to_sub_mesh[mesh][triangle_num] = sub_mesh;
           }
 
-          // Write out the sub mesh
+          /* write out the sub mesh */
           auto tm_writer = global::manager.GetWriter(
               SceneManager::Type::TriangleMesh, tm_id);
-          tm_writer->write(to_protobuf(*sub_mesh));
+          protobuf::TriangleMesh tm_proto = to_protobuf(*sub_mesh);
+          tm_proto.set_material_id(material_id);
+          tm_writer->write(tm_proto);
         }
 
         auto writer =

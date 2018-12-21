@@ -218,6 +218,14 @@ class TextureParams {
     void ReportUnused() const;
     const ParamSet &GetGeomParams() const { return geomParams; }
     const ParamSet &GetMaterialParams() const { return materialParams; }
+    const std::map<std::string, std::shared_ptr<Texture<Float>>>
+        &GetFloatTextures() const {
+        return floatTextures;
+    }
+    const std::map<std::string, std::shared_ptr<Texture<Spectrum>>>
+        &GetSpectrumTextures() const {
+        return spectrumTextures;
+    }
 
   private:
     // TextureParams Private Data

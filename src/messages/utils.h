@@ -48,6 +48,7 @@ protobuf::RayState to_protobuf(const RayState& state);
 protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample);
 protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 protobuf::Scene to_protobuf(const Scene& scene);
+protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
@@ -67,6 +68,11 @@ RayState from_protobuf(const protobuf::RayState& state);
 CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& sample);
 ParamSet from_protobuf(const protobuf::ParamSet& paramset);
 Scene from_protobuf(const protobuf::Scene& scene);
+TextureParams from_protobuf(
+    const protobuf::TextureParams& texture_params, ParamSet& geom_params,
+    ParamSet& material_params,
+    std::map<std::string, std::shared_ptr<Texture<Float>>> fTexCache,
+    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTexCache);
 
 namespace light {
 
@@ -98,6 +104,37 @@ protobuf::Camera to_protobuf(const std::string& name, const ParamSet& params,
                              const ParamSet& filterParams);
 
 }  // namespace camera
+
+namespace material {
+
+std::shared_ptr<Material> from_protobuf(const protobuf::Material& material);
+
+protobuf::Material to_protobuf(const std::string& name,
+                               const TextureParams& tp);
+
+}  // namespace material
+
+namespace float_texture {
+
+std::shared_ptr<Texture<Float>> from_protobuf(
+    const protobuf::FloatTexture& texture);
+
+protobuf::FloatTexture to_protobuf(const std::string& name,
+                                   const Transform& tex2world,
+                                   const TextureParams& tp);
+
+}  // namespace float_texture
+
+namespace spectrum_texture {
+
+std::shared_ptr<Texture<Spectrum>> from_protobuf(
+    const protobuf::SpectrumTexture& texture);
+
+protobuf::SpectrumTexture to_protobuf(const std::string& name,
+                                      const Transform& tex2world,
+                                      const TextureParams& tp);
+
+}  // namespace spectrum_texture
 
 }  // namespace pbrt
 
