@@ -532,32 +532,23 @@ Scene from_protobuf(const protobuf::Scene& proto_scene) {
 TextureParams from_protobuf(
     const protobuf::TextureParams& texture_params, ParamSet& geom_params,
     ParamSet& material_params,
-    std::map<std::string, std::shared_ptr<Texture<Float>>>& fTexCache,
-    std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTexCache) {
+    std::map<std::string, std::shared_ptr<Texture<Float>>>& fTex,
+    std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex) {
 
-    std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
-    /* Load the textures if not loaded already */
     for (auto& kv : texture_params.float_textures()) {
-        if (fTexCache.count(kv.first) == 0) {
-            auto texture_reader = global::manager.GetReader(
-                SceneManager::Type::FloatTexture, kv.second);
-            protobuf::FloatTexture texture;
-            texture_reader->read(&texture);
-            fTexCache[kv.first] = float_texture::from_protobuf(texture);
-        }
-        fTex[kv.first] = fTexCache[kv.first];
+        auto texture_reader = global::manager.GetReader(
+            SceneManager::Type::FloatTexture, kv.second);
+        protobuf::FloatTexture texture;
+        texture_reader->read(&texture);
+        fTex[kv.first] = float_texture::from_protobuf(texture);
     }
-    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
     for (auto& kv : texture_params.spectrum_textures()) {
-        if (sTexCache.count(kv.first) == 0) {
-            // Load the texture
-            auto texture_reader = global::manager.GetReader(
-                SceneManager::Type::SpectrumTexture, kv.second);
-            protobuf::SpectrumTexture texture;
-            texture_reader->read(&texture);
-            sTexCache[kv.first] = spectrum_texture::from_protobuf(texture);
-        }
-        sTex[kv.first] = sTexCache[kv.first];
+        // Load the texture
+        auto texture_reader = global::manager.GetReader(
+            SceneManager::Type::SpectrumTexture, kv.second);
+        protobuf::SpectrumTexture texture;
+        texture_reader->read(&texture);
+        sTex[kv.first] = spectrum_texture::from_protobuf(texture);
     }
     geom_params = from_protobuf(texture_params.geom_params());
     material_params = from_protobuf(texture_params.material_params());
@@ -743,11 +734,11 @@ std::shared_ptr<Material> material::from_protobuf(
     const protobuf::Material& material) {
     ParamSet geom_params;
     ParamSet material_params;
-    std::map<std::string, std::shared_ptr<Texture<Float>>> fTexCache;
-    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTexCache;
+    std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
+    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
     TextureParams tp =
         pbrt::from_protobuf(material.texture_params(), geom_params,
-                            material_params, fTexCache, sTexCache);
+                            material_params, fTex, sTex);
     return pbrt::MakeMaterial(material.name(), tp);
 }
 
@@ -763,11 +754,11 @@ std::shared_ptr<Texture<Float>> float_texture::from_protobuf(
     const protobuf::FloatTexture& texture) {
     ParamSet geom_params;
     ParamSet material_params;
-    std::map<std::string, std::shared_ptr<Texture<Float>>> fTexCache;
-    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTexCache;
+    std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
+    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
     TextureParams tp =
         pbrt::from_protobuf(texture.texture_params(), geom_params,
-                            material_params, fTexCache, sTexCache);
+                            material_params, fTex, sTex);
 
     return MakeFloatTexture(texture.name(),
                             Transform(pbrt::from_protobuf(texture.tex2world())),
@@ -788,11 +779,11 @@ std::shared_ptr<Texture<Spectrum>> spectrum_texture::from_protobuf(
     const protobuf::SpectrumTexture& texture) {
     ParamSet geom_params;
     ParamSet material_params;
-    std::map<std::string, std::shared_ptr<Texture<Float>>> fTexCache;
-    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTexCache;
+    std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
+    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
     TextureParams tp =
         pbrt::from_protobuf(texture.texture_params(), geom_params,
-                            material_params, fTexCache, sTexCache);
+                            material_params, fTex, sTex);
 
     return MakeSpectrumTexture(
         texture.name(), Transform(pbrt::from_protobuf(texture.tex2world())),
