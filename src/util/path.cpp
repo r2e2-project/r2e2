@@ -127,6 +127,15 @@ namespace roost {
     return file_info.st_size;
   }
 
+  off_t file_size_at( const FileDescriptor & dirfd, const path & pathn )
+  {
+    struct stat file_info;
+    CheckSystemCall( "fstatat " + pathn.string(),
+                     fstatat( dirfd.fd_num(),
+                              pathn.string().c_str(), &file_info, 0) );
+    return file_info.st_size;
+  }
+
   path canonical( const path & pathn )
   {
     char canonical_file_name[ PATH_MAX ];

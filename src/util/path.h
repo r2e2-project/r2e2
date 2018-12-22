@@ -7,6 +7,8 @@
 #include <vector>
 #include <sys/stat.h>
 
+#include "util/file_descriptor.h"
+
 namespace roost {
   class Directory
   {
@@ -43,6 +45,7 @@ namespace roost {
 
   bool exists( const path & pathn );
   off_t file_size( const path & pathn );
+  off_t file_size_at( const FileDescriptor & dirfd, const path & pathn );
   void move_file( const path & src, const path & dest );
   path operator/( const path & prefix, const path & suffix );
   path canonical( const path & pathn );

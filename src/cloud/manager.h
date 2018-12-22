@@ -7,6 +7,7 @@
 #include "messages/serialization.h"
 #include "util/optional.h"
 #include "util/util.h"
+#include "util/path.h"
 
 namespace pbrt {
 
@@ -25,6 +26,13 @@ class SceneManager {
         COUNT
     };
 
+    struct Object {
+        size_t id;
+        off_t size;
+
+        Object(const size_t id, const off_t size) : id(id), size(size) {}
+    };
+
     SceneManager() {}
 
     using ReaderPtr = std::unique_ptr<protobuf::RecordReader>;
@@ -37,12 +45,15 @@ class SceneManager {
     uint32_t getNextId(const Type type, const void* ptr = nullptr);
     uint32_t getId(const void* ptr) const { return ptrIds.at(ptr); }
 
+    std::map<Type, std::vector<Object>> listObjects() const;
+
   private:
     static std::string getFileName(const Type type, const uint32_t id);
 
     size_t autoIds[to_underlying(Type::COUNT)] = {0};
+    std::string scenePath{};
     Optional<FileDescriptor> sceneFD{};
-    std::unordered_map<const void*, uint32_t> ptrIds;
+    std::unordered_map<const void*, uint32_t> ptrIds{};
 };
 
 namespace global {
