@@ -7,6 +7,7 @@
 #include <queue>
 #include <iostream>
 
+#include "net/address.h"
 #include "net/socket.h"
 #include "net/nb_secure_socket.h"
 
@@ -28,6 +29,7 @@ public:
     : socket_( std::move( sock ) )
   {}
 
+  Connection & operator=( const Connection & ) = delete;
   Connection( const Connection & ) = delete;
 
   ~Connection()
@@ -39,6 +41,28 @@ public:
 
   void enqueue_write( const std::string & str ) { write_buffer_.append( str ); }
   const SocketType & socket() const { return socket_; }
+};
+
+class UDPConnection
+{
+  friend class ExecutionLoop;
+
+private:
+  UDPSocket socket_ {};
+  std::vector<std::pair<Address, std::string>> outgoing_datagrams_{};
+
+public:
+  UDPConnection() {}
+
+  UDPConnection & operator=( const UDPConnection & ) = delete;
+  UDPConnection( const UDPConnection & ) = delete;
+
+  void enqueue_datagram(const Address& addr, std::string&& datagram)
+  {
+      outgoing_datagrams_.push_back(make_pair(addr, move(datagram)));
+  }
+
+  const UDPSocket & socket() const { return socket_; }
 };
 
 using TCPConnection = Connection<TCPSocket>;

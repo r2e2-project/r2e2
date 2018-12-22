@@ -6,8 +6,8 @@
 #include <unordered_map>
 #include "messages/serialization.h"
 #include "util/optional.h"
-#include "util/util.h"
 #include "util/path.h"
+#include "util/util.h"
 
 namespace pbrt {
 
