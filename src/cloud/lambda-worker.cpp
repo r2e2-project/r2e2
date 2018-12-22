@@ -35,11 +35,12 @@ void usage(const char* argv0) {
 
 class LambdaWorker {
   public:
-    LambdaWorker(const string& storageBackendUri);
+    LambdaWorker(const string& coordinatorAddr, const uint16_t coordinatorPort,
+                 const string& storageBackendUri);
 
-    void process_message(shared_ptr<TCPConnection>& connection,
-                         const Message& message);
+    void run();
 
+    void process_message(const Message& message);
     void initializeScene();
 
   private:
@@ -48,36 +49,62 @@ class LambdaWorker {
     void loadLights();
     void loadFakeScene();
 
+    Address coordinatorAddr;
+    ExecutionLoop loop{};
     UniqueDirectory workingDirectory;
     unique_ptr<StorageBackend> storageBackend;
+    shared_ptr<TCPConnection> coordinatorConnection;
+    MessageParser messageParser{};
 
+    /* Scene Data */
     vector<unique_ptr<Transform>> transformCache{};
-
     bool initialized{false};
     shared_ptr<Camera> camera{};
     shared_ptr<Sampler> sampler{};
     unique_ptr<Scene> fakeScene{};
     vector<shared_ptr<Light>> lights{};
-
-    deque<RayState> rayQueue;
+    deque<RayState> rayQueue{};
 };
 
-LambdaWorker::LambdaWorker(const string& storageBackendUri)
-    : workingDirectory("/tmp/pbrt-worker"),
+LambdaWorker::LambdaWorker(const string& coordinatorIP,
+                           const uint16_t coordinatorPort,
+                           const string& storageBackendUri)
+    : coordinatorAddr(coordinatorIP, coordinatorPort),
+      workingDirectory("/tmp/pbrt-worker"),
       storageBackend(StorageBackend::create_backend(storageBackendUri)) {
     roost::chdir(workingDirectory.name());
     global::manager.init(".");
+
+    coordinatorConnection = loop.make_connection<TCPConnection>(
+        coordinatorAddr,
+        [this](shared_ptr<TCPConnection>, string&& data) {
+            this->messageParser.parse(data);
+            return true;
+        },
+        []() { cerr << "Error." << endl; }, []() { throw ProgramFinished(); });
+
+    Message hello_message{Message::OpCode::Hey, ""};
+    coordinatorConnection->enqueue_write(hello_message.str());
 }
 
-void LambdaWorker::process_message(shared_ptr<TCPConnection>& connection,
-                                   const Message& message) {
+void LambdaWorker::run() {
+    while (loop.loop_once(-1).result == Poller::Result::Type::Success) {
+        while (!messageParser.empty()) {
+            Message message = move(messageParser.front());
+            messageParser.pop();
+            process_message(message);
+        }
+    }
+}
+
+void LambdaWorker::process_message(const Message& message) {
     switch (message.opcode()) {
     case Message::OpCode::Hey:
         break;
 
     case Message::OpCode::Ping: {
         Message pong{Message::OpCode::Pong, ""};
-        connection->enqueue_write(pong.str());
+        coordinatorConnection->enqueue_write(pong.str());
         break;
     }
 
@@ -116,8 +143,8 @@ void LambdaWorker::process_message(shared_ptr<TCPConnection>& connection,
                 state.sample.num = sampleNum++;
                 state.sample.pixel = pixel;
                 state.sample.pFilm = cameraSample.pFilm;
-                state.sample.weight = camera->GenerateRayDifferential(
-                    cameraSample, &state.ray);
+                state.sample.weight =
+                    camera->GenerateRayDifferential(cameraSample, &state.ray);
                 state.remainingBounces = maxDepth;
                 state.ray.ScaleDifferentials(rayScale);
                 state.StartTrace();
@@ -196,33 +223,8 @@ int main(int argc, char const* argv[]) {
 
         const uint16_t coordinatorPort = stoi(argv[2]);
 
-        LambdaWorker worker{argv[3]};
-
-        Address coordinatorAddr{argv[1], coordinatorPort};
-        ExecutionLoop loop;
-        MessageParser messageParser;
-
-        shared_ptr<TCPConnection> connection =
-            loop.make_connection<TCPConnection>(
-                coordinatorAddr,
-                [&messageParser](shared_ptr<TCPConnection>, string&& data) {
-                    messageParser.parse(data);
-                    return true;
-                },
-                []() { cerr << "Error." << endl; },
-                []() { throw ProgramFinished(); });
-
-        Message hello_message{Message::OpCode::Hey, ""};
-        connection->enqueue_write(hello_message.str());
-
-        while (loop.loop_once(-1).result == Poller::Result::Type::Success) {
-            while (!messageParser.empty()) {
-                Message message = move(messageParser.front());
-                messageParser.pop();
-                worker.process_message(connection, message);
-            }
-        }
-
+        LambdaWorker worker{argv[1], coordinatorPort, argv[3]};
+        worker.run();
     } catch (const ProgramFinished&) {
         return EXIT_SUCCESS;
     } catch (const exception& e) {
