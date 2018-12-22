@@ -273,11 +273,11 @@ protobuf::TextureParams to_protobuf(const TextureParams& texture_params) {
   *params.mutable_geom_params() = to_protobuf(texture_params.GetGeomParams());
   *params.mutable_material_params() = to_protobuf(texture_params.GetMaterialParams());
   for (auto& kv : texture_params.GetFloatTextures()) {
-    int id = global::manager.getId(SceneManager::Type::FloatTexture, kv.second.get());
+    int id = global::manager.getId(kv.second.get());
     (*params.mutable_float_textures())[kv.first] = id;
   }
   for (auto& kv : texture_params.GetSpectrumTextures()) {
-    int id = global::manager.getId(SceneManager::Type::SpectrumTexture, kv.second.get());
+    int id = global::manager.getId(kv.second.get());
     (*params.mutable_spectrum_textures())[kv.first] = id;
   }
   return params;

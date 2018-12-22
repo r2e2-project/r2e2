@@ -68,8 +68,7 @@ class BVHAccel : public Aggregate {
     bool Intersect(const Ray &ray, SurfaceInteraction *isect) const;
     bool IntersectP(const Ray &ray) const;
 
-    void Dump(const size_t max_treelet_nodes,
-              const size_t index_offset = 0) const;
+    uint32_t Dump(const size_t max_treelet_nodes) const;
 
   private:
     // BVHAccel Private Methods
@@ -93,8 +92,7 @@ class BVHAccel : public Aggregate {
     int flattenBVHTree(BVHBuildNode *node, int *offset);
 
     void assignTreelets(uint32_t * labels, const uint32_t max_nodes) const;
-    void dumpTreelets(uint32_t *labels, const size_t max_treelet_nodes,
-                      const size_t index_offset) const;
+    uint32_t dumpTreelets(uint32_t *labels, const size_t max_treelet_nodes) const;
 
     // BVHAccel Private Data
     const int maxPrimsInNode;

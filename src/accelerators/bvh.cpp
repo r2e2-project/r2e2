@@ -942,18 +942,18 @@ void BVHAccel::assignTreelets(uint32_t * labels, const uint32_t max_nodes) const
     } */
 }
 
-void BVHAccel::dumpTreelets(uint32_t * labels,
-                            const size_t max_treelet_nodes,
-                            const size_t index_offset) const {
-
-    uint32_t nested_tree_offset = nodeCount;
+uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
+                                const size_t max_treelet_nodes) const {
     std::map<BVHAccel *, size_t> bvh_instances;
+    const uint32_t bvh_root_id =
+        global::manager.getNextId(SceneManager::Type::Treelet, &nodes[0]);
+
     for (int root_index = 0; root_index < nodeCount; root_index++) {
         if (not labels[root_index]) {
             continue; /* we've already written this node to disk */
         }
 
-        const size_t treelet_id = root_index + index_offset;
+        const size_t treelet_id = global::manager.getId(&nodes[root_index]);
 
         // For each triangle mesh in each treelet, determine the set of triangle
         // idxs from that mesh which are in the treelet
@@ -1029,12 +1029,16 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
                 }
 
                 if (labels[node.secondChildOffset] != current_treelet) {
+                    global::manager.getNextId(SceneManager::Type::Treelet,
+                                              &nodes[node.secondChildOffset]);
                     q.push(-1);
                 } else {
                     q.push(node.secondChildOffset);
                 }
 
                 if (labels[node_index + 1] != current_treelet) {
+                    global::manager.getNextId(SceneManager::Type::Treelet,
+                                              &nodes[node_index + 1]);
                     q.push(-1);
                 } else {
                     q.push(node_index + 1);
@@ -1048,7 +1052,7 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
           TriangleMesh* mesh = kv.first;
           const Material* material = kv.second;
 
-          const int material_id = global::manager.getId(SceneManager::Type::Material, material);
+          const int material_id = global::manager.getId(material);
           triangle_mesh_material_ids[mesh] = material_id;
         }
 
@@ -1178,10 +1182,6 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
                             std::dynamic_pointer_cast<TransformedPrimitive>(primitive);
 
                         if (tp != nullptr and tp->GetBaseType() == PrimitiveType::Aggregate) {
-                            if (index_offset != 0) {
-                                throw std::runtime_error("only one level of bvh instances is supported");
-                            }
-
                             std::shared_ptr<BVHAccel> bvh =
                                 std::dynamic_pointer_cast<BVHAccel>(tp->GetPrimitive());
 
@@ -1190,9 +1190,7 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
                             }
 
                             if (not bvh_instances.count(bvh.get())) {
-                                bvh->Dump(max_treelet_nodes, nested_tree_offset);
-                                bvh_instances[bvh.get()] = nested_tree_offset;
-                                nested_tree_offset += bvh->nodeCount;
+                                bvh_instances[bvh.get()] = bvh->Dump(max_treelet_nodes);
                             }
 
                             protobuf::TransformedPrimitive proto_tp;
@@ -1240,7 +1238,7 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
             }
 
             if (labels[node.secondChildOffset] != current_treelet) {
-                proto_node.set_right_ref(index_offset + node.secondChildOffset);
+                proto_node.set_right_ref(global::manager.getId(&nodes[node.secondChildOffset]));
                 q.push(-1);
             }
             else {
@@ -1248,7 +1246,7 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
             }
 
             if (labels[node_index + 1] != current_treelet) {
-                proto_node.set_left_ref(index_offset + node_index + 1);
+                proto_node.set_left_ref(global::manager.getId(&nodes[node_index + 1]));
                 q.push(-1);
             }
             else {
@@ -1260,11 +1258,11 @@ void BVHAccel::dumpTreelets(uint32_t * labels,
 
     }
 
+    return bvh_root_id;
 }
 
-void BVHAccel::Dump(const size_t max_treelet_nodes,
-                    const size_t index_offset) const {
-    std::cerr << "Dumping BVH... ";
+uint32_t BVHAccel::Dump(const size_t max_treelet_nodes) const {
+    std::cerr << "Dumping BVH...\n";
 
     /* (1) assign each node to a treelet */
     std::unique_ptr<uint32_t[]> treelet_labels {new uint32_t[nodeCount]};
@@ -1272,8 +1270,7 @@ void BVHAccel::Dump(const size_t max_treelet_nodes,
     assignTreelets(treelet_labels.get(), max_treelet_nodes);
 
     /* (2) dump the treelets to disk */
-    dumpTreelets(treelet_labels.get(), max_treelet_nodes, index_offset);
-    std::cerr << "done." << std::endl;
+    return dumpTreelets(treelet_labels.get(), max_treelet_nodes);
 }
 
 }

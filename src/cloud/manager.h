@@ -36,13 +36,14 @@ class SceneManager {
         const Type type, const uint32_t id = 0) const;
 
     uint32_t getNextId(const Type type, const void* ptr = nullptr) {
-        uint32_t id = autoIds[to_underlying(type)]++;
+        const uint32_t id = autoIds[to_underlying(type)]++;
         if (ptr) {
           ptr_ids[ptr] = id;
         }
         return id;
     }
-    uint32_t getId(const Type type, const void* ptr) {
+
+    uint32_t getId(const void* ptr) {
         if (ptr_ids.count(ptr) == 0) {
             throw std::runtime_error("no id for ptr: " +
                                      std::to_string((uint64_t)ptr));
