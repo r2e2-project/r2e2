@@ -62,6 +62,12 @@ void ExecutionLoop::remove_connection<SSLConnection>( const list<shared_ptr<SSLC
 }
 
 template<>
+void ExecutionLoop::remove_connection<UDPConnection>( const list<shared_ptr<UDPConnection>>::iterator & it )
+{
+  udp_connections_.erase( it );
+}
+
+template<>
 shared_ptr<TCPConnection>
 ExecutionLoop::add_connection( TCPSocket && socket,
                                const function<bool(shared_ptr<TCPConnection>, string &&)> & data_callback,
@@ -217,6 +223,74 @@ ExecutionLoop::make_connection( const Address & address,
   secure_socket.connect();
 
   return add_connection<NBSecureSocket>( move( secure_socket ), data_callback, error_callback, close_callback );
+}
+
+shared_ptr<UDPConnection>
+ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection>, string &&)> & data_callback,
+                                    const function<void()> & error_callback,
+                                    const function<void()> & close_callback )
+{
+  UDPSocket socket;
+  socket.set_blocking( false );
+
+  auto connection_it = udp_connections_.emplace( udp_connections_.end(),
+                                                 make_shared<UDPConnection>( move( socket ) ) );
+
+  shared_ptr<UDPConnection> & connection = *connection_it;
+
+  auto real_close_callback =
+    [connection_it, cc=move( close_callback ), this] ()
+    {
+      cc();
+      remove_connection<UDPConnection>( connection_it );
+    };
+
+  auto fderror_callback =
+    [error_callback, real_close_callback]
+    {
+      error_callback();
+      real_close_callback();
+    };
+
+  poller_.add_action(
+    Poller::Action(
+      connection->socket_, Direction::Out,
+      [connection] ()
+      {
+        auto datagram = move(connection->outgoing_datagrams_.front());
+        connection->outgoing_datagrams_.pop();
+
+        connection->socket_.sendto(datagram.first, datagram.second);
+        return ResultType::Continue;
+      },
+      [connection] { return connection->outgoing_datagrams_.size(); },
+      fderror_callback
+    )
+  );
+
+  poller_.add_action(
+    Poller::Action(
+      connection->socket_, Direction::In,
+      [connection,
+       data_callback  { move( data_callback ) },
+       close_callback { move( real_close_callback ) }] ()
+      {
+        auto datagram = connection->socket_.recvfrom();
+        auto & data = datagram.second;
+
+        if ( data.empty() or not data_callback( connection, move( data ) ) ) {
+          close_callback();
+          return ResultType::CancelAll;
+        }
+
+        return ResultType::Continue;
+      },
+      [connection]() { return true; },
+      fderror_callback
+    )
+  );
+
+  return *connection_it;
 }
 
 template<class ConnectionType>

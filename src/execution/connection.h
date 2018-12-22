@@ -49,17 +49,21 @@ class UDPConnection
 
 private:
   UDPSocket socket_ {};
-  std::vector<std::pair<Address, std::string>> outgoing_datagrams_{};
+  std::queue<std::pair<Address, std::string>> outgoing_datagrams_{};
 
 public:
   UDPConnection() {}
+
+  UDPConnection( UDPSocket && sock )
+    : socket_( std::move( sock ) )
+  {}
 
   UDPConnection & operator=( const UDPConnection & ) = delete;
   UDPConnection( const UDPConnection & ) = delete;
 
   void enqueue_datagram(const Address& addr, std::string&& datagram)
   {
-      outgoing_datagrams_.push_back(make_pair(addr, move(datagram)));
+      outgoing_datagrams_.push(make_pair(addr, move(datagram)));
   }
 
   const UDPSocket & socket() const { return socket_; }

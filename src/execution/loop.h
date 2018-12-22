@@ -40,6 +40,7 @@ private:
   std::list<std::tuple<uint64_t, bool, LocalCallbackFunc, ChildProcess>> child_processes_ {};
   std::list<std::shared_ptr<TCPConnection>> connections_ {};
   std::list<std::shared_ptr<SSLConnection>> ssl_connections_ {};
+  std::list<std::shared_ptr<UDPConnection>> udp_connections_ {};
 
   SSLContext ssl_context_ {};
 
@@ -47,6 +48,8 @@ private:
 
   template<typename SocketType>
   typename std::list<std::shared_ptr<Connection<SocketType>>>::iterator create_connection( SocketType && socket );
+
+  std::list<std::shared_ptr<UDPConnection>>::iterator create_connection( UDPSocket && socket );
 
   template<typename ConnectionType>
   void remove_connection( const typename std::list<std::shared_ptr<ConnectionType>>::iterator & it );
@@ -67,6 +70,14 @@ public:
                   const std::function<void()> & error_callback = [](){},
                   const std::function<void()> & close_callback = [](){} );
 
+  std::shared_ptr<UDPConnection>
+  add_connection( UDPSocket && socket,
+                  const std::function<bool(std::shared_ptr<UDPConnection>,
+                                           std::string &&)> & data_callback,
+                  const std::function<void()> & error_callback = [](){},
+                  const std::function<void()> & close_callback = [](){} );
+
+
   template<class ConnectionType>
   std::shared_ptr<ConnectionType>
   make_connection( const Address & address,
@@ -74,6 +85,12 @@ public:
                                             std::string &&)> & data_callback,
                    const std::function<void()> & error_callback = [](){},
                    const std::function<void()> & close_callback = [](){} );
+
+  std::shared_ptr<UDPConnection>
+  make_udp_connection( const std::function<bool(std::shared_ptr<UDPConnection>,
+                                                std::string &&)> & data_callback,
+                       const std::function<void()> & error_callback = [](){},
+                       const std::function<void()> & close_callback = [](){} );
 
   template<class ConnectionType>
   uint64_t make_http_request( const std::string & tag,
