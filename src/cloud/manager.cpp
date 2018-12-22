@@ -8,7 +8,7 @@ using namespace std;
 
 namespace pbrt {
 
-void SceneManager::init(const string &scenePath) {
+void SceneManager::init(const string& scenePath) {
     sceneFD.reset(CheckSystemCall(
         scenePath, open(scenePath.c_str(), O_DIRECTORY | O_CLOEXEC)));
 }
@@ -38,37 +38,30 @@ unique_ptr<protobuf::RecordWriter> SceneManager::GetWriter(
 }
 
 string SceneManager::getFileName(const Type type, const uint32_t id) {
+    // clang-format off
     switch (type) {
-    case Type::Treelet:
-        return "T" + to_string(id);
-
-    case Type::TriangleMesh:
-        return "TM" + to_string(id);
-
-    case Type::Sampler:
-        return "SAMPLER";
-
-    case Type::Camera:
-        return "CAMERA";
-
-    case Type::Lights:
-        return "LIGHTS";
-
-    case Type::Scene:
-        return "SCENE";
-
-    case Type::Material:
-      return "MAT" + to_string(id);
-
-    case Type::FloatTexture:
-      return "FTEX" + to_string(id);
-
-    case Type::SpectrumTexture:
-      return "STEX" + to_string(id);
-
-    default:
-        throw runtime_error("invalid object type");
+    case Type::Treelet: return "T" + to_string(id);
+    case Type::TriangleMesh: return "TM" + to_string(id);
+    case Type::Sampler: return "SAMPLER";
+    case Type::Camera: return "CAMERA";
+    case Type::Lights: return "LIGHTS";
+    case Type::Scene: return "SCENE";
+    case Type::Material: return "MAT" + to_string(id);
+    case Type::FloatTexture: return "FTEX" + to_string(id);
+    case Type::SpectrumTexture: return "STEX" + to_string(id);
+    default: throw runtime_error("invalid object type");
     }
+    // clang-format on
+}
+
+uint32_t SceneManager::getNextId(const Type type, const void* ptr) {
+    const uint32_t id = autoIds[to_underlying(type)]++;
+
+    if (ptr) {
+        ptrIds[ptr] = id;
+    }
+
+    return id;
 }
 
 namespace global {
