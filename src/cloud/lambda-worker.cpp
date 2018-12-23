@@ -35,7 +35,7 @@ void usage(const char* argv0) {
 
 class LambdaWorker {
   public:
-    LambdaWorker(const string& coordinatorAddr, const uint16_t coordinatorPort,
+    LambdaWorker(const string& coordinatorIP, const uint16_t coordinatorPort,
                  const string& storageBackendUri);
 
     void run();
