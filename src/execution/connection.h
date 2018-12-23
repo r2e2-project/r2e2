@@ -40,7 +40,7 @@ public:
   }
 
   void enqueue_write( const std::string & str ) { write_buffer_.append( str ); }
-  const SocketType & socket() const { return socket_; }
+  SocketType & socket() { return socket_; }
 };
 
 class UDPConnection
@@ -66,7 +66,7 @@ public:
       outgoing_datagrams_.push(make_pair(addr, move(datagram)));
   }
 
-  const UDPSocket & socket() const { return socket_; }
+  UDPSocket & socket() { return socket_; }
 };
 
 using TCPConnection = Connection<TCPSocket>;

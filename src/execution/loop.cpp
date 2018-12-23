@@ -226,7 +226,7 @@ ExecutionLoop::make_connection( const Address & address,
 }
 
 shared_ptr<UDPConnection>
-ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection>, string &&)> & data_callback,
+ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection>, Address &&, string &&)> & data_callback,
                                     const function<void()> & error_callback,
                                     const function<void()> & close_callback )
 {
@@ -276,9 +276,9 @@ ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection
        close_callback { move( real_close_callback ) }] ()
       {
         auto datagram = connection->socket_.recvfrom();
-        auto & data = datagram.second;
 
-        if ( data.empty() or not data_callback( connection, move( data ) ) ) {
+        if ( not data_callback( connection, move( datagram.first ),
+                                move( datagram.second ) ) ) {
           close_callback();
           return ResultType::CancelAll;
         }

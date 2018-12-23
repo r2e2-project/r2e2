@@ -54,6 +54,7 @@ class LambdaWorker {
     UniqueDirectory workingDirectory;
     unique_ptr<StorageBackend> storageBackend;
     shared_ptr<TCPConnection> coordinatorConnection;
+    shared_ptr<UDPConnection> udpConnection;
     MessageParser messageParser{};
 
     /* Scene Data */
@@ -83,8 +84,18 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         },
         []() { cerr << "Error." << endl; }, []() { throw ProgramFinished(); });
 
-    Message hello_message{Message::OpCode::Hey, ""};
-    coordinatorConnection->enqueue_write(hello_message.str());
+    udpConnection = loop.make_udp_connection(
+        [](shared_ptr<UDPConnection>, Address, string&& data) {
+            cerr << "UDP DATAGRAM: " << data << endl;
+            return true;
+        },
+        []() { cerr << "Error." << endl; }, []() { throw ProgramFinished(); });
+
+    Message helloMsg{Message::OpCode::Hey, ""};
+    coordinatorConnection->enqueue_write(helloMsg.str());
+
+    Message udpMsg{Message::OpCode::Hey, "UDP"};
+    udpConnection->enqueue_datagram(coordinatorAddr, udpMsg.str());
 }
 
 void LambdaWorker::run() {

@@ -60,6 +60,16 @@ int main(int argc, char const *argv[]) {
         map<uint64_t, Lambda> lambdas;
         set<uint64_t> freeLambdas;
 
+        auto udpConnection = loop.make_udp_connection(
+            [](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
+                cerr << "UDP from " << addr.str() << endl;
+                return true;
+            },
+            []() { throw runtime_error("udp connection error"); },
+            []() { throw runtime_error("udp connection died"); });
+
+        udpConnection->socket().bind({"0.0.0.0", listenPort});
+
         loop.make_listener({"0.0.0.0", listenPort}, [&](ExecutionLoop &loop,
                                                         TCPSocket &&socket) {
             cerr << "Incoming connection from " << socket.peer_address().str()

@@ -88,6 +88,7 @@ public:
 
   std::shared_ptr<UDPConnection>
   make_udp_connection( const std::function<bool(std::shared_ptr<UDPConnection>,
+                                                Address &&,
                                                 std::string &&)> & data_callback,
                        const std::function<void()> & error_callback = [](){},
                        const std::function<void()> & close_callback = [](){} );
