@@ -49,6 +49,8 @@ public:
     /* comparisons */
     bool operator==( const Address & other ) const;
     bool operator<( const Address & other ) const;
+
+    static std::pair<std::string, uint16_t> decompose( const std::string & ip_port );
 };
 
 #endif /* ADDRESS_HH */

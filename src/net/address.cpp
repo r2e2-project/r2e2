@@ -116,6 +116,16 @@ Address::Address( const std::string & ip, const uint16_t port )
     *this = Address( ip, ::to_string( port ), hints );
 }
 
+pair<string, uint16_t> Address::decompose( const string & ip_port )
+{
+    const size_t colonPos = ip_port.find( ":" );
+    if ( colonPos == string::npos ) {
+        throw runtime_error( "invalid ip:port format" );
+    }
+    const uint16_t port = strict_atoi( ip_port.substr( colonPos + 1 ) );
+    return make_pair( ip_port.substr( 0, colonPos ), port );
+}
+
 /* accessors */
 
 pair<string, uint16_t> Address::ip_port( void ) const
