@@ -56,6 +56,7 @@ class LambdaWorker {
     shared_ptr<TCPConnection> coordinatorConnection;
     shared_ptr<UDPConnection> udpConnection;
     MessageParser messageParser{};
+    Optional<size_t> workerId;
 
     /* Scene Data */
     vector<unique_ptr<Transform>> transformCache{};
@@ -85,7 +86,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { cerr << "Error." << endl; }, []() { throw ProgramFinished(); });
 
     udpConnection = loop.make_udp_connection(
-        [](shared_ptr<UDPConnection>, Address, string&& data) {
+        [](shared_ptr<UDPConnection>, Address&& addr, string&& data) {
             cerr << "UDP DATAGRAM: " << data << endl;
             return true;
         },
@@ -93,9 +94,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     Message helloMsg{Message::OpCode::Hey, ""};
     coordinatorConnection->enqueue_write(helloMsg.str());
-
-    Message udpMsg{Message::OpCode::Hey, "UDP"};
-    udpConnection->enqueue_datagram(coordinatorAddr, udpMsg.str());
 }
 
 void LambdaWorker::run() {
@@ -111,6 +109,8 @@ void LambdaWorker::run() {
 void LambdaWorker::process_message(const Message& message) {
     switch (message.opcode()) {
     case Message::OpCode::Hey:
+        workerId.reset(stoi(message.payload()));
+        udpConnection->enqueue_datagram(coordinatorAddr, to_string(*workerId));
         break;
 
     case Message::OpCode::Ping: {

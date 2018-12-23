@@ -28,6 +28,7 @@ struct Lambda {
     size_t id;
     State state{State::Idle};
     shared_ptr<TCPConnection> connection;
+    Address udpAddress{};
 
     Lambda(const size_t id, shared_ptr<TCPConnection> &&connection)
         : id(id), connection(move(connection)) {}
@@ -61,8 +62,15 @@ int main(int argc, char const *argv[]) {
         set<uint64_t> freeLambdas;
 
         auto udpConnection = loop.make_udp_connection(
-            [](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
-                cerr << "UDP from " << addr.str() << endl;
+            [&lambdas](shared_ptr<UDPConnection>, Address &&addr,
+                       string &&data) {
+                cerr << "set udp address for " << data << endl;
+                const size_t workerId = stoull(data);
+                if (lambdas.count(workerId) == 0) {
+                    throw runtime_error("invalid worker id");
+                }
+
+                lambdas.at(workerId).udpAddress = move(addr);
                 return true;
             },
             []() { throw runtime_error("udp connection error"); },
@@ -78,7 +86,7 @@ int main(int argc, char const *argv[]) {
             auto messageParser = make_shared<MessageParser>();
             auto connection = loop.add_connection<TCPSocket>(
                 move(socket),
-                [messageParser, &getSceneMessageStr](
+                [current_lambda_id, messageParser, &getSceneMessageStr](
                     shared_ptr<TCPConnection> connection, string &&data) {
                     messageParser->parse(data);
 
@@ -88,6 +96,10 @@ int main(int argc, char const *argv[]) {
 
                         switch (message.opcode()) {
                         case Message::OpCode::Hey: {
+                            Message heyBackMessage{
+                                Message::OpCode::Hey,
+                                to_string(current_lambda_id)};
+                            connection->enqueue_write(heyBackMessage.str());
                             connection->enqueue_write(getSceneMessageStr);
                             break;
                         }
