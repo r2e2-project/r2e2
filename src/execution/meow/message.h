@@ -20,6 +20,9 @@ namespace meow {
       Pong,
       Get,
       GenerateRays,
+      GetWorker,
+      ConnectTo,
+      ConnectionRequest,
       Bye,
     };
 
@@ -53,6 +56,7 @@ namespace meow {
     bool empty() const { return completed_messages_.empty(); }
     Message & front() { return completed_messages_.front(); }
     void pop() { completed_messages_.pop(); }
+    void push( Message && msg ) { completed_messages_.push( std::move( msg ) ); }
   };
 
 }

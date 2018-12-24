@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <deque>
 #include <iostream>
 #include <limits>
@@ -33,6 +34,16 @@ void usage(const char* argv0) {
     cerr << "Usage: " << argv0 << " DESTINATION PORT STORAGE-BACKEND" << endl;
 }
 
+struct Peer {
+    enum class State { Connecting, Connected };
+
+    Address address;
+    State state{State::Connecting};
+    int32_t seed{0};
+
+    Peer(Address&& addr) : address(move(addr)) {}
+};
+
 class LambdaWorker {
   public:
     LambdaWorker(const string& coordinatorIP, const uint16_t coordinatorPort,
@@ -40,10 +51,10 @@ class LambdaWorker {
 
     void run();
 
-    void process_message(const Message& message);
+  private:
+    bool process_message(const Message& message);
     void initializeScene();
 
-  private:
     void loadCamera();
     void loadSampler();
     void loadLights();
@@ -57,6 +68,8 @@ class LambdaWorker {
     shared_ptr<UDPConnection> udpConnection;
     MessageParser messageParser{};
     Optional<size_t> workerId;
+    map<size_t, Peer> peers;
+    int32_t mySeed;
 
     /* Scene Data */
     vector<unique_ptr<Transform>> transformCache{};
@@ -77,6 +90,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     roost::chdir(workingDirectory.name());
     global::manager.init(".");
 
+    srand(time(nullptr));
+    do {
+        mySeed = rand();
+    } while (mySeed == 0);
+
     coordinatorConnection = loop.make_connection<TCPConnection>(
         coordinatorAddr,
         [this](shared_ptr<TCPConnection>, string&& data) {
@@ -86,8 +104,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { cerr << "Error." << endl; }, []() { throw ProgramFinished(); });
 
     udpConnection = loop.make_udp_connection(
-        [](shared_ptr<UDPConnection>, Address&& addr, string&& data) {
-            cerr << "UDP DATAGRAM: " << data << endl;
+        [this](shared_ptr<UDPConnection>, Address&& addr, string&& data) {
+            this->messageParser.parse(data);
             return true;
         },
         []() { cerr << "Error." << endl; }, []() { throw ProgramFinished(); });
@@ -97,16 +115,52 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 }
 
 void LambdaWorker::run() {
-    while (loop.loop_once(-1).result == Poller::Result::Type::Success) {
+    constexpr int TIMEOUT = 500; /* ms */
+    while (true) {
+        auto pollerResult = loop.loop_once(TIMEOUT).result;
+        if (pollerResult != Poller::Result::Type::Success &&
+            pollerResult != Poller::Result::Type::Timeout) {
+            break;
+        }
+
         while (!messageParser.empty()) {
             Message message = move(messageParser.front());
             messageParser.pop();
-            process_message(message);
+            if (!process_message(message)) {
+                messageParser.push(move(message));
+            }
+        }
+
+        for (auto& kv : peers) {
+            auto& peerId = kv.first;
+            auto& peer = kv.second;
+
+            switch (peer.state) {
+            case Peer::State::Connecting: {
+                protobuf::ConnectRequest connectRequestProto;
+                connectRequestProto.set_worker_id(*workerId);
+                connectRequestProto.set_my_seed(mySeed);
+                connectRequestProto.set_your_seed(peer.seed);
+
+                Message connectRequestMessage{
+                    Message::OpCode::ConnectionRequest,
+                    protoutil::to_string(connectRequestProto)};
+
+                udpConnection->enqueue_datagram(peer.address,
+                                                connectRequestMessage.str());
+
+                break;
+            }
+
+            case Peer::State::Connected:
+                /* send keep alive */
+                break;
+            }
         }
     }
 }
 
-void LambdaWorker::process_message(const Message& message) {
+bool LambdaWorker::process_message(const Message& message) {
     switch (message.opcode()) {
     case Message::OpCode::Hey:
         workerId.reset(stoi(message.payload()));
@@ -167,6 +221,50 @@ void LambdaWorker::process_message(const Message& message) {
         break;
     }
 
+    case Message::OpCode::ConnectTo: {
+        protobuf::ConnectTo connectProto;
+        protoutil::from_string(message.payload(), connectProto);
+
+        if (peers.count(connectProto.worker_id())) {
+            /* We already have this peer (do something?) */
+            break;
+        }
+
+        const auto destination = Address::decompose(connectProto.address());
+        peers.emplace(
+            piecewise_construct, forward_as_tuple(connectProto.worker_id()),
+            forward_as_tuple(Address{destination.first, destination.second}));
+        break;
+    }
+
+    case Message::OpCode::ConnectionRequest: {
+        protobuf::ConnectRequest connectRequestProto;
+        protoutil::from_string(message.payload(), connectRequestProto);
+
+        const auto otherWorkerId = connectRequestProto.worker_id();
+
+        if (peers.count(otherWorkerId) == 0) {
+            /* we still haven't heard about this worker id from the master,
+            we should wait. */
+            return false;
+        }
+
+        auto& peer = peers.at(otherWorkerId);
+
+        if (peer.state == Peer::State::Connected) {
+            break;
+        }
+
+        peer.seed = connectRequestProto.my_seed();
+
+        if (connectRequestProto.your_seed() == mySeed) {
+            peer.state = Peer::State::Connected;
+            cerr << "connected to worker " << otherWorkerId << endl;
+        }
+
+        break;
+    }
+
     case Message::OpCode::Bye:
         throw ProgramFinished();
         break;
@@ -174,6 +272,8 @@ void LambdaWorker::process_message(const Message& message) {
     default:
         throw runtime_error("unhandled message opcode");
     }
+
+    return true;
 }
 
 void LambdaWorker::loadCamera() {
