@@ -3,11 +3,13 @@
 
 #include <string>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
 #include "util/file_descriptor.h"
+#include "util/optional.h"
 #include "pbrt.pb.h"
 
 namespace pbrt {
@@ -19,7 +21,8 @@ public:
     RecordWriter& operator=(RecordWriter &&) = default;
 
     RecordWriter(const std::string & filename);
-    RecordWriter(FileDescriptor && fd) : fd_(std::move(fd)) {}
+    RecordWriter(FileDescriptor && fd);
+    RecordWriter(std::ostringstream * os);
 
     template<class ProtobufType>
     void write(const ProtobufType & proto);
@@ -27,9 +30,10 @@ public:
     void write_empty();
 
 private:
-    FileDescriptor fd_;
-    google::protobuf::io::FileOutputStream raw_output_ { fd_.fd_num() };
-    google::protobuf::io::CodedOutputStream coded_output_ { &raw_output_ };
+    Optional<FileDescriptor> fd_{};
+
+    std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> output_stream_;
+    google::protobuf::io::CodedOutputStream coded_output_;
 };
 
 class RecordReader {
@@ -39,15 +43,20 @@ public:
 
     RecordReader(const std::string & filename);
     RecordReader(FileDescriptor && fd);
+    RecordReader(std::istringstream && is);
 
     template<class ProtobufType>
     bool read(ProtobufType * record);
     bool eof() const { return eof_; }
 
 private:
-    FileDescriptor fin_;
-    google::protobuf::io::FileInputStream raw_input_ { fin_.fd_num() };
-    google::protobuf::io::CodedInputStream coded_input_ { &raw_input_ };
+    void initialize();
+
+    Optional<FileDescriptor> fd_;
+    Optional<std::istringstream> istream_;
+
+    std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> input_stream_;
+    google::protobuf::io::CodedInputStream coded_input_;
 
     google::protobuf::uint32 next_size_;
     bool eof_ {false};
