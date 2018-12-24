@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include <deque>
 #include <iostream>
 #include <memory>
@@ -41,6 +42,8 @@ class LambdaMaster {
     void run();
 
   private:
+    void loadCamera();
+
     string scenePath;
     ExecutionLoop loop{};
     uint64_t currentLambdaID = 0;
@@ -48,10 +51,17 @@ class LambdaMaster {
     set<uint64_t> freeLambdas{};
     shared_ptr<UDPConnection> udpConnection{};
     string getSceneMessageStr;
+
+    /* Scene Data */
+    vector<unique_ptr<Transform>> transformCache{};
+    shared_ptr<Camera> camera{};
 };
 
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
     : scenePath(scenePath) {
+    global::manager.init(scenePath);
+    loadCamera();
+
     ostringstream allSceneObjects;
     for (string &filename : roost::get_directory_listing(scenePath)) {
         allSceneObjects << filename << endl;
@@ -76,6 +86,11 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
 
     udpConnection->socket().bind({"0.0.0.0", listenPort});
 
+    /* Vector2i sampleExtent = sampleBounds.Diagonal();
+    const int tileSize = 16;
+    Point2i nTiles((sampleExtent.x + tileSize - 1) / tileSize,
+                   (sampleExtent.y + tileSize - 1) / tileSize); */
+
     loop.make_listener({"0.0.0.0", listenPort}, [&](ExecutionLoop &loop,
                                                     TCPSocket &&socket) {
         cerr << "Incoming connection from " << socket.peer_address().str()
@@ -98,6 +113,14 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
                                                to_string(ID)};
                         connection->enqueue_write(heyBackMessage.str());
                         connection->enqueue_write(getSceneMessageStr);
+
+                        protobuf::GenerateRays generateProto;
+                        *generateProto.mutable_crop_window() =
+                            to_protobuf(camera->film->GetSampleBounds());
+                        Message generateRaysMessage{
+                            Message::OpCode::GenerateRays,
+                            protoutil::to_string(generateProto)};
+                        connection->enqueue_write(generateRaysMessage.str());
                         break;
                     }
 
@@ -172,6 +195,13 @@ void LambdaMaster::run() {
     }
 }
 
+void LambdaMaster::loadCamera() {
+    auto reader = global::manager.GetReader(SceneManager::Type::Camera);
+    protobuf::Camera proto_camera;
+    reader->read(&proto_camera);
+    camera = camera::from_protobuf(proto_camera, transformCache);
+}
+
 int main(int argc, char const *argv[]) {
     try {
         if (argc <= 0) {
@@ -182,6 +212,8 @@ int main(int argc, char const *argv[]) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
+
+        google::InitGoogleLogging(argv[0]);
 
         const string scenePath{argv[1]};
         const uint16_t listenPort = stoi(argv[2]);

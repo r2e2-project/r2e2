@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include <cstdlib>
 #include <deque>
 #include <iostream>
@@ -74,8 +75,8 @@ class LambdaWorker {
     int32_t mySeed;
 
     /* Scene Data */
-    vector<unique_ptr<Transform>> transformCache{};
     bool initialized{false};
+    vector<unique_ptr<Transform>> transformCache{};
     shared_ptr<Camera> camera{};
     shared_ptr<Sampler> sampler{};
     unique_ptr<Scene> fakeScene{};
@@ -95,8 +96,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     : coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
       storageBackend(StorageBackend::create_backend(storageBackendUri)) {
+    PbrtOptions.nThreads = 1;
     roost::chdir(workingDirectory.name());
     global::manager.init(".");
+
+    treelet = make_shared<CloudBVH>();
 
     srand(time(nullptr));
     do {
@@ -167,6 +171,7 @@ void LambdaWorker::run() {
         }
 
         /* let's trace rays that we have to trace */
+        cerr << rayQueue.size() << endl;
         while (!rayQueue.empty()) {
             RayState rayState = move(rayQueue.front());
             rayQueue.pop_front();
@@ -190,9 +195,8 @@ void LambdaWorker::run() {
         }
 
         swap(rayQueue, processedRays);
-        processedRays.clear();
 
-        if (rayQueue.size() == 0) {
+        if (rayQueue.size() == 0 and finishedRays.size() > 0) {
             const Bounds2i sampleBounds = camera->film->GetSampleBounds();
             unique_ptr<FilmTile> filmTile =
                 camera->film->GetFilmTile(sampleBounds);
@@ -206,12 +210,15 @@ void LambdaWorker::run() {
             camera->film->MergeFilmTile(move(filmTile));
             camera->film->WriteImage();
 
-            throw ProgramFinished();
+            return;
         }
     }
 }
 
 bool LambdaWorker::process_message(const Message& message) {
+    cerr << ">> Processing [msg:" << static_cast<int>(message.opcode())
+         << "]... ";
+
     switch (message.opcode()) {
     case Message::OpCode::Hey:
         workerId.reset(stoi(message.payload()));
@@ -239,6 +246,8 @@ bool LambdaWorker::process_message(const Message& message) {
     }
 
     case Message::OpCode::GenerateRays: {
+        initializeScene();
+
         protobuf::GenerateRays data;
         protoutil::from_string(message.payload(), data);
 
@@ -338,6 +347,7 @@ bool LambdaWorker::process_message(const Message& message) {
         throw runtime_error("unhandled message opcode");
     }
 
+    cerr << "done.\n";
     return true;
 }
 
@@ -396,6 +406,8 @@ int main(int argc, char const* argv[]) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
+
+        google::InitGoogleLogging(argv[0]);
 
         const uint16_t coordinatorPort = stoi(argv[2]);
 
