@@ -23,6 +23,7 @@ namespace meow {
       GetWorker,
       ConnectTo,
       ConnectionRequest,
+      SendRays,
       Bye,
     };
 

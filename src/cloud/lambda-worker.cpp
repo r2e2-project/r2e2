@@ -193,6 +193,19 @@ void LambdaWorker::run() {
         processedRays.clear();
 
         if (rayQueue.size() == 0) {
+            const Bounds2i sampleBounds = camera->film->GetSampleBounds();
+            unique_ptr<FilmTile> filmTile =
+                camera->film->GetFilmTile(sampleBounds);
+
+            for (auto& rayState : finishedRays) {
+                filmTile->AddSample(rayState.sample.pFilm,
+                                    rayState.Ld * rayState.beta,
+                                    rayState.sample.weight);
+            }
+
+            camera->film->MergeFilmTile(move(filmTile));
+            camera->film->WriteImage();
+
             throw ProgramFinished();
         }
     }
