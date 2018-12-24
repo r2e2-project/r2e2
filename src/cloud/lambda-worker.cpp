@@ -5,6 +5,8 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "cloud/bvh.h"
+#include "cloud/integrator.h"
 #include "cloud/manager.h"
 #include "cloud/raystate.h"
 #include "core/camera.h"
@@ -78,7 +80,13 @@ class LambdaWorker {
     shared_ptr<Sampler> sampler{};
     unique_ptr<Scene> fakeScene{};
     vector<shared_ptr<Light>> lights{};
+    std::shared_ptr<CloudBVH> treelet{};
+    MemoryArena arena;
+
+    /* Rays */
     deque<RayState> rayQueue{};
+    deque<RayState> processedRays{};
+    deque<RayState> finishedRays{};
 };
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
@@ -156,6 +164,36 @@ void LambdaWorker::run() {
                 /* send keep alive */
                 break;
             }
+        }
+
+        /* let's trace rays that we have to trace */
+        while (!rayQueue.empty()) {
+            RayState rayState = move(rayQueue.front());
+            rayQueue.pop_front();
+
+            if (!rayState.toVisit.empty()) {
+                auto newRay = CloudIntegrator::Trace(move(rayState), treelet);
+                if (!newRay.isShadowRay || !newRay.hit.initialized()) {
+                    processedRays.push_back(move(newRay));
+                }
+            } else if (rayState.isShadowRay) {
+                if (!rayState.hit.initialized()) {
+                    finishedRays.push_back(move(rayState));
+                }
+            } else if (rayState.hit.initialized()) {
+                auto newRays = CloudIntegrator::Shade(move(rayState), treelet,
+                                                      lights, sampler, arena);
+                for (auto& newRay : newRays) {
+                    processedRays.push_back(move(newRay));
+                }
+            }
+        }
+
+        swap(rayQueue, processedRays);
+        processedRays.clear();
+
+        if (rayQueue.size() == 0) {
+            throw ProgramFinished();
         }
     }
 }
@@ -260,6 +298,20 @@ bool LambdaWorker::process_message(const Message& message) {
         if (connectRequestProto.your_seed() == mySeed) {
             peer.state = Peer::State::Connected;
             cerr << "connected to worker " << otherWorkerId << endl;
+        }
+
+        break;
+    }
+
+    case Message::OpCode::SendRays: {
+        istringstream iss{message.payload()};
+        protobuf::RecordReader reader{move(iss)};
+        protobuf::RayState protoState;
+
+        while (!reader.eof()) {
+            if (reader.read(&protoState)) {
+                rayQueue.push_back(move(from_protobuf(protoState)));
+            }
         }
 
         break;
