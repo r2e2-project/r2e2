@@ -30,6 +30,7 @@ struct Lambda {
     State state{State::Idle};
     shared_ptr<TCPConnection> connection;
     Optional<Address> udpAddress{};
+    Point2i tile;
 
     Lambda(const size_t id, shared_ptr<TCPConnection> &&connection)
         : id(id), connection(move(connection)) {}
@@ -44,6 +45,8 @@ class LambdaMaster {
   private:
     void loadCamera();
 
+    static constexpr int TILE_SIZE = 16;
+
     string scenePath;
     ExecutionLoop loop{};
     uint64_t currentLambdaID = 0;
@@ -55,6 +58,8 @@ class LambdaMaster {
     /* Scene Data */
     vector<unique_ptr<Transform>> transformCache{};
     shared_ptr<Camera> camera{};
+
+    Bounds2i sampleBounds;
 };
 
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
@@ -86,12 +91,13 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
 
     udpConnection->socket().bind({"0.0.0.0", listenPort});
 
-    /* Vector2i sampleExtent = sampleBounds.Diagonal();
-    const int tileSize = 16;
-    Point2i nTiles((sampleExtent.x + tileSize - 1) / tileSize,
-                   (sampleExtent.y + tileSize - 1) / tileSize); */
+    sampleBounds = camera->film->GetSampleBounds();
+    Vector2i sampleExtent = sampleBounds.Diagonal();
+    Point2i nTiles((sampleExtent.x + TILE_SIZE - 1) / TILE_SIZE,
+                   (sampleExtent.y + TILE_SIZE - 1) / TILE_SIZE);
 
-    loop.make_listener({"0.0.0.0", listenPort}, [&](ExecutionLoop &loop,
+    loop.make_listener({"0.0.0.0", listenPort}, [this, nTiles](
+                                                    ExecutionLoop &loop,
                                                     TCPSocket &&socket) {
         cerr << "Incoming connection from " << socket.peer_address().str()
              << endl;
@@ -99,7 +105,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
         auto messageParser = make_shared<MessageParser>();
         auto connection = loop.add_connection<TCPSocket>(
             move(socket),
-            [this, ID = currentLambdaID, messageParser](
+            [this, ID = currentLambdaID, messageParser, &nTiles](
                 shared_ptr<TCPConnection> connection, string &&data) {
                 messageParser->parse(data);
 
@@ -114,9 +120,18 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
                         connection->enqueue_write(heyBackMessage.str());
                         connection->enqueue_write(getSceneMessageStr);
 
+                        /* compute the crop window */
+                        int tileX = ID % nTiles.x;
+                        int tileY = ID / nTiles.x;
+                        int x0 = this->sampleBounds.pMin.x + tileX * TILE_SIZE;
+                        int x1 = min(x0 + TILE_SIZE, this->sampleBounds.pMax.x);
+                        int y0 = this->sampleBounds.pMin.y + tileY * TILE_SIZE;
+                        int y1 = min(y0 + TILE_SIZE, this->sampleBounds.pMax.y);
+                        Bounds2i tileBounds{Point2i{x0, y0}, Point2i{x1, y1}};
+
                         protobuf::GenerateRays generateProto;
                         *generateProto.mutable_crop_window() =
-                            to_protobuf(camera->film->GetSampleBounds());
+                            to_protobuf(tileBounds);
                         Message generateRaysMessage{
                             Message::OpCode::GenerateRays,
                             protoutil::to_string(generateProto)};

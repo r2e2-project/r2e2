@@ -96,6 +96,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     : coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
       storageBackend(StorageBackend::create_backend(storageBackendUri)) {
+    cerr << "* starting worker in " << workingDirectory.name() << endl;
     PbrtOptions.nThreads = 1;
     roost::chdir(workingDirectory.name());
     global::manager.init(".");
