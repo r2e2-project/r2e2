@@ -25,6 +25,8 @@ namespace meow {
       ConnectionRequest,
       SendRays,
       Bye,
+
+      COUNT
     };
 
   private:

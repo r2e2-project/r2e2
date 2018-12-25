@@ -252,6 +252,9 @@ void LambdaWorker::run() {
         }
 
         /* let's trace rays that we have to trace */
+        cerr << ">>> tracing " << rayQueue.size() << " ray"
+             << ((rayQueue.size() == 1) ? "" : "s") << endl;
+
         while (!rayQueue.empty()) {
             RayState ray = move(rayQueue.front());
             rayQueue.pop_front();

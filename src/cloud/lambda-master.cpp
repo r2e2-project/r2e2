@@ -24,6 +24,8 @@ using namespace std;
 using namespace meow;
 using namespace pbrt;
 
+using OpCode = Message::OpCode;
+
 void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA PORT" << endl; }
 
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
@@ -35,9 +37,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
     for (string &filename : roost::get_directory_listing(scenePath)) {
         allSceneObjects << filename << endl;
     }
-
-    getSceneMessageStr =
-        Message(Message::OpCode::Get, allSceneObjects.str()).str();
+    getSceneMessageStr = Message(OpCode::Get, allSceneObjects.str()).str();
 
     udpConnection = loop.make_udp_connection(
         [&](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
@@ -69,99 +69,14 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
         auto messageParser = make_shared<MessageParser>();
         auto connection = loop.add_connection<TCPSocket>(
             move(socket),
-            [this, ID = currentLambdaID, messageParser, &nTiles](
+            [this, ID = currentLambdaID, messageParser](
                 shared_ptr<TCPConnection> connection, string &&data) {
                 messageParser->parse(data);
 
-                deque<Message> unprocessedMessages;
-
                 while (!messageParser->empty()) {
-                    Message message = move(messageParser->front());
+                    incomingMessages.emplace_back(ID,
+                                                  move(messageParser->front()));
                     messageParser->pop();
-
-                    switch (message.opcode()) {
-                    case Message::OpCode::Hey: {
-                        Message heyBackMessage{Message::OpCode::Hey,
-                                               to_string(ID)};
-                        connection->enqueue_write(heyBackMessage.str());
-                        connection->enqueue_write(getSceneMessageStr);
-
-                        /* compute the crop window */
-                        int tileX = ID % nTiles.x;
-                        int tileY = ID / nTiles.x;
-                        int x0 = this->sampleBounds.pMin.x + tileX * TILE_SIZE;
-                        int x1 = min(x0 + TILE_SIZE, this->sampleBounds.pMax.x);
-                        int y0 = this->sampleBounds.pMin.y + tileY * TILE_SIZE;
-                        int y1 = min(y0 + TILE_SIZE, this->sampleBounds.pMax.y);
-                        Bounds2i tileBounds{Point2i{x0, y0}, Point2i{x1, y1}};
-
-                        protobuf::GenerateRays generateProto;
-                        *generateProto.mutable_crop_window() =
-                            to_protobuf(tileBounds);
-                        Message generateRaysMessage{
-                            Message::OpCode::GenerateRays,
-                            protoutil::to_string(generateProto)};
-                        connection->enqueue_write(generateRaysMessage.str());
-                        break;
-                    }
-
-                    case Message::OpCode::GetWorker: {
-                        auto &this_lambda = lambdas.at(ID);
-
-                        if (!this_lambda.udpAddress.initialized()) {
-                            unprocessedMessages.push_back(move(message));
-                            break;
-                        }
-
-                        bool found = false;
-                        for (auto &kv : lambdas) {
-                            if (kv.first != ID &&
-                                kv.second.udpAddress.initialized()) {
-                                /* sending Worker B info to A */
-                                protobuf::ConnectTo connectProtoA;
-                                connectProtoA.set_worker_id(kv.first);
-                                connectProtoA.set_address(
-                                    kv.second.udpAddress->str());
-                                const Message connectMessageA{
-                                    Message::OpCode::ConnectTo,
-                                    protoutil::to_string(connectProtoA)};
-
-                                connection->enqueue_write(
-                                    connectMessageA.str());
-
-                                /* sending Worker A info to B */
-                                protobuf::ConnectTo connectProtoB;
-                                connectProtoB.set_worker_id(ID);
-                                connectProtoB.set_address(
-                                    this_lambda.udpAddress->str());
-                                const Message connectMessageB{
-                                    Message::OpCode::ConnectTo,
-                                    protoutil::to_string(connectProtoB)};
-
-                                kv.second.connection->enqueue_write(
-                                    connectMessageB.str());
-
-                                found = true;
-                                break;
-                            }
-                        }
-
-                        if (!found) {
-                            unprocessedMessages.push_back(move(message));
-                            break;
-                        }
-
-                        break;
-                    }
-
-                    default:
-                        throw runtime_error("unhandled message opcode");
-                    }
-                }
-
-                while (!unprocessedMessages.empty()) {
-                    messageParser->push(move(unprocessedMessages.front()));
-                    unprocessedMessages.pop_front();
                 }
 
                 return true;
@@ -169,18 +84,112 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
             []() { throw runtime_error("error occured"); },
             []() { throw runtime_error("worker died"); });
 
-        lambdas.emplace(piecewise_construct, forward_as_tuple(currentLambdaID),
-                        forward_as_tuple(currentLambdaID, move(connection)));
-        freeLambdas.insert(currentLambdaID);
-        currentLambdaID++;
+        auto lambdaIt =
+            lambdas
+                .emplace(piecewise_construct, forward_as_tuple(currentLambdaID),
+                         forward_as_tuple(currentLambdaID, move(connection)))
+                .first;
 
+        /* assign a tile to the lambda, if we need to */
+        if (currentLambdaID < nTiles.x * nTiles.y) {
+            /* compute the crop window */
+            int tileX = currentLambdaID % nTiles.x;
+            int tileY = currentLambdaID / nTiles.x;
+            int x0 = this->sampleBounds.pMin.x + tileX * TILE_SIZE;
+            int x1 = min(x0 + TILE_SIZE, this->sampleBounds.pMax.x);
+            int y0 = this->sampleBounds.pMin.y + tileY * TILE_SIZE;
+            int y1 = min(y0 + TILE_SIZE, this->sampleBounds.pMax.y);
+            lambdaIt->second.tile.reset(Point2i{x0, y0}, Point2i{x1, y1});
+        }
+
+        currentLambdaID++;
         return true;
     });
 }
 
+bool LambdaMaster::process_message(const uint64_t lambdaId,
+                                   const meow::Message &message) {
+    auto &lambda = lambdas.at(lambdaId);
+
+    switch (message.opcode()) {
+    case OpCode::Hey: {
+        Message heyBackMessage{OpCode::Hey, to_string(lambdaId)};
+        lambda.connection->enqueue_write(heyBackMessage.str());
+        lambda.connection->enqueue_write(getSceneMessageStr);
+
+        if (lambda.tile.initialized()) {
+            protobuf::GenerateRays proto;
+            *proto.mutable_crop_window() = to_protobuf(*lambda.tile);
+            Message message{OpCode::GenerateRays, protoutil::to_string(proto)};
+            lambda.connection->enqueue_write(message.str());
+        }
+
+        break;
+    }
+
+    case OpCode::GetWorker: {
+        if (!lambda.udpAddress.initialized()) {
+            return false;
+        }
+
+        bool found = false;
+        for (auto &kv : lambdas) {
+            if (kv.first != lambdaId && kv.second.udpAddress.initialized()) {
+                /* sending Worker B info to A */
+                protobuf::ConnectTo protoA;
+                protoA.set_worker_id(kv.first);
+                protoA.set_address(kv.second.udpAddress->str());
+                const Message messageA{OpCode::ConnectTo,
+                                       protoutil::to_string(protoA)};
+
+                lambda.connection->enqueue_write(messageA.str());
+
+                /* sending Worker A info to B */
+                protobuf::ConnectTo protoB;
+                protoB.set_worker_id(lambdaId);
+                protoB.set_address(lambda.udpAddress->str());
+                const Message messageB{OpCode::ConnectTo,
+                                       protoutil::to_string(protoB)};
+
+                kv.second.connection->enqueue_write(messageB.str());
+
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            return false;
+        }
+
+        break;
+    }
+
+    default:
+        throw runtime_error("unhandled message opcode");
+    }
+
+    return true;
+}
+
 void LambdaMaster::run() {
+    constexpr int TIMEOUT = 100;
+
     while (true) {
-        loop.loop_once(-1);
+        loop.loop_once(TIMEOUT);
+
+        deque<pair<uint64_t, Message>> unprocessedMessages;
+
+        while (!incomingMessages.empty()) {
+            auto front = move(incomingMessages.front());
+            incomingMessages.pop_front();
+
+            if (!process_message(front.first, front.second)) {
+                unprocessedMessages.push_back(move(front));
+            }
+        }
+
+        swap(unprocessedMessages, incomingMessages);
     }
 }
 

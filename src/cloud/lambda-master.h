@@ -12,6 +12,7 @@
 #include "core/transform.h"
 #include "execution/connection.h"
 #include "execution/loop.h"
+#include "execution/meow/message.h"
 #include "util/optional.h"
 
 namespace pbrt {
@@ -22,6 +23,8 @@ class LambdaMaster {
 
     void run();
 
+    static constexpr int TILE_SIZE = 16;
+
   private:
     struct Lambda {
         enum class State { Idle, Busy };
@@ -29,23 +32,23 @@ class LambdaMaster {
         State state{State::Idle};
         std::shared_ptr<TCPConnection> connection;
         Optional<Address> udpAddress{};
-        Point2i tile;
+        Optional<Bounds2i> tile;
 
         Lambda(const size_t id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}
     };
 
-    static constexpr int TILE_SIZE = 16;
-
+    bool process_message(const uint64_t lambdaId, const meow::Message &message);
     void loadCamera();
 
     std::string scenePath;
     ExecutionLoop loop{};
     uint64_t currentLambdaID = 0;
     std::map<uint64_t, Lambda> lambdas{};
-    std::set<uint64_t> freeLambdas{};
     std::shared_ptr<UDPConnection> udpConnection{};
     std::string getSceneMessageStr;
+
+    std::deque<std::pair<uint64_t, meow::Message>> incomingMessages;
 
     /* Scene Data */
     std::vector<std::unique_ptr<Transform>> transformCache{};
