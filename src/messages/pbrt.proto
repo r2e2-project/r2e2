@@ -120,18 +120,21 @@ message VisitNode {
 }
 
 message RayState {
+    // SAMPLE DATA
     uint64 sample_id = 1;
     int64 sample_num = 2;
     Point2i sample_pixel = 3;
     Point2f sample_p_film = 4;
-    RayDifferential ray = 5;
-    repeated VisitNode to_visit = 6;
-    VisitNode hit = 7;
-    RGBSpectrum beta = 8;
-    RGBSpectrum Ld = 9;
-    uint32 bounces = 10;
-    uint32 remaining_bounces = 11;
-    bool is_shadow_ray = 12;
+    float sample_weight = 5;
+
+    RayDifferential ray = 6;
+    repeated VisitNode to_visit = 7;
+    VisitNode hit = 8;
+    RGBSpectrum beta = 9;
+    RGBSpectrum Ld = 10;
+    uint32 bounces = 11;
+    uint32 remaining_bounces = 12;
+    bool is_shadow_ray = 13;
 }
 // ParamSet
 

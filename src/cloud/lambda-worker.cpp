@@ -13,6 +13,7 @@
 #include "core/geometry.h"
 #include "core/light.h"
 #include "core/sampler.h"
+#include "core/spectrum.h"
 #include "core/transform.h"
 #include "execution/loop.h"
 #include "execution/meow/message.h"
@@ -179,8 +180,7 @@ bool LambdaWorker::processMessage(const Message& message) {
     }
 
     case OpCode::SendRays: {
-        istringstream iss{message.payload()};
-        protobuf::RecordReader reader{move(iss)};
+        protobuf::RecordReader reader{istringstream{message.payload()}};
         protobuf::RayState proto;
 
         while (!reader.eof()) {
@@ -327,8 +327,12 @@ void LambdaWorker::run() {
             RayState ray = move(finishedRays.front());
             finishedRays.pop_front();
 
-            filmTile->AddSample(ray.sample.pFilm, ray.Ld * ray.beta,
-                                ray.sample.weight);
+            Spectrum L{ray.Ld * ray.beta};
+            if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
+                L = Spectrum(0.f);
+            }
+
+            filmTile->AddSample(ray.sample.pFilm, L, ray.sample.weight);
         }
     }
 }
