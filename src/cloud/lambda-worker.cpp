@@ -1,7 +1,6 @@
-#include <glog/logging.h>
+#include "lambda-worker.h"
+
 #include <cstdlib>
-#include <deque>
-#include <iostream>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -31,68 +30,14 @@ using namespace std;
 using namespace meow;
 using namespace pbrt;
 
+using OpCode = Message::OpCode;
+using PollerResult = Poller::Result::Type;
+
 class ProgramFinished : public exception {};
 
 void usage(const char* argv0) {
     cerr << "Usage: " << argv0 << " DESTINATION PORT STORAGE-BACKEND" << endl;
 }
-
-struct Peer {
-    enum class State { Connecting, Connected };
-
-    Address address;
-    State state{State::Connecting};
-    int32_t seed{0};
-
-    Peer(Address&& addr) : address(move(addr)) {}
-};
-
-class LambdaWorker {
-  public:
-    LambdaWorker(const string& coordinatorIP, const uint16_t coordinatorPort,
-                 const string& storageBackendUri);
-
-    void run();
-
-  private:
-    bool process_message(const Message& message);
-    void initializeScene();
-
-    void loadCamera();
-    void loadSampler();
-    void loadLights();
-    void loadFakeScene();
-
-    Address coordinatorAddr;
-    ExecutionLoop loop{};
-    UniqueDirectory workingDirectory;
-    unique_ptr<StorageBackend> storageBackend;
-    shared_ptr<TCPConnection> coordinatorConnection;
-    shared_ptr<UDPConnection> udpConnection;
-    MessageParser messageParser{};
-    Optional<size_t> workerId;
-    map<size_t, Peer> peers;
-    int32_t mySeed;
-
-    /* Scene Data */
-    bool initialized{false};
-    vector<unique_ptr<Transform>> transformCache{};
-    shared_ptr<Camera> camera{};
-    unique_ptr<FilmTile> filmTile{};
-    shared_ptr<Sampler> sampler{};
-    unique_ptr<Scene> fakeScene{};
-    vector<shared_ptr<Light>> lights{};
-    std::shared_ptr<CloudBVH> treelet{};
-    MemoryArena arena;
-
-    /* Rays */
-    deque<RayState> rayQueue{};
-    deque<RayState> processedRays{};
-    deque<RayState> finishedRays{};
-
-    /* Out-queues */
-    deque<RayState> outQueue{};
-};
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const uint16_t coordinatorPort,
@@ -127,16 +72,141 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         },
         []() { cerr << "Error." << endl; }, []() { throw ProgramFinished(); });
 
-    Message helloMsg{Message::OpCode::Hey, ""};
-    coordinatorConnection->enqueue_write(helloMsg.str());
+    Message message{OpCode::Hey, ""};
+    coordinatorConnection->enqueue_write(message.str());
+}
+
+void LambdaWorker::generateRays(const Bounds2i& bounds) {
+    initializeScene();
+
+    const Bounds2i sampleBounds = camera->film->GetSampleBounds();
+    const uint8_t maxDepth = 5;
+    const float rayScale = 1 / sqrt((Float)sampler->samplesPerPixel);
+
+    for (const Point2i pixel : bounds) {
+        sampler->StartPixel(pixel);
+        if (!InsideExclusive(pixel, sampleBounds)) continue;
+
+        size_t sampleNum = 0;
+        do {
+            CameraSample cameraSample = sampler->GetCameraSample(pixel);
+
+            RayState state;
+            state.sample.num = sampleNum++;
+            state.sample.pixel = pixel;
+            state.sample.pFilm = cameraSample.pFilm;
+            state.sample.weight =
+                camera->GenerateRayDifferential(cameraSample, &state.ray);
+            state.remainingBounces = maxDepth;
+            state.ray.ScaleDifferentials(rayScale);
+            state.StartTrace();
+
+            rayQueue.push_back(move(state));
+        } while (sampler->StartNextSample());
+    }
+}
+
+bool LambdaWorker::process_message(const Message& message) {
+    cerr << ">> [msg:" << static_cast<int>(message.opcode()) << "]\n";
+
+    switch (message.opcode()) {
+    case OpCode::Hey:
+        workerId.reset(stoull(message.payload()));
+        udpConnection->enqueue_datagram(coordinatorAddr, to_string(*workerId));
+        break;
+
+    case OpCode::Ping: {
+        Message pong{OpCode::Pong, ""};
+        coordinatorConnection->enqueue_write(pong.str());
+        break;
+    }
+
+    case OpCode::Get: {
+        string line;
+        istringstream iss{message.payload()};
+        vector<storage::GetRequest> requests;
+        while (getline(iss, line)) {
+            if (line.length()) requests.emplace_back(line, line);
+        }
+
+        storageBackend->get(requests);
+        break;
+    }
+
+    case OpCode::GenerateRays: {
+        protobuf::GenerateRays proto;
+        protoutil::from_string(message.payload(), proto);
+        generateRays(from_protobuf(proto.crop_window()));
+        break;
+    }
+
+    case OpCode::ConnectTo: {
+        protobuf::ConnectTo proto;
+        protoutil::from_string(message.payload(), proto);
+
+        if (peers.count(proto.worker_id()) == 0) {
+            const auto dest = Address::decompose(proto.address());
+            peers.emplace(proto.worker_id(), Peer{{dest.first, dest.second}});
+        }
+
+        break;
+    }
+
+    case OpCode::ConnectionRequest: {
+        protobuf::ConnectRequest proto;
+        protoutil::from_string(message.payload(), proto);
+
+        const auto otherWorkerId = proto.worker_id();
+        if (peers.count(otherWorkerId) == 0) {
+            /* we still haven't heard about this worker id from the master,
+            we should wait. */
+            return false;
+        }
+
+        auto& peer = peers.at(otherWorkerId);
+        if (peer.state == Peer::State::Connected) {
+            break;
+        }
+
+        peer.seed = proto.my_seed();
+        if (proto.your_seed() == mySeed) {
+            peer.state = Peer::State::Connected;
+            cerr << "connected to worker " << otherWorkerId << endl;
+        }
+
+        break;
+    }
+
+    case OpCode::SendRays: {
+        istringstream iss{message.payload()};
+        protobuf::RecordReader reader{move(iss)};
+        protobuf::RayState proto;
+
+        while (!reader.eof()) {
+            if (reader.read(&proto)) {
+                rayQueue.push_back(move(from_protobuf(proto)));
+            }
+        }
+
+        break;
+    }
+
+    case OpCode::Bye:
+        throw ProgramFinished();
+        break;
+
+    default:
+        throw runtime_error("unhandled message opcode");
+    }
+
+    return true;
 }
 
 void LambdaWorker::run() {
     constexpr int TIMEOUT = 500; /* ms */
     while (true) {
-        auto pollerResult = loop.loop_once(TIMEOUT).result;
-        if (pollerResult != Poller::Result::Type::Success &&
-            pollerResult != Poller::Result::Type::Timeout) {
+        auto res = loop.loop_once(TIMEOUT).result;
+        if (res != PollerResult::Success && res != PollerResult::Timeout) {
             break;
         }
 
@@ -144,6 +214,7 @@ void LambdaWorker::run() {
         while (!messageParser.empty()) {
             Message message = move(messageParser.front());
             messageParser.pop();
+
             if (!process_message(message)) {
                 unprocessedMessages.push_back(move(message));
             }
@@ -160,18 +231,14 @@ void LambdaWorker::run() {
 
             switch (peer.state) {
             case Peer::State::Connecting: {
-                protobuf::ConnectRequest connectRequestProto;
-                connectRequestProto.set_worker_id(*workerId);
-                connectRequestProto.set_my_seed(mySeed);
-                connectRequestProto.set_your_seed(peer.seed);
+                protobuf::ConnectRequest proto;
+                proto.set_worker_id(*workerId);
+                proto.set_my_seed(mySeed);
+                proto.set_your_seed(peer.seed);
+                Message message{OpCode::ConnectionRequest,
+                                protoutil::to_string(proto)};
 
-                Message connectRequestMessage{
-                    Message::OpCode::ConnectionRequest,
-                    protoutil::to_string(connectRequestProto)};
-
-                udpConnection->enqueue_datagram(peer.address,
-                                                connectRequestMessage.str());
-
+                udpConnection->enqueue_datagram(peer.address, message.str());
                 break;
             }
 
@@ -183,20 +250,20 @@ void LambdaWorker::run() {
 
         /* let's trace rays that we have to trace */
         while (!rayQueue.empty()) {
-            RayState rayState = move(rayQueue.front());
+            RayState ray = move(rayQueue.front());
             rayQueue.pop_front();
 
-            if (!rayState.toVisit.empty()) {
-                auto newRay = CloudIntegrator::Trace(move(rayState), treelet);
+            if (!ray.toVisit.empty()) {
+                auto newRay = CloudIntegrator::Trace(move(ray), treelet);
                 if (!newRay.isShadowRay || !newRay.hit.initialized()) {
                     processedRays.push_back(move(newRay));
                 }
-            } else if (rayState.isShadowRay) {
-                if (!rayState.hit.initialized()) {
-                    finishedRays.push_back(move(rayState));
+            } else if (ray.isShadowRay) {
+                if (!ray.hit.initialized()) {
+                    finishedRays.push_back(move(ray));
                 }
-            } else if (rayState.hit.initialized()) {
-                auto newRays = CloudIntegrator::Shade(move(rayState), treelet,
+            } else if (ray.hit.initialized()) {
+                auto newRays = CloudIntegrator::Shade(move(ray), treelet,
                                                       lights, sampler, arena);
                 for (auto& newRay : newRays) {
                     processedRays.push_back(move(newRay));
@@ -205,187 +272,50 @@ void LambdaWorker::run() {
         }
 
         while (!processedRays.empty()) {
-            RayState rayState = move(processedRays.front());
+            RayState ray = move(processedRays.front());
             processedRays.pop_front();
 
-            if (rayState.currentTreelet() % 2 == *workerId % 2) {
-                rayQueue.push_back(move(rayState));
+            if (ray.currentTreelet() % 2 == *workerId % 2) {
+                rayQueue.push_back(move(ray));
             } else {
-                outQueue.push_back(move(rayState));
+                outQueue.push_back(move(ray));
             }
         }
 
         if (!outQueue.empty()) {
             if (peers.size() == 0) {
-                Message getWorkerMessage{Message::OpCode::GetWorker, ""};
-                coordinatorConnection->enqueue_write(getWorkerMessage.str());
+                Message message{OpCode::GetWorker, ""};
+                coordinatorConnection->enqueue_write(message.str());
             } else {
                 auto& peer = peers.begin()->second;
+
                 if (peer.state == Peer::State::Connected) {
                     while (!outQueue.empty()) {
                         ostringstream oss;
                         protobuf::RecordWriter writer{&oss};
 
                         while (oss.tellp() < 1'000) {
-                            auto rayState = move(outQueue.front());
+                            auto ray = move(outQueue.front());
                             outQueue.pop_front();
-                            writer.write(to_protobuf(rayState));
+                            writer.write(to_protobuf(ray));
                         }
 
-                        Message sendRaysMessage{Message::OpCode::SendRays,
-                                                oss.str()};
+                        Message message{OpCode::SendRays, oss.str()};
                         udpConnection->enqueue_datagram(peer.address,
-                                                        sendRaysMessage.str());
+                                                        message.str());
                     }
                 }
             }
-
-            while (!finishedRays.empty()) {
-                RayState rayState = move(finishedRays.front());
-                finishedRays.pop_front();
-
-                filmTile->AddSample(rayState.sample.pFilm,
-                                    rayState.Ld * rayState.beta,
-                                    rayState.sample.weight);
-            }
-        }
-    }
-}
-
-bool LambdaWorker::process_message(const Message& message) {
-    cerr << ">> Processing [msg:" << static_cast<int>(message.opcode())
-         << "]... ";
-
-    switch (message.opcode()) {
-    case Message::OpCode::Hey:
-        workerId.reset(stoi(message.payload()));
-        udpConnection->enqueue_datagram(coordinatorAddr, to_string(*workerId));
-        break;
-
-    case Message::OpCode::Ping: {
-        Message pong{Message::OpCode::Pong, ""};
-        coordinatorConnection->enqueue_write(pong.str());
-        break;
-    }
-
-    case Message::OpCode::Get: {
-        vector<storage::GetRequest> getRequests;
-
-        string line;
-        istringstream iss{message.payload()};
-
-        while (getline(iss, line)) {
-            if (line.length()) getRequests.emplace_back(line, line);
         }
 
-        storageBackend->get(getRequests);
-        break;
-    }
+        while (!finishedRays.empty()) {
+            RayState ray = move(finishedRays.front());
+            finishedRays.pop_front();
 
-    case Message::OpCode::GenerateRays: {
-        initializeScene();
-
-        protobuf::GenerateRays data;
-        protoutil::from_string(message.payload(), data);
-
-        const auto& bounds = from_protobuf(data.crop_window());
-        const Bounds2i sampleBounds = camera->film->GetSampleBounds();
-        const uint8_t maxDepth = 5;
-        const float rayScale = 1 / sqrt((Float)sampler->samplesPerPixel);
-
-        for (const Point2i pixel : bounds) {
-            sampler->StartPixel(pixel);
-            if (!InsideExclusive(pixel, sampleBounds)) continue;
-
-            size_t sampleNum = 0;
-            do {
-                CameraSample cameraSample = sampler->GetCameraSample(pixel);
-
-                RayState state;
-                state.sample.num = sampleNum++;
-                state.sample.pixel = pixel;
-                state.sample.pFilm = cameraSample.pFilm;
-                state.sample.weight =
-                    camera->GenerateRayDifferential(cameraSample, &state.ray);
-                state.remainingBounces = maxDepth;
-                state.ray.ScaleDifferentials(rayScale);
-                state.StartTrace();
-
-                rayQueue.push_back(move(state));
-            } while (sampler->StartNextSample());
+            filmTile->AddSample(ray.sample.pFilm, ray.Ld * ray.beta,
+                                ray.sample.weight);
         }
-
-        break;
     }
-
-    case Message::OpCode::ConnectTo: {
-        protobuf::ConnectTo connectProto;
-        protoutil::from_string(message.payload(), connectProto);
-
-        if (peers.count(connectProto.worker_id())) {
-            /* We already have this peer (do something?) */
-            break;
-        }
-
-        const auto destination = Address::decompose(connectProto.address());
-        peers.emplace(
-            piecewise_construct, forward_as_tuple(connectProto.worker_id()),
-            forward_as_tuple(Address{destination.first, destination.second}));
-        break;
-    }
-
-    case Message::OpCode::ConnectionRequest: {
-        protobuf::ConnectRequest connectRequestProto;
-        protoutil::from_string(message.payload(), connectRequestProto);
-
-        const auto otherWorkerId = connectRequestProto.worker_id();
-
-        if (peers.count(otherWorkerId) == 0) {
-            /* we still haven't heard about this worker id from the master,
-            we should wait. */
-            return false;
-        }
-
-        auto& peer = peers.at(otherWorkerId);
-
-        if (peer.state == Peer::State::Connected) {
-            break;
-        }
-
-        peer.seed = connectRequestProto.my_seed();
-
-        if (connectRequestProto.your_seed() == mySeed) {
-            peer.state = Peer::State::Connected;
-            cerr << "connected to worker " << otherWorkerId << endl;
-        }
-
-        break;
-    }
-
-    case Message::OpCode::SendRays: {
-        istringstream iss{message.payload()};
-        protobuf::RecordReader reader{move(iss)};
-        protobuf::RayState protoState;
-
-        while (!reader.eof()) {
-            if (reader.read(&protoState)) {
-                rayQueue.push_back(move(from_protobuf(protoState)));
-            }
-        }
-
-        break;
-    }
-
-    case Message::OpCode::Bye:
-        throw ProgramFinished();
-        break;
-
-    default:
-        throw runtime_error("unhandled message opcode");
-    }
-
-    cerr << "done.\n";
-    return true;
 }
 
 void LambdaWorker::loadCamera() {
