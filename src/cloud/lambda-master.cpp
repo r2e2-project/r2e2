@@ -1,3 +1,5 @@
+#include "lambda-master.h"
+
 #include <glog/logging.h>
 #include <deque>
 #include <iostream>
@@ -19,48 +21,10 @@
 #include "util/path.h"
 
 using namespace std;
-using namespace pbrt;
 using namespace meow;
+using namespace pbrt;
 
 void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA PORT" << endl; }
-
-struct Lambda {
-    enum class State { Idle, Busy };
-    size_t id;
-    State state{State::Idle};
-    shared_ptr<TCPConnection> connection;
-    Optional<Address> udpAddress{};
-    Point2i tile;
-
-    Lambda(const size_t id, shared_ptr<TCPConnection> &&connection)
-        : id(id), connection(move(connection)) {}
-};
-
-class LambdaMaster {
-  public:
-    LambdaMaster(const string &scenePath, const uint16_t listenPort);
-
-    void run();
-
-  private:
-    void loadCamera();
-
-    static constexpr int TILE_SIZE = 16;
-
-    string scenePath;
-    ExecutionLoop loop{};
-    uint64_t currentLambdaID = 0;
-    map<uint64_t, Lambda> lambdas{};
-    set<uint64_t> freeLambdas{};
-    shared_ptr<UDPConnection> udpConnection{};
-    string getSceneMessageStr;
-
-    /* Scene Data */
-    vector<unique_ptr<Transform>> transformCache{};
-    shared_ptr<Camera> camera{};
-
-    Bounds2i sampleBounds;
-};
 
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
     : scenePath(scenePath) {
