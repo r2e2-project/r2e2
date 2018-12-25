@@ -38,7 +38,7 @@ class LambdaMaster {
             : id(id), connection(std::move(connection)) {}
     };
 
-    bool process_message(const uint64_t lambdaId, const meow::Message &message);
+    bool processMessage(const uint64_t lambdaId, const meow::Message &message);
     void loadCamera();
 
     std::string scenePath;

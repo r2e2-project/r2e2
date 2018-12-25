@@ -7,6 +7,7 @@
 #include <queue>
 
 #include "util/chunk.h"
+#include "util/util.h"
 
 namespace meow {
 
@@ -28,6 +29,12 @@ namespace meow {
 
       COUNT
     };
+
+    static constexpr char const* OPCODE_NAMES[to_underlying(OpCode::COUNT)] = {
+        "",          "Hey",       "Ping",
+        "Pong",      "Get",       "GenerateRays",
+        "GetWorker", "ConnectTo", "ConnectionRequest",
+        "SendRays",  "Bye"};
 
   private:
     uint32_t payload_length_ { 0 };

@@ -11,6 +11,8 @@
 using namespace std;
 using namespace meow;
 
+constexpr char const* Message::OPCODE_NAMES[to_underlying(Message::OpCode::COUNT)];
+
 string put_field( const uint32_t n )
 {
   const uint32_t network_order = htobe32( n );

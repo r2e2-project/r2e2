@@ -107,8 +107,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
     });
 }
 
-bool LambdaMaster::process_message(const uint64_t lambdaId,
-                                   const meow::Message &message) {
+bool LambdaMaster::processMessage(const uint64_t lambdaId,
+                                  const meow::Message &message) {
     auto &lambda = lambdas.at(lambdaId);
 
     switch (message.opcode()) {
@@ -184,7 +184,7 @@ void LambdaMaster::run() {
             auto front = move(incomingMessages.front());
             incomingMessages.pop_front();
 
-            if (!process_message(front.first, front.second)) {
+            if (!processMessage(front.first, front.second)) {
                 unprocessedMessages.push_back(move(front));
             }
         }

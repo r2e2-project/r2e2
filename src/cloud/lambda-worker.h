@@ -39,7 +39,7 @@ class LambdaWorker {
         Peer(Address&& addr) : address(std::move(addr)) {}
     };
 
-    bool process_message(const meow::Message& message);
+    bool processMessage(const meow::Message& message);
     void initializeScene();
 
     void loadCamera();
@@ -59,6 +59,7 @@ class LambdaWorker {
     Optional<size_t> workerId;
     std::map<size_t, Peer> peers;
     int32_t mySeed;
+    bool peerRequested{false};
 
     /* Scene Data */
     bool initialized{false};
