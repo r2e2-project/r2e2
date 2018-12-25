@@ -78,6 +78,7 @@ class LambdaWorker {
     bool initialized{false};
     vector<unique_ptr<Transform>> transformCache{};
     shared_ptr<Camera> camera{};
+    unique_ptr<FilmTile> filmTile{};
     shared_ptr<Sampler> sampler{};
     unique_ptr<Scene> fakeScene{};
     vector<shared_ptr<Light>> lights{};
@@ -195,21 +196,15 @@ void LambdaWorker::run() {
             }
         }
 
-        swap(rayQueue, processedRays);
+        if (finishedRays.size() > 0) {
+            while(!finishedRays.empty()) {
+                RayState rayState = move(finishedRays.front());
+                finishedRays.pop_front();
 
-        if (rayQueue.size() == 0 and finishedRays.size() > 0) {
-            const Bounds2i sampleBounds = camera->film->GetSampleBounds();
-            unique_ptr<FilmTile> filmTile =
-                camera->film->GetFilmTile(sampleBounds);
-
-            for (auto& rayState : finishedRays) {
                 filmTile->AddSample(rayState.sample.pFilm,
                                     rayState.Ld * rayState.beta,
                                     rayState.sample.weight);
             }
-
-            camera->film->MergeFilmTile(move(filmTile));
-            camera->film->WriteImage();
 
             return;
         }
@@ -357,6 +352,7 @@ void LambdaWorker::loadCamera() {
     protobuf::Camera proto_camera;
     reader->read(&proto_camera);
     camera = camera::from_protobuf(proto_camera, transformCache);
+    filmTile = camera->film->GetFilmTile(camera->film->GetSampleBounds());
 }
 
 void LambdaWorker::loadSampler() {
