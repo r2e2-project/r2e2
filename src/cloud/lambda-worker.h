@@ -72,12 +72,13 @@ class LambdaWorker {
     MemoryArena arena;
 
     /* Rays */
-    std::deque<RayState> rayQueue{};
-    std::deque<RayState> processedRays{};
-    std::deque<RayState> finishedRays{};
+    std::deque<RayState> rayQueue{};      /* rays that should be traced */
+    std::deque<RayState> processedRays{}; /* rays that have been traced and require
+                                             another treelet */
+    std::deque<RayState> finishedRays{};  /* rays have have been completed/shadded */
 
     /* Out-queues */
-    std::deque<RayState> outQueue{};
+    std::deque<RayState> outQueue{}; /* rays to push to another peer */
 };
 
 }  // namespace pbrt

@@ -210,6 +210,8 @@ void LambdaWorker::run() {
             break;
         }
 
+        /* process received messages (messages that can't be processed yet
+         * are ignored for this iteration) */
         deque<Message> unprocessedMessages;
         while (!messageParser.empty()) {
             Message message = move(messageParser.front());
@@ -225,6 +227,7 @@ void LambdaWorker::run() {
             unprocessedMessages.pop_front();
         }
 
+        /* ensure peer connections are healthy */
         for (auto& kv : peers) {
             auto& peerId = kv.first;
             auto& peer = kv.second;
@@ -253,6 +256,7 @@ void LambdaWorker::run() {
             RayState ray = move(rayQueue.front());
             rayQueue.pop_front();
 
+            /* the ray is still tracing through the bvh, so continue tracing it */
             if (!ray.toVisit.empty()) {
                 auto newRay = CloudIntegrator::Trace(move(ray), treelet);
                 if (!newRay.isShadowRay || !newRay.hit.initialized()) {
@@ -260,8 +264,10 @@ void LambdaWorker::run() {
                 }
             } else if (ray.isShadowRay) {
                 if (!ray.hit.initialized()) {
+                  /* the shadow ray didn't hit anything, so count this ray's contribution*/
                     finishedRays.push_back(move(ray));
                 }
+            /* the ray hit something, so shade it */
             } else if (ray.hit.initialized()) {
                 auto newRays = CloudIntegrator::Shade(move(ray), treelet,
                                                       lights, sampler, arena);
@@ -271,6 +277,8 @@ void LambdaWorker::run() {
             }
         }
 
+        /* check if a ray should be pushed to another worker or traced locally
+         */
         while (!processedRays.empty()) {
             RayState ray = move(processedRays.front());
             processedRays.pop_front();
@@ -282,6 +290,7 @@ void LambdaWorker::run() {
             }
         }
 
+        /* send rays to peers */
         if (!outQueue.empty()) {
             if (peers.size() == 0) {
                 Message message{OpCode::GetWorker, ""};
@@ -308,6 +317,7 @@ void LambdaWorker::run() {
             }
         }
 
+        /* aggregate film updates from finished rays into the local filmTile */
         while (!finishedRays.empty()) {
             RayState ray = move(finishedRays.front());
             finishedRays.pop_front();
