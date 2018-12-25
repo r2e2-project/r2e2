@@ -48,10 +48,8 @@ struct RayState {
     uint8_t remainingBounces{3};
     bool isShadowRay{false};
 
-    void StartTrace() {
-        hit.clear();
-        toVisit.push_back({});
-    }
+    void StartTrace();
+    uint32_t currentTreelet() const;
 };
 
 }  // namespace pbrt

@@ -89,6 +89,9 @@ class LambdaWorker {
     deque<RayState> rayQueue{};
     deque<RayState> processedRays{};
     deque<RayState> finishedRays{};
+
+    /* Out-queues */
+    deque<RayState> outQueue{};
 };
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
@@ -137,12 +140,18 @@ void LambdaWorker::run() {
             break;
         }
 
+        deque<Message> unprocessedMessages;
         while (!messageParser.empty()) {
             Message message = move(messageParser.front());
             messageParser.pop();
             if (!process_message(message)) {
-                messageParser.push(move(message));
+                unprocessedMessages.push_back(move(message));
             }
+        }
+
+        while (!unprocessedMessages.empty()) {
+            messageParser.push(move(unprocessedMessages.front()));
+            unprocessedMessages.pop_front();
         }
 
         for (auto& kv : peers) {
@@ -173,7 +182,6 @@ void LambdaWorker::run() {
         }
 
         /* let's trace rays that we have to trace */
-        cerr << rayQueue.size() << endl;
         while (!rayQueue.empty()) {
             RayState rayState = move(rayQueue.front());
             rayQueue.pop_front();
@@ -196,8 +204,43 @@ void LambdaWorker::run() {
             }
         }
 
-        if (finishedRays.size() > 0) {
-            while(!finishedRays.empty()) {
+        while (!processedRays.empty()) {
+            RayState rayState = move(processedRays.front());
+            processedRays.pop_front();
+
+            if (rayState.currentTreelet() % 2 == *workerId % 2) {
+                rayQueue.push_back(move(rayState));
+            } else {
+                outQueue.push_back(move(rayState));
+            }
+        }
+
+        if (!outQueue.empty()) {
+            if (peers.size() == 0) {
+                Message getWorkerMessage{Message::OpCode::GetWorker, ""};
+                coordinatorConnection->enqueue_write(getWorkerMessage.str());
+            } else {
+                auto& peer = peers.begin()->second;
+                if (peer.state == Peer::State::Connected) {
+                    while (!outQueue.empty()) {
+                        ostringstream oss;
+                        protobuf::RecordWriter writer{&oss};
+
+                        while (oss.tellp() < 1'000) {
+                            auto rayState = move(outQueue.front());
+                            outQueue.pop_front();
+                            writer.write(to_protobuf(rayState));
+                        }
+
+                        Message sendRaysMessage{Message::OpCode::SendRays,
+                                                oss.str()};
+                        udpConnection->enqueue_datagram(peer.address,
+                                                        sendRaysMessage.str());
+                    }
+                }
+            }
+
+            while (!finishedRays.empty()) {
                 RayState rayState = move(finishedRays.front());
                 finishedRays.pop_front();
 
@@ -205,8 +248,6 @@ void LambdaWorker::run() {
                                     rayState.Ld * rayState.beta,
                                     rayState.sample.weight);
             }
-
-            return;
         }
     }
 }

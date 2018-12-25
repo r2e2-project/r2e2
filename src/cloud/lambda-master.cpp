@@ -109,6 +109,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
                 shared_ptr<TCPConnection> connection, string &&data) {
                 messageParser->parse(data);
 
+                deque<Message> unprocessedMessages;
+
                 while (!messageParser->empty()) {
                     Message message = move(messageParser->front());
                     messageParser->pop();
@@ -143,7 +145,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
                         auto &this_lambda = lambdas.at(ID);
 
                         if (!this_lambda.udpAddress.initialized()) {
-                            throw runtime_error("UDP address is not available");
+                            unprocessedMessages.push_back(move(message));
+                            break;
                         }
 
                         bool found = false;
@@ -151,24 +154,25 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
                             if (kv.first != ID &&
                                 kv.second.udpAddress.initialized()) {
                                 /* sending Worker B info to A */
-                                protobuf::ConnectTo connectProto;
-                                connectProto.set_worker_id(kv.first);
-                                connectProto.set_address(
+                                protobuf::ConnectTo connectProtoA;
+                                connectProtoA.set_worker_id(kv.first);
+                                connectProtoA.set_address(
                                     kv.second.udpAddress->str());
                                 const Message connectMessageA{
                                     Message::OpCode::ConnectTo,
-                                    protoutil::to_string(connectProto)};
+                                    protoutil::to_string(connectProtoA)};
 
                                 connection->enqueue_write(
                                     connectMessageA.str());
 
                                 /* sending Worker A info to B */
-                                connectProto.set_worker_id(ID);
-                                connectProto.set_address(
+                                protobuf::ConnectTo connectProtoB;
+                                connectProtoB.set_worker_id(ID);
+                                connectProtoB.set_address(
                                     this_lambda.udpAddress->str());
                                 const Message connectMessageB{
                                     Message::OpCode::ConnectTo,
-                                    protoutil::to_string(connectProto)};
+                                    protoutil::to_string(connectProtoB)};
 
                                 kv.second.connection->enqueue_write(
                                     connectMessageB.str());
@@ -179,7 +183,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
                         }
 
                         if (!found) {
-                            throw runtime_error("no workers are available");
+                            unprocessedMessages.push_back(move(message));
+                            break;
                         }
 
                         break;
@@ -188,6 +193,11 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
                     default:
                         throw runtime_error("unhandled message opcode");
                     }
+                }
+
+                while (!unprocessedMessages.empty()) {
+                    messageParser->push(move(unprocessedMessages.front()));
+                    unprocessedMessages.pop_front();
                 }
 
                 return true;
