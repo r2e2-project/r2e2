@@ -104,6 +104,8 @@ public:
                           const std::function<bool(ExecutionLoop &,
                                                    TCPSocket &&)> & connection_callback );
 
+  Poller & poller() { return poller_; }
+
   Poller::Result loop_once( const int timeout_ms = -1 );
 };
 
