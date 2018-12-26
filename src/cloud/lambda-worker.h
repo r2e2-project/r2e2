@@ -47,6 +47,12 @@ class LambdaWorker {
     void loadLights();
     void loadFakeScene();
 
+    Poller::Action::Result::Type handleRayQueue();
+    Poller::Action::Result::Type handleOutQueue();
+    Poller::Action::Result::Type handleFinishedQueue();
+    Poller::Action::Result::Type handlePeers();
+    Poller::Action::Result::Type handleMessages();
+
     void generateRays(const Bounds2i& cropWindow);
 
     Address coordinatorAddr;
@@ -73,13 +79,12 @@ class LambdaWorker {
     MemoryArena arena;
 
     /* Rays */
-    std::deque<RayState> rayQueue{};      /* rays that should be traced */
-    std::deque<RayState> processedRays{}; /* rays that have been traced and require
-                                             another treelet */
-    std::deque<RayState> finishedRays{};  /* rays have have been completed/shadded */
+    std::deque<RayState> rayQueue{};
+    std::deque<RayState> finishedQueue{};
+    std::deque<RayState> outQueue{};
 
-    /* Out-queues */
-    std::deque<RayState> outQueue{}; /* rays to push to another peer */
+    /* Always-on FD */
+    FileDescriptor dummyFD{STDOUT_FILENO};
 };
 
 }  // namespace pbrt

@@ -30,6 +30,7 @@
 using namespace std;
 using namespace meow;
 using namespace pbrt;
+using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
@@ -73,8 +74,165 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         },
         []() { cerr << "Error." << endl; }, []() { throw ProgramFinished(); });
 
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, bind(&LambdaWorker::handleRayQueue, this),
+        [this]() { return !rayQueue.empty(); },
+        []() { throw runtime_error("ray queue failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, bind(&LambdaWorker::handleOutQueue, this),
+        [this]() { return !outQueue.empty(); },
+        []() { throw runtime_error("out queue failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
+        [this]() { return !finishedQueue.empty(); },
+        []() { throw runtime_error("finished queue failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, bind(&LambdaWorker::handlePeers, this),
+        [this]() { return !peers.empty(); },
+        []() { throw runtime_error("peers failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, bind(&LambdaWorker::handleMessages, this),
+        [this]() { return !messageParser.empty(); },
+        []() { throw runtime_error("messages failed"); }));
+
     Message message{OpCode::Hey, ""};
     coordinatorConnection->enqueue_write(message.str());
+}
+
+Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
+    deque<RayState> processedRays;
+
+    constexpr size_t MAX_RAYS = 10'000;
+    size_t i = 0;
+
+    for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
+        RayState ray = move(rayQueue.front());
+        rayQueue.pop_front();
+
+        if (!ray.toVisit.empty()) {
+            auto newRay = CloudIntegrator::Trace(move(ray), treelet);
+            if (!newRay.isShadowRay || !newRay.hit.initialized()) {
+                processedRays.push_back(move(newRay));
+            }
+        } else if (ray.isShadowRay) {
+            if (!ray.hit.initialized()) {
+                finishedQueue.push_back(move(ray));
+            }
+        } else if (ray.hit.initialized()) {
+            auto newRays = CloudIntegrator::Shade(move(ray), treelet, lights,
+                                                  sampler, arena);
+            for (auto& newRay : newRays) {
+                processedRays.push_back(move(newRay));
+            }
+        }
+    }
+
+    while (!processedRays.empty()) {
+        RayState ray = move(processedRays.front());
+        processedRays.pop_front();
+
+        if (ray.currentTreelet() % 2 == *workerId % 2) {
+            rayQueue.push_back(move(ray));
+        } else {
+            outQueue.push_back(move(ray));
+        }
+    }
+
+    return ResultType::Continue;
+}
+
+Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
+    if (!outQueue.empty()) {
+        if (peers.size() == 0 && !peerRequested) {
+            Message message{OpCode::GetWorker, ""};
+            coordinatorConnection->enqueue_write(message.str());
+            peerRequested = true;
+        } else if (peers.size()) {
+            auto& peer = peers.begin()->second;
+
+            if (peer.state == Peer::State::Connected) {
+                while (!outQueue.empty()) {
+                    ostringstream oss;
+                    protobuf::RecordWriter writer{&oss};
+
+                    while (oss.tellp() < 1'000 && !outQueue.empty()) {
+                        RayState ray = move(outQueue.front());
+                        outQueue.pop_front();
+                        writer.write(to_protobuf(ray));
+                    }
+
+                    Message message{OpCode::SendRays, oss.str()};
+                    udpConnection->enqueue_datagram(peer.address,
+                                                    message.str());
+                }
+            }
+        }
+    }
+
+    return ResultType::Continue;
+}
+
+Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
+    while (!finishedQueue.empty()) {
+        RayState ray = move(finishedQueue.front());
+        finishedQueue.pop_front();
+
+        Spectrum L{ray.Ld * ray.beta};
+        if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
+            L = Spectrum(0.f);
+        }
+
+        filmTile->AddSample(ray.sample.pFilm, L, ray.sample.weight);
+    }
+
+    return ResultType::Continue;
+}
+
+Poller::Action::Result::Type LambdaWorker::handlePeers() {
+    for (auto& kv : peers) {
+        auto& peerId = kv.first;
+        auto& peer = kv.second;
+
+        switch (peer.state) {
+        case Peer::State::Connecting: {
+            protobuf::ConnectRequest proto;
+            proto.set_worker_id(*workerId);
+            proto.set_my_seed(mySeed);
+            proto.set_your_seed(peer.seed);
+            Message message{OpCode::ConnectionRequest,
+                            protoutil::to_string(proto)};
+
+            udpConnection->enqueue_datagram(peer.address, message.str());
+            break;
+        }
+
+        case Peer::State::Connected:
+            /* send keep alive */
+            break;
+        }
+    }
+
+    return ResultType::Continue;
+}
+
+Poller::Action::Result::Type LambdaWorker::handleMessages() {
+    MessageParser unprocessedMessages;
+    while (!messageParser.empty()) {
+        Message message = move(messageParser.front());
+        messageParser.pop();
+
+        if (!processMessage(message)) {
+            unprocessedMessages.push(move(message));
+        }
+    }
+
+    swap(messageParser, unprocessedMessages);
+
+    return ResultType::Continue;
 }
 
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
@@ -204,136 +362,9 @@ bool LambdaWorker::processMessage(const Message& message) {
 }
 
 void LambdaWorker::run() {
-    constexpr int TIMEOUT = 500; /* ms */
     while (true) {
-        auto res = loop.loop_once(TIMEOUT).result;
-        if (res != PollerResult::Success && res != PollerResult::Timeout) {
-            break;
-        }
-
-        /* process received messages (messages that can't be processed yet
-         * are ignored for this iteration) */
-        deque<Message> unprocessedMessages;
-        while (!messageParser.empty()) {
-            Message message = move(messageParser.front());
-            messageParser.pop();
-
-            if (!processMessage(message)) {
-                unprocessedMessages.push_back(move(message));
-            }
-        }
-
-        while (!unprocessedMessages.empty()) {
-            messageParser.push(move(unprocessedMessages.front()));
-            unprocessedMessages.pop_front();
-        }
-
-        /* ensure peer connections are healthy */
-        for (auto& kv : peers) {
-            auto& peerId = kv.first;
-            auto& peer = kv.second;
-
-            switch (peer.state) {
-            case Peer::State::Connecting: {
-                protobuf::ConnectRequest proto;
-                proto.set_worker_id(*workerId);
-                proto.set_my_seed(mySeed);
-                proto.set_your_seed(peer.seed);
-                Message message{OpCode::ConnectionRequest,
-                                protoutil::to_string(proto)};
-
-                udpConnection->enqueue_datagram(peer.address, message.str());
-                break;
-            }
-
-            case Peer::State::Connected:
-                /* send keep alive */
-                break;
-            }
-        }
-
-        /* let's trace rays that we have to trace */
-        cerr << ">>> tracing " << rayQueue.size() << " ray"
-             << ((rayQueue.size() == 1) ? "" : "s") << endl;
-
-        while (!rayQueue.empty()) {
-            RayState ray = move(rayQueue.front());
-            rayQueue.pop_front();
-
-            /* the ray is still tracing through the bvh, so continue tracing it */
-            if (!ray.toVisit.empty()) {
-                auto newRay = CloudIntegrator::Trace(move(ray), treelet);
-                if (!newRay.isShadowRay || !newRay.hit.initialized()) {
-                    processedRays.push_back(move(newRay));
-                }
-            } else if (ray.isShadowRay) {
-                if (!ray.hit.initialized()) {
-                  /* the shadow ray didn't hit anything, so count this ray's contribution*/
-                    finishedRays.push_back(move(ray));
-                }
-            /* the ray hit something, so shade it */
-            } else if (ray.hit.initialized()) {
-                auto newRays = CloudIntegrator::Shade(move(ray), treelet,
-                                                      lights, sampler, arena);
-                for (auto& newRay : newRays) {
-                    processedRays.push_back(move(newRay));
-                }
-            }
-        }
-
-        /* check if a ray should be pushed to another worker or traced locally
-         */
-        while (!processedRays.empty()) {
-            RayState ray = move(processedRays.front());
-            processedRays.pop_front();
-
-            if (ray.currentTreelet() % 2 == *workerId % 2) {
-                rayQueue.push_back(move(ray));
-            } else {
-                outQueue.push_back(move(ray));
-            }
-        }
-
-        /* send rays to peers */
-        if (!outQueue.empty()) {
-            if (peers.size() == 0 && !peerRequested) {
-                Message message{OpCode::GetWorker, ""};
-                coordinatorConnection->enqueue_write(message.str());
-                peerRequested = true;
-            } else if (peers.size()) {
-                auto& peer = peers.begin()->second;
-
-                if (peer.state == Peer::State::Connected) {
-                    while (!outQueue.empty()) {
-                        ostringstream oss;
-                        protobuf::RecordWriter writer{&oss};
-
-                        while (oss.tellp() < 1'000 && !outQueue.empty()) {
-                            RayState ray = move(outQueue.front());
-                            outQueue.pop_front();
-                            writer.write(to_protobuf(ray));
-                        }
-
-                        Message message{OpCode::SendRays, oss.str()};
-                        udpConnection->enqueue_datagram(peer.address,
-                                                        message.str());
-                    }
-                }
-            }
-        }
-
-        /* aggregate film updates from finished rays into the local filmTile */
-        while (!finishedRays.empty()) {
-            RayState ray = move(finishedRays.front());
-            finishedRays.pop_front();
-
-            Spectrum L{ray.Ld * ray.beta};
-            if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
-                L = Spectrum(0.f);
-            }
-
-            filmTile->AddSample(ray.sample.pFilm, L, ray.sample.weight);
-        }
+        auto res = loop.loop_once().result;
+        if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 }
 
