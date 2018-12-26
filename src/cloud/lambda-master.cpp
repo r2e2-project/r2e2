@@ -33,6 +33,21 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
     global::manager.init(scenePath);
     loadCamera();
 
+    /* get the list of all objects and create entries for tracking their
+     * assignment to workers for each */
+    for (auto &kv : global::manager.listObjects()) {
+        const SceneManager::Type &type = kv.first;
+        const std::vector<SceneManager::Object> &objects = kv.second;
+        for (const SceneManager::Object &obj : objects) {
+            ObjectTypeID id{type, obj.id};
+            SceneObjectInfo info{};
+            info.id = obj.id;
+            info.size = obj.size;
+            sceneObjects.insert({id, info});
+            unassignedObjects.push(id);
+        }
+    }
+
     ostringstream allSceneObjects;
     for (string &filename : roost::get_directory_listing(scenePath)) {
         allSceneObjects << filename << endl;
@@ -89,6 +104,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
                 .emplace(piecewise_construct, forward_as_tuple(currentWorkerID),
                          forward_as_tuple(currentWorkerID, move(connection)))
                 .first;
+        auto &this_worker = workerIt->second;
 
         /* assign a tile to the worker, if we need to */
         if (currentWorkerID < nTiles.x * nTiles.y) {
@@ -101,6 +117,20 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
             const int y1 = min(y0 + TILE_SIZE, this->sampleBounds.pMax.y);
             workerIt->second.tile.reset(Point2i{x0, y0}, Point2i{x1, y1});
         }
+
+        /* assign treelet to worker */
+        std::vector<ObjectTypeID> getObjectIds =
+            this->assignTreelets(this_worker);
+        protobuf::GetObjects getObjectsProto;
+        for (ObjectTypeID &id : getObjectIds) {
+            protobuf::ObjectTypeID *object_id =
+                getObjectsProto.add_object_ids();
+            object_id->set_type(to_underlying(id.type));
+            object_id->set_id(id.id);
+        }
+        Message getObjectsMessage{Message::OpCode::Get,
+                                  protoutil::to_string(getObjectsProto)};
+        connection->enqueue_write(getObjectsMessage.str());
 
         currentWorkerID++;
         return true;
@@ -204,6 +234,69 @@ void LambdaMaster::loadCamera() {
     reader->read(&proto_camera);
     camera = camera::from_protobuf(proto_camera, transformCache);
 }
+
+std::vector<LambdaMaster::ObjectTypeID> LambdaMaster::assignTreelets(
+    Worker &worker) {
+    /* Scene assignment strategy
+
+       When a worker connects to the master:
+       1. The master consults the list of residentSceneObjects to determine if
+          there are objects which have not been assigned to a worker yet. If so,
+          it assigns as many of those objects as it can to the worker.
+       2. If all treelets have been allocated at least once, then find the
+       treelet with the largest load
+     */
+
+    /* NOTE(apoms): for now, we only assign one treelet to each worker, but
+     * should be able to support assigning multiple based on freeSpace in the
+     * future */
+    vector<ObjectTypeID> objectsToAssign;
+    size_t &freeSpace = worker.freeSpace;
+    /* if some objects are unassigned, assign them */
+    while (!unassignedObjects.empty()) {
+        ObjectTypeID id = unassignedObjects.top();
+        SceneObjectInfo& info = sceneObjects.at(id);
+        if (info.size < freeSpace) {
+            freeSpace -= info.size;
+            objectsToAssign.push_back(id);
+            unassignedObjects.pop();
+            break;
+        }
+    }
+    /* otherwise, find the object with the largest discrepancy between rays
+     * requested and rays processed */
+    if (objectsToAssign.empty()) {
+        ObjectTypeID highestID;
+        float highestLoad = numeric_limits<float>::min();
+        for (auto &kv : sceneObjects) {
+            const ObjectTypeID &id = kv.first;
+            const SceneObjectInfo &info = kv.second;
+
+            float EPS = 1e-10;
+            float load =
+                info.rayRequestsPerSecond / (info.raysProcessedPerSecond + EPS);
+            if (load > highestLoad && info.size < freeSpace) {
+                highestID = id;
+                highestLoad = load;
+            }
+        }
+        SceneObjectInfo &info = sceneObjects.at(highestID);
+        freeSpace -= info.size;
+        objectsToAssign.push_back(highestID);
+    }
+
+    /* update scene objects assignment to track that this worker now has the
+     * assigned objects */
+    for (ObjectTypeID &id : objectsToAssign) {
+        SceneObjectInfo &info = sceneObjects.at(id);
+        info.workers.insert(worker.id);
+        worker.objects.insert(id);
+    }
+
+    return objectsToAssign;
+}
+
+void LambdaMaster::updateObjectUsage(const Worker &worker) {}
 
 int main(int argc, char const *argv[]) {
     try {

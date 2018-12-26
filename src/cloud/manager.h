@@ -26,8 +26,10 @@ class SceneManager {
         COUNT
     };
 
+    using ObjectID = size_t;
+
     struct Object {
-        size_t id;
+        ObjectID id;
         off_t size;
 
         Object(const size_t id, const off_t size) : id(id), size(size) {}

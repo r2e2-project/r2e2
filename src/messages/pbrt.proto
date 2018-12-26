@@ -216,6 +216,15 @@ message Scene {
 
 // LambdaCommands
 
+message ObjectTypeID {
+    uint32 type = 1;
+    uint64 id = 2;
+};
+
+message GetObjects {
+    repeated ObjectTypeID object_ids = 1;
+}
+
 message GenerateRays {
     Bounds2i crop_window = 1;
 }

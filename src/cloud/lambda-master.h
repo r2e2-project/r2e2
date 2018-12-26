@@ -6,11 +6,13 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <stack>
 
 #include "cloud/lambda.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/transform.h"
+#include "cloud/manager.h"
 #include "execution/connection.h"
 #include "execution/loop.h"
 #include "execution/meow/message.h"
@@ -27,6 +29,29 @@ class LambdaMaster {
     static constexpr int TILE_SIZE = 16;
 
   private:
+    struct SceneObjectInfo {
+        SceneManager::ObjectID id;
+        size_t size;
+        std::set<uint64_t>
+            workers; /* the set of workers which have this scene object */
+        float rayRequestsPerSecond{
+            1}; /* the production rate for rays that need this scene object */
+        float raysProcessedPerSecond{
+            1}; /* the processing rate of rays for this scene object */
+    };
+
+    struct ObjectTypeID {
+        SceneManager::Type type;
+        SceneManager::ObjectID id;
+
+        bool operator<(const ObjectTypeID &other) const {
+            if (type == other.type) {
+                return id < other.id;
+            }
+            return type < other.type;
+        }
+    };
+
     struct Worker {
         enum class State { Idle, Busy };
         WorkerId id;
@@ -34,6 +59,8 @@ class LambdaMaster {
         std::shared_ptr<TCPConnection> connection;
         Optional<Address> udpAddress{};
         Optional<Bounds2i> tile;
+        std::set<ObjectTypeID> objects;
+        size_t freeSpace{2 * 1000 * 1000 * 1000}; /* in bytes (assuming 2 GBs free to start) */
 
         Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}
@@ -41,6 +68,10 @@ class LambdaMaster {
 
     bool processMessage(const WorkerId workerId, const meow::Message &message);
     void loadCamera();
+
+    std::vector<ObjectTypeID> assignTreelets(Worker &worker);
+
+    void updateObjectUsage(const Worker &worker);
 
     std::string scenePath;
     ExecutionLoop loop{};
@@ -57,7 +88,17 @@ class LambdaMaster {
     std::vector<std::unique_ptr<Transform>> transformCache{};
     std::shared_ptr<Camera> camera{};
 
+    /* Scene Objects */
+    std::map<ObjectTypeID, SceneObjectInfo> sceneObjects;
+    std::stack<ObjectTypeID> unassignedObjects;
+
     Bounds2i sampleBounds;
+};
+
+class Schedule {
+  public:
+
+  private:
 };
 
 }  // namespace pbrt
