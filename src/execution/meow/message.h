@@ -67,6 +67,7 @@ namespace meow {
     Message & front() { return completed_messages_.front(); }
     void pop() { completed_messages_.pop(); }
     void push( Message && msg ) { completed_messages_.push( std::move( msg ) ); }
+    size_t size() const { return completed_messages_.size(); }
   };
 
 }

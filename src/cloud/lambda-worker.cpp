@@ -81,7 +81,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleOutQueue, this),
-        [this]() { return !outQueue.empty(); },
+        [this]() { return !outQueue.empty() && !peers.empty(); },
         []() { throw runtime_error("out queue failed"); }));
 
     loop.poller().add_action(Poller::Action(
@@ -108,6 +108,9 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 
     constexpr size_t MAX_RAYS = 10'000;
     size_t i = 0;
+
+    cerr << "[rayqueue] " << rayQueue.size() << " ray"
+         << (rayQueue.size() == 1 ? "" : "s") << endl;
 
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayState ray = move(rayQueue.front());
@@ -146,29 +149,29 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
-    if (!outQueue.empty()) {
-        if (peers.size() == 0 && !peerRequested) {
-            Message message{OpCode::GetWorker, ""};
-            coordinatorConnection->enqueue_write(message.str());
-            peerRequested = true;
-        } else if (peers.size()) {
-            auto& peer = peers.begin()->second;
+    cerr << "[outqueue] " << outQueue.size() << " ray"
+         << (outQueue.size() == 1 ? "" : "s") << endl;
 
-            if (peer.state == Peer::State::Connected) {
-                while (!outQueue.empty()) {
-                    ostringstream oss;
-                    protobuf::RecordWriter writer{&oss};
+    if (peers.size() == 0 && !peerRequested) {
+        Message message{OpCode::GetWorker, ""};
+        coordinatorConnection->enqueue_write(message.str());
+        peerRequested = true;
+    } else if (peers.size()) {
+        auto& peer = peers.begin()->second;
 
-                    while (oss.tellp() < 1'000 && !outQueue.empty()) {
-                        RayState ray = move(outQueue.front());
-                        outQueue.pop_front();
-                        writer.write(to_protobuf(ray));
-                    }
+        if (peer.state == Peer::State::Connected) {
+            while (!outQueue.empty()) {
+                ostringstream oss;
+                protobuf::RecordWriter writer{&oss};
 
-                    Message message{OpCode::SendRays, oss.str()};
-                    udpConnection->enqueue_datagram(peer.address,
-                                                    message.str());
+                while (oss.tellp() < 1'000 && !outQueue.empty()) {
+                    RayState ray = move(outQueue.front());
+                    outQueue.pop_front();
+                    writer.write(to_protobuf(ray));
                 }
+
+                Message message{OpCode::SendRays, oss.str()};
+                udpConnection->enqueue_datagram(peer.address, message.str());
             }
         }
     }
@@ -177,6 +180,9 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
+    cerr << "[finishedqueue] " << finishedQueue.size() << " ray"
+         << (finishedQueue.size() == 1 ? "" : "s") << endl;
+
     while (!finishedQueue.empty()) {
         RayState ray = move(finishedQueue.front());
         finishedQueue.pop_front();
@@ -193,6 +199,9 @@ Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handlePeers() {
+    cerr << "[peers] " << peers.size() << " peer"
+         << (peers.size() == 1 ? "" : "s") << endl;
+
     for (auto& kv : peers) {
         auto& peerId = kv.first;
         auto& peer = kv.second;
@@ -220,6 +229,9 @@ Poller::Action::Result::Type LambdaWorker::handlePeers() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleMessages() {
+    cerr << "[messages] " << messageParser.size() << " message"
+         << (messageParser.size() == 1 ? "" : "s") << endl;
+
     MessageParser unprocessedMessages;
     while (!messageParser.empty()) {
         Message message = move(messageParser.front());
@@ -266,7 +278,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 }
 
 bool LambdaWorker::processMessage(const Message& message) {
-    cerr << ">> [msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
+    cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
          << "]\n";
 
     switch (message.opcode()) {
@@ -331,7 +343,7 @@ bool LambdaWorker::processMessage(const Message& message) {
         peer.seed = proto.my_seed();
         if (proto.your_seed() == mySeed) {
             peer.state = Peer::State::Connected;
-            cerr << "connected to worker " << otherWorkerId << endl;
+            cerr << "* connected to worker-" << otherWorkerId << endl;
         }
 
         break;
