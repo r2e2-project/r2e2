@@ -15,4 +15,8 @@ constexpr auto to_underlying( E e ) noexcept
   return static_cast<std::underlying_type_t<E>>( e );
 }
 
+inline std::string pluralize( const std::string & word, const size_t count ) {
+    return word + (count == 1 ? "s" : "");
+}
+
 #endif /* PBRT_UTIL_UTIL_HH */

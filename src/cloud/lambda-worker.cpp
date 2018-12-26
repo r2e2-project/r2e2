@@ -109,8 +109,8 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
     constexpr size_t MAX_RAYS = 10'000;
     size_t i = 0;
 
-    cerr << "[rayqueue] " << rayQueue.size() << " ray"
-         << (rayQueue.size() == 1 ? "" : "s") << endl;
+    cerr << "[rayqueue] " << rayQueue.size() << " "
+         << pluralize("ray", rayQueue.size()) << endl;
 
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayState ray = move(rayQueue.front());
@@ -149,8 +149,8 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
-    cerr << "[outqueue] " << outQueue.size() << " ray"
-         << (outQueue.size() == 1 ? "" : "s") << endl;
+    cerr << "[outqueue] " << outQueue.size() << " "
+         << pluralize("ray", outQueue.size()) << endl;
 
     if (peers.size() == 0 && !peerRequested) {
         Message message{OpCode::GetWorker, ""};
@@ -180,8 +180,8 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
-    cerr << "[finishedqueue] " << finishedQueue.size() << " ray"
-         << (finishedQueue.size() == 1 ? "" : "s") << endl;
+    cerr << "[finishedqueue] " << finishedQueue.size() << " "
+         << pluralize("ray", finishedQueue.size()) << endl;
 
     while (!finishedQueue.empty()) {
         RayState ray = move(finishedQueue.front());
@@ -199,8 +199,8 @@ Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handlePeers() {
-    cerr << "[peers] " << peers.size() << " peer"
-         << (peers.size() == 1 ? "" : "s") << endl;
+    cerr << "[peers] " << peers.size() << " "
+         << pluralize("peer", peers.size()) << endl;
 
     for (auto& kv : peers) {
         auto& peerId = kv.first;
@@ -229,8 +229,8 @@ Poller::Action::Result::Type LambdaWorker::handlePeers() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleMessages() {
-    cerr << "[messages] " << messageParser.size() << " message"
-         << (messageParser.size() == 1 ? "" : "s") << endl;
+    cerr << "[messages] " << messageParser.size() << " "
+         << pluralize("message", messageParser.size()) << endl;
 
     MessageParser unprocessedMessages;
     while (!messageParser.empty()) {
