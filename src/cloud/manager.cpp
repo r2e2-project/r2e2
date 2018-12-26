@@ -81,7 +81,7 @@ SceneManager::listObjects() const {
 
     auto check_for = [this, &result](const Type type, const string& filename) {
         if (filename.compare(0, TYPE_PREFIXES[to_underlying(type)].length(),
-                             TYPE_PREFIXES[to_underlying(type)])) {
+                             TYPE_PREFIXES[to_underlying(type)]) == 0) {
             const size_t size = roost::file_size_at(*sceneFD, filename);
             result[type].emplace_back(
                 stoi(filename.substr(
@@ -94,10 +94,10 @@ SceneManager::listObjects() const {
     };
 
     for (const auto& filename : roost::get_directory_listing(scenePath)) {
-        check_for(Type::TriangleMesh, filename) &&
-            check_for(Type::Treelet, filename) &&
-            check_for(Type::Material, filename) &&
-            check_for(Type::FloatTexture, filename) &&
+        check_for(Type::TriangleMesh, filename) ||
+            check_for(Type::Treelet, filename) ||
+            check_for(Type::Material, filename) ||
+            check_for(Type::FloatTexture, filename) ||
             check_for(Type::SpectrumTexture, filename);
     }
 
