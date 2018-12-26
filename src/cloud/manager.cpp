@@ -93,7 +93,7 @@ SceneManager::listObjects() const {
         return false;
     };
 
-    for (const auto& filename : roost::list_directory(scenePath)) {
+    for (const auto& filename : roost::get_directory_listing(scenePath)) {
         check_for(Type::TriangleMesh, filename) &&
             check_for(Type::Treelet, filename) &&
             check_for(Type::Material, filename) &&
