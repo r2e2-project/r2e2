@@ -138,8 +138,8 @@ bool LambdaMaster::processMessage(const uint64_t sourceWorkerId,
 
         /* let's see if we have a worker that has that treelet */
         if (treeletToWorker.count(treeletId) == 0) {
-            throw runtime_error("No worker found for treelet " +
-                                to_string(treeletId));
+            cerr << "No worker found for treelet " << treeletId << endl;
+            return false;
         }
 
         Optional<WorkerId> selectedWorkerId;

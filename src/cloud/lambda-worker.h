@@ -38,6 +38,8 @@ class LambdaWorker {
         State state{State::Connecting};
         int32_t seed{0};
 
+        std::set<TreeletId> treelets{};
+
         Worker(const WorkerId id, Address&& addr)
             : id(id), address(std::move(addr)) {}
     };
@@ -55,6 +57,7 @@ class LambdaWorker {
     Poller::Action::Result::Type handleFinishedQueue();
     Poller::Action::Result::Type handlePeers();
     Poller::Action::Result::Type handleMessages();
+    Poller::Action::Result::Type handleNeededTreelets();
 
     void generateRays(const Bounds2i& cropWindow);
 
@@ -86,6 +89,7 @@ class LambdaWorker {
     std::deque<RayState> finishedQueue{};
     std::map<TreeletId, std::deque<RayState>> pendingQueue{};
     std::map<TreeletId, std::deque<RayState>> outQueue{};
+    size_t outQueueSize{0};
 
     std::map<TreeletId, WorkerId> treeletToWorker{};
     std::set<TreeletId> neededTreelets;

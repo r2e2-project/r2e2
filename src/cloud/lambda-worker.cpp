@@ -1,6 +1,7 @@
 #include "lambda-worker.h"
 
 #include <cstdlib>
+#include <iterator>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -66,14 +67,16 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             this->messageParser.parse(data);
             return true;
         },
-        []() { cerr << "Error." << endl; }, []() { throw ProgramFinished(); });
+        []() { cerr << "Connection to coordinator failed." << endl; },
+        []() { throw ProgramFinished(); });
 
     udpConnection = loop.make_udp_connection(
         [this](shared_ptr<UDPConnection>, Address&& addr, string&& data) {
             this->messageParser.parse(data);
             return true;
         },
-        []() { cerr << "Error." << endl; }, []() { throw ProgramFinished(); });
+        []() { cerr << "UDP connection to coordinator failed." << endl; },
+        []() { throw ProgramFinished(); });
 
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleRayQueue, this),
@@ -82,7 +85,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleOutQueue, this),
-        [this]() { return !outQueue.empty() && !peers.empty(); },
+        [this]() { return outQueueSize > 0; },
         []() { throw runtime_error("out queue failed"); }));
 
     loop.poller().add_action(Poller::Action(
@@ -99,6 +102,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         dummyFD, Direction::Out, bind(&LambdaWorker::handleMessages, this),
         [this]() { return !messageParser.empty(); },
         []() { throw runtime_error("messages failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out,
+        bind(&LambdaWorker::handleNeededTreelets, this),
+        [this]() { return !neededTreelets.empty(); },
+        []() { throw runtime_error("treelet request failed"); }));
 
     Message message{OpCode::Hey, ""};
     coordinatorConnection->enqueue_write(message.str());
@@ -119,12 +128,19 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 
         if (!ray.toVisit.empty()) {
             auto newRay = CloudIntegrator::Trace(move(ray), treelet);
-            if (!newRay.isShadowRay || !newRay.hit.initialized()) {
+            const bool hit = newRay.hit.initialized();
+            const bool emptyVisit = newRay.toVisit.empty();
+
+            if (newRay.isShadowRay) {
+                if (hit) {
+                    continue; /* discard */
+                } else if (emptyVisit) {
+                    finishedQueue.push_back(move(newRay));
+                } else {
+                    processedRays.push_back(move(newRay));
+                }
+            } else if (!emptyVisit || hit) {
                 processedRays.push_back(move(newRay));
-            }
-        } else if (ray.isShadowRay) {
-            if (!ray.hit.initialized()) {
-                finishedQueue.push_back(move(ray));
             }
         } else if (ray.hit.initialized()) {
             auto newRays = CloudIntegrator::Shade(move(ray), treelet, lights,
@@ -144,8 +160,9 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
         if (nextTreelet % 2 == *workerId % 2) {
             rayQueue.push_back(move(ray));
         } else {
-            if (outQueue.count(nextTreelet)) {
+            if (treeletToWorker.count(nextTreelet)) {
                 outQueue[nextTreelet].push_back(move(ray));
+                outQueueSize++;
             } else {
                 neededTreelets.insert(nextTreelet);
             }
@@ -171,6 +188,8 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
             while (oss.tellp() < 1'000 && !q.second.empty()) {
                 RayState ray = move(q.second.front());
                 q.second.pop_front();
+                outQueueSize--;
+
                 writer.write(to_protobuf(ray));
             }
 
@@ -247,6 +266,23 @@ Poller::Action::Result::Type LambdaWorker::handleMessages() {
 
     swap(messageParser, unprocessedMessages);
 
+    return ResultType::Continue;
+}
+
+Poller::Action::Result::Type LambdaWorker::handleNeededTreelets() {
+    for (const auto& treeletId : neededTreelets) {
+        if (requestedTreelets.count(treeletId)) {
+            continue;
+        }
+
+        protobuf::GetWorker proto;
+        proto.set_treelet_id(treeletId);
+        Message message(OpCode::GetWorker, protoutil::to_string(proto));
+        coordinatorConnection->enqueue_write(message.str());
+        requestedTreelets.insert(treeletId);
+    }
+
+    neededTreelets.clear();
     return ResultType::Continue;
 }
 
@@ -348,6 +384,23 @@ bool LambdaWorker::processMessage(const Message& message) {
         if (proto.your_seed() == mySeed) {
             peer.state = Worker::State::Connected;
             cerr << "* connected to worker-" << otherWorkerId << endl;
+
+            const TreeletId treeletId = proto.treelet_id();
+
+            peer.treelets.insert(treeletId);
+            treeletToWorker[treeletId] = otherWorkerId;
+            requestedTreelets.erase(treeletId);
+
+            if (pendingQueue.count(treeletId)) {
+                auto& treeletPendingQueue = pendingQueue[treeletId];
+                auto& treeletOutQueue = outQueue[treeletId];
+
+                while (!treeletPendingQueue.empty()) {
+                    treeletOutQueue.push_back(
+                        move(treeletPendingQueue.front()));
+                    treeletPendingQueue.pop_front();
+                }
+            }
         }
 
         break;
