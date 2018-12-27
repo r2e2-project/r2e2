@@ -43,14 +43,16 @@ class LambdaMaster {
 
     std::string scenePath;
     ExecutionLoop loop{};
+    std::shared_ptr<UDPConnection> udpConnection{};
+
     uint64_t currentLambdaID = 0;
     std::map<uint64_t, Lambda> lambdas{};
-    std::shared_ptr<UDPConnection> udpConnection{};
-    std::string getSceneMessageStr;
+    std::map<uint32_t, std::vector<uint64_t>> objectToLambda{};
 
     std::deque<std::pair<uint64_t, meow::Message>> incomingMessages;
 
     /* Scene Data */
+    std::string getSceneMessageStr{};
     std::vector<std::unique_ptr<Transform>> transformCache{};
     std::shared_ptr<Camera> camera{};
 

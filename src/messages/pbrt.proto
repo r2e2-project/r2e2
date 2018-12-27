@@ -220,9 +220,14 @@ message GenerateRays {
     Bounds2i crop_window = 1;
 }
 
+message GetWorker {
+    uint32 treelet_id = 1;
+}
+
 message ConnectTo {
     uint32 worker_id = 1;
-    string address = 2;
+    uint32 treelet_id = 2;
+    string address = 3;
 }
 
 message ConnectRequest {

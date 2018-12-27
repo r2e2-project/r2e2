@@ -107,61 +107,66 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
     });
 }
 
-bool LambdaMaster::processMessage(const uint64_t lambdaId,
+bool LambdaMaster::processMessage(const uint64_t sourceWorkerId,
                                   const meow::Message &message) {
-    auto &lambda = lambdas.at(lambdaId);
+    auto &sourceWorker = lambdas.at(sourceWorkerId);
 
     switch (message.opcode()) {
     case OpCode::Hey: {
-        Message heyBackMessage{OpCode::Hey, to_string(lambdaId)};
-        lambda.connection->enqueue_write(heyBackMessage.str());
-        lambda.connection->enqueue_write(getSceneMessageStr);
+        Message heyBackMessage{OpCode::Hey, to_string(sourceWorkerId)};
+        sourceWorker.connection->enqueue_write(heyBackMessage.str());
+        sourceWorker.connection->enqueue_write(getSceneMessageStr);
 
-        if (lambda.tile.initialized()) {
+        if (sourceWorker.tile.initialized()) {
             protobuf::GenerateRays proto;
-            *proto.mutable_crop_window() = to_protobuf(*lambda.tile);
+            *proto.mutable_crop_window() = to_protobuf(*sourceWorker.tile);
             Message message{OpCode::GenerateRays, protoutil::to_string(proto)};
-            lambda.connection->enqueue_write(message.str());
+            sourceWorker.connection->enqueue_write(message.str());
         }
 
         break;
     }
 
     case OpCode::GetWorker: {
-        if (!lambda.udpAddress.initialized()) {
+        if (!sourceWorker.udpAddress.initialized()) {
             return false;
         }
 
-        bool found = false;
-        for (auto &kv : lambdas) {
-            if (kv.first != lambdaId && kv.second.udpAddress.initialized()) {
-                /* sending Worker B info to A */
-                protobuf::ConnectTo protoA;
-                protoA.set_worker_id(kv.first);
-                protoA.set_address(kv.second.udpAddress->str());
-                const Message messageA{OpCode::ConnectTo,
-                                       protoutil::to_string(protoA)};
+        protobuf::GetWorker proto;
+        protoutil::from_string(message.payload(), proto);
+        const auto treeletId = proto.treelet_id();
 
-                lambda.connection->enqueue_write(messageA.str());
-
-                /* sending Worker A info to B */
-                protobuf::ConnectTo protoB;
-                protoB.set_worker_id(lambdaId);
-                protoB.set_address(lambda.udpAddress->str());
-                const Message messageB{OpCode::ConnectTo,
-                                       protoutil::to_string(protoB)};
-
-                kv.second.connection->enqueue_write(messageB.str());
-
-                found = true;
-                break;
-            }
+        /* let's see if we have a worker that has that treelet */
+        if (objectToLambda.count(treeletId) == 0) {
+            throw runtime_error("No worker found for treelet " +
+                                to_string(treeletId));
         }
 
-        if (!found) {
-            return false;
+        Optional<uint64_t> selectedWorkerId;
+        const auto &workerList = objectToLambda[treeletId];
+
+        for (size_t i = 0; i < workerList.size(); i++) {
+            auto &worker = lambdas.at(workerList[i]);
+            if (worker.udpAddress.initialized()) continue;
+            selectedWorkerId = workerList[i];
         }
 
+        if (!selectedWorkerId.initialized()) {
+            throw runtime_error("No worker found for treelet " +
+                                to_string(treeletId));
+        }
+
+        auto message = [this](const Lambda &worker) -> Message {
+            protobuf::ConnectTo proto;
+            proto.set_worker_id(worker.id);
+            proto.set_address(worker.udpAddress->str());
+            return {OpCode::ConnectTo, protoutil::to_string(proto)};
+        };
+
+        const auto &selectedWorker = lambdas.at(*selectedWorkerId);
+
+        sourceWorker.connection->enqueue_write(message(selectedWorker).str());
+        selectedWorker.connection->enqueue_write(message(sourceWorker).str());
         break;
     }
 
