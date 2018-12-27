@@ -26,7 +26,7 @@ class LambdaMaster {
     static constexpr int TILE_SIZE = 16;
 
   private:
-    struct Lambda {
+    struct Worker {
         enum class State { Idle, Busy };
         size_t id;
         State state{State::Idle};
@@ -34,20 +34,20 @@ class LambdaMaster {
         Optional<Address> udpAddress{};
         Optional<Bounds2i> tile;
 
-        Lambda(const size_t id, std::shared_ptr<TCPConnection> &&connection)
+        Worker(const size_t id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}
     };
 
-    bool processMessage(const uint64_t lambdaId, const meow::Message &message);
+    bool processMessage(const uint64_t workerId, const meow::Message &message);
     void loadCamera();
 
     std::string scenePath;
     ExecutionLoop loop{};
     std::shared_ptr<UDPConnection> udpConnection{};
 
-    uint64_t currentLambdaID = 0;
-    std::map<uint64_t, Lambda> lambdas{};
-    std::map<uint32_t, std::vector<uint64_t>> objectToLambda{};
+    uint64_t currentWorkerID = 0;
+    std::map<uint64_t, Worker> workers{};
+    std::map<uint32_t, std::vector<uint64_t>> objectToWorker{};
 
     std::deque<std::pair<uint64_t, meow::Message>> incomingMessages;
 

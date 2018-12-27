@@ -43,11 +43,11 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
         [&](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
             cerr << "set udp address for " << data << endl;
             const size_t workerId = stoull(data);
-            if (lambdas.count(workerId) == 0) {
+            if (workers.count(workerId) == 0) {
                 throw runtime_error("invalid worker id");
             }
 
-            lambdas.at(workerId).udpAddress.reset(move(addr));
+            workers.at(workerId).udpAddress.reset(move(addr));
             return true;
         },
         []() { throw runtime_error("udp connection error"); },
@@ -69,7 +69,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
         auto messageParser = make_shared<MessageParser>();
         auto connection = loop.add_connection<TCPSocket>(
             move(socket),
-            [this, ID = currentLambdaID, messageParser](
+            [this, ID = currentWorkerID, messageParser](
                 shared_ptr<TCPConnection> connection, string &&data) {
                 messageParser->parse(data);
 
@@ -84,32 +84,32 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
             []() { throw runtime_error("error occured"); },
             []() { throw runtime_error("worker died"); });
 
-        auto lambdaIt =
-            lambdas
-                .emplace(piecewise_construct, forward_as_tuple(currentLambdaID),
-                         forward_as_tuple(currentLambdaID, move(connection)))
+        auto workerIt =
+            workers
+                .emplace(piecewise_construct, forward_as_tuple(currentWorkerID),
+                         forward_as_tuple(currentWorkerID, move(connection)))
                 .first;
 
-        /* assign a tile to the lambda, if we need to */
-        if (currentLambdaID < nTiles.x * nTiles.y) {
+        /* assign a tile to the worker, if we need to */
+        if (currentWorkerID < nTiles.x * nTiles.y) {
             /* compute the crop window */
-            int tileX = currentLambdaID % nTiles.x;
-            int tileY = currentLambdaID / nTiles.x;
+            int tileX = currentWorkerID % nTiles.x;
+            int tileY = currentWorkerID / nTiles.x;
             int x0 = this->sampleBounds.pMin.x + tileX * TILE_SIZE;
             int x1 = min(x0 + TILE_SIZE, this->sampleBounds.pMax.x);
             int y0 = this->sampleBounds.pMin.y + tileY * TILE_SIZE;
             int y1 = min(y0 + TILE_SIZE, this->sampleBounds.pMax.y);
-            lambdaIt->second.tile.reset(Point2i{x0, y0}, Point2i{x1, y1});
+            workerIt->second.tile.reset(Point2i{x0, y0}, Point2i{x1, y1});
         }
 
-        currentLambdaID++;
+        currentWorkerID++;
         return true;
     });
 }
 
 bool LambdaMaster::processMessage(const uint64_t sourceWorkerId,
                                   const meow::Message &message) {
-    auto &sourceWorker = lambdas.at(sourceWorkerId);
+    auto &sourceWorker = workers.at(sourceWorkerId);
 
     switch (message.opcode()) {
     case OpCode::Hey: {
@@ -137,16 +137,16 @@ bool LambdaMaster::processMessage(const uint64_t sourceWorkerId,
         const auto treeletId = proto.treelet_id();
 
         /* let's see if we have a worker that has that treelet */
-        if (objectToLambda.count(treeletId) == 0) {
+        if (objectToWorker.count(treeletId) == 0) {
             throw runtime_error("No worker found for treelet " +
                                 to_string(treeletId));
         }
 
         Optional<uint64_t> selectedWorkerId;
-        const auto &workerList = objectToLambda[treeletId];
+        const auto &workerList = objectToWorker[treeletId];
 
         for (size_t i = 0; i < workerList.size(); i++) {
-            auto &worker = lambdas.at(workerList[i]);
+            auto &worker = workers.at(workerList[i]);
             if (worker.udpAddress.initialized()) continue;
             selectedWorkerId = workerList[i];
         }
@@ -156,14 +156,14 @@ bool LambdaMaster::processMessage(const uint64_t sourceWorkerId,
                                 to_string(treeletId));
         }
 
-        auto message = [this](const Lambda &worker) -> Message {
+        auto message = [this](const Worker &worker) -> Message {
             protobuf::ConnectTo proto;
             proto.set_worker_id(worker.id);
             proto.set_address(worker.udpAddress->str());
             return {OpCode::ConnectTo, protoutil::to_string(proto)};
         };
 
-        const auto &selectedWorker = lambdas.at(*selectedWorkerId);
+        const auto &selectedWorker = workers.at(*selectedWorkerId);
 
         sourceWorker.connection->enqueue_write(message(selectedWorker).str());
         selectedWorker.connection->enqueue_write(message(sourceWorker).str());
