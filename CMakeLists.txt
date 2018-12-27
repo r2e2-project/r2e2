@@ -605,7 +605,11 @@ TARGET_LINK_LIBRARIES ( pbrt_lambda_master ${ALL_PBRT_LIBS} )
 ADD_EXECUTABLE ( pbrt_lambda_worker src/cloud/lambda-worker.cpp )
 SET_TARGET_PROPERTIES ( pbrt_lambda_worker PROPERTIES OUTPUT_NAME "pbrt-lambda-worker" )
 TARGET_COMPILE_FEATURES ( pbrt_lambda_worker PRIVATE ${PBRT_CXX11_FEATURES} )
-TARGET_LINK_LIBRARIES ( pbrt_lambda_worker ${ALL_PBRT_LIBS} dl z unwind lzma -static -Wl,-allow-multiple-definition -s -Wl,--whole-archive -lpthread -Wl,--no-whole-archive)
+set(STRIP_SYMBOLS "")
+IF(CMAKE_BUILD_TYPE MATCHES RELEASE)
+  set(STRIP_SYMBOLS "-s")
+ENDIF()
+TARGET_LINK_LIBRARIES ( pbrt_lambda_worker ${ALL_PBRT_LIBS} dl z unwind lzma -static -Wl,-allow-multiple-definition ${STRIP_SYMBOLS} -Wl,--whole-archive -lpthread -Wl,--no-whole-archive)
 
 
 # Unit test
