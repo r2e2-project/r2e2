@@ -159,7 +159,7 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
     } else if (peers.size()) {
         auto& peer = peers.begin()->second;
 
-        if (peer.state == Peer::State::Connected) {
+        if (peer.state == Worker::State::Connected) {
             while (!outQueue.empty()) {
                 ostringstream oss;
                 protobuf::RecordWriter writer{&oss};
@@ -199,15 +199,15 @@ Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handlePeers() {
-    cerr << "[peers] " << peers.size() << " "
-         << pluralize("peer", peers.size()) << endl;
+    cerr << "[peers] " << peers.size() << " " << pluralize("peer", peers.size())
+         << endl;
 
     for (auto& kv : peers) {
         auto& peerId = kv.first;
         auto& peer = kv.second;
 
         switch (peer.state) {
-        case Peer::State::Connecting: {
+        case Worker::State::Connecting: {
             protobuf::ConnectRequest proto;
             proto.set_worker_id(*workerId);
             proto.set_my_seed(mySeed);
@@ -219,7 +219,7 @@ Poller::Action::Result::Type LambdaWorker::handlePeers() {
             break;
         }
 
-        case Peer::State::Connected:
+        case Worker::State::Connected:
             /* send keep alive */
             break;
         }
@@ -318,7 +318,8 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         if (peers.count(proto.worker_id()) == 0) {
             const auto dest = Address::decompose(proto.address());
-            peers.emplace(proto.worker_id(), Peer{{dest.first, dest.second}});
+            peers.emplace(proto.worker_id(),
+                          Worker{proto.worker_id(), {dest.first, dest.second}});
         }
 
         break;
@@ -336,13 +337,13 @@ bool LambdaWorker::processMessage(const Message& message) {
         }
 
         auto& peer = peers.at(otherWorkerId);
-        if (peer.state == Peer::State::Connected) {
+        if (peer.state == Worker::State::Connected) {
             break;
         }
 
         peer.seed = proto.my_seed();
         if (proto.your_seed() == mySeed) {
-            peer.state = Peer::State::Connected;
+            peer.state = Worker::State::Connected;
             cerr << "* connected to worker-" << otherWorkerId << endl;
         }
 

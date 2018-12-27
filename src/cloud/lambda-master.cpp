@@ -42,7 +42,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
     udpConnection = loop.make_udp_connection(
         [&](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
             cerr << "set udp address for " << data << endl;
-            const size_t workerId = stoull(data);
+            const WorkerId workerId = stoull(data);
             if (workers.count(workerId) == 0) {
                 throw runtime_error("invalid worker id");
             }
@@ -93,12 +93,12 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
         /* assign a tile to the worker, if we need to */
         if (currentWorkerID < nTiles.x * nTiles.y) {
             /* compute the crop window */
-            int tileX = currentWorkerID % nTiles.x;
-            int tileY = currentWorkerID / nTiles.x;
-            int x0 = this->sampleBounds.pMin.x + tileX * TILE_SIZE;
-            int x1 = min(x0 + TILE_SIZE, this->sampleBounds.pMax.x);
-            int y0 = this->sampleBounds.pMin.y + tileY * TILE_SIZE;
-            int y1 = min(y0 + TILE_SIZE, this->sampleBounds.pMax.y);
+            const int tileX = currentWorkerID % nTiles.x;
+            const int tileY = currentWorkerID / nTiles.x;
+            const int x0 = this->sampleBounds.pMin.x + tileX * TILE_SIZE;
+            const int x1 = min(x0 + TILE_SIZE, this->sampleBounds.pMax.x);
+            const int y0 = this->sampleBounds.pMin.y + tileY * TILE_SIZE;
+            const int y1 = min(y0 + TILE_SIZE, this->sampleBounds.pMax.y);
             workerIt->second.tile.reset(Point2i{x0, y0}, Point2i{x1, y1});
         }
 
@@ -137,13 +137,13 @@ bool LambdaMaster::processMessage(const uint64_t sourceWorkerId,
         const auto treeletId = proto.treelet_id();
 
         /* let's see if we have a worker that has that treelet */
-        if (objectToWorker.count(treeletId) == 0) {
+        if (treeletToWorker.count(treeletId) == 0) {
             throw runtime_error("No worker found for treelet " +
                                 to_string(treeletId));
         }
 
-        Optional<uint64_t> selectedWorkerId;
-        const auto &workerList = objectToWorker[treeletId];
+        Optional<WorkerId> selectedWorkerId;
+        const auto &workerList = treeletToWorker[treeletId];
 
         for (size_t i = 0; i < workerList.size(); i++) {
             auto &worker = workers.at(workerList[i]);
@@ -183,7 +183,7 @@ void LambdaMaster::run() {
     while (true) {
         loop.loop_once(TIMEOUT);
 
-        deque<pair<uint64_t, Message>> unprocessedMessages;
+        deque<pair<WorkerId, Message>> unprocessedMessages;
 
         while (!incomingMessages.empty()) {
             auto front = move(incomingMessages.front());

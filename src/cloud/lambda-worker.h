@@ -6,6 +6,7 @@
 #include <string>
 
 #include "cloud/bvh.h"
+#include "cloud/lambda.h"
 #include "cloud/raystate.h"
 #include "core/camera.h"
 #include "core/geometry.h"
@@ -29,14 +30,16 @@ class LambdaWorker {
     void run();
 
   private:
-    struct Peer {
+    struct Worker {
         enum class State { Connecting, Connected };
 
+        WorkerId id;
         Address address;
         State state{State::Connecting};
         int32_t seed{0};
 
-        Peer(Address&& addr) : address(std::move(addr)) {}
+        Worker(const WorkerId id, Address&& addr)
+            : id(id), address(std::move(addr)) {}
     };
 
     bool processMessage(const meow::Message& message);
@@ -62,8 +65,8 @@ class LambdaWorker {
     std::shared_ptr<TCPConnection> coordinatorConnection;
     std::shared_ptr<UDPConnection> udpConnection;
     meow::MessageParser messageParser{};
-    Optional<size_t> workerId;
-    std::map<size_t, Peer> peers;
+    Optional<WorkerId> workerId;
+    std::map<WorkerId, Worker> peers;
     int32_t mySeed;
     bool peerRequested{false};
 

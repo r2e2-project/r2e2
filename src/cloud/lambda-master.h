@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "cloud/lambda.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/transform.h"
@@ -28,28 +29,28 @@ class LambdaMaster {
   private:
     struct Worker {
         enum class State { Idle, Busy };
-        size_t id;
+        WorkerId id;
         State state{State::Idle};
         std::shared_ptr<TCPConnection> connection;
         Optional<Address> udpAddress{};
         Optional<Bounds2i> tile;
 
-        Worker(const size_t id, std::shared_ptr<TCPConnection> &&connection)
+        Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}
     };
 
-    bool processMessage(const uint64_t workerId, const meow::Message &message);
+    bool processMessage(const WorkerId workerId, const meow::Message &message);
     void loadCamera();
 
     std::string scenePath;
     ExecutionLoop loop{};
     std::shared_ptr<UDPConnection> udpConnection{};
 
-    uint64_t currentWorkerID = 0;
-    std::map<uint64_t, Worker> workers{};
-    std::map<uint32_t, std::vector<uint64_t>> objectToWorker{};
+    WorkerId currentWorkerID = 0;
+    std::map<WorkerId, Worker> workers{};
+    std::map<TreeletId, std::vector<WorkerId>> treeletToWorker{};
 
-    std::deque<std::pair<uint64_t, meow::Message>> incomingMessages;
+    std::deque<std::pair<WorkerId, meow::Message>> incomingMessages;
 
     /* Scene Data */
     std::string getSceneMessageStr{};
