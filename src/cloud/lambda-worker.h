@@ -84,7 +84,12 @@ class LambdaWorker {
     /* Rays */
     std::deque<RayState> rayQueue{};
     std::deque<RayState> finishedQueue{};
-    std::deque<RayState> outQueue{};
+    std::map<TreeletId, std::deque<RayState>> pendingQueue{};
+    std::map<TreeletId, std::deque<RayState>> outQueue{};
+
+    std::map<TreeletId, WorkerId> treeletToWorker{};
+    std::set<TreeletId> neededTreelets;
+    std::set<TreeletId> requestedTreelets;
 
     /* Always-on FD */
     FileDescriptor dummyFD{STDOUT_FILENO};

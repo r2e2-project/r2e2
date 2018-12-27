@@ -225,15 +225,16 @@ message GetWorker {
 }
 
 message ConnectTo {
-    uint32 worker_id = 1;
+    uint64 worker_id = 1;
     uint32 treelet_id = 2;
     string address = 3;
 }
 
 message ConnectRequest {
-    uint32 worker_id = 1;
-    int32 my_seed = 2;
-    int32 your_seed = 3;
+    uint64 worker_id = 1;
+    uint32 treelet_id = 2; // Extend to support mutiple treelets
+    int32 my_seed = 3;
+    int32 your_seed = 4;
 }
 
 // Materials & Textures

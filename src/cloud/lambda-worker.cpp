@@ -48,6 +48,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       workingDirectory("/tmp/pbrt-worker"),
       storageBackend(StorageBackend::create_backend(storageBackendUri)) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
+
     PbrtOptions.nThreads = 1;
     roost::chdir(workingDirectory.name());
     global::manager.init(".");
@@ -138,10 +139,16 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
         RayState ray = move(processedRays.front());
         processedRays.pop_front();
 
-        if (ray.currentTreelet() % 2 == *workerId % 2) {
+        const TreeletId nextTreelet = ray.currentTreelet();
+
+        if (nextTreelet % 2 == *workerId % 2) {
             rayQueue.push_back(move(ray));
         } else {
-            outQueue.push_back(move(ray));
+            if (outQueue.count(nextTreelet)) {
+                outQueue[nextTreelet].push_back(move(ray));
+            } else {
+                neededTreelets.insert(nextTreelet);
+            }
         }
     }
 
@@ -149,30 +156,26 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
-    cerr << "[outqueue] " << outQueue.size() << " "
-         << pluralize("ray", outQueue.size()) << endl;
+    for (auto& q : outQueue) {
+        if (q.second.size() == 0) continue;
 
-    if (peers.size() == 0 && !peerRequested) {
-        Message message{OpCode::GetWorker, ""};
-        coordinatorConnection->enqueue_write(message.str());
-        peerRequested = true;
-    } else if (peers.size()) {
-        auto& peer = peers.begin()->second;
+        cerr << "[outqueue: " << q.first << "] " << outQueue.size() << " "
+             << pluralize("ray", outQueue.size()) << endl;
 
-        if (peer.state == Worker::State::Connected) {
-            while (!outQueue.empty()) {
-                ostringstream oss;
-                protobuf::RecordWriter writer{&oss};
+        auto& peer = peers.at(treeletToWorker[q.first]);
 
-                while (oss.tellp() < 1'000 && !outQueue.empty()) {
-                    RayState ray = move(outQueue.front());
-                    outQueue.pop_front();
-                    writer.write(to_protobuf(ray));
-                }
+        while (!q.second.empty()) {
+            ostringstream oss;
+            protobuf::RecordWriter writer{&oss};
 
-                Message message{OpCode::SendRays, oss.str()};
-                udpConnection->enqueue_datagram(peer.address, message.str());
+            while (oss.tellp() < 1'000 && !q.second.empty()) {
+                RayState ray = move(q.second.front());
+                q.second.pop_front();
+                writer.write(to_protobuf(ray));
             }
+
+            Message message{OpCode::SendRays, oss.str()};
+            udpConnection->enqueue_datagram(peer.address, message.str());
         }
     }
 
