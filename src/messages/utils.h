@@ -3,6 +3,7 @@
 
 #include "cloud/integrator.h"
 #include "cloud/raystate.h"
+#include "cloud/manager.h"
 #include "core/geometry.h"
 #include "core/light.h"
 #include "core/paramset.h"
@@ -49,6 +50,7 @@ protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample);
 protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 protobuf::Scene to_protobuf(const Scene& scene);
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
+protobuf::ObjectTypeID to_protobuf(const SceneManager::ObjectTypeID& objectTypeID);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
@@ -73,6 +75,7 @@ TextureParams from_protobuf(
     ParamSet& material_params,
     std::map<std::string, std::shared_ptr<Texture<Float>>>& fTex,
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex);
+SceneManager::ObjectTypeID from_protobuf(const protobuf::ObjectTypeID& objectTypeID);
 
 namespace light {
 

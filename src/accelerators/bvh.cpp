@@ -1147,6 +1147,16 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
           protobuf::TriangleMesh tm_proto = to_protobuf(*sub_mesh);
           tm_proto.set_material_id(material_id);
           tm_writer->write(tm_proto);
+
+          /* track the dependency of the mesh on the material */
+          global::manager.recordDependency(
+              SceneManager::ObjectTypeID{SceneManager::Type::TriangleMesh, tm_id},
+              SceneManager::ObjectTypeID{SceneManager::Type::Material, material_id});
+
+          /* track the dependency of the treelet on the mesh */
+          global::manager.recordDependency(
+              SceneManager::ObjectTypeID{SceneManager::Type::Treelet, treelet_id},
+              SceneManager::ObjectTypeID{SceneManager::Type::TriangleMesh, tm_id});
         }
 
         auto writer =

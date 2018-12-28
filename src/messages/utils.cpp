@@ -284,6 +284,14 @@ protobuf::TextureParams to_protobuf(const TextureParams& texture_params) {
   return params;
 }
 
+protobuf::ObjectTypeID to_protobuf(
+    const SceneManager::ObjectTypeID& objectTypeID) {
+    protobuf::ObjectTypeID proto;
+    proto.set_type(to_underlying(objectTypeID.type));
+    proto.set_id(objectTypeID.id);
+    return proto;
+}
+
 template <class ValueType, class ProtoItem>
 unique_ptr<ValueType[]> p2v(const ProtoItem& item) {
     auto values = make_unique<ValueType[]>(item.values_size());
@@ -555,6 +563,13 @@ TextureParams from_protobuf(
     geom_params = from_protobuf(texture_params.geom_params());
     material_params = from_protobuf(texture_params.material_params());
     return TextureParams(geom_params, material_params, fTex, sTex);
+}
+
+SceneManager::ObjectTypeID from_protobuf(
+    const protobuf::ObjectTypeID& objectTypeID) {
+    return SceneManager::ObjectTypeID{
+        static_cast<SceneManager::Type>(objectTypeID.type()),
+        objectTypeID.id()};
 }
 
 protobuf::Light light::to_protobuf(const string& name, const ParamSet& params,

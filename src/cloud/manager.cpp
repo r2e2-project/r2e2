@@ -3,13 +3,19 @@
 #include <fcntl.h>
 
 #include "util/exception.h"
+#include "messages/utils.h"
 
 using namespace std;
 
 namespace pbrt {
 
 static const std::string TYPE_PREFIXES[] = {
-    "T", "TM", "LIGHTS", "SAMPLER", "CAMERA", "SCENE", "MAT", "FTEX", "STEX"};
+    "T",     "TM",  "LIGHTS", "SAMPLER", "CAMERA",
+    "SCENE", "MAT", "FTEX",   "STEX",    "MANIFEST"};
+
+std::string SceneManager::ObjectTypeID::to_string() const {
+  return SceneManager::getFileName(type, id);
+}
 
 void SceneManager::init(const string& scenePath) {
     this->scenePath = scenePath;
@@ -54,6 +60,7 @@ string SceneManager::getFileName(const Type type, const uint32_t id) {
     case Type::Camera:
     case Type::Lights:
     case Type::Scene:
+    case Type::Manifest:
         return TYPE_PREFIXES[to_underlying(type)];
 
     default:
@@ -63,45 +70,92 @@ string SceneManager::getFileName(const Type type, const uint32_t id) {
 
 uint32_t SceneManager::getNextId(const Type type, const void* ptr) {
     const uint32_t id = autoIds[to_underlying(type)]++;
-
     if (ptr) {
         ptrIds[ptr] = id;
     }
-
     return id;
 }
 
-map<SceneManager::Type, vector<SceneManager::Object>>
-SceneManager::listObjects() const {
+void SceneManager::recordDependency(const ObjectTypeID& from,
+                                    const ObjectTypeID& to) {
+    dependencies[from].insert(to);
+}
+
+protobuf::Manifest SceneManager::makeManifest() const {
+    protobuf::Manifest manifest;
+    /* add ids for all objects */
+    auto add_to_manifest = [this, &manifest](const SceneManager::Type& type) {
+        size_t total_ids = autoIds[to_underlying(type)];
+        for (size_t id = 0; id < total_ids; ++id) {
+            ObjectTypeID type_id{type, id};
+            protobuf::Manifest::Object* obj = manifest.add_objects();
+            (*obj->mutable_id()) = to_protobuf(type_id);
+            if (dependencies.count(type_id) > 0) {
+                for (const ObjectTypeID& dep : dependencies.at(type_id)) {
+                    protobuf::ObjectTypeID* dep_id = obj->add_dependencies();
+                    (*dep_id) = to_protobuf(dep);
+                }
+            }
+        }
+    };
+    add_to_manifest(SceneManager::Type::Treelet);
+    add_to_manifest(SceneManager::Type::TriangleMesh);
+    add_to_manifest(SceneManager::Type::Material);
+    add_to_manifest(SceneManager::Type::FloatTexture);
+    add_to_manifest(SceneManager::Type::SpectrumTexture);
+    return manifest;
+}
+
+std::map<SceneManager::Type, vector<SceneManager::Object>>
+SceneManager::listObjects() {
     if (!sceneFD.initialized()) {
         throw runtime_error("SceneManager is not initialized");
     }
 
-    map<Type, vector<Object>> result;
+    if (dependencies.empty()) {
+      loadManifest();
+    }
 
-    auto check_for = [this, &result](const Type type, const string& filename) {
-        if (filename.compare(0, TYPE_PREFIXES[to_underlying(type)].length(),
-                             TYPE_PREFIXES[to_underlying(type)]) == 0) {
-            const size_t size = roost::file_size_at(*sceneFD, filename);
-            result[type].emplace_back(
-                stoi(filename.substr(
-                    TYPE_PREFIXES[to_underlying(type)].length())),
-                size);
-            return true;
-        }
-
-        return false;
-    };
-
-    for (const auto& filename : roost::get_directory_listing(scenePath)) {
-        check_for(Type::TriangleMesh, filename) ||
-            check_for(Type::Treelet, filename) ||
-            check_for(Type::Material, filename) ||
-            check_for(Type::FloatTexture, filename) ||
-            check_for(Type::SpectrumTexture, filename);
+    std::map<Type, vector<Object>> result;
+    /* read the list of objects from the manifest file */
+    for (auto& kv : dependencies) {
+      const ObjectTypeID& id = kv.first;
+      std::string filename = getFileName(id.type, id.id);
+      const size_t size = roost::file_size_at(*sceneFD, filename);
+      result[id.type].push_back(Object(id.id, size));
     }
 
     return result;
+}
+
+std::map<SceneManager::ObjectTypeID, std::set<SceneManager::ObjectTypeID>>
+SceneManager::listObjectDependencies() {
+    if (!sceneFD.initialized()) {
+        throw runtime_error("SceneManager is not initialized");
+    }
+
+    if (dependencies.empty()) {
+      loadManifest();
+    }
+
+    return dependencies;
+}
+
+void SceneManager::loadManifest() {
+    auto reader = GetReader(SceneManager::Type::Manifest);
+    protobuf::Manifest manifest;
+    reader->read(&manifest);
+    for (const protobuf::Manifest::Object& obj : manifest.objects()) {
+        ObjectTypeID id = from_protobuf(obj.id());
+        dependencies[id] = {};
+        for (const protobuf::ObjectTypeID& dep : obj.dependencies()) {
+            dependencies[id].insert(from_protobuf(dep));
+        }
+    }
+    dependencies[ObjectTypeID{Type::Scene, 0}];
+    dependencies[ObjectTypeID{Type::Camera, 0}];
+    dependencies[ObjectTypeID{Type::Lights, 0}];
+    dependencies[ObjectTypeID{Type::Sampler, 0}];
 }
 
 namespace global {

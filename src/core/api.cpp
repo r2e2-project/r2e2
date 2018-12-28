@@ -555,6 +555,10 @@ STAT_COUNTER("Scene/Materials created", nMaterialsCreated);
 
 std::shared_ptr<Material> MakeMaterial(const std::string &name,
                                        const TextureParams &mp) {
+    if (PbrtOptions.dumpScene) {
+      mp.StartRecordingUsage();
+    }
+
     Material *material = nullptr;
     if (name == "" || name == "none")
         return nullptr;
@@ -619,17 +623,40 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
             "Use \"path\" or \"volpath\".",
             name.c_str(), renderOptions->IntegratorName.c_str());
 
-    mp.ReportUnused();
-    if (!material) Error("Unable to create material \"%s\"", name.c_str());
-    else ++nMaterialsCreated;
-
-    if (PbrtOptions.dumpScene) {
+    if (PbrtOptions.dumpScene && material) {
         int id =
             global::manager.getNextId(SceneManager::Type::Material, material);
         auto writer =
             global::manager.GetWriter(SceneManager::Type::Material, id);
         writer->write(material::to_protobuf(name, mp));
+        /* record dependencies from material to textures */
+        for (const std::string& name : mp.GetUsedFloatTextures()) {
+          auto tex = mp.GetFloatTextureOrNull(name).get();
+          if (global::manager.hasId(tex)) {
+              int tex_id = global::manager.getId(tex);
+              global::manager.recordDependency(
+                  SceneManager::ObjectTypeID{SceneManager::Type::Material, id},
+                  SceneManager::ObjectTypeID{SceneManager::Type::FloatTexture,
+                                             tex_id});
+          }
+        }
+        for (const std::string &name : mp.GetUsedSpectrumTextures()) {
+            auto tex = mp.GetSpectrumTextureOrNull(name).get();
+            if (global::manager.hasId(tex)) {
+                int tex_id = global::manager.getId(tex);
+                global::manager.recordDependency(
+                    SceneManager::ObjectTypeID{SceneManager::Type::Material,
+                                               id},
+                    SceneManager::ObjectTypeID{
+                        SceneManager::Type::SpectrumTexture, tex_id});
+            }
+        }
+        mp.StopRecordingUsage();
     }
+
+    mp.ReportUnused();
+    if (!material) Error("Unable to create material \"%s\"", name.c_str());
+    else ++nMaterialsCreated;
 
     return std::shared_ptr<Material>(material);
 }
@@ -1661,6 +1688,11 @@ void pbrtWorldEnd() {
         if (PbrtOptions.dumpScene) {
             auto writer = global::manager.GetWriter(SceneManager::Type::Scene);
             writer->write(to_protobuf(*scene));
+
+            /* dump the manifest file for this render */
+            auto manifestWriter =
+                global::manager.GetWriter(SceneManager::Type::Manifest);
+            manifestWriter->write(global::manager.makeManifest());
         }
 
         // This is kind of ugly; we directly override the current profiler

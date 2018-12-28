@@ -274,3 +274,14 @@ message SpectrumTexture {
   Matrix tex2world = 2;
   TextureParams texture_params = 3;
 }
+
+// Manifest
+
+message Manifest {
+  message Object {
+    ObjectTypeID id = 1;
+    repeated ObjectTypeID dependencies = 2;
+  };
+  repeated Object objects = 1;
+}
+

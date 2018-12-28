@@ -23,6 +23,7 @@ class SceneManager {
         Material,
         FloatTexture,
         SpectrumTexture,
+        Manifest,
         COUNT
     };
 
@@ -35,6 +36,20 @@ class SceneManager {
         Object(const size_t id, const off_t size) : id(id), size(size) {}
     };
 
+    struct ObjectTypeID {
+        SceneManager::Type type;
+        SceneManager::ObjectID id;
+
+        bool operator<(const ObjectTypeID &other) const {
+            if (type == other.type) {
+                return id < other.id;
+            }
+            return type < other.type;
+        }
+
+        std::string to_string() const;
+    };
+
     SceneManager() {}
 
     using ReaderPtr = std::unique_ptr<protobuf::RecordReader>;
@@ -44,18 +59,26 @@ class SceneManager {
     bool initialized() const { return sceneFD.initialized(); }
     ReaderPtr GetReader(const Type type, const uint32_t id = 0) const;
     WriterPtr GetWriter(const Type type, const uint32_t id = 0) const;
+
+    /* used during dumping */
     uint32_t getNextId(const Type type, const void* ptr = nullptr);
     uint32_t getId(const void* ptr) const { return ptrIds.at(ptr); }
+    bool hasId(const void* ptr) const { return ptrIds.count(ptr) > 0; }
+    void recordDependency(const ObjectTypeID& from, const ObjectTypeID& to);
+    protobuf::Manifest makeManifest() const;
 
-    std::map<Type, std::vector<Object>> listObjects() const;
+    std::map<Type, std::vector<Object>> listObjects();
+    std::map<ObjectTypeID, std::set<ObjectTypeID>> listObjectDependencies();
 
   private:
     static std::string getFileName(const Type type, const uint32_t id);
+    void loadManifest();
 
     size_t autoIds[to_underlying(Type::COUNT)] = {0};
     std::string scenePath{};
     Optional<FileDescriptor> sceneFD{};
     std::unordered_map<const void*, uint32_t> ptrIds{};
+    std::map<ObjectTypeID, std::set<ObjectTypeID>> dependencies;
 };
 
 namespace global {
