@@ -186,8 +186,8 @@ bool LambdaMaster::processMessage(const uint64_t sourceWorkerId,
 
         for (size_t i = 0; i < workerList.size(); i++) {
             auto &worker = workers.at(workerList[i]);
-            if (worker.udpAddress.initialized()) continue;
-            selectedWorkerId = workerList[i];
+            if (!worker.udpAddress.initialized()) continue;
+            selectedWorkerId.reset(workerList[i]);
         }
 
         if (!selectedWorkerId.initialized()) {
