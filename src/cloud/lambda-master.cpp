@@ -25,6 +25,7 @@ using namespace meow;
 using namespace pbrt;
 
 using OpCode = Message::OpCode;
+using ObjectTypeID = SceneManager::ObjectTypeID;
 
 void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA PORT" << endl; }
 
@@ -39,14 +40,14 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
         const SceneManager::Type &type = kv.first;
         const std::vector<SceneManager::Object> &objects = kv.second;
         for (const SceneManager::Object &obj : objects) {
-            SceneManager::ObjectTypeID id{type, obj.id};
+            ObjectTypeID id{type, obj.id};
             SceneObjectInfo info{};
             info.id = obj.id;
             info.size = obj.size;
             sceneObjects.insert({id, info});
             if (type == SceneManager::Type::Treelet) {
-              unassignedTreelets.push(id);
-            } 
+                unassignedTreelets.push(id);
+            }
         }
     }
     requiredDependentObjects = global::manager.listObjectDependencies();
@@ -120,7 +121,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
 
             /* assign root treelet to worker since it is generating rays for a
              * crop window */
-            //this->assignRootTreelet(workerIt->second);
+            // this->assignRootTreelet(workerIt->second);
             this->assignAllTreelets(workerIt->second);
         }
         /* assign treelet to worker based on most in-demand treelets */
@@ -145,7 +146,7 @@ bool LambdaMaster::processMessage(const uint64_t sourceWorkerId,
         {
             /* send the list of assigned objects to the worker */
             protobuf::GetObjects getObjectsProto;
-            for (const SceneManager::ObjectTypeID &id : sourceWorker.objects) {
+            for (const ObjectTypeID &id : sourceWorker.objects) {
                 protobuf::ObjectTypeID *object_id =
                     getObjectsProto.add_object_ids();
                 (*object_id) = to_protobuf(id);
@@ -243,11 +244,10 @@ void LambdaMaster::loadCamera() {
     camera = camera::from_protobuf(proto_camera, transformCache);
 }
 
-std::vector<SceneManager::ObjectTypeID> LambdaMaster::assignAllTreelets(
-    Worker &worker) {
-    std::vector<SceneManager::ObjectTypeID> objectsToAssign;
+std::vector<ObjectTypeID> LambdaMaster::assignAllTreelets(Worker &worker) {
+    std::vector<ObjectTypeID> objectsToAssign;
     for (auto &kv : sceneObjects) {
-        const SceneManager::ObjectTypeID &id = kv.first;
+        const ObjectTypeID &id = kv.first;
         const SceneObjectInfo &info = kv.second;
 
         if (id.type != SceneManager::Type::Treelet) continue;
@@ -256,29 +256,27 @@ std::vector<SceneManager::ObjectTypeID> LambdaMaster::assignAllTreelets(
     }
     /* update scene objects assignment to track that this lambda now has the
      * assigned objects */
-    for (SceneManager::ObjectTypeID &id : objectsToAssign) {
+    for (ObjectTypeID &id : objectsToAssign) {
         assignObject(worker, id);
     }
 
     return objectsToAssign;
 }
 
-std::vector<SceneManager::ObjectTypeID> LambdaMaster::assignRootTreelet(
-    Worker &worker) {
-    std::vector<SceneManager::ObjectTypeID> objectsToAssign = {
-        SceneManager::ObjectTypeID{SceneManager::Type::Treelet, 0}};
+std::vector<ObjectTypeID> LambdaMaster::assignRootTreelet(Worker &worker) {
+    std::vector<ObjectTypeID> objectsToAssign = {
+        ObjectTypeID{SceneManager::Type::Treelet, 0}};
 
     /* update scene objects assignment to track that this worker now has the
      * assigned objects */
-    for (SceneManager::ObjectTypeID &id : objectsToAssign) {
+    for (ObjectTypeID &id : objectsToAssign) {
         assignObject(worker, id);
     }
 
     return objectsToAssign;
 }
 
-std::vector<SceneManager::ObjectTypeID> LambdaMaster::assignTreelets(
-    Worker &worker) {
+std::vector<ObjectTypeID> LambdaMaster::assignTreelets(Worker &worker) {
     /* Scene assignment strategy
 
        When a worker connects to the master:
@@ -292,11 +290,11 @@ std::vector<SceneManager::ObjectTypeID> LambdaMaster::assignTreelets(
     /* NOTE(apoms): for now, we only assign one treelet to each worker, but
      * should be able to support assigning multiple based on freeSpace in the
      * future */
-    vector<SceneManager::ObjectTypeID> objectsToAssign;
+    vector<ObjectTypeID> objectsToAssign;
     size_t &freeSpace = worker.freeSpace;
     /* if some objects are unassigned, assign them */
     while (!unassignedTreelets.empty()) {
-        SceneManager::ObjectTypeID id = unassignedTreelets.top();
+        ObjectTypeID id = unassignedTreelets.top();
         size_t size = getObjectSizeWithDependencies(worker, id);
         if (size < freeSpace) {
             objectsToAssign.push_back(id);
@@ -308,10 +306,10 @@ std::vector<SceneManager::ObjectTypeID> LambdaMaster::assignTreelets(
     /* otherwise, find the object with the largest discrepancy between rays
      * requested and rays processed */
     if (objectsToAssign.empty()) {
-        SceneManager::ObjectTypeID highestID;
+        ObjectTypeID highestID;
         float highestLoad = numeric_limits<float>::min();
         for (auto &kv : sceneObjects) {
-            const SceneManager::ObjectTypeID &id = kv.first;
+            const ObjectTypeID &id = kv.first;
             const SceneObjectInfo &info = kv.second;
 
             if (id.type != SceneManager::Type::Treelet) continue;
@@ -332,32 +330,31 @@ std::vector<SceneManager::ObjectTypeID> LambdaMaster::assignTreelets(
     return objectsToAssign;
 }
 
-std::vector<SceneManager::ObjectTypeID> LambdaMaster::assignBaseSceneObjects(
-    Worker &worker) {
-    std::vector<SceneManager::ObjectTypeID> objectsToAssign = {
-      SceneManager::ObjectTypeID{SceneManager::Type::Scene, 0},
-      SceneManager::ObjectTypeID{SceneManager::Type::Camera, 0},
-      SceneManager::ObjectTypeID{SceneManager::Type::Sampler, 0},
-      SceneManager::ObjectTypeID{SceneManager::Type::Lights, 0},
+std::vector<ObjectTypeID> LambdaMaster::assignBaseSceneObjects(Worker &worker) {
+    std::vector<ObjectTypeID> objectsToAssign = {
+        ObjectTypeID{SceneManager::Type::Scene, 0},
+        ObjectTypeID{SceneManager::Type::Camera, 0},
+        ObjectTypeID{SceneManager::Type::Sampler, 0},
+        ObjectTypeID{SceneManager::Type::Lights, 0},
     };
 
     /* update scene objects assignment to track that this worker now has the
      * assigned objects */
-    for (SceneManager::ObjectTypeID &id : objectsToAssign) {
+    for (ObjectTypeID &id : objectsToAssign) {
         assignObject(worker, id);
     }
 
     return objectsToAssign;
 }
 
-void LambdaMaster::assignObject(Worker &worker, const SceneManager::ObjectTypeID &object) {
+void LambdaMaster::assignObject(Worker &worker, const ObjectTypeID &object) {
     /* assign object and all its dependencies */
-    std::vector<SceneManager::ObjectTypeID> objectsToAssign = {object};
-    for (const SceneManager::ObjectTypeID &id : getRecursiveDependencies(object)) {
-      objectsToAssign.push_back(id);
+    std::vector<ObjectTypeID> objectsToAssign = {object};
+    for (const ObjectTypeID &id : getRecursiveDependencies(object)) {
+        objectsToAssign.push_back(id);
     }
 
-    for (SceneManager::ObjectTypeID &id : objectsToAssign) {
+    for (ObjectTypeID &id : objectsToAssign) {
         SceneObjectInfo &info = sceneObjects.at(id);
         if (worker.objects.count(id) == 0) {
             info.workers.insert(worker.id);
@@ -367,30 +364,29 @@ void LambdaMaster::assignObject(Worker &worker, const SceneManager::ObjectTypeID
     }
 }
 
-std::set<SceneManager::ObjectTypeID> LambdaMaster::getRecursiveDependencies(
-    const SceneManager::ObjectTypeID &object) {
-  std::set<SceneManager::ObjectTypeID> allDeps;
-  for (const SceneManager::ObjectTypeID& id : requiredDependentObjects[object]) {
-    allDeps.insert(id);
-    auto deps = getRecursiveDependencies(id);
-    allDeps.insert(deps.begin(), deps.end());
-  }
-  return allDeps;
+std::set<ObjectTypeID> LambdaMaster::getRecursiveDependencies(
+    const ObjectTypeID &object) {
+    std::set<ObjectTypeID> allDeps;
+    for (const ObjectTypeID &id : requiredDependentObjects[object]) {
+        allDeps.insert(id);
+        auto deps = getRecursiveDependencies(id);
+        allDeps.insert(deps.begin(), deps.end());
+    }
+    return allDeps;
 }
 
 size_t LambdaMaster::getObjectSizeWithDependencies(Worker &worker,
-                                                   const SceneManager::ObjectTypeID &object) {
-  size_t size = sceneObjects.at(object).size;
-  for (const SceneManager::ObjectTypeID& id : getRecursiveDependencies(object)) {
-      if (worker.objects.count(id) == 0) {
-          size += sceneObjects.at(id).size;
-      }
-  }
-  return size;
+                                                   const ObjectTypeID &object) {
+    size_t size = sceneObjects.at(object).size;
+    for (const ObjectTypeID &id : getRecursiveDependencies(object)) {
+        if (worker.objects.count(id) == 0) {
+            size += sceneObjects.at(id).size;
+        }
+    }
+    return size;
 }
 
 void LambdaMaster::updateObjectUsage(const Worker &worker) {}
-
 
 int main(int argc, char const *argv[]) {
     try {
