@@ -134,40 +134,40 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
     });
 }
 
-bool LambdaMaster::processMessage(const uint64_t sourceWorkerId,
+bool LambdaMaster::processMessage(const uint64_t workerId,
                                   const meow::Message &message) {
-    auto &sourceWorker = workers.at(sourceWorkerId);
+    auto &worker = workers.at(workerId);
 
     switch (message.opcode()) {
     case OpCode::Hey: {
-        Message heyBackMessage{OpCode::Hey, to_string(sourceWorkerId)};
-        sourceWorker.connection->enqueue_write(heyBackMessage.str());
+        Message heyBackMessage{OpCode::Hey, to_string(workerId)};
+        worker.connection->enqueue_write(heyBackMessage.str());
 
         {
             /* send the list of assigned objects to the worker */
             protobuf::GetObjects getObjectsProto;
-            for (const ObjectTypeID &id : sourceWorker.objects) {
+            for (const ObjectTypeID &id : worker.objects) {
                 protobuf::ObjectTypeID *object_id =
                     getObjectsProto.add_object_ids();
                 (*object_id) = to_protobuf(id);
             }
             Message getObjectsMessage{Message::OpCode::GetObjects,
                                       protoutil::to_string(getObjectsProto)};
-            sourceWorker.connection->enqueue_write(getObjectsMessage.str());
+            worker.connection->enqueue_write(getObjectsMessage.str());
         }
 
-        if (sourceWorker.tile.initialized()) {
+        if (worker.tile.initialized()) {
             protobuf::GenerateRays proto;
-            *proto.mutable_crop_window() = to_protobuf(*sourceWorker.tile);
+            *proto.mutable_crop_window() = to_protobuf(*worker.tile);
             Message message{OpCode::GenerateRays, protoutil::to_string(proto)};
-            sourceWorker.connection->enqueue_write(message.str());
+            worker.connection->enqueue_write(message.str());
         }
 
         break;
     }
 
     case OpCode::GetWorker: {
-        if (!sourceWorker.udpAddress.initialized()) {
+        if (!worker.udpAddress.initialized()) {
             return false;
         }
 
@@ -204,8 +204,8 @@ bool LambdaMaster::processMessage(const uint64_t sourceWorkerId,
 
         const auto &selectedWorker = workers.at(*selectedWorkerId);
 
-        sourceWorker.connection->enqueue_write(message(selectedWorker).str());
-        selectedWorker.connection->enqueue_write(message(sourceWorker).str());
+        worker.connection->enqueue_write(message(selectedWorker).str());
+        selectedWorker.connection->enqueue_write(message(worker).str());
         break;
     }
 
