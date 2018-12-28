@@ -1,6 +1,7 @@
 #ifndef PBRT_CLOUD_LAMBDA_WORKER_H
 #define PBRT_CLOUD_LAMBDA_WORKER_H
 
+#include <cstring>
 #include <deque>
 #include <iostream>
 #include <string>
@@ -18,6 +19,7 @@
 #include "net/address.h"
 #include "storage/backend.h"
 #include "util/temp_dir.h"
+#include "util/timerfd.h"
 
 namespace pbrt {
 
@@ -90,6 +92,7 @@ class LambdaWorker {
     std::deque<RayState> finishedQueue{};
     std::map<TreeletId, std::deque<RayState>> pendingQueue{};
     std::map<TreeletId, std::deque<RayState>> outQueue{};
+    size_t pendingQueueSize{0};
     size_t outQueueSize{0};
 
     std::map<TreeletId, WorkerId> treeletToWorker{};
@@ -100,9 +103,8 @@ class LambdaWorker {
     FileDescriptor dummyFD{STDOUT_FILENO};
 
     /* Timers */
-    static constexpr std::chrono::milliseconds PEER_CHECK_INTERVAL{5'000};
-    std::chrono::steady_clock::time_point last_peer_check{
-        std::chrono::steady_clock::now()};
+    TimerFD peerTimer;
+    TimerFD statusPrintTimer;
 };
 
 }  // namespace pbrt

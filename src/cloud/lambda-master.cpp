@@ -147,9 +147,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
             /* send the list of assigned objects to the worker */
             protobuf::GetObjects getObjectsProto;
             for (const ObjectTypeID &id : worker.objects) {
-                protobuf::ObjectTypeID *object_id =
-                    getObjectsProto.add_object_ids();
-                (*object_id) = to_protobuf(id);
+                *getObjectsProto.add_object_ids() = to_protobuf(id);
             }
             Message getObjectsMessage{Message::OpCode::GetObjects,
                                       protoutil::to_string(getObjectsProto)};
@@ -191,8 +189,8 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         }
 
         if (!selectedWorkerId.initialized()) {
-            throw runtime_error("No worker found for treelet " +
-                                to_string(treeletId));
+            cerr << "No worker found for treelet " << treeletId << endl;
+            return false;
         }
 
         auto message = [this](const Worker &worker) -> Message {
@@ -250,7 +248,8 @@ vector<ObjectTypeID> LambdaMaster::assignAllTreelets(Worker &worker) {
         const ObjectTypeID &id = kv.first;
         const SceneObjectInfo &info = kv.second;
 
-        if (id.type != SceneManager::Type::Treelet) continue;
+        if (id.type != SceneManager::Type::Treelet ||
+            (id.id != 0 && ((id.id % 2) != (worker.id % 2)))) continue;
 
         objectsToAssign.push_back(id);
     }
@@ -349,16 +348,21 @@ vector<ObjectTypeID> LambdaMaster::assignBaseSceneObjects(Worker &worker) {
 
 void LambdaMaster::assignObject(Worker &worker, const ObjectTypeID &object) {
     /* assign object and all its dependencies */
+
+    if (object.type == SceneManager::Type::Treelet) {
+        treeletToWorker[object.id].push_back(worker.id);
+    }
+
     vector<ObjectTypeID> objectsToAssign = {object};
     for (const ObjectTypeID &id : getRecursiveDependencies(object)) {
         objectsToAssign.push_back(id);
     }
 
-    for (ObjectTypeID &id : objectsToAssign) {
-        SceneObjectInfo &info = sceneObjects.at(id);
-        if (worker.objects.count(id) == 0) {
+    for (ObjectTypeID &obj : objectsToAssign) {
+        SceneObjectInfo &info = sceneObjects.at(obj);
+        if (worker.objects.count(obj) == 0) {
             info.workers.insert(worker.id);
-            worker.objects.insert(id);
+            worker.objects.insert(obj);
             worker.freeSpace -= info.size;
         }
     }

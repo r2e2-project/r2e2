@@ -1,5 +1,6 @@
 #include "lambda-worker.h"
 
+#include <sys/timerfd.h>
 #include <cstdlib>
 #include <iterator>
 #include <limits>
@@ -38,6 +39,9 @@ using PollerResult = Poller::Result::Type;
 
 class ProgramFinished : public exception {};
 
+constexpr chrono::milliseconds PEER_CHECK_INTERVAL{5'000};
+constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
+
 void usage(const char* argv0) {
     cerr << "Usage: " << argv0 << " DESTINATION PORT STORAGE-BACKEND" << endl;
 }
@@ -47,7 +51,9 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const string& storageBackendUri)
     : coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
-      storageBackend(StorageBackend::create_backend(storageBackendUri)) {
+      storageBackend(StorageBackend::create_backend(storageBackendUri)),
+      peerTimer(PEER_CHECK_INTERVAL),
+      statusPrintTimer(STATUS_PRINT_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
 
     PbrtOptions.nThreads = 1;
@@ -94,11 +100,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("finished queue failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaWorker::handlePeers, this),
-        [this]() {
-            return !peers.empty() && (chrono::steady_clock::now() -
-                                      last_peer_check) >= PEER_CHECK_INTERVAL;
-        },
+        peerTimer.fd, Direction::In, bind(&LambdaWorker::handlePeers, this),
+        [this]() { return !peers.empty(); },
         []() { throw runtime_error("peers failed"); }));
 
     loop.poller().add_action(Poller::Action(
@@ -112,6 +115,22 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return !neededTreelets.empty(); },
         []() { throw runtime_error("treelet request failed"); }));
 
+    loop.poller().add_action(Poller::Action(
+        statusPrintTimer.fd, Direction::In,
+        [this]() {
+            statusPrintTimer.reset();
+
+            cerr << "ray: " << rayQueue.size()
+                 << " / finished: " << finishedQueue.size()
+                 << " / pending: " << pendingQueueSize
+                 << " / out: " << outQueueSize << " / peers: " << peers.size()
+                 << " / messages: " << messageParser.size() << endl;
+
+            return ResultType::Continue;
+        },
+        [this]() { return true; },
+        []() { throw runtime_error("status print failed"); }));
+
     Message message{OpCode::Hey, ""};
     coordinatorConnection->enqueue_write(message.str());
 }
@@ -121,9 +140,6 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 
     constexpr size_t MAX_RAYS = 10'000;
     size_t i = 0;
-
-    cerr << "[rayqueue] " << rayQueue.size() << " "
-         << pluralize("ray", rayQueue.size()) << endl;
 
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayState ray = move(rayQueue.front());
@@ -168,6 +184,8 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
                 outQueueSize++;
             } else {
                 neededTreelets.insert(nextTreelet);
+                pendingQueue[nextTreelet].push_back(move(ray));
+                pendingQueueSize++;
             }
         }
     }
@@ -178,9 +196,6 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
     for (auto& q : outQueue) {
         if (q.second.size() == 0) continue;
-
-        cerr << "[outqueue: " << q.first << "] " << outQueue.size() << " "
-             << pluralize("ray", outQueue.size()) << endl;
 
         auto& peer = peers.at(treeletToWorker[q.first]);
 
@@ -205,9 +220,6 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
-    cerr << "[finishedqueue] " << finishedQueue.size() << " "
-         << pluralize("ray", finishedQueue.size()) << endl;
-
     while (!finishedQueue.empty()) {
         RayState ray = move(finishedQueue.front());
         finishedQueue.pop_front();
@@ -224,10 +236,7 @@ Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handlePeers() {
-    cerr << "[peers] " << peers.size() << " " << pluralize("peer", peers.size())
-         << endl;
-
-    last_peer_check = chrono::steady_clock::now();
+    peerTimer.reset();
 
     for (auto& kv : peers) {
         auto& peerId = kv.first;
@@ -256,9 +265,6 @@ Poller::Action::Result::Type LambdaWorker::handlePeers() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleMessages() {
-    cerr << "[messages] " << messageParser.size() << " "
-         << pluralize("message", messageParser.size()) << endl;
-
     MessageParser unprocessedMessages;
     while (!messageParser.empty()) {
         Message message = move(messageParser.front());
@@ -402,13 +408,15 @@ bool LambdaWorker::processMessage(const Message& message) {
             requestedTreelets.erase(treeletId);
 
             if (pendingQueue.count(treeletId)) {
-                auto& treeletPendingQueue = pendingQueue[treeletId];
-                auto& treeletOutQueue = outQueue[treeletId];
+                auto& treeletPending = pendingQueue[treeletId];
+                auto& treeletOut = outQueue[treeletId];
 
-                while (!treeletPendingQueue.empty()) {
-                    treeletOutQueue.push_back(
-                        move(treeletPendingQueue.front()));
-                    treeletPendingQueue.pop_front();
+                outQueueSize += treeletPending.size();
+                pendingQueueSize -= treeletPending.size();
+
+                while (!treeletPending.empty()) {
+                    treeletOut.push_back(move(treeletPending.front()));
+                    treeletPending.pop_front();
                 }
             }
         }
@@ -442,7 +450,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 
 void LambdaWorker::run() {
     while (true) {
-        auto res = loop.loop_once().result;
+        auto res = loop.loop_once(200).result;
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 }
