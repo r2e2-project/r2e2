@@ -322,14 +322,13 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 }
 
 void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
-  std::vector<storage::GetRequest> requests;
-  for (const protobuf::ObjectTypeID& objectTypeID : objects.object_ids()) {
-      SceneManager::ObjectTypeID id = from_protobuf(objectTypeID);
-      std::string filePath = id.to_string();
-      std::cout << filePath << std::endl;;
-      requests.emplace_back(filePath, filePath);
-  }
-  storageBackend->get(requests);
+    vector<storage::GetRequest> requests;
+    for (const protobuf::ObjectTypeID& objectTypeID : objects.object_ids()) {
+        SceneManager::ObjectTypeID id = from_protobuf(objectTypeID);
+        string filePath = id.to_string();
+        requests.emplace_back(filePath, filePath);
+    }
+    storageBackend->get(requests);
 }
 
 bool LambdaWorker::processMessage(const Message& message) {

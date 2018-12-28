@@ -38,7 +38,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
      * assignment to workers for each */
     for (auto &kv : global::manager.listObjects()) {
         const SceneManager::Type &type = kv.first;
-        const std::vector<SceneManager::Object> &objects = kv.second;
+        const vector<SceneManager::Object> &objects = kv.second;
         for (const SceneManager::Object &obj : objects) {
             ObjectTypeID id{type, obj.id};
             SceneObjectInfo info{};
@@ -244,8 +244,8 @@ void LambdaMaster::loadCamera() {
     camera = camera::from_protobuf(proto_camera, transformCache);
 }
 
-std::vector<ObjectTypeID> LambdaMaster::assignAllTreelets(Worker &worker) {
-    std::vector<ObjectTypeID> objectsToAssign;
+vector<ObjectTypeID> LambdaMaster::assignAllTreelets(Worker &worker) {
+    vector<ObjectTypeID> objectsToAssign;
     for (auto &kv : sceneObjects) {
         const ObjectTypeID &id = kv.first;
         const SceneObjectInfo &info = kv.second;
@@ -263,8 +263,8 @@ std::vector<ObjectTypeID> LambdaMaster::assignAllTreelets(Worker &worker) {
     return objectsToAssign;
 }
 
-std::vector<ObjectTypeID> LambdaMaster::assignRootTreelet(Worker &worker) {
-    std::vector<ObjectTypeID> objectsToAssign = {
+vector<ObjectTypeID> LambdaMaster::assignRootTreelet(Worker &worker) {
+    vector<ObjectTypeID> objectsToAssign = {
         ObjectTypeID{SceneManager::Type::Treelet, 0}};
 
     /* update scene objects assignment to track that this worker now has the
@@ -276,7 +276,7 @@ std::vector<ObjectTypeID> LambdaMaster::assignRootTreelet(Worker &worker) {
     return objectsToAssign;
 }
 
-std::vector<ObjectTypeID> LambdaMaster::assignTreelets(Worker &worker) {
+vector<ObjectTypeID> LambdaMaster::assignTreelets(Worker &worker) {
     /* Scene assignment strategy
 
        When a worker connects to the master:
@@ -330,8 +330,8 @@ std::vector<ObjectTypeID> LambdaMaster::assignTreelets(Worker &worker) {
     return objectsToAssign;
 }
 
-std::vector<ObjectTypeID> LambdaMaster::assignBaseSceneObjects(Worker &worker) {
-    std::vector<ObjectTypeID> objectsToAssign = {
+vector<ObjectTypeID> LambdaMaster::assignBaseSceneObjects(Worker &worker) {
+    vector<ObjectTypeID> objectsToAssign = {
         ObjectTypeID{SceneManager::Type::Scene, 0},
         ObjectTypeID{SceneManager::Type::Camera, 0},
         ObjectTypeID{SceneManager::Type::Sampler, 0},
@@ -349,7 +349,7 @@ std::vector<ObjectTypeID> LambdaMaster::assignBaseSceneObjects(Worker &worker) {
 
 void LambdaMaster::assignObject(Worker &worker, const ObjectTypeID &object) {
     /* assign object and all its dependencies */
-    std::vector<ObjectTypeID> objectsToAssign = {object};
+    vector<ObjectTypeID> objectsToAssign = {object};
     for (const ObjectTypeID &id : getRecursiveDependencies(object)) {
         objectsToAssign.push_back(id);
     }
@@ -364,9 +364,9 @@ void LambdaMaster::assignObject(Worker &worker, const ObjectTypeID &object) {
     }
 }
 
-std::set<ObjectTypeID> LambdaMaster::getRecursiveDependencies(
+set<ObjectTypeID> LambdaMaster::getRecursiveDependencies(
     const ObjectTypeID &object) {
-    std::set<ObjectTypeID> allDeps;
+    set<ObjectTypeID> allDeps;
     for (const ObjectTypeID &id : requiredDependentObjects[object]) {
         allDeps.insert(id);
         auto deps = getRecursiveDependencies(id);
