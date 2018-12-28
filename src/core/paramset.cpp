@@ -722,6 +722,43 @@ void ParamSet::Print(int indent) const {
     printItems("rgb", indent, spectra);
 }
 
+void ParamSet::StartRecordingUsage() const {
+#define MOVE_TEMP(v)                                   \
+    for (size_t i = 0; i < (v).size(); ++i) {          \
+        (v)[i]->lookedUpRecordTemp = (v)[i]->lookedUp; \
+        (v)[i]->lookedUp = false;                      \
+    }
+    MOVE_TEMP(ints);
+    MOVE_TEMP(bools);
+    MOVE_TEMP(floats);
+    MOVE_TEMP(point2fs);
+    MOVE_TEMP(vector2fs);
+    MOVE_TEMP(point3fs);
+    MOVE_TEMP(vector3fs);
+    MOVE_TEMP(normals);
+    MOVE_TEMP(spectra);
+    MOVE_TEMP(strings);
+    MOVE_TEMP(textures);
+}
+
+void ParamSet::StopRecordingUsage() const {
+#define UPDATE_USAGE(v)                                                    \
+    for (size_t i = 0; i < (v).size(); ++i) {                              \
+        (v)[i]->lookedUp = (v)[i]->lookedUpRecordTemp || (v)[i]->lookedUp; \
+    }
+    UPDATE_USAGE(ints);
+    UPDATE_USAGE(bools);
+    UPDATE_USAGE(floats);
+    UPDATE_USAGE(point2fs);
+    UPDATE_USAGE(vector2fs);
+    UPDATE_USAGE(point3fs);
+    UPDATE_USAGE(vector3fs);
+    UPDATE_USAGE(normals);
+    UPDATE_USAGE(spectra);
+    UPDATE_USAGE(strings);
+    UPDATE_USAGE(textures);
+}
+
 // TextureParams Method Definitions
 std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTexture(
     const std::string &n, const Spectrum &def) const {
@@ -839,6 +876,46 @@ reportUnusedMaterialParams(
                          }) == geom.end())
             Warning("Parameter \"%s\" not used", param->name.c_str());
     }
+}
+
+void TextureParams::StartRecordingUsage() const {
+  geomParams.StartRecordingUsage();
+  materialParams.StartRecordingUsage();
+}
+
+void TextureParams::StopRecordingUsage() const {
+  geomParams.StopRecordingUsage();
+  materialParams.StopRecordingUsage();
+}
+
+std::vector<std::string> TextureParams::GetUsedFloatTextures() const {
+    std::vector<std::string> used;
+#define GET_USED(v)                           \
+    for (size_t i = 0; i < (v).size(); ++i) { \
+        if ((v)[i]->lookedUp) {               \
+            used.push_back((v)[i]->name);     \
+        }                                     \
+    }
+    GET_USED(geomParams.textures);
+    GET_USED(geomParams.floats);
+    GET_USED(materialParams.textures);
+    GET_USED(materialParams.floats);
+    return used;
+}
+
+std::vector<std::string> TextureParams::GetUsedSpectrumTextures() const {
+    std::vector<std::string> used;
+#define GET_USED(v)                           \
+    for (size_t i = 0; i < (v).size(); ++i) { \
+        if ((v)[i]->lookedUp) {               \
+            used.push_back((v)[i]->name);     \
+        }                                     \
+    }
+    GET_USED(geomParams.textures);
+    GET_USED(geomParams.spectra);
+    GET_USED(materialParams.textures);
+    GET_USED(materialParams.spectra);
+    return used;
 }
 
 void TextureParams::ReportUnused() const {

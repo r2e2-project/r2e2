@@ -121,6 +121,8 @@ class ParamSet {
     void Clear();
     std::string ToString() const;
     void Print(int indent) const;
+    void StartRecordingUsage() const;
+    void StopRecordingUsage() const;
 
   private:
     friend class TextureParams;
@@ -153,6 +155,7 @@ struct ParamSetItem {
     const std::unique_ptr<T[]> values;
     const int nValues;
     mutable bool lookedUp = false;
+    mutable bool lookedUpRecordTemp = false;
 };
 
 // ParamSetItem Methods
@@ -215,7 +218,12 @@ class TextureParams {
         return geomParams.FindOneSpectrum(n,
                                           materialParams.FindOneSpectrum(n, d));
     }
+    void StartRecordingUsage() const;
+    void StopRecordingUsage() const;
+    std::vector<std::string> GetUsedFloatTextures() const;
+    std::vector<std::string> GetUsedSpectrumTextures() const;
     void ReportUnused() const;
+
     const ParamSet &GetGeomParams() const { return geomParams; }
     const ParamSet &GetMaterialParams() const { return materialParams; }
     const std::map<std::string, std::shared_ptr<Texture<Float>>>
