@@ -40,18 +40,6 @@ class LambdaMaster {
             1}; /* the processing rate of rays for this scene object */
     };
 
-    struct ObjectTypeID {
-        SceneManager::Type type;
-        SceneManager::ObjectID id;
-
-        bool operator<(const ObjectTypeID &other) const {
-            if (type == other.type) {
-                return id < other.id;
-            }
-            return type < other.type;
-        }
-    };
-
     struct Worker {
         enum class State { Idle, Busy };
         WorkerId id;
@@ -59,8 +47,9 @@ class LambdaMaster {
         std::shared_ptr<TCPConnection> connection;
         Optional<Address> udpAddress{};
         Optional<Bounds2i> tile;
-        std::set<ObjectTypeID> objects;
-        size_t freeSpace{2 * 1000 * 1000 * 1000}; /* in bytes (assuming 2 GBs free to start) */
+        std::set<SceneManager::ObjectTypeID> objects;
+        size_t freeSpace{2 * 1000 * 1000 *
+                         1000}; /* in bytes (assuming 2 GBs free to start) */
 
         Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}
@@ -69,8 +58,16 @@ class LambdaMaster {
     bool processMessage(const WorkerId workerId, const meow::Message &message);
     void loadCamera();
 
-    std::vector<ObjectTypeID> assignTreelets(Worker &worker);
-
+    std::vector<SceneManager::ObjectTypeID> assignAllTreelets(Worker &worker);
+    std::vector<SceneManager::ObjectTypeID> assignRootTreelet(Worker &worker);
+    std::vector<SceneManager::ObjectTypeID> assignTreelets(Worker &worker);
+    std::vector<SceneManager::ObjectTypeID> assignBaseSceneObjects(
+        Worker &worker);
+    void assignObject(Worker &worker, const SceneManager::ObjectTypeID &object);
+    std::set<SceneManager::ObjectTypeID> getRecursiveDependencies(
+        const SceneManager::ObjectTypeID &object);
+    size_t getObjectSizeWithDependencies(
+        Worker &worker, const SceneManager::ObjectTypeID &object);
     void updateObjectUsage(const Worker &worker);
 
     std::string scenePath;
@@ -89,8 +86,10 @@ class LambdaMaster {
     std::shared_ptr<Camera> camera{};
 
     /* Scene Objects */
-    std::map<ObjectTypeID, SceneObjectInfo> sceneObjects;
-    std::stack<ObjectTypeID> unassignedObjects;
+    std::map<SceneManager::ObjectTypeID, SceneObjectInfo> sceneObjects;
+    std::map<SceneManager::ObjectTypeID, std::set<SceneManager::ObjectTypeID>>
+        requiredDependentObjects;
+    std::stack<SceneManager::ObjectTypeID> unassignedTreelets;
 
     Bounds2i sampleBounds;
 };

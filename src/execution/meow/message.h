@@ -19,7 +19,7 @@ namespace meow {
       Hey = 0x1,
       Ping,
       Pong,
-      Get,
+      GetObjects,
       GenerateRays,
       GetWorker,
       ConnectTo,

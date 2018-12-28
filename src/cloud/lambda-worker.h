@@ -60,6 +60,7 @@ class LambdaWorker {
     Poller::Action::Result::Type handleNeededTreelets();
 
     void generateRays(const Bounds2i& cropWindow);
+    void getObjects(const protobuf::GetObjects& objects);
 
     Address coordinatorAddr;
     ExecutionLoop loop{};

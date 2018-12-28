@@ -321,6 +321,17 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
     }
 }
 
+void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
+  std::vector<storage::GetRequest> requests;
+  for (const protobuf::ObjectTypeID& objectTypeID : objects.object_ids()) {
+      SceneManager::ObjectTypeID id = from_protobuf(objectTypeID);
+      std::string filePath = id.to_string();
+      std::cout << filePath << std::endl;;
+      requests.emplace_back(filePath, filePath);
+  }
+  storageBackend->get(requests);
+}
+
 bool LambdaWorker::processMessage(const Message& message) {
     cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
          << "]\n";
@@ -337,15 +348,10 @@ bool LambdaWorker::processMessage(const Message& message) {
         break;
     }
 
-    case OpCode::Get: {
-        string line;
-        istringstream iss{message.payload()};
-        vector<storage::GetRequest> requests;
-        while (getline(iss, line)) {
-            if (line.length()) requests.emplace_back(line, line);
-        }
-
-        storageBackend->get(requests);
+    case OpCode::GetObjects: {
+        protobuf::GetObjects proto;
+        protoutil::from_string(message.payload(), proto);
+        getObjects(proto);
         break;
     }
 
