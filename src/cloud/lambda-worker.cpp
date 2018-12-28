@@ -95,7 +95,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handlePeers, this),
-        [this]() { return !peers.empty(); },
+        [this]() {
+            return !peers.empty() && (chrono::steady_clock::now() -
+                                      last_peer_check) >= PEER_CHECK_INTERVAL;
+        },
         []() { throw runtime_error("peers failed"); }));
 
     loop.poller().add_action(Poller::Action(
@@ -223,6 +226,8 @@ Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
 Poller::Action::Result::Type LambdaWorker::handlePeers() {
     cerr << "[peers] " << peers.size() << " " << pluralize("peer", peers.size())
          << endl;
+
+    last_peer_check = chrono::steady_clock::now();
 
     for (auto& kv : peers) {
         auto& peerId = kv.first;

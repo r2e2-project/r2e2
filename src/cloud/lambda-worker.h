@@ -97,6 +97,11 @@ class LambdaWorker {
 
     /* Always-on FD */
     FileDescriptor dummyFD{STDOUT_FILENO};
+
+    /* Timers */
+    static constexpr std::chrono::milliseconds PEER_CHECK_INTERVAL{5'000};
+    std::chrono::steady_clock::time_point last_peer_check{
+        std::chrono::steady_clock::now()};
 };
 
 }  // namespace pbrt
