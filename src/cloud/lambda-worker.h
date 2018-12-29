@@ -30,6 +30,7 @@ class LambdaWorker {
                  const std::string& storageBackendUri);
 
     void run();
+    void writeImage();
 
   private:
     struct Worker {

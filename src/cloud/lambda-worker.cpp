@@ -74,7 +74,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             return true;
         },
         []() { cerr << "Connection to coordinator failed." << endl; },
-        []() { throw ProgramFinished(); });
+        [this]() {
+            cerr << "Writing output image... ";
+            writeImage();
+            cerr << "done.\n";
+            throw ProgramFinished();
+        });
 
     udpConnection = loop.make_udp_connection(
         [this](shared_ptr<UDPConnection>, Address&& addr, string&& data) {
@@ -527,6 +532,11 @@ void LambdaWorker::initializeScene() {
     }
 
     initialized = true;
+}
+
+void LambdaWorker::writeImage() {
+    camera->film->MergeFilmTile(move(filmTile));
+    camera->film->WriteImage();
 }
 
 int main(int argc, char const* argv[]) {

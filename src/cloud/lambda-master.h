@@ -27,7 +27,7 @@ class LambdaMaster {
 
     void run();
 
-    static constexpr int TILE_SIZE = 4;
+    static constexpr int TILE_SIZE = 32;
 
   private:
     using ObjectTypeID = SceneManager::ObjectTypeID;
