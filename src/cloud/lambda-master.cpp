@@ -23,14 +23,18 @@
 using namespace std;
 using namespace meow;
 using namespace pbrt;
+using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
+using PollerResult = Poller::Result::Type;
 using ObjectTypeID = SceneManager::ObjectTypeID;
+
+constexpr chrono::milliseconds WORKER_REQUEST_INTERVAL{500};
 
 void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA PORT" << endl; }
 
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
-    : scenePath(scenePath) {
+    : scenePath(scenePath), workerRequestTimer(WORKER_REQUEST_INTERVAL) {
     global::manager.init(scenePath);
     loadCamera();
 
@@ -54,10 +58,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
 
     udpConnection = loop.make_udp_connection(
         [&](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
-            cerr << "set udp address for " << data << endl;
             const WorkerId workerId = stoull(data);
             if (workers.count(workerId) == 0) {
-                throw runtime_error("invalid worker id");
+                throw runtime_error("unexpected worker id");
             }
 
             workers.at(workerId).udpAddress.reset(move(addr));
@@ -72,6 +75,17 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
     Vector2i sampleExtent = sampleBounds.Diagonal();
     Point2i nTiles((sampleExtent.x + TILE_SIZE - 1) / TILE_SIZE,
                    (sampleExtent.y + TILE_SIZE - 1) / TILE_SIZE);
+
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, bind(&LambdaMaster::handleMessages, this),
+        [this]() { return !incomingMessages.empty(); },
+        []() { throw runtime_error("messages failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        workerRequestTimer.fd, Direction::In,
+        bind(&LambdaMaster::handleWorkerRequests, this),
+        [this]() { return !pendingWorkerRequests.empty(); },
+        []() { throw runtime_error("worker requests failed"); }));
 
     loop.make_listener({"0.0.0.0", listenPort}, [this, nTiles](
                                                     ExecutionLoop &loop,
@@ -104,7 +118,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
                 .first;
         auto &this_worker = workerIt->second;
 
-        /* assigns the minimal necessary scene objects for working with a scene
+        /* assigns the minimal necessary scene objects for working with a
+         * scene
          */
         this->assignBaseSceneObjects(workerIt->second);
 
@@ -119,8 +134,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
             const int y1 = min(y0 + TILE_SIZE, this->sampleBounds.pMax.y);
             workerIt->second.tile.reset(Point2i{x0, y0}, Point2i{x1, y1});
 
-            /* assign root treelet to worker since it is generating rays for a
-             * crop window */
+            /* assign root treelet to worker since it is generating rays for
+             * a crop window */
             // this->assignRootTreelet(workerIt->second);
             this->assignAllTreelets(workerIt->second);
         }
@@ -134,8 +149,96 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
     });
 }
 
+ResultType LambdaMaster::handleMessages() {
+    deque<pair<WorkerId, Message>> unprocessedMessages;
+
+    while (!incomingMessages.empty()) {
+        auto front = move(incomingMessages.front());
+        incomingMessages.pop_front();
+
+        if (!processMessage(front.first, front.second)) {
+            if (front.second.opcode() == OpCode::GetWorker) {
+                pendingWorkerRequests.push_back(move(front));
+            } else {
+                unprocessedMessages.push_back(move(front));
+            }
+        }
+    }
+
+    swap(unprocessedMessages, incomingMessages);
+    return ResultType::Continue;
+}
+
+ResultType LambdaMaster::handleWorkerRequests() {
+    workerRequestTimer.reset();
+
+    deque<pair<WorkerId, Message>> unprocessedMessages;
+
+    while (!pendingWorkerRequests.empty()) {
+        auto front = move(pendingWorkerRequests.front());
+        pendingWorkerRequests.pop_front();
+
+        if (!processWorkerRequest(front.first, front.second)) {
+            unprocessedMessages.push_back(move(front));
+        }
+    }
+
+    swap(unprocessedMessages, pendingWorkerRequests);
+    return ResultType::Continue;
+}
+
+bool LambdaMaster::processWorkerRequest(const WorkerId workerId,
+                                        const Message &message) {
+    auto &worker = workers.at(workerId);
+
+    if (!worker.udpAddress.initialized()) {
+        return false;
+    }
+
+    protobuf::GetWorker proto;
+    protoutil::from_string(message.payload(), proto);
+    const auto treeletId = proto.treelet_id();
+
+    /* let's see if we have a worker that has that treelet */
+    if (treeletToWorker.count(treeletId) == 0) {
+        cerr << "No worker found for treelet " << treeletId << endl;
+        return false;
+    }
+
+    Optional<WorkerId> selectedWorkerId;
+    const auto &workerList = treeletToWorker[treeletId];
+
+    for (size_t i = 0; i < workerList.size(); i++) {
+        auto &worker = workers.at(workerList[i]);
+        if (!worker.udpAddress.initialized()) continue;
+        selectedWorkerId.reset(workerList[i]);
+    }
+
+    if (!selectedWorkerId.initialized()) {
+        cerr << "No worker found for treelet " << treeletId << endl;
+        return false;
+    }
+
+    auto makeMessage = [this](const Worker &worker) -> Message {
+        protobuf::ConnectTo proto;
+        proto.set_worker_id(worker.id);
+        proto.set_address(worker.udpAddress->str());
+        return {OpCode::ConnectTo, protoutil::to_string(proto)};
+    };
+
+    const auto &selectedWorker = workers.at(*selectedWorkerId);
+
+    worker.connection->enqueue_write(makeMessage(selectedWorker).str());
+    selectedWorker.connection->enqueue_write(makeMessage(worker).str());
+
+    return true;
+}
+
 bool LambdaMaster::processMessage(const uint64_t workerId,
                                   const meow::Message &message) {
+    cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
+         << "] from worker " << workerId << endl;
+
     auto &worker = workers.at(workerId);
 
     switch (message.opcode()) {
@@ -164,48 +267,8 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         break;
     }
 
-    case OpCode::GetWorker: {
-        if (!worker.udpAddress.initialized()) {
-            return false;
-        }
-
-        protobuf::GetWorker proto;
-        protoutil::from_string(message.payload(), proto);
-        const auto treeletId = proto.treelet_id();
-
-        /* let's see if we have a worker that has that treelet */
-        if (treeletToWorker.count(treeletId) == 0) {
-            cerr << "No worker found for treelet " << treeletId << endl;
-            return false;
-        }
-
-        Optional<WorkerId> selectedWorkerId;
-        const auto &workerList = treeletToWorker[treeletId];
-
-        for (size_t i = 0; i < workerList.size(); i++) {
-            auto &worker = workers.at(workerList[i]);
-            if (!worker.udpAddress.initialized()) continue;
-            selectedWorkerId.reset(workerList[i]);
-        }
-
-        if (!selectedWorkerId.initialized()) {
-            cerr << "No worker found for treelet " << treeletId << endl;
-            return false;
-        }
-
-        auto message = [this](const Worker &worker) -> Message {
-            protobuf::ConnectTo proto;
-            proto.set_worker_id(worker.id);
-            proto.set_address(worker.udpAddress->str());
-            return {OpCode::ConnectTo, protoutil::to_string(proto)};
-        };
-
-        const auto &selectedWorker = workers.at(*selectedWorkerId);
-
-        worker.connection->enqueue_write(message(selectedWorker).str());
-        selectedWorker.connection->enqueue_write(message(worker).str());
-        break;
-    }
+    case OpCode::GetWorker:
+        return processWorkerRequest(workerId, message);
 
     default:
         throw runtime_error("unhandled message opcode");
@@ -215,23 +278,9 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 }
 
 void LambdaMaster::run() {
-    constexpr int TIMEOUT = 100;
-
     while (true) {
-        loop.loop_once(TIMEOUT);
-
-        deque<pair<WorkerId, Message>> unprocessedMessages;
-
-        while (!incomingMessages.empty()) {
-            auto front = move(incomingMessages.front());
-            incomingMessages.pop_front();
-
-            if (!processMessage(front.first, front.second)) {
-                unprocessedMessages.push_back(move(front));
-            }
-        }
-
-        swap(unprocessedMessages, incomingMessages);
+        auto res = loop.loop_once().result;
+        if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 }
 
@@ -249,7 +298,8 @@ vector<ObjectTypeID> LambdaMaster::assignAllTreelets(Worker &worker) {
         const SceneObjectInfo &info = kv.second;
 
         if (id.type != SceneManager::Type::Treelet ||
-            (id.id != 0 && ((id.id % 2) != (worker.id % 2)))) continue;
+            (id.id != 0 && ((id.id % 2) != (worker.id % 2))))
+            continue;
 
         objectsToAssign.push_back(id);
     }

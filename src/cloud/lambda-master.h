@@ -17,6 +17,7 @@
 #include "execution/loop.h"
 #include "execution/meow/message.h"
 #include "util/optional.h"
+#include "util/timerfd.h"
 
 namespace pbrt {
 
@@ -26,7 +27,7 @@ class LambdaMaster {
 
     void run();
 
-    static constexpr int TILE_SIZE = 16;
+    static constexpr int TILE_SIZE = 4;
 
   private:
     using ObjectTypeID = SceneManager::ObjectTypeID;
@@ -57,7 +58,12 @@ class LambdaMaster {
             : id(id), connection(std::move(connection)) {}
     };
 
+    Poller::Action::Result::Type handleMessages();
+    Poller::Action::Result::Type handleWorkerRequests();
+
     bool processMessage(const WorkerId workerId, const meow::Message &message);
+    bool processWorkerRequest(const WorkerId workerId,
+                              const meow::Message &message);
     void loadCamera();
 
     std::vector<ObjectTypeID> assignAllTreelets(Worker &worker);
@@ -78,7 +84,9 @@ class LambdaMaster {
     std::map<WorkerId, Worker> workers{};
     std::map<TreeletId, std::vector<WorkerId>> treeletToWorker{};
 
+    /* Message Queues */
     std::deque<std::pair<WorkerId, meow::Message>> incomingMessages;
+    std::deque<std::pair<WorkerId, meow::Message>> pendingWorkerRequests;
 
     /* Scene Data */
     std::string getSceneMessageStr{};
@@ -86,11 +94,16 @@ class LambdaMaster {
     std::shared_ptr<Camera> camera{};
 
     /* Scene Objects */
+    Bounds2i sampleBounds;
     std::map<ObjectTypeID, SceneObjectInfo> sceneObjects;
     std::map<ObjectTypeID, std::set<ObjectTypeID>> requiredDependentObjects;
     std::stack<ObjectTypeID> unassignedTreelets;
 
-    Bounds2i sampleBounds;
+    /* Always-on FD */
+    FileDescriptor dummyFD{STDOUT_FILENO};
+
+    /* Timers */
+    TimerFD workerRequestTimer;
 };
 
 class Schedule {

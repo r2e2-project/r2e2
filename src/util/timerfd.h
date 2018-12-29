@@ -25,7 +25,7 @@ struct TimerFD {
 
     void reset() {
         char buffer[8];
-        read(fd.fd_num(), buffer, 8);
+        CheckSystemCall("read", read(fd.fd_num(), buffer, 8));
     }
 
     ~TimerFD() {

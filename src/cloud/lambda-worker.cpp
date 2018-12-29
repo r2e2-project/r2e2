@@ -39,7 +39,7 @@ using PollerResult = Poller::Result::Type;
 
 class ProgramFinished : public exception {};
 
-constexpr chrono::milliseconds PEER_CHECK_INTERVAL{5'000};
+constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 
 void usage(const char* argv0) {
@@ -176,7 +176,7 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 
         const TreeletId nextTreelet = ray.currentTreelet();
 
-        if (nextTreelet % 2 == *workerId % 2) {
+        if (nextTreelet % 2 == *workerId % 2 || nextTreelet == 0) {
             rayQueue.push_back(move(ray));
         } else {
             if (treeletToWorker.count(nextTreelet)) {
@@ -201,14 +201,16 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
 
         while (!q.second.empty()) {
             ostringstream oss;
-            protobuf::RecordWriter writer{&oss};
 
-            while (oss.tellp() < 1'000 && !q.second.empty()) {
-                RayState ray = move(q.second.front());
-                q.second.pop_front();
-                outQueueSize--;
+            {
+                protobuf::RecordWriter writer{&oss};
+                while (oss.tellp() < 1'000 && !q.second.empty()) {
+                    RayState ray = move(q.second.front());
+                    q.second.pop_front();
+                    outQueueSize--;
 
-                writer.write(to_protobuf(ray));
+                    writer.write(to_protobuf(ray));
+                }
             }
 
             Message message{OpCode::SendRays, oss.str()};
@@ -450,7 +452,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 
 void LambdaWorker::run() {
     while (true) {
-        auto res = loop.loop_once(200).result;
+        auto res = loop.loop_once().result;
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 }
