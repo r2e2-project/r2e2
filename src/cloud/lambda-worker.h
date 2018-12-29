@@ -61,6 +61,9 @@ class LambdaWorker {
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleNeededTreelets();
 
+    meow::Message createConnectionRequest(const Worker& peer);
+    meow::Message createConnectionResponse(const Worker& peer);
+
     void generateRays(const Bounds2i& cropWindow);
     void getObjects(const protobuf::GetObjects& objects);
 
@@ -85,6 +88,7 @@ class LambdaWorker {
     std::unique_ptr<Scene> fakeScene{};
     std::vector<std::shared_ptr<Light>> lights{};
     std::shared_ptr<CloudBVH> treelet{};
+    std::set<uint32_t> treeletIds{};
     MemoryArena arena;
 
     /* Rays */

@@ -241,9 +241,15 @@ message ConnectTo {
 
 message ConnectRequest {
     uint64 worker_id = 1;
-    uint32 treelet_id = 2; // Extend to support mutiple treelets
-    int32 my_seed = 3;
-    int32 your_seed = 4;
+    int32 my_seed = 2;
+    int32 your_seed = 3;
+}
+
+message ConnectResponse {
+    uint64 worker_id = 1;
+    int32 my_seed = 2;
+    int32 your_seed = 3;
+    repeated uint32 treelet_ids = 4;
 }
 
 // Materials & Textures
@@ -284,4 +290,3 @@ message Manifest {
   };
   repeated Object objects = 1;
 }
-

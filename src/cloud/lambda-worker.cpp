@@ -135,6 +135,25 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     coordinatorConnection->enqueue_write(message.str());
 }
 
+Message LambdaWorker::createConnectionRequest(const Worker& peer) {
+    protobuf::ConnectRequest proto;
+    proto.set_worker_id(*workerId);
+    proto.set_my_seed(mySeed);
+    proto.set_your_seed(peer.seed);
+    return {OpCode::ConnectionRequest, protoutil::to_string(proto)};
+}
+
+Message LambdaWorker::createConnectionResponse(const Worker& peer) {
+    protobuf::ConnectResponse proto;
+    proto.set_worker_id(*workerId);
+    proto.set_my_seed(mySeed);
+    proto.set_your_seed(peer.seed);
+    for (const auto& treeletId : treeletIds) {
+        proto.add_treelet_ids(treeletId);
+    }
+    return {OpCode::ConnectionResponse, protoutil::to_string(proto)};
+}
+
 Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
     deque<RayState> processedRays;
 
@@ -176,7 +195,7 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 
         const TreeletId nextTreelet = ray.currentTreelet();
 
-        if (nextTreelet % 2 == *workerId % 2 || nextTreelet == 0) {
+        if (treeletIds.count(nextTreelet)) {
             rayQueue.push_back(move(ray));
         } else {
             if (treeletToWorker.count(nextTreelet)) {
@@ -246,13 +265,7 @@ Poller::Action::Result::Type LambdaWorker::handlePeers() {
 
         switch (peer.state) {
         case Worker::State::Connecting: {
-            protobuf::ConnectRequest proto;
-            proto.set_worker_id(*workerId);
-            proto.set_my_seed(mySeed);
-            proto.set_your_seed(peer.seed);
-            Message message{OpCode::ConnectionRequest,
-                            protoutil::to_string(proto)};
-
+            auto message = createConnectionRequest(peer);
             udpConnection->enqueue_datagram(peer.address, message.str());
             break;
         }
@@ -333,6 +346,7 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
     vector<storage::GetRequest> requests;
     for (const protobuf::ObjectTypeID& objectTypeID : objects.object_ids()) {
         SceneManager::ObjectTypeID id = from_protobuf(objectTypeID);
+        if (id.type == SceneManager::Type::Treelet) treeletIds.insert(id.id);
         string filePath = id.to_string();
         requests.emplace_back(filePath, filePath);
     }
@@ -373,6 +387,8 @@ bool LambdaWorker::processMessage(const Message& message) {
         protobuf::ConnectTo proto;
         protoutil::from_string(message.payload(), proto);
 
+        cerr << protoutil::to_json(proto) << endl;
+
         if (peers.count(proto.worker_id()) == 0) {
             const auto dest = Address::decompose(proto.address());
             peers.emplace(proto.worker_id(),
@@ -388,42 +404,52 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         const auto otherWorkerId = proto.worker_id();
         if (peers.count(otherWorkerId) == 0) {
-            /* we still haven't heard about this worker id from the master,
-            we should wait. */
+            /* we haven't heard about this peer from the master, let's process
+             * it later */
             return false;
         }
 
         auto& peer = peers.at(otherWorkerId);
-        if (peer.state == Worker::State::Connected) {
-            break;
+        auto message = createConnectionResponse(peer);
+        udpConnection->enqueue_datagram(peer.address, message.str());
+        break;
+    }
+
+    case OpCode::ConnectionResponse: {
+        protobuf::ConnectResponse proto;
+        protoutil::from_string(message.payload(), proto);
+
+        const auto otherWorkerId = proto.worker_id();
+        if (peers.count(otherWorkerId) == 0) {
+            /* we don't know about this worker */
+            return true;
         }
 
+        auto& peer = peers.at(otherWorkerId);
         peer.seed = proto.my_seed();
         if (proto.your_seed() == mySeed) {
             peer.state = Worker::State::Connected;
-            cerr << "* connected to worker-" << otherWorkerId << endl;
+            cerr << "* connected to worker " << otherWorkerId << endl;
 
-            const TreeletId treeletId = proto.treelet_id();
+            for (const auto treeletId : proto.treelet_ids()) {
+                peer.treelets.insert(treeletId);
+                treeletToWorker[treeletId] = otherWorkerId;
+                requestedTreelets.erase(treeletId);
 
-            peer.treelets.insert(treeletId);
-            treeletToWorker[treeletId] = otherWorkerId;
-            requestedTreelets.erase(treeletId);
+                if (pendingQueue.count(treeletId)) {
+                    auto& treeletPending = pendingQueue[treeletId];
+                    auto& treeletOut = outQueue[treeletId];
 
-            if (pendingQueue.count(treeletId)) {
-                auto& treeletPending = pendingQueue[treeletId];
-                auto& treeletOut = outQueue[treeletId];
+                    outQueueSize += treeletPending.size();
+                    pendingQueueSize -= treeletPending.size();
 
-                outQueueSize += treeletPending.size();
-                pendingQueueSize -= treeletPending.size();
-
-                while (!treeletPending.empty()) {
-                    treeletOut.push_back(move(treeletPending.front()));
-                    treeletPending.pop_front();
+                    while (!treeletPending.empty()) {
+                        treeletOut.push_back(move(treeletPending.front()));
+                        treeletPending.pop_front();
+                    }
                 }
             }
         }
-
-        break;
     }
 
     case OpCode::SendRays: {

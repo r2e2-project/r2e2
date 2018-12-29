@@ -24,6 +24,7 @@ namespace meow {
       GetWorker,
       ConnectTo,
       ConnectionRequest,
+      ConnectionResponse,
       SendRays,
       Bye,
 
@@ -31,10 +32,18 @@ namespace meow {
     };
 
     static constexpr char const* OPCODE_NAMES[to_underlying(OpCode::COUNT)] = {
-        "",          "Hey",       "Ping",
-        "Pong",      "Get",       "GenerateRays",
-        "GetWorker", "ConnectTo", "ConnectionRequest",
-        "SendRays",  "Bye"};
+        "",
+        "Hey",
+        "Ping",
+        "Pong",
+        "Get",
+        "GenerateRays",
+        "GetWorker",
+        "ConnectTo",
+        "ConnectionRequest",
+        "ConnectionResponse",
+        "SendRays",
+        "Bye"};
 
   private:
     uint32_t payload_length_ { 0 };

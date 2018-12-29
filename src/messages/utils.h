@@ -1,9 +1,11 @@
 #ifndef PBRT_MESSAGES_UTILS_H
 #define PBRT_MESSAGES_UTILS_H
 
+#include <google/protobuf/util/json_util.h>
+
 #include "cloud/integrator.h"
-#include "cloud/raystate.h"
 #include "cloud/manager.h"
+#include "cloud/raystate.h"
 #include "core/geometry.h"
 #include "core/light.h"
 #include "core/paramset.h"
@@ -24,6 +26,22 @@ std::string to_string(const ProtobufType& proto) {
 template <class ProtobufType>
 void from_string(const std::string& data, ProtobufType& dest) {
     dest.ParseFromString(data);
+}
+
+template <class ProtobufType>
+std::string to_json(const ProtobufType& protobuf,
+                    const bool pretty_print = false) {
+    using namespace google::protobuf::util;
+    JsonPrintOptions print_options;
+    print_options.add_whitespace = pretty_print;
+    print_options.always_print_primitive_fields = true;
+
+    std::string ret;
+    if (not MessageToJsonString(protobuf, &ret, print_options).ok()) {
+        throw std::runtime_error("cannot convert protobuf to json");
+    }
+
+    return ret;
 }
 
 }  // namespace protoutil
@@ -50,7 +68,8 @@ protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample);
 protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 protobuf::Scene to_protobuf(const Scene& scene);
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
-protobuf::ObjectTypeID to_protobuf(const SceneManager::ObjectTypeID& objectTypeID);
+protobuf::ObjectTypeID to_protobuf(
+    const SceneManager::ObjectTypeID& objectTypeID);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
@@ -75,7 +94,8 @@ TextureParams from_protobuf(
     ParamSet& material_params,
     std::map<std::string, std::shared_ptr<Texture<Float>>>& fTex,
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex);
-SceneManager::ObjectTypeID from_protobuf(const protobuf::ObjectTypeID& objectTypeID);
+SceneManager::ObjectTypeID from_protobuf(
+    const protobuf::ObjectTypeID& objectTypeID);
 
 namespace light {
 
