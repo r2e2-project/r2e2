@@ -1272,6 +1272,9 @@ void pbrtTexture(const std::string &name, const std::string &type,
 
     TextureParams tp(params, params, *graphicsState.floatTextures,
                      *graphicsState.spectrumTextures);
+    if (PbrtOptions.dumpScene) {
+      tp.RemapFilenames(global::manager.getScenePath());
+    }
     if (type == "float") {
         // Create _Float_ texture and store in _floatTextures_
         if (graphicsState.floatTextures->find(name) !=

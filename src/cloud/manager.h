@@ -70,6 +70,8 @@ class SceneManager {
     std::map<Type, std::vector<Object>> listObjects();
     std::map<ObjectTypeID, std::set<ObjectTypeID>> listObjectDependencies();
 
+  const std::string& getScenePath() { return scenePath; }
+
   private:
     static std::string getFileName(const Type type, const uint32_t id);
     void loadManifest();

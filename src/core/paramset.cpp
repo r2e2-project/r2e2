@@ -1,4 +1,3 @@
-
 /*
     pbrt source code is Copyright(c) 1998-2016
                         Matt Pharr, Greg Humphreys, and Wenzel Jakob.
@@ -35,6 +34,8 @@
 #include "paramset.h"
 #include "floatfile.h"
 #include "textures/constant.h"
+
+#include <fstream>
 
 namespace pbrt {
 
@@ -438,6 +439,22 @@ std::string ParamSet::FindOneFilename(const std::string &name,
     std::string filename = FindOneString(name, "");
     if (filename == "") return d;
     filename = AbsolutePath(ResolveFilename(filename));
+    if (remappedFilenames.count(filename) > 0) {
+      filename = remappedFilenames[filename];
+    } else if (remappingBasePath != "") {
+        std::string basename = BaseFilename(filename);
+        /* add a random prefix to avoid overwritting files with the same
+         * basename */
+        std::string randPrefix = RandomString(6);
+        std::string remappedFilename =
+            remappingBasePath + "/" + randPrefix + "_" + basename;
+        remappedFilenames[filename] = remappedFilename;
+        /* copy file to remapped location */
+        std::ifstream src(filename, std::ios::binary);
+        std::ofstream dst(remappedFilename, std::ios::binary);
+        dst << src.rdbuf();
+        filename = remappedFilename;
+    }
     return filename;
 }
 
@@ -759,6 +776,10 @@ void ParamSet::StopRecordingUsage() const {
     UPDATE_USAGE(textures);
 }
 
+void ParamSet::RemapFilenames(const std::string &basepath) const {
+  remappingBasePath = basepath;
+}
+
 // TextureParams Method Definitions
 std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTexture(
     const std::string &n, const Spectrum &def) const {
@@ -879,13 +900,28 @@ reportUnusedMaterialParams(
 }
 
 void TextureParams::StartRecordingUsage() const {
-  geomParams.StartRecordingUsage();
-  materialParams.StartRecordingUsage();
+    geomParams.StartRecordingUsage();
+    materialParams.StartRecordingUsage();
 }
 
 void TextureParams::StopRecordingUsage() const {
-  geomParams.StopRecordingUsage();
-  materialParams.StopRecordingUsage();
+    geomParams.StopRecordingUsage();
+    materialParams.StopRecordingUsage();
+}
+
+void TextureParams::RemapFilenames(const std::string &basepath) const {
+    geomParams.RemapFilenames(basepath);
+    materialParams.RemapFilenames(basepath);
+}
+
+std::map<std::string, std::string> TextureParams::GetRemappedFilenames() const {
+  auto geomFilenames = geomParams.GetRemappedFilenames();
+  auto materialFilenames = materialParams.GetRemappedFilenames();
+  std::map<std::string, std::string> filenames(materialFilenames);
+  for (auto& kv : geomFilenames) {
+    filenames[kv.first] = kv.second;
+  }
+  return filenames;
 }
 
 std::vector<std::string> TextureParams::GetUsedFloatTextures() const {
@@ -901,6 +937,7 @@ std::vector<std::string> TextureParams::GetUsedFloatTextures() const {
     GET_USED(materialParams.textures);
     GET_USED(materialParams.floats);
     return used;
+#undef GET_USED
 }
 
 std::vector<std::string> TextureParams::GetUsedSpectrumTextures() const {
@@ -916,6 +953,7 @@ std::vector<std::string> TextureParams::GetUsedSpectrumTextures() const {
     GET_USED(materialParams.textures);
     GET_USED(materialParams.spectra);
     return used;
+#undef GET_USED
 }
 
 void TextureParams::ReportUnused() const {

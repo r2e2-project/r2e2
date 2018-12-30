@@ -88,6 +88,11 @@ std::string DirectoryContaining(const std::string &filename) {
     return filename;
 }
 
+std::string BaseFilename(const std::string &filename) {
+    throw new std::logic_error("Not implemented on Windows.");
+    return filename;
+}
+
 #else
 
 bool IsAbsolutePath(const std::string &filename) {
@@ -120,7 +125,33 @@ std::string DirectoryContaining(const std::string &filename) {
     return result;
 }
 
+std::string BaseFilename(const std::string &filename) {
+    char *t = strdup(filename.c_str());
+    std::string result = basename(t);
+    free(t);
+    return result;
+}
+
 #endif
+
+std::string RandomString(std::string::size_type length) {
+    static auto &chrs =
+        "0123456789"
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    thread_local static std::mt19937 rg{std::random_device{}()};
+    thread_local static std::uniform_int_distribution<std::string::size_type>
+        pick(0, sizeof(chrs) - 2);
+
+    std::string s;
+
+    s.reserve(length);
+
+    while (length--) s += chrs[pick(rg)];
+
+    return s;
+}
 
 void SetSearchDirectory(const std::string &dirname) {
     searchDirectory = dirname;
