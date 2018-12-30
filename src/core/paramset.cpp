@@ -890,11 +890,11 @@ void TextureParams::StopRecordingUsage() const {
 
 std::vector<std::string> TextureParams::GetUsedFloatTextures() const {
     std::vector<std::string> used;
-#define GET_USED(v)                           \
-    for (size_t i = 0; i < (v).size(); ++i) { \
-        if ((v)[i]->lookedUp) {               \
-            used.push_back((v)[i]->name);     \
-        }                                     \
+#define GET_USED(v)                                                      \
+    for (size_t i = 0; i < (v).size(); ++i) {                            \
+        if ((v)[i]->lookedUp && floatTextures.count((v)[i]->name) > 0) { \
+            used.push_back((v)[i]->name);                                \
+        }                                                                \
     }
     GET_USED(geomParams.textures);
     GET_USED(geomParams.floats);
@@ -905,11 +905,11 @@ std::vector<std::string> TextureParams::GetUsedFloatTextures() const {
 
 std::vector<std::string> TextureParams::GetUsedSpectrumTextures() const {
     std::vector<std::string> used;
-#define GET_USED(v)                           \
-    for (size_t i = 0; i < (v).size(); ++i) { \
-        if ((v)[i]->lookedUp) {               \
-            used.push_back((v)[i]->name);     \
-        }                                     \
+#define GET_USED(v)                                                         \
+    for (size_t i = 0; i < (v).size(); ++i) {                               \
+        if ((v)[i]->lookedUp && spectrumTextures.count((v)[i]->name) > 0) { \
+            used.push_back((v)[i]->name);                                   \
+        }                                                                   \
     }
     GET_USED(geomParams.textures);
     GET_USED(geomParams.spectra);
