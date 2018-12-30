@@ -29,6 +29,11 @@ RecordWriter::RecordWriter(std::ostringstream* os)
 
 void RecordWriter::write_empty() { coded_output_.WriteLittleEndian32(0); }
 
+void RecordWriter::write(const string& string) {
+    coded_output_.WriteLittleEndian32(string.length());
+    coded_output_.WriteRaw(string.data(), string.length());
+}
+
 RecordReader::RecordReader(const string& filename)
     : RecordReader(FileDescriptor(
           CheckSystemCall(filename, open(filename.c_str(), O_RDONLY, 0)))) {}

@@ -27,6 +27,8 @@ public:
     template<class ProtobufType>
     void write(const ProtobufType & proto);
 
+    void write(const std::string & string);
+
     void write_empty();
 
 private:
@@ -83,6 +85,10 @@ bool RecordReader::read(ProtobufType * record) {
         coded_input_.PushLimit(next_size_);
 
     if (record->ParseFromCodedStream(&coded_input_)) {
+        if (coded_input_.BytesUntilLimit() != 0) {
+            throw std::runtime_error("message was shorter than expected");
+        }
+
         coded_input_.PopLimit(message_limit);
         eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
         return true;

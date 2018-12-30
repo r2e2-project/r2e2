@@ -225,20 +225,29 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
 
         while (!q.second.empty()) {
             ostringstream oss;
+            size_t packetLen = 5;
 
             {
                 protobuf::RecordWriter writer{&oss};
-                while (oss.tellp() < 1'000 && !q.second.empty()) {
+
+                while (packetLen < 1'200 && !q.second.empty()) {
                     RayState ray = move(q.second.front());
                     q.second.pop_front();
                     outQueueSize--;
 
-                    writer.write(to_protobuf(ray));
+                    const string& rayStr =
+                        protoutil::to_string(to_protobuf(ray));
+
+                    packetLen += rayStr.length() + 4;
+                    writer.write(rayStr);
                 }
             }
 
+            oss.flush();
             Message message{OpCode::SendRays, oss.str()};
-            udpConnection->enqueue_datagram(peer.address, message.str());
+            auto messageStr = message.str();
+            cerr << "message.len = " << messageStr.length() << endl;
+            udpConnection->enqueue_datagram(peer.address, move(messageStr));
         }
     }
 
@@ -432,7 +441,8 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         auto& peer = peers.at(otherWorkerId);
         peer.seed = proto.my_seed();
-        if (proto.your_seed() == mySeed) {
+        if (peer.state != Worker::State::Connected &&
+            proto.your_seed() == mySeed) {
             peer.state = Worker::State::Connected;
             cerr << "* connected to worker " << otherWorkerId << endl;
 
@@ -455,6 +465,8 @@ bool LambdaWorker::processMessage(const Message& message) {
                 }
             }
         }
+
+        break;
     }
 
     case OpCode::SendRays: {
