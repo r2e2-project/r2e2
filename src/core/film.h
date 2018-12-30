@@ -71,11 +71,13 @@ class Film {
     void WriteImage(Float splatScale = 1);
     void Clear();
 
+    void setFilename(const std::string &filename) { this->filename = filename; }
+
     // Film Public Data
     const Point2i fullResolution;
     const Float diagonal;
     std::unique_ptr<Filter> filter;
-    const std::string filename;
+    std::string filename;
     Bounds2i croppedPixelBounds;
 
   private:

@@ -75,9 +75,13 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         },
         []() { cerr << "Connection to coordinator failed." << endl; },
         [this]() {
-            cerr << "Writing output image... ";
-            writeImage();
-            cerr << "done.\n";
+            if (outputName.length()) {
+                cerr << "Writing output image... ";
+                writeImage();
+                storage::PutRequest putOutputRequest{outputName, outputName};
+                storageBackend->put({putOutputRequest});
+                cerr << "done.\n";
+            }
             throw ProgramFinished();
         });
 
@@ -246,7 +250,6 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
             oss.flush();
             Message message{OpCode::SendRays, oss.str()};
             auto messageStr = message.str();
-            cerr << "message.len = " << messageStr.length() << endl;
             udpConnection->enqueue_datagram(peer.address, move(messageStr));
         }
     }
@@ -375,6 +378,7 @@ bool LambdaWorker::processMessage(const Message& message) {
     case OpCode::Hey:
         workerId.reset(stoull(message.payload()));
         udpConnection->enqueue_datagram(coordinatorAddr, to_string(*workerId));
+        outputName = to_string(*workerId) + ".png";
         break;
 
     case OpCode::Ping: {
@@ -506,6 +510,10 @@ void LambdaWorker::loadCamera() {
     reader->read(&proto_camera);
     camera = camera::from_protobuf(proto_camera, transformCache);
     filmTile = camera->film->GetFilmTile(camera->film->GetSampleBounds());
+
+    if (outputName.length()) {
+        camera->film->setFilename(outputName);
+    }
 }
 
 void LambdaWorker::loadSampler() {

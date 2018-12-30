@@ -79,6 +79,7 @@ class LambdaWorker {
     std::map<WorkerId, Worker> peers;
     int32_t mySeed;
     bool peerRequested{false};
+    std::string outputName;
 
     /* Scene Data */
     bool initialized{false};

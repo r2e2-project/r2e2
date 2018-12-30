@@ -298,7 +298,7 @@ vector<ObjectTypeID> LambdaMaster::assignAllTreelets(Worker &worker) {
         const SceneObjectInfo &info = kv.second;
 
         if (id.type != SceneManager::Type::Treelet ||
-            (id.id != 0 && ((id.id % 2) != (worker.id % 2))))
+            (id.id != 0 && ((id.id % 4) != (worker.id % 4))))
             continue;
 
         objectsToAssign.push_back(id);
