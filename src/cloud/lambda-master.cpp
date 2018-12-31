@@ -16,6 +16,7 @@
 #include "execution/loop.h"
 #include "execution/meow/message.h"
 #include "messages/utils.h"
+#include "net/lambda.h"
 #include "net/socket.h"
 #include "util/exception.h"
 #include "util/path.h"
@@ -32,18 +33,17 @@ using ObjectTypeID = SceneManager::ObjectTypeID;
 constexpr chrono::milliseconds WORKER_REQUEST_INTERVAL{500};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 
-void usage(const char *argv0) {
-    cerr << argv0 << " SCENE-DATA PORT NUM-LAMBDA PUBLIC-ADDR" << endl;
-}
-
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                            const uint32_t numberOfLambdas,
                            const string &publicAddress,
-                           const string &storageBackend)
+                           const string &storageBackend,
+                           const string &awsRegion)
     : scenePath(scenePath),
       numberOfLambdas(numberOfLambdas),
       publicAddress(publicAddress),
       storageBackend(storageBackend),
+      awsRegion(awsRegion),
+      awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
       workerRequestTimer(WORKER_REQUEST_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL) {
     global::manager.init(scenePath);
@@ -309,6 +309,17 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 }
 
 void LambdaMaster::run() {
+    /* request launching the lambdas */
+    cout << "Launching " << numberOfLambdas << " lambda(s)" << endl;
+    for (size_t i = 0; i < numberOfLambdas; i++) {
+        loop.make_http_request<SSLConnection>(
+            "start-worker", awsAddress, generateRequest(),
+            [](const uint64_t, const string &, const HTTPResponse &) {},
+            [](const uint64_t, const string &) {
+                cerr << "invocation request failed" << endl;
+            });
+    }
+
     while (true) {
         auto res = loop.loop_once().result;
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
@@ -473,13 +484,33 @@ size_t LambdaMaster::getObjectSizeWithDependencies(Worker &worker,
 
 void LambdaMaster::updateObjectUsage(const Worker &worker) {}
 
+HTTPRequest LambdaMaster::generateRequest() {
+    const string functionName = "pbrt-lambda-function";
+
+    protobuf::InvocationPayload proto;
+    proto.set_storage_backend(storageBackend);
+    proto.set_coordinator(publicAddress);
+
+    return LambdaInvocationRequest(
+               awsCredentials, awsRegion, functionName,
+               protoutil::to_json(proto),
+               LambdaInvocationRequest::InvocationType::EVENT,
+               LambdaInvocationRequest::LogType::NONE)
+        .to_http_request();
+}
+
+void usage(const char *argv0) {
+    cerr << argv0 << " SCENE-DATA PORT NUM-LAMBDA PUBLIC-ADDR STORAGE REGION"
+         << endl;
+}
+
 int main(int argc, char const *argv[]) {
     try {
         if (argc <= 0) {
             abort();
         }
 
-        if (argc != 6) {
+        if (argc != 7) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
@@ -491,9 +522,10 @@ int main(int argc, char const *argv[]) {
         const uint32_t numberOfLambdas = stoul(argv[3]);
         const string publicAddress = argv[4];
         const string storageBackend = argv[5];
+        const string awsRegion = argv[6];
 
-        LambdaMaster master{scenePath, listenPort, numberOfLambdas,
-                            publicAddress, storageBackend};
+        LambdaMaster master{scenePath,     listenPort,     numberOfLambdas,
+                            publicAddress, storageBackend, awsRegion};
         master.run();
     } catch (const exception &e) {
         print_exception(argv[0], e);

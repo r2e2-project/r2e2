@@ -9,9 +9,9 @@ import hashlib
 import base64
 import boto3
 
-def create_function_package(label, output, pbrt_lambda_worker):
+def create_function_package(output, pbrt_lambda_worker):
     PACKAGE_FILES = {
-        #"pbrt-lambda-worker": pbrt_lambda_worker,
+        "pbrt-lambda-worker": pbrt_lambda_worker,
         "main.py": "lambda-function/main.py",
     }
 
@@ -65,7 +65,7 @@ def main():
 
     function_name = 'pbrt-lambda-function'
     function_file = "{}.zip".format(function_name)
-    create_function_package(label, function_file, args.pbrt_lambda_worker)
+    create_function_package(function_file, args.pbrt_lambda_worker)
     print("Installing lambda function {}... ".format(function_name), end='')
     install_lambda_package(function_file, function_name, args.role, args.region,
                            delete=args.delete)

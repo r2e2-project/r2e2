@@ -216,6 +216,11 @@ message Scene {
 
 // LambdaCommands
 
+message InvocationPayload {
+    string storage_backend = 1;
+    string coordinator = 2;
+}
+
 message ObjectTypeID {
     uint32 type = 1;
     uint64 id = 2;

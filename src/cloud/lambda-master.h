@@ -17,6 +17,9 @@
 #include "execution/connection.h"
 #include "execution/loop.h"
 #include "execution/meow/message.h"
+#include "net/address.h"
+#include "net/aws.h"
+#include "net/http_request.h"
 #include "util/optional.h"
 #include "util/timerfd.h"
 
@@ -27,7 +30,8 @@ class LambdaMaster {
     LambdaMaster(const std::string &scenePath, const uint16_t listenPort,
                  const uint32_t numberOfLambdas,
                  const std::string &publicAddress,
-                 const std::string &storageBackend);
+                 const std::string &storageBackend,
+                 const std::string &awsRegion);
 
     void run();
 
@@ -70,6 +74,7 @@ class LambdaMaster {
                               const meow::Message &message);
     void loadCamera();
 
+    /* Assigning Objects */
     std::vector<ObjectTypeID> assignAllTreelets(Worker &worker);
     std::vector<ObjectTypeID> assignRootTreelet(Worker &worker);
     std::vector<ObjectTypeID> assignTreelets(Worker &worker);
@@ -80,10 +85,16 @@ class LambdaMaster {
                                          const ObjectTypeID &object);
     void updateObjectUsage(const Worker &worker);
 
+    /* AWS Lambda */
+    HTTPRequest generateRequest();
+
     const std::string scenePath;
     const uint32_t numberOfLambdas;
     const std::string publicAddress;
     const std::string storageBackend;
+    const Address awsAddress;
+    const std::string awsRegion;
+    const AWSCredentials awsCredentials{};
 
     ExecutionLoop loop{};
     std::shared_ptr<UDPConnection> udpConnection{};
