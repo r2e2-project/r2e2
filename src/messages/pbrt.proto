@@ -136,6 +136,13 @@ message RayState {
     uint32 remaining_bounces = 12;
     bool is_shadow_ray = 13;
 }
+
+message FinishedRay {
+    Point2f p_film = 1;
+    float weight = 2;
+    RGBSpectrum L = 3;
+}
+
 // ParamSet
 
 message ParamSet {

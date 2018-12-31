@@ -44,8 +44,13 @@ constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{5'000};
 constexpr chrono::milliseconds WORKER_STATS_INTERVAL{5'000};
 
-void usage(const char* argv0) {
-    cerr << "Usage: " << argv0 << " DESTINATION PORT STORAGE-BACKEND" << endl;
+protobuf::FinishedRay createFinishedRay(const Point2f& pFilm,
+                                        const Float weight, const Spectrum L) {
+    protobuf::FinishedRay proto;
+    *proto.mutable_p_film() = to_protobuf(pFilm);
+    proto.set_weight(weight);
+    *proto.mutable_l() = to_protobuf(L);
+    return proto;
 }
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
@@ -79,12 +84,23 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { cerr << "Connection to coordinator failed." << endl; },
         [this]() {
             if (outputName.length()) {
-                cerr << "Writing output image... ";
-                writeImage();
+                {
+                    protobuf::RecordWriter writer{outputName};
+                    for (const RayState& ray : finishedQueue) {
+                        Spectrum L{ray.Ld * ray.beta};
+                        if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
+                            L = Spectrum(0.f);
+                        }
+
+                        writer.write(createFinishedRay(ray.sample.pFilm,
+                                                       ray.sample.weight, L));
+                    }
+                }
+
                 storage::PutRequest putOutputRequest{outputName, outputName};
                 storageBackend->put({putOutputRequest});
-                cerr << "done.\n";
             }
+
             throw ProgramFinished();
         });
 
@@ -106,10 +122,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return outQueueSize > 0; },
         []() { throw runtime_error("out queue failed"); }));
 
-    loop.poller().add_action(Poller::Action(
+    /* loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
         [this]() { return !finishedQueue.empty(); },
-        []() { throw runtime_error("finished queue failed"); }));
+        []() { throw runtime_error("finished queue failed"); })); */
 
     loop.poller().add_action(Poller::Action(
         peerTimer.fd, Direction::In, bind(&LambdaWorker::handlePeers, this),
@@ -396,7 +412,7 @@ bool LambdaWorker::processMessage(const Message& message) {
     case OpCode::Hey:
         workerId.reset(stoull(message.payload()));
         udpConnection->enqueue_datagram(coordinatorAddr, to_string(*workerId));
-        outputName = to_string(*workerId) + ".png";
+        outputName = to_string(*workerId) + ".rays";
         break;
 
     case OpCode::Ping: {
@@ -528,10 +544,6 @@ void LambdaWorker::loadCamera() {
     reader->read(&proto_camera);
     camera = camera::from_protobuf(proto_camera, transformCache);
     filmTile = camera->film->GetFilmTile(camera->film->GetSampleBounds());
-
-    if (outputName.length()) {
-        camera->film->setFilename(outputName);
-    }
 }
 
 void LambdaWorker::loadSampler() {
@@ -577,6 +589,10 @@ void LambdaWorker::writeImage() {
     camera->film->WriteImage();
 }
 
+void usage(const char* argv0) {
+    cerr << "Usage: " << argv0 << " DESTINATION PORT STORAGE-BACKEND" << endl;
+}
+
 int main(int argc, char const* argv[]) {
     try {
         if (argc <= 0) {
@@ -589,9 +605,7 @@ int main(int argc, char const* argv[]) {
         }
 
         google::InitGoogleLogging(argv[0]);
-
         const uint16_t coordinatorPort = stoi(argv[2]);
-
         LambdaWorker worker{argv[1], coordinatorPort, argv[3]};
         worker.run();
     } catch (const ProgramFinished&) {
