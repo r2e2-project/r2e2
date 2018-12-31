@@ -20,6 +20,7 @@
 #include "net/socket.h"
 #include "util/exception.h"
 #include "util/path.h"
+#include "util/status_bar.h"
 
 using namespace std;
 using namespace meow;
@@ -32,6 +33,11 @@ using ObjectTypeID = SceneManager::ObjectTypeID;
 
 constexpr chrono::milliseconds WORKER_REQUEST_INTERVAL{500};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
+
+void sigint_handler( int )
+{
+  throw runtime_error( "killed by signal" );
+}
 
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                            const uint32_t numberOfLambdas,
@@ -102,12 +108,15 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         statusPrintTimer.fd, Direction::In,
         [this]() {
             statusPrintTimer.reset();
+            ostringstream oss;
 
-            cerr << "workers: " << workers.size()
-                 << " / finished paths: " << workerStats.finishedPaths
-                 << " / worker requests: " << pendingWorkerRequests.size()
-                 << " / messages: " << incomingMessages.size() << endl;
+            oss << "\033[0m" << "\033[48;5;022m"
+                << " workers: " << workers.size()
+                << " | finished paths: " << workerStats.finishedPaths
+                << " | worker requests: " << pendingWorkerRequests.size()
+                << " | messages: " << incomingMessages.size();
 
+            StatusBar::set_text(oss.str());
             return ResultType::Continue;
         },
         [this]() { return true; },
@@ -310,6 +319,8 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 
 void LambdaMaster::run() {
     /* request launching the lambdas */
+    StatusBar::get();
+
     cout << "Launching " << numberOfLambdas << " lambda(s)" << endl;
     for (size_t i = 0; i < numberOfLambdas; i++) {
         loop.make_http_request<SSLConnection>(
@@ -514,6 +525,8 @@ int main(int argc, char const *argv[]) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
+
+        signal(SIGINT, sigint_handler);
 
         google::InitGoogleLogging(argv[0]);
 
