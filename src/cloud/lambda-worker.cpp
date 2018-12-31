@@ -41,8 +41,8 @@ using PollerResult = Poller::Result::Type;
 class ProgramFinished : public exception {};
 
 constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
-constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
-constexpr chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
+constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{5'000};
+constexpr chrono::milliseconds WORKER_STATS_INTERVAL{5'000};
 
 void usage(const char* argv0) {
     cerr << "Usage: " << argv0 << " DESTINATION PORT STORAGE-BACKEND" << endl;
