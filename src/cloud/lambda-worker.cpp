@@ -10,6 +10,7 @@
 #include "cloud/bvh.h"
 #include "cloud/integrator.h"
 #include "cloud/manager.h"
+#include "cloud/stats.h"
 #include "cloud/raystate.h"
 #include "core/camera.h"
 #include "core/geometry.h"
@@ -188,6 +189,9 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
                 }
             } else if (!emptyVisit || hit) {
                 processedRays.push_back(move(newRay));
+            }
+            else if (emptyVisit) {
+                workerStats.finishedPaths++;
             }
         } else if (ray.hit.initialized()) {
             auto newRays = CloudIntegrator::Shade(move(ray), treelet, lights,
