@@ -32,10 +32,18 @@ using ObjectTypeID = SceneManager::ObjectTypeID;
 constexpr chrono::milliseconds WORKER_REQUEST_INTERVAL{500};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 
-void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA PORT" << endl; }
+void usage(const char *argv0) {
+    cerr << argv0 << " SCENE-DATA PORT NUM-LAMBDA PUBLIC-ADDR" << endl;
+}
 
-LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
+LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
+                           const uint32_t numberOfLambdas,
+                           const string &publicAddress,
+                           const string &storageBackend)
     : scenePath(scenePath),
+      numberOfLambdas(numberOfLambdas),
+      publicAddress(publicAddress),
+      storageBackend(storageBackend),
       workerRequestTimer(WORKER_REQUEST_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL) {
     global::manager.init(scenePath);
@@ -471,7 +479,7 @@ int main(int argc, char const *argv[]) {
             abort();
         }
 
-        if (argc != 3) {
+        if (argc != 6) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
@@ -480,8 +488,12 @@ int main(int argc, char const *argv[]) {
 
         const string scenePath{argv[1]};
         const uint16_t listenPort = stoi(argv[2]);
+        const uint32_t numberOfLambdas = stoul(argv[3]);
+        const string publicAddress = argv[4];
+        const string storageBackend = argv[5];
 
-        LambdaMaster master{scenePath, listenPort};
+        LambdaMaster master{scenePath, listenPort, numberOfLambdas,
+                            publicAddress, storageBackend};
         master.run();
     } catch (const exception &e) {
         print_exception(argv[0], e);

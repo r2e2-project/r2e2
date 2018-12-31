@@ -24,7 +24,10 @@ namespace pbrt {
 
 class LambdaMaster {
   public:
-    LambdaMaster(const std::string &scenePath, const uint16_t listenPort);
+    LambdaMaster(const std::string &scenePath, const uint16_t listenPort,
+                 const uint32_t numberOfLambdas,
+                 const std::string &publicAddress,
+                 const std::string &storageBackend);
 
     void run();
 
@@ -77,7 +80,11 @@ class LambdaMaster {
                                          const ObjectTypeID &object);
     void updateObjectUsage(const Worker &worker);
 
-    std::string scenePath;
+    const std::string scenePath;
+    const uint32_t numberOfLambdas;
+    const std::string publicAddress;
+    const std::string storageBackend;
+
     ExecutionLoop loop{};
     std::shared_ptr<UDPConnection> udpConnection{};
 
