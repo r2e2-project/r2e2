@@ -611,6 +611,13 @@ IF(CMAKE_BUILD_TYPE MATCHES RELEASE)
 ENDIF()
 TARGET_LINK_LIBRARIES ( pbrt_lambda_worker ${ALL_PBRT_LIBS} dl z unwind lzma -static -Wl,-allow-multiple-definition ${STRIP_SYMBOLS} -Wl,--whole-archive -lpthread -Wl,--no-whole-archive)
 
+# pbrt-lambda-master
+ADD_EXECUTABLE ( pbrt_lambda_aggregate src/cloud/lambda-aggregate.cpp )
+ADD_SANITIZERS ( pbrt_lambda_aggregate )
+
+SET_TARGET_PROPERTIES ( pbrt_lambda_aggregate PROPERTIES OUTPUT_NAME "pbrt-lambda-aggregate" )
+TARGET_COMPILE_FEATURES ( pbrt_lambda_aggregate PRIVATE ${PBRT_CXX11_FEATURES} )
+TARGET_LINK_LIBRARIES ( pbrt_lambda_aggregate ${ALL_PBRT_LIBS} )
 
 # Unit test
 

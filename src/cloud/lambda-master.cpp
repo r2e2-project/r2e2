@@ -263,8 +263,8 @@ bool LambdaMaster::processWorkerRequest(const WorkerId workerId,
 
 bool LambdaMaster::processMessage(const uint64_t workerId,
                                   const meow::Message &message) {
-    cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
-         << "] from worker " << workerId << endl;
+    /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
+         << "] from worker " << workerId << endl; */
 
     auto &worker = workers.at(workerId);
 
