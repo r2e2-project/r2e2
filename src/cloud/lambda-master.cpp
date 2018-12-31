@@ -20,6 +20,7 @@
 #include "net/socket.h"
 #include "util/exception.h"
 #include "util/path.h"
+#include "util/random.h"
 #include "util/status_bar.h"
 
 using namespace std;
@@ -34,10 +35,7 @@ using ObjectTypeID = SceneManager::ObjectTypeID;
 constexpr chrono::milliseconds WORKER_REQUEST_INTERVAL{500};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 
-void sigint_handler( int )
-{
-  throw runtime_error( "killed by signal" );
-}
+void sigint_handler(int) { throw runtime_error("killed by signal"); }
 
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                            const uint32_t numberOfLambdas,
@@ -110,7 +108,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             statusPrintTimer.reset();
             ostringstream oss;
 
-            oss << "\033[0m" << "\033[48;5;022m"
+            oss << "\033[0m"
+                << "\033[48;5;022m"
                 << " workers: " << workers.size()
                 << " | finished paths: " << workerStats.finishedPaths
                 << " | worker requests: " << pendingWorkerRequests.size()
@@ -239,27 +238,22 @@ bool LambdaMaster::processWorkerRequest(const WorkerId workerId,
         return false;
     }
 
-    Optional<WorkerId> selectedWorkerId;
-    const auto &workerList = treeletToWorker[treeletId];
+    const auto &workerIdList = treeletToWorker[treeletId];
+    const auto selectedWorkerId =
+        *random::sample(workerIdList.cbegin(), workerIdList.cend());
+    const auto &selectedWorker = workers.at(selectedWorkerId);
 
-    for (size_t i = 0; i < workerList.size(); i++) {
-        auto &worker = workers.at(workerList[i]);
-        if (!worker.udpAddress.initialized()) continue;
-        selectedWorkerId.reset(workerList[i]);
-    }
-
-    if (!selectedWorkerId.initialized()) {
+    if (!selectedWorker.udpAddress.initialized()) {
+        cerr << "No UDP address for " << selectedWorkerId << endl;
         return false;
     }
 
-    auto makeMessage = [this](const Worker &worker) -> Message {
+    auto makeMessage = [](const Worker &worker) -> Message {
         protobuf::ConnectTo proto;
         proto.set_worker_id(worker.id);
         proto.set_address(worker.udpAddress->str());
         return {OpCode::ConnectTo, protoutil::to_string(proto)};
     };
-
-    const auto &selectedWorker = workers.at(*selectedWorkerId);
 
     worker.connection->enqueue_write(makeMessage(selectedWorker).str());
     selectedWorker.connection->enqueue_write(makeMessage(worker).str());
