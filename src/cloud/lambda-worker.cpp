@@ -10,8 +10,8 @@
 #include "cloud/bvh.h"
 #include "cloud/integrator.h"
 #include "cloud/manager.h"
-#include "cloud/stats.h"
 #include "cloud/raystate.h"
+#include "cloud/stats.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/light.h"
@@ -42,6 +42,7 @@ class ProgramFinished : public exception {};
 
 constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
+constexpr chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
 
 void usage(const char* argv0) {
     cerr << "Usage: " << argv0 << " DESTINATION PORT STORAGE-BACKEND" << endl;
@@ -54,6 +55,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       workingDirectory("/tmp/pbrt-worker"),
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
       peerTimer(PEER_CHECK_INTERVAL),
+      workerStatsTimer(WORKER_STATS_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
 
@@ -126,6 +128,19 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("treelet request failed"); }));
 
     loop.poller().add_action(Poller::Action(
+        workerStatsTimer.fd, Direction::In,
+        [this]() {
+            workerStatsTimer.reset();
+            auto proto = to_protobuf(global::workerStats);
+            Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
+            coordinatorConnection->enqueue_write(message.str());
+            global::workerStats.reset();
+            return ResultType::Continue;
+        },
+        [this]() { return true; },
+        []() { throw runtime_error("worker stats failed"); }));
+
+    loop.poller().add_action(Poller::Action(
         statusPrintTimer.fd, Direction::In,
         [this]() {
             statusPrintTimer.reset();
@@ -189,9 +204,8 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
                 }
             } else if (!emptyVisit || hit) {
                 processedRays.push_back(move(newRay));
-            }
-            else if (emptyVisit) {
-                workerStats.finishedPaths++;
+            } else if (emptyVisit) {
+                global::workerStats.finishedPaths++;
             }
         } else if (ray.hit.initialized()) {
             auto newRays = CloudIntegrator::Shade(move(ray), treelet, lights,

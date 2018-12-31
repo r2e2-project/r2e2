@@ -5,6 +5,7 @@
 
 #include "cloud/integrator.h"
 #include "cloud/manager.h"
+#include "cloud/stats.h"
 #include "cloud/raystate.h"
 #include "core/geometry.h"
 #include "core/light.h"
@@ -70,6 +71,7 @@ protobuf::Scene to_protobuf(const Scene& scene);
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
 protobuf::ObjectTypeID to_protobuf(
     const SceneManager::ObjectTypeID& objectTypeID);
+protobuf::WorkerStats to_protobuf(const WorkerStats& state);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
@@ -96,6 +98,7 @@ TextureParams from_protobuf(
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex);
 SceneManager::ObjectTypeID from_protobuf(
     const protobuf::ObjectTypeID& objectTypeID);
+WorkerStats from_protobuf(const protobuf::WorkerStats& state);
 
 namespace light {
 

@@ -10,6 +10,7 @@
 
 #include "cloud/lambda.h"
 #include "cloud/manager.h"
+#include "cloud/stats.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/transform.h"
@@ -104,6 +105,10 @@ class LambdaMaster {
 
     /* Timers */
     TimerFD workerRequestTimer;
+    TimerFD statusPrintTimer;
+
+    /* Worker stats */
+    WorkerStats workerStats;
 };
 
 class Schedule {

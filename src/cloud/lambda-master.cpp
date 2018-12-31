@@ -30,11 +30,14 @@ using PollerResult = Poller::Result::Type;
 using ObjectTypeID = SceneManager::ObjectTypeID;
 
 constexpr chrono::milliseconds WORKER_REQUEST_INTERVAL{500};
+constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 
 void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA PORT" << endl; }
 
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
-    : scenePath(scenePath), workerRequestTimer(WORKER_REQUEST_INTERVAL) {
+    : scenePath(scenePath),
+      workerRequestTimer(WORKER_REQUEST_INTERVAL),
+      statusPrintTimer(STATUS_PRINT_INTERVAL) {
     global::manager.init(scenePath);
     loadCamera();
 
@@ -86,6 +89,21 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort)
         bind(&LambdaMaster::handleWorkerRequests, this),
         [this]() { return !pendingWorkerRequests.empty(); },
         []() { throw runtime_error("worker requests failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        statusPrintTimer.fd, Direction::In,
+        [this]() {
+            statusPrintTimer.reset();
+
+            cerr << "workers: " << workers.size()
+                 << " / finished paths: " << workerStats.finishedPaths
+                 << " / worker requests: " << pendingWorkerRequests.size()
+                 << " / messages: " << incomingMessages.size() << endl;
+
+            return ResultType::Continue;
+        },
+        [this]() { return true; },
+        []() { throw runtime_error("status print failed"); }));
 
     loop.make_listener({"0.0.0.0", listenPort}, [this, nTiles](
                                                     ExecutionLoop &loop,
@@ -201,7 +219,6 @@ bool LambdaMaster::processWorkerRequest(const WorkerId workerId,
 
     /* let's see if we have a worker that has that treelet */
     if (treeletToWorker.count(treeletId) == 0) {
-        cerr << "No worker found for treelet " << treeletId << endl;
         return false;
     }
 
@@ -215,7 +232,6 @@ bool LambdaMaster::processWorkerRequest(const WorkerId workerId,
     }
 
     if (!selectedWorkerId.initialized()) {
-        cerr << "No worker found for treelet " << treeletId << endl;
         return false;
     }
 
@@ -269,6 +285,13 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 
     case OpCode::GetWorker:
         return processWorkerRequest(workerId, message);
+
+    case OpCode::WorkerStats: {
+        protobuf::WorkerStats proto;
+        protoutil::from_string(message.payload(), proto);
+        workerStats.merge(from_protobuf(proto));
+        break;
+    }
 
     default:
         throw runtime_error("unhandled message opcode");

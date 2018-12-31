@@ -252,6 +252,10 @@ message ConnectResponse {
     repeated uint32 treelet_ids = 4;
 }
 
+message WorkerStats {
+    uint64 finished_paths = 1;
+}
+
 // Materials & Textures
 message TextureParams {
   ParamSet geom_params = 1;

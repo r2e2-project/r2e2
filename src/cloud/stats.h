@@ -11,6 +11,10 @@ struct WorkerStats {
     void reset() {
         finishedPaths = 0;
     }
+
+    void merge(const WorkerStats &other) {
+        finishedPaths += other.finishedPaths;
+    }
 };
 
 namespace global {

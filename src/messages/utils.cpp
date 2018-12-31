@@ -292,6 +292,12 @@ protobuf::ObjectTypeID to_protobuf(
     return proto;
 }
 
+protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
+    protobuf::WorkerStats proto;
+    proto.set_finished_paths(stats.finishedPaths);
+    return proto;
+}
+
 template <class ValueType, class ProtoItem>
 unique_ptr<ValueType[]> p2v(const ProtoItem& item) {
     auto values = make_unique<ValueType[]>(item.values_size());
@@ -815,6 +821,12 @@ protobuf::SpectrumTexture spectrum_texture::to_protobuf(
     texture.mutable_tex2world()->CopyFrom(pbrt::to_protobuf(tex2world.GetMatrix()));
     texture.mutable_texture_params()->CopyFrom(pbrt::to_protobuf(tp));
     return texture;
+}
+
+WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
+    WorkerStats stats;
+    stats.finishedPaths = proto.finished_paths();
+    return stats;
 }
 
 }  // namespace pbrt

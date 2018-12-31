@@ -25,6 +25,7 @@ namespace meow {
       ConnectTo,
       ConnectionRequest,
       ConnectionResponse,
+      WorkerStats,
       SendRays,
       Bye,
 
@@ -42,6 +43,7 @@ namespace meow {
         "ConnectTo",
         "ConnectionRequest",
         "ConnectionResponse",
+        "WorkerStats",
         "SendRays",
         "Bye"};
 

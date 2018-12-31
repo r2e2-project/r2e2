@@ -111,6 +111,7 @@ class LambdaWorker {
     /* Timers */
     TimerFD peerTimer;
     TimerFD statusPrintTimer;
+    TimerFD workerStatsTimer;
 };
 
 }  // namespace pbrt
