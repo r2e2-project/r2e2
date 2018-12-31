@@ -34,6 +34,11 @@ void RecordWriter::write(const string& string) {
     coded_output_.WriteRaw(string.data(), string.length());
 }
 
+void RecordWriter::write(const uint32_t& integer) {
+    coded_output_.WriteLittleEndian32(4);
+    coded_output_.WriteLittleEndian32(integer);
+}
+
 RecordReader::RecordReader(const string& filename)
     : RecordReader(FileDescriptor(
           CheckSystemCall(filename, open(filename.c_str(), O_RDONLY, 0)))) {}
@@ -50,6 +55,40 @@ RecordReader::RecordReader(istringstream&& is)
       input_stream_(make_unique<IstreamInputStream>(&*istream_)),
       coded_input_(input_stream_.get()) {
     initialize();
+}
+
+bool RecordReader::read(std::string* string) {
+    if (eof_) { throw std::runtime_error("RecordReader: end of file reached"); }
+
+    if (next_size_ == 0) {
+        eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
+        return false;
+    }
+
+    if (coded_input_.ReadString(string, next_size_)) {
+      eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
+      return true;
+    }
+
+    eof_ = true;
+    return false;
+}
+
+bool RecordReader::read(uint32_t* integer) {
+    if (eof_) { throw std::runtime_error("RecordReader: end of file reached"); }
+
+    if (next_size_ == 0) {
+        eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
+        return false;
+    }
+
+    if (coded_input_.ReadLittleEndian32(integer)) {
+      eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
+      return true;
+    }
+
+    eof_ = true;
+    return false;
 }
 
 void RecordReader::initialize() {

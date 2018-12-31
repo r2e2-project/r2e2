@@ -120,8 +120,11 @@ SceneManager::listObjects() {
     /* read the list of objects from the manifest file */
     for (auto& kv : dependencies) {
       const ObjectTypeID& id = kv.first;
-      std::string filename = getFileName(id.type, id.id);
-      const size_t size = roost::file_size_at(*sceneFD, filename);
+      size_t size = 0;
+      if (id.type != Type::TriangleMesh) {
+          std::string filename = getFileName(id.type, id.id);
+          size = roost::file_size_at(*sceneFD, filename);
+      }
       result[id.type].push_back(Object(id.id, size));
     }
 

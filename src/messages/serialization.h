@@ -29,6 +29,8 @@ public:
 
     void write(const std::string & string);
 
+    void write(const uint32_t& integer);
+
     void write_empty();
 
 private:
@@ -49,6 +51,11 @@ public:
 
     template<class ProtobufType>
     bool read(ProtobufType * record);
+  
+    bool read(std::string* string);
+
+    bool read(uint32_t* integer);
+
     bool eof() const { return eof_; }
 
 private:

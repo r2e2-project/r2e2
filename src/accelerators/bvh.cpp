@@ -1056,6 +1056,12 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
           triangle_mesh_material_ids[mesh] = material_id;
         }
 
+        auto writer =
+            global::manager.GetWriter(SceneManager::Type::Treelet, treelet_id);
+
+        uint32_t num_triangle_meshes = triangles_in_treelet.size();
+        writer->write(num_triangle_meshes);
+
         /* Split up triangle meshes. Currently we only split the meshes so that
          all triangles in the treelet are included.
          TODO(apoms): Split triangle meshes up based on the footprint of the
@@ -1142,11 +1148,10 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
           }
 
           /* write out the sub mesh */
-          auto tm_writer = global::manager.GetWriter(
-              SceneManager::Type::TriangleMesh, tm_id);
           protobuf::TriangleMesh tm_proto = to_protobuf(*sub_mesh);
+          tm_proto.set_id(tm_id);
           tm_proto.set_material_id(material_id);
-          tm_writer->write(tm_proto);
+          writer->write(tm_proto);
 
           /* track the dependency of the mesh on the material */
           global::manager.recordDependency(
@@ -1158,9 +1163,6 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
               SceneManager::ObjectTypeID{SceneManager::Type::Treelet, treelet_id},
               SceneManager::ObjectTypeID{SceneManager::Type::TriangleMesh, tm_id});
         }
-
-        auto writer =
-            global::manager.GetWriter(SceneManager::Type::Treelet, treelet_id);
 
         const uint32_t current_treelet = labels[root_index];
         std::stack<int> q;

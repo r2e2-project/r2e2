@@ -409,7 +409,13 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
     vector<storage::GetRequest> requests;
     for (const protobuf::ObjectTypeID& objectTypeID : objects.object_ids()) {
         SceneManager::ObjectTypeID id = from_protobuf(objectTypeID);
-        if (id.type == SceneManager::Type::Treelet) treeletIds.insert(id.id);
+        if (id.type == SceneManager::Type::TriangleMesh) {
+          /* triangle meshes are packed into treelets, so ignore */
+          continue;
+        }
+        if (id.type == SceneManager::Type::Treelet) {
+          treeletIds.insert(id.id);
+        }
         string filePath = id.to_string();
         requests.emplace_back(filePath, filePath);
     }

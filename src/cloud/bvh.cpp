@@ -65,6 +65,20 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
     auto &treelet = treelets_[root_id];
     auto &tree_primitives = treelet.primitives;
 
+    /* read in the triangle meshes for this treelet first */
+    uint32_t num_triangle_meshes = 0;
+    reader->read(&num_triangle_meshes);
+    for (int i = 0; i < num_triangle_meshes; ++i) {
+        /* load the TriangleMesh if necessary */
+        protobuf::TriangleMesh tm;
+        reader->read(&tm);
+        int64_t tm_id = tm.id();
+        assert(triangle_meshes_.count(tm_id) == 0);
+        triangle_meshes_[tm_id] =
+            make_shared<TriangleMesh>(move(from_protobuf(tm)));
+        triangle_mesh_material_ids_[tm_id] = tm.material_id();
+    }
+
     while (not reader->eof()) {
         protobuf::BVHNode proto_node;
         if (not reader->read(&proto_node)) {
@@ -140,17 +154,6 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
                 auto &proto_t = proto_node.triangles(i);
                 const auto tm_id = proto_t.mesh_id();
 
-                /* load the TriangleMesh if necessary */
-                if (triangle_meshes_.count(tm_id) == 0) {
-                    auto tm_reader = global::manager.GetReader(
-                        SceneManager::Type::TriangleMesh, tm_id);
-                    protobuf::TriangleMesh tm;
-                    tm_reader->read(&tm);
-                    triangle_meshes_[tm_id] =
-                        make_shared<TriangleMesh>(move(from_protobuf(tm)));
-                    triangle_mesh_material_ids_[tm_id] =
-                        tm.material_id();
-                }
                 const auto material_id =
                     triangle_mesh_material_ids_[tm_id];
                 /* load the Material if necessary */

@@ -77,6 +77,7 @@ message TriangleMesh {
     repeated Vector3f s = 6;  // Vector3f
     repeated Point2f uv = 7;
     int64 material_id = 8;
+    int64 id = 9;
 }
 
 message Triangle {
