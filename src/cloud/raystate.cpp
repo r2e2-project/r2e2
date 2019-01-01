@@ -17,5 +17,5 @@ uint32_t RayState::currentTreelet() const {
         return hit->treelet;
     }
 
-    return numeric_limits<uint32_t>::max();
+    return 0;
 }
