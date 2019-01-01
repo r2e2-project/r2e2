@@ -41,8 +41,8 @@ using PollerResult = Poller::Result::Type;
 class ProgramFinished : public exception {};
 
 constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
-constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{5'000};
-constexpr chrono::milliseconds WORKER_STATS_INTERVAL{5'000};
+constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{2'000};
+constexpr chrono::milliseconds WORKER_STATS_INTERVAL{2'000};
 
 protobuf::FinishedRay createFinishedRay(const Point2f& pFilm,
                                         const Float weight, const Spectrum L) {
@@ -110,7 +110,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             return true;
         },
         []() { cerr << "UDP connection to coordinator failed." << endl; },
-        []() { throw ProgramFinished(); });
+        []() { throw ProgramFinished(); }, true);
 
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleRayQueue, this),
@@ -165,7 +165,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                  << " / finished: " << finishedQueue.size()
                  << " / pending: " << pendingQueueSize
                  << " / out: " << outQueueSize << " / peers: " << peers.size()
-                 << " / messages: " << messageParser.size() << endl;
+                 << " / sent: " << sentRays
+                 << " / received: " << receivedRays << endl;
 
             return ResultType::Continue;
         },
@@ -271,7 +272,9 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
                 while (packetLen < 1'200 && !q.second.empty()) {
                     RayState ray = move(q.second.front());
                     q.second.pop_front();
+
                     outQueueSize--;
+                    sentRays++;
 
                     const string& rayStr =
                         protoutil::to_string(to_protobuf(ray));
@@ -405,8 +408,8 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
 }
 
 bool LambdaWorker::processMessage(const Message& message) {
-    cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
-         << "]\n";
+    /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
+         << "]\n"; */
 
     switch (message.opcode()) {
     case OpCode::Hey:
@@ -513,6 +516,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         while (!reader.eof()) {
             if (reader.read(&proto)) {
+                receivedRays++;
                 rayQueue.push_back(move(from_protobuf(proto)));
             }
         }

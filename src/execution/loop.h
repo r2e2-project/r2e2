@@ -91,7 +91,8 @@ public:
                                                 Address &&,
                                                 std::string &&)> & data_callback,
                        const std::function<void()> & error_callback = [](){},
-                       const std::function<void()> & close_callback = [](){} );
+                       const std::function<void()> & close_callback = [](){},
+                       const bool pacing = false );
 
   template<class ConnectionType>
   uint64_t make_http_request( const std::string & tag,

@@ -30,7 +30,16 @@ ExecutionLoop::ExecutionLoop()
 
 Poller::Result ExecutionLoop::loop_once( const int timeout_ms )
 {
-  return poller_.poll( timeout_ms );
+  int real_timeout_ms = timeout_ms;
+  for ( const auto & udp_connection : udp_connections_ ) {
+      const int conn_timeout = udp_connection->ms_until_next();
+      real_timeout_ms =
+          ( conn_timeout == -1 or conn_timeout == 0 )
+              ? -1
+              : ( real_timeout_ms == -1 ? conn_timeout
+                                       : min(conn_timeout, real_timeout_ms ) );
+  }
+  return poller_.poll( real_timeout_ms );
 }
 
 template<>
@@ -228,13 +237,14 @@ ExecutionLoop::make_connection( const Address & address,
 shared_ptr<UDPConnection>
 ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection>, Address &&, string &&)> & data_callback,
                                     const function<void()> & error_callback,
-                                    const function<void()> & close_callback )
+                                    const function<void()> & close_callback,
+                                    const bool pacing )
 {
   UDPSocket socket;
   socket.set_blocking( false );
 
   auto connection_it = udp_connections_.emplace( udp_connections_.end(),
-                                                 make_shared<UDPConnection>( move( socket ) ) );
+                                                 make_shared<UDPConnection>( move( socket ), pacing ) );
 
   shared_ptr<UDPConnection> & connection = *connection_it;
 
@@ -257,13 +267,13 @@ ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection
       connection->socket_, Direction::Out,
       [connection] ()
       {
-        auto datagram = move(connection->outgoing_datagrams_.front());
-        connection->outgoing_datagrams_.pop();
+        auto datagram = move(connection->queue_front());
+        connection->queue_pop();
 
         connection->socket_.sendto(datagram.first, datagram.second);
         return ResultType::Continue;
       },
-      [connection] { return connection->outgoing_datagrams_.size(); },
+      [connection] { return not connection->queue_empty(); },
       fderror_callback
     )
   );
