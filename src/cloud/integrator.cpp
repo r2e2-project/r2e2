@@ -168,6 +168,8 @@ void CloudIntegrator::Render(const Scene &scene) {
 
             if (newRay.isShadowRay) {
                 if (hit) {
+                    newRay.Ld = 0.f;
+                    finishedRays.push_back(move(newRay));
                     continue; /* discard */
                 } else if (emptyVisit) {
                     finishedRays.push_back(move(newRay));
@@ -177,35 +179,40 @@ void CloudIntegrator::Render(const Scene &scene) {
             } else if (!emptyVisit || hit) {
                 rayQueue.push_back(move(newRay));
             }
+            else {
+                newRay.Ld = 0.f;
+                finishedRays.push_back(move(newRay));
+            }
         } else if (state.hit.initialized()) {
             auto newRays =
                 Shade(move(state), bvh, scene.lights, sampler, arena);
             for (auto &newRay : newRays) {
                 rayQueue.push_back(move(newRay));
             }
-        } else {
-            ReportValue(pathLength, state.bounces);
         }
     }
 
-    struct Sample {
+    struct CSample {
         Point2f pFilm;
         Spectrum L{0.f};
         Float weight{0.f};
     };
 
-    unordered_map<size_t, Sample> allSamples;
+    unordered_map<size_t, CSample> allSamples;
 
     for (const auto &state : finishedRays) {
         if (allSamples.count(state.sample.id) == 0) {
             allSamples[state.sample.id].pFilm = state.sample.pFilm;
             allSamples[state.sample.id].weight = state.sample.weight;
+            allSamples[state.sample.id].L = 0.f;
         }
 
         Spectrum L = state.beta * state.Ld;
         if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) L = Spectrum(0.f);
         allSamples[state.sample.id].L += L;
     }
+
+    cout << allSamples.size() << endl;
 
     for (const auto &kv : allSamples) {
         filmTile->AddSample(kv.second.pFilm, kv.second.L, kv.second.weight);
