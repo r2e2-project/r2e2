@@ -126,8 +126,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             oss << "\033[0m"
                 << "\033[48;5;022m"
                 << " finished paths: " << workerStats.finishedPaths << " ("
-                << " | workers: " << workers.size() << fixed << setprecision(1)
+                << fixed << setprecision(1)
                 << (100.0 * workerStats.finishedPaths / totalPaths) << "%)"
+                << " | workers: " << workers.size()
                 << " | requests: " << pendingWorkerRequests.size()
                 << " | time: " << setfill('0') << setw(2) << (duration / 60)
                 << ":" << setw(2) << (duration % 60);
@@ -187,8 +188,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
             /* assign root treelet to worker since it is generating rays for
              * a crop window */
-            this->assignRootTreelet(workerIt->second);
-            // this->assignAllTreelets(workerIt->second);
+            // this->assignRootTreelet(workerIt->second);
+            this->assignAllTreelets(workerIt->second);
         }
         /* assign treelet to worker based on most in-demand treelets */
         else {
