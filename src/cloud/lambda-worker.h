@@ -101,7 +101,7 @@ class LambdaWorker {
     size_t pendingQueueSize{0};
     size_t outQueueSize{0};
 
-    std::map<TreeletId, WorkerId> treeletToWorker{};
+    std::map<TreeletId, std::vector<WorkerId>> treeletToWorker{};
     std::set<TreeletId> neededTreelets;
     std::set<TreeletId> requestedTreelets;
 

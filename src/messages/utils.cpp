@@ -295,6 +295,8 @@ protobuf::ObjectTypeID to_protobuf(
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
     protobuf::WorkerStats proto;
     proto.set_finished_paths(stats.finishedPaths);
+    proto.set_sent_rays(stats.sentRays);
+    proto.set_received_rays(stats.sentRays);
     return proto;
 }
 
@@ -826,6 +828,8 @@ protobuf::SpectrumTexture spectrum_texture::to_protobuf(
 WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
     WorkerStats stats;
     stats.finishedPaths = proto.finished_paths();
+    stats.sentRays = proto.sent_rays();
+    stats.receivedRays = proto.received_rays();
     return stats;
 }
 

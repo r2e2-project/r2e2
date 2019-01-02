@@ -26,6 +26,7 @@
 #include "storage/backend.h"
 #include "util/exception.h"
 #include "util/path.h"
+#include "util/random.h"
 #include "util/system_runner.h"
 #include "util/temp_dir.h"
 #include "util/temp_file.h"
@@ -160,22 +161,21 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return true; },
         []() { throw runtime_error("worker stats failed"); }));
 
-    loop.poller().add_action(Poller::Action(
-        statusPrintTimer.fd, Direction::In,
-        [this]() {
-            statusPrintTimer.reset();
+    loop.poller().add_action(
+        Poller::Action(statusPrintTimer.fd, Direction::In,
+                       [this]() {
+                           statusPrintTimer.reset();
 
-            cerr << "ray: " << rayQueue.size()
-                 << " / finished: " << finishedQueue.size()
-                 << " / pending: " << pendingQueueSize
-                 << " / out: " << outQueueSize << " / peers: " << peers.size()
-                 << " / sent: " << sentRays << " / received: " << receivedRays
-                 << endl;
+                           cerr << "ray: " << rayQueue.size()
+                                << " / finished: " << finishedQueue.size()
+                                << " / pending: " << pendingQueueSize
+                                << " / out: " << outQueueSize
+                                << " / peers: " << peers.size() << endl;
 
-            return ResultType::Continue;
-        },
-        [this]() { return true; },
-        []() { throw runtime_error("status print failed"); }));
+                           return ResultType::Continue;
+                       },
+                       [this]() { return true; },
+                       []() { throw runtime_error("status print failed"); }));
 
     Message message{OpCode::Hey, ""};
     coordinatorConnection->enqueue_write(message.str());
@@ -266,7 +266,9 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
     for (auto& q : outQueue) {
         if (q.second.size() == 0) continue;
 
-        auto& peer = peers.at(treeletToWorker[q.first]);
+        auto& workerCandidates = treeletToWorker[q.first];
+        auto& peer = peers.at(
+            *random::sample(workerCandidates.begin(), workerCandidates.end()));
 
         while (!q.second.empty()) {
             ostringstream oss;
@@ -280,7 +282,7 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
                     q.second.pop_front();
 
                     outQueueSize--;
-                    sentRays++;
+                    global::workerStats.sentRays++;
 
                     const string& rayStr =
                         protoutil::to_string(to_protobuf(ray));
@@ -410,11 +412,11 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
     for (const protobuf::ObjectTypeID& objectTypeID : objects.object_ids()) {
         SceneManager::ObjectTypeID id = from_protobuf(objectTypeID);
         if (id.type == SceneManager::Type::TriangleMesh) {
-          /* triangle meshes are packed into treelets, so ignore */
-          continue;
+            /* triangle meshes are packed into treelets, so ignore */
+            continue;
         }
         if (id.type == SceneManager::Type::Treelet) {
-          treeletIds.insert(id.id);
+            treeletIds.insert(id.id);
         }
         string filePath = id.to_string();
         requests.emplace_back(filePath, filePath);
@@ -505,7 +507,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 
             for (const auto treeletId : proto.treelet_ids()) {
                 peer.treelets.insert(treeletId);
-                treeletToWorker[treeletId] = otherWorkerId;
+                treeletToWorker[treeletId].push_back(otherWorkerId);
                 requestedTreelets.erase(treeletId);
 
                 if (pendingQueue.count(treeletId)) {
@@ -532,7 +534,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         while (!reader.eof()) {
             if (reader.read(&proto)) {
-                receivedRays++;
+                global::workerStats.receivedRays++;
                 rayQueue.push_back(move(from_protobuf(proto)));
             }
         }

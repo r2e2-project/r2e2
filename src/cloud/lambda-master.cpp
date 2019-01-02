@@ -130,6 +130,14 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                 << (100.0 * workerStats.finishedPaths / totalPaths) << "%)"
                 << " | workers: " << workers.size()
                 << " | requests: " << pendingWorkerRequests.size()
+                << " | \u2197 " << workerStats.sentRays
+                << " | \u2198 " << workerStats.receivedRays << " (" << fixed
+                << setprecision(1)
+                << (workerStats.sentRays == 0
+                        ? 0
+                        : (100.0 * workerStats.receivedRays /
+                           workerStats.sentRays))
+                << "%)"
                 << " | time: " << setfill('0') << setw(2) << (duration / 60)
                 << ":" << setw(2) << (duration % 60);
 
@@ -193,8 +201,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         }
         /* assign treelet to worker based on most in-demand treelets */
         else {
-            this->assignTreelets(workerIt->second);
-            // this->assignAllTreelets(workerIt->second);
+            // this->assignTreelets(workerIt->second);
+            this->assignAllTreelets(workerIt->second);
         }
 
         currentWorkerID++;
