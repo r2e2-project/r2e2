@@ -125,6 +125,7 @@ void CloudIntegrator::Render(const Scene &scene) {
     unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
     deque<RayState> rayQueue;
+    deque<RayState> finishedRays;
     vector<SampleData> cameraSamples;
 
     /* Generate all the samples */
@@ -171,13 +172,7 @@ void CloudIntegrator::Render(const Scene &scene) {
                 if (hit) {
                     continue; /* discard */
                 } else if (emptyVisit) {
-                    Spectrum L = state.beta * state.Ld;
-
-                    if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
-                        L = Spectrum(0.f);
-                    }
-
-                    cameraSamples[state.sample.id].L += L;
+                    finishedRays.push_back(move(newRay));
                 } else {
                     rayQueue.push_back(move(newRay));
                 }
@@ -193,6 +188,12 @@ void CloudIntegrator::Render(const Scene &scene) {
         } else {
             ReportValue(pathLength, state.bounces);
         }
+    }
+
+    for (const auto &state : finishedRays) {
+        Spectrum L = state.beta * state.Ld;
+        if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) L = Spectrum(0.f);
+        cameraSamples[state.sample.id].L += L;
     }
 
     for (const auto &sampleData : cameraSamples) {
