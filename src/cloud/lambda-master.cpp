@@ -2,6 +2,7 @@
 
 #include <glog/logging.h>
 #include <deque>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -36,6 +37,13 @@ constexpr chrono::milliseconds WORKER_REQUEST_INTERVAL{500};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 
 void sigint_handler(int) { throw runtime_error("killed by signal"); }
+
+shared_ptr<Sampler> loadSampler() {
+    auto reader = global::manager.GetReader(SceneManager::Type::Sampler);
+    protobuf::Sampler proto_sampler;
+    reader->read(&proto_sampler);
+    return sampler::from_protobuf(proto_sampler);
+}
 
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                            const uint32_t numberOfLambdas,
@@ -91,6 +99,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     Point2i nTiles((sampleExtent.x + TILE_SIZE - 1) / TILE_SIZE,
                    (sampleExtent.y + TILE_SIZE - 1) / TILE_SIZE);
 
+    totalPaths =
+        sampleExtent.x * sampleExtent.y * loadSampler()->samplesPerPixel;
+
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaMaster::handleMessages, this),
         [this]() { return !incomingMessages.empty(); },
@@ -111,7 +122,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             oss << "\033[0m"
                 << "\033[48;5;022m"
                 << " workers: " << workers.size()
-                << " | finished paths: " << workerStats.finishedPaths
+                << " | finished paths: " << workerStats.finishedPaths << " ("
+                << fixed << setprecision(1)
+                << (100.0 * workerStats.finishedPaths / totalPaths) << "%)"
                 << " | worker requests: " << pendingWorkerRequests.size()
                 << " | messages: " << incomingMessages.size();
 

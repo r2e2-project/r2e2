@@ -108,9 +108,9 @@ class LambdaMaster {
     std::deque<std::pair<WorkerId, meow::Message>> pendingWorkerRequests;
 
     /* Scene Data */
-    std::string getSceneMessageStr{};
     std::vector<std::unique_ptr<Transform>> transformCache{};
     std::shared_ptr<Camera> camera{};
+    size_t totalPaths{0};
 
     /* Scene Objects */
     Bounds2i sampleBounds;
