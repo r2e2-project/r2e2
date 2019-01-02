@@ -52,7 +52,7 @@ private:
   UDPSocket socket_ {};
   std::queue<std::pair<Address, std::string>> outgoing_datagrams_{};
 
-  static constexpr std::chrono::microseconds pace_ { 2'000 };
+  static constexpr std::chrono::microseconds pace_ { 3'000 };
   bool pacing_{false};
   std::chrono::steady_clock::time_point when_next_;
 
