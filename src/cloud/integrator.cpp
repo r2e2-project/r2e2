@@ -138,27 +138,23 @@ void CloudIntegrator::Render(const Scene &scene) {
         do {
             SampleData sampleData;
             sampleData.sample = sampler->GetCameraSample(pixel);
-            cameraSamples.emplace_back(move(sampleData));
 
             RayState state;
             state.sample.id = i++;
             state.sample.num = sample_num++;
             state.sample.pixel = pixel;
+            sampleData.weight =
+                camera->GenerateRayDifferential(sampleData.sample, &state.ray);
+            state.ray.ScaleDifferentials(1 / sqrt((Float)sampler->samplesPerPixel));
             state.remainingBounces = maxDepth;
+            state.StartTrace();
+
             rayQueue.push_back(move(state));
+            cameraSamples.push_back(move(sampleData));
 
             ++nIntersectionTests;
             ++nCameraRays;
         } while (sampler->StartNextSample());
-    }
-
-    /* Generate all the rays */
-    for (RayState &state : rayQueue) {
-        auto &sampleData = cameraSamples[state.sample.id];
-        sampleData.weight =
-            camera->GenerateRayDifferential(sampleData.sample, &state.ray);
-        state.ray.ScaleDifferentials(1 / sqrt((Float)sampler->samplesPerPixel));
-        state.StartTrace();
     }
 
     while (not rayQueue.empty()) {
