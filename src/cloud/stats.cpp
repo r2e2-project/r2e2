@@ -1,5 +1,7 @@
 #include "stats.h"
 
-namespace pbrt::global {
+namespace pbrt {
+namespace global {
 WorkerStats workerStats;
 }
+}  // namespace pbrt

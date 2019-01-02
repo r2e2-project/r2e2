@@ -130,8 +130,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                 << (100.0 * workerStats.finishedPaths / totalPaths) << "%)"
                 << " | workers: " << workers.size()
                 << " | requests: " << pendingWorkerRequests.size()
-                << " | \u2197 " << workerStats.sentRays
-                << " | \u2198 " << workerStats.receivedRays << " (" << fixed
+                << " | \u2191 " << workerStats.sentRays
+                << " | \u2193 " << workerStats.receivedRays << " (" << fixed
                 << setprecision(1)
                 << (workerStats.sentRays == 0
                         ? 0

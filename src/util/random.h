@@ -4,7 +4,8 @@
 #include <iterator>
 #include <random>
 
-namespace pbrt::random {
+namespace pbrt {
+namespace random {
 
 template <typename Iter, typename RandomGenerator>
 Iter sample(Iter start, Iter end, RandomGenerator& g) {
@@ -20,6 +21,7 @@ Iter sample(Iter start, Iter end) {
     return sample(start, end, gen);
 }
 
-}
+}  // namespace random
+}  // namespace pbrt
 
 #endif /* PBRT_UTIL_RANDOM_H */
