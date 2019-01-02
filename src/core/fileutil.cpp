@@ -35,6 +35,7 @@
 #include "fileutil.h"
 #include <cstdlib>
 #include <climits>
+#include <random>
 #ifndef PBRT_IS_WINDOWS
 #include <libgen.h>
 #endif
