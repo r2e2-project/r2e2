@@ -175,7 +175,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         }
         /* assign treelet to worker based on most in-demand treelets */
         else {
-            this->assignTreelets(workerIt->second);
+            // this->assignTreelets(workerIt->second);
+            this->assignAllTreelets(workerIt->second);
         }
 
         currentWorkerID++;

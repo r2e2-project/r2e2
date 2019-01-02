@@ -373,8 +373,6 @@ Poller::Action::Result::Type LambdaWorker::handleNeededTreelets() {
 }
 
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
-    initializeScene();
-
     const Bounds2i sampleBounds = camera->film->GetSampleBounds();
     const Vector2i sampleExtent = sampleBounds.Diagonal();
     const uint8_t maxDepth = 5;
@@ -439,6 +437,7 @@ bool LambdaWorker::processMessage(const Message& message) {
         protobuf::GetObjects proto;
         protoutil::from_string(message.payload(), proto);
         getObjects(proto);
+        initializeScene();
         break;
     }
 
@@ -567,9 +566,9 @@ void LambdaWorker::loadSampler() {
     reader->read(&proto_sampler);
     sampler = sampler::from_protobuf(proto_sampler);
 
-    if (workerId.initialized()) {
+    /* if (workerId.initialized()) {
         sampler = sampler->Clone(*workerId);
-    }
+    } */
 }
 
 void LambdaWorker::loadLights() {
