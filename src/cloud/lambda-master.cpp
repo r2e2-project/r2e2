@@ -119,14 +119,19 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             statusPrintTimer.reset();
             ostringstream oss;
 
+            auto duration = chrono::duration_cast<chrono::seconds>(
+                                chrono::steady_clock::now() - startTime)
+                                .count();
+
             oss << "\033[0m"
                 << "\033[48;5;022m"
-                << " workers: " << workers.size()
-                << " | finished paths: " << workerStats.finishedPaths << " ("
+                << " finished paths: " << workerStats.finishedPaths << " ("
+                << " | workers: " << workers.size()
                 << fixed << setprecision(1)
                 << (100.0 * workerStats.finishedPaths / totalPaths) << "%)"
-                << " | worker requests: " << pendingWorkerRequests.size()
-                << " | messages: " << incomingMessages.size();
+                << " | requests: " << pendingWorkerRequests.size()
+                << " | time: " << setfill('0') << setw(2) << (duration / 60)
+                << ":" << setw(2) << (duration % 60);
 
             StatusBar::set_text(oss.str());
             return ResultType::Continue;
@@ -183,13 +188,13 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
             /* assign root treelet to worker since it is generating rays for
              * a crop window */
-            // this->assignRootTreelet(workerIt->second);
-            this->assignAllTreelets(workerIt->second);
+            this->assignRootTreelet(workerIt->second);
+            // this->assignAllTreelets(workerIt->second);
         }
         /* assign treelet to worker based on most in-demand treelets */
         else {
-            // this->assignTreelets(workerIt->second);
-            this->assignAllTreelets(workerIt->second);
+            this->assignTreelets(workerIt->second);
+            // this->assignAllTreelets(workerIt->second);
         }
 
         currentWorkerID++;

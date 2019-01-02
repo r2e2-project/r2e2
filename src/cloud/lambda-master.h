@@ -125,6 +125,9 @@ class LambdaMaster {
     TimerFD workerRequestTimer;
     TimerFD statusPrintTimer;
 
+    std::chrono::steady_clock::time_point startTime{
+        std::chrono::steady_clock::now()};
+
     /* Worker stats */
     WorkerStats workerStats;
 };
