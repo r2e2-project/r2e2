@@ -22,6 +22,9 @@ def handler(event, context):
     # remove old worker directories
     os.system("rm -rf /tmp/pbrt-worker.*")
 
+    # remove old log files
+    os.system("rm -rf /tmp/pbrt-lambda-*")
+
     retcode, output = run_command(["pbrt-lambda-worker",
                                    coordinator_host,
                                    coordinator_port,
