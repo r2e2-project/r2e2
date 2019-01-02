@@ -5,8 +5,8 @@
 #include <deque>
 #include <iterator>
 
-#include "core/paramset.h"
 #include "cloud/stats.h"
+#include "core/paramset.h"
 
 using namespace std;
 
@@ -145,7 +145,8 @@ void CloudIntegrator::Render(const Scene &scene) {
             state.sample.pixel = pixel;
             sampleData.weight =
                 camera->GenerateRayDifferential(sampleData.sample, &state.ray);
-            state.ray.ScaleDifferentials(1 / sqrt((Float)sampler->samplesPerPixel));
+            state.ray.ScaleDifferentials(1 /
+                                         sqrt((Float)sampler->samplesPerPixel));
             state.remainingBounces = maxDepth;
             state.StartTrace();
 
@@ -160,34 +161,37 @@ void CloudIntegrator::Render(const Scene &scene) {
     while (not rayQueue.empty()) {
         RayState state = move(rayQueue.back());
         rayQueue.pop_back();
-        vector<RayState> newRays;
 
-        if (not state.toVisit.empty()) {
+        if (!state.toVisit.empty()) {
             auto newRay = Trace(move(state), bvh);
-            if (!newRay.isShadowRay || !newRay.hit.initialized()) {
-                newRays.push_back(move(newRay));
-            }
-        } else if (state.isShadowRay) {
-            Spectrum L{0.f};
+            const bool hit = newRay.hit.initialized();
+            const bool emptyVisit = newRay.toVisit.empty();
 
-            if (!state.hit.initialized()) {
-                L = state.beta * state.Ld;
-            }
+            if (newRay.isShadowRay) {
+                if (hit) {
+                    continue; /* discard */
+                } else if (emptyVisit) {
+                    Spectrum L = state.beta * state.Ld;
 
-            if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
-                L = Spectrum(0.f);
-            }
+                    if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
+                        L = Spectrum(0.f);
+                    }
 
-            cameraSamples[state.sample.id].L += L;
+                    cameraSamples[state.sample.id].L += L;
+                } else {
+                    rayQueue.push_back(move(newRay));
+                }
+            } else if (!emptyVisit || hit) {
+                rayQueue.push_back(move(newRay));
+            }
         } else if (state.hit.initialized()) {
-            newRays = Shade(move(state), bvh, scene.lights, sampler, arena);
-            arena.Reset();
+            auto newRays =
+                Shade(move(state), bvh, scene.lights, sampler, arena);
+            for (auto &newRay : newRays) {
+                rayQueue.push_back(move(newRay));
+            }
         } else {
             ReportValue(pathLength, state.bounces);
-        }
-
-        for (auto &&newRay : newRays) {
-            rayQueue.push_back(move(newRay));
         }
     }
 
