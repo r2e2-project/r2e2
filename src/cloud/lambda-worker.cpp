@@ -44,9 +44,11 @@ constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{2'000};
 constexpr chrono::milliseconds WORKER_STATS_INTERVAL{2'000};
 
-protobuf::FinishedRay createFinishedRay(const Point2f& pFilm,
+protobuf::FinishedRay createFinishedRay(const size_t sampleId,
+                                        const Point2f& pFilm,
                                         const Float weight, const Spectrum L) {
     protobuf::FinishedRay proto;
+    proto.set_sample_id(sampleId);
     *proto.mutable_p_film() = to_protobuf(pFilm);
     proto.set_weight(weight);
     *proto.mutable_l() = to_protobuf(L);
@@ -87,12 +89,14 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                 {
                     protobuf::RecordWriter writer{outputName};
                     for (const RayState& ray : finishedQueue) {
-                        Spectrum L{ray.Ld * ray.beta};
+                        Spectrum L{ray.beta * ray.Ld};
+
                         if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
                             L = Spectrum(0.f);
                         }
 
-                        writer.write(createFinishedRay(ray.sample.pFilm,
+                        writer.write(createFinishedRay(ray.sample.id,
+                                                       ray.sample.pFilm,
                                                        ray.sample.weight, L));
                     }
                 }
@@ -165,8 +169,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                  << " / finished: " << finishedQueue.size()
                  << " / pending: " << pendingQueueSize
                  << " / out: " << outQueueSize << " / peers: " << peers.size()
-                 << " / sent: " << sentRays
-                 << " / received: " << receivedRays << endl;
+                 << " / sent: " << sentRays << " / received: " << receivedRays
+                 << endl;
 
             return ResultType::Continue;
         },
@@ -200,7 +204,6 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
     deque<RayState> processedRays;
 
     constexpr size_t MAX_RAYS = 10'000;
-    size_t i = 0;
 
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayState ray = move(rayQueue.front());
@@ -213,7 +216,8 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 
             if (newRay.isShadowRay) {
                 if (hit) {
-                    continue; /* discard */
+                    newRay.Ld = 0.f;
+                    finishedQueue.push_back(move(newRay));
                 } else if (emptyVisit) {
                     finishedQueue.push_back(move(newRay));
                 } else {
@@ -222,6 +226,8 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
             } else if (!emptyVisit || hit) {
                 processedRays.push_back(move(newRay));
             } else if (emptyVisit) {
+                newRay.Ld = 0.f;
+                finishedQueue.push_back(move(newRay));
                 global::workerStats.finishedPaths++;
             }
         } else if (ray.hit.initialized()) {
@@ -370,8 +376,10 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
     initializeScene();
 
     const Bounds2i sampleBounds = camera->film->GetSampleBounds();
+    const Vector2i sampleExtent = sampleBounds.Diagonal();
     const uint8_t maxDepth = 5;
-    const float rayScale = 1 / sqrt((Float)sampler->samplesPerPixel);
+    const auto samplesPerPixel = sampler->samplesPerPixel;
+    const Float rayScale = 1 / sqrt((Float)samplesPerPixel);
 
     for (const Point2i pixel : bounds) {
         sampler->StartPixel(pixel);
@@ -382,13 +390,16 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             CameraSample cameraSample = sampler->GetCameraSample(pixel);
 
             RayState state;
+            state.sample.id =
+                (pixel.x + pixel.y * sampleExtent.x) * samplesPerPixel +
+                sampleNum;
             state.sample.num = sampleNum++;
             state.sample.pixel = pixel;
             state.sample.pFilm = cameraSample.pFilm;
             state.sample.weight =
                 camera->GenerateRayDifferential(cameraSample, &state.ray);
-            state.remainingBounces = maxDepth;
             state.ray.ScaleDifferentials(rayScale);
+            state.remainingBounces = maxDepth;
             state.StartTrace();
 
             rayQueue.push_back(move(state));
@@ -555,6 +566,10 @@ void LambdaWorker::loadSampler() {
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);
     sampler = sampler::from_protobuf(proto_sampler);
+
+    if (workerId.initialized()) {
+        sampler = sampler->Clone(*workerId);
+    }
 }
 
 void LambdaWorker::loadLights() {

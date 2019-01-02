@@ -138,9 +138,10 @@ message RayState {
 }
 
 message FinishedRay {
-    Point2f p_film = 1;
-    float weight = 2;
-    RGBSpectrum L = 3;
+    uint64 sample_id = 1;
+    Point2f p_film = 2;
+    float weight = 3;
+    RGBSpectrum L = 4;
 }
 
 // ParamSet
