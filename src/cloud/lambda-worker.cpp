@@ -628,6 +628,7 @@ int main(int argc, char const* argv[]) {
             return EXIT_FAILURE;
         }
 
+        FLAGS_logtostderr = 1;
         google::InitGoogleLogging(argv[0]);
         const uint16_t coordinatorPort = stoi(argv[2]);
         LambdaWorker worker{argv[1], coordinatorPort, argv[3]};

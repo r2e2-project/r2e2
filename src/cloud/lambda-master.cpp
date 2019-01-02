@@ -126,8 +126,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             oss << "\033[0m"
                 << "\033[48;5;022m"
                 << " finished paths: " << workerStats.finishedPaths << " ("
-                << " | workers: " << workers.size()
-                << fixed << setprecision(1)
+                << " | workers: " << workers.size() << fixed << setprecision(1)
                 << (100.0 * workerStats.finishedPaths / totalPaths) << "%)"
                 << " | requests: " << pendingWorkerRequests.size()
                 << " | time: " << setfill('0') << setw(2) << (duration / 60)
@@ -142,8 +141,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     loop.make_listener({"0.0.0.0", listenPort}, [this, nTiles](
                                                     ExecutionLoop &loop,
                                                     TCPSocket &&socket) {
-        cerr << "Incoming connection from " << socket.peer_address().str()
-             << endl;
+        LOG(INFO) << "Incoming connection from " << socket.peer_address().str()
+                  << endl;
 
         auto messageParser = make_shared<MessageParser>();
         auto connection = loop.add_connection<TCPSocket>(
@@ -263,7 +262,7 @@ bool LambdaMaster::processWorkerRequest(const WorkerId workerId,
     const auto &selectedWorker = workers.at(selectedWorkerId);
 
     if (!selectedWorker.udpAddress.initialized()) {
-        cerr << "No UDP address for " << selectedWorkerId << endl;
+        LOG(WARNING) << "No UDP address for " << selectedWorkerId << endl;
         return false;
     }
 
@@ -334,13 +333,13 @@ void LambdaMaster::run() {
     /* request launching the lambdas */
     StatusBar::get();
 
-    cout << "Launching " << numberOfLambdas << " lambda(s)" << endl;
+    cerr << "Launching " << numberOfLambdas << " lambda(s)..." << endl;
     for (size_t i = 0; i < numberOfLambdas; i++) {
         loop.make_http_request<SSLConnection>(
             "start-worker", awsAddress, generateRequest(),
             [](const uint64_t, const string &, const HTTPResponse &) {},
             [](const uint64_t, const string &) {
-                cerr << "invocation request failed" << endl;
+                LOG(ERROR) << "invocation request failed" << endl;
             });
     }
 
@@ -429,7 +428,7 @@ vector<ObjectTypeID> LambdaMaster::assignTreelets(Worker &worker) {
 
             if (id.type != SceneManager::Type::Treelet) continue;
 
-            float EPS = 1e-10;
+            constexpr float EPS = 1e-10;
             float load =
                 info.rayRequestsPerSecond / (info.raysProcessedPerSecond + EPS);
             size_t size = getObjectSizeWithDependencies(worker, highestID);
