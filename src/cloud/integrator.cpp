@@ -126,7 +126,6 @@ void CloudIntegrator::Render(const Scene &scene) {
 
     deque<RayState> rayQueue;
     deque<RayState> finishedRays;
-    vector<SampleData> cameraSamples;
 
     /* Generate all the samples */
     size_t i = 0;
@@ -137,22 +136,21 @@ void CloudIntegrator::Render(const Scene &scene) {
 
         size_t sample_num = 0;
         do {
-            SampleData sampleData;
-            sampleData.sample = sampler->GetCameraSample(pixel);
+            CameraSample cameraSample = sampler->GetCameraSample(pixel);
 
             RayState state;
             state.sample.id = i++;
             state.sample.num = sample_num++;
             state.sample.pixel = pixel;
-            sampleData.weight =
-                camera->GenerateRayDifferential(sampleData.sample, &state.ray);
+            state.sample.pFilm = cameraSample.pFilm;
+            state.sample.weight =
+                camera->GenerateRayDifferential(cameraSample, &state.ray);
             state.ray.ScaleDifferentials(1 /
                                          sqrt((Float)sampler->samplesPerPixel));
             state.remainingBounces = maxDepth;
             state.StartTrace();
 
             rayQueue.push_back(move(state));
-            cameraSamples.push_back(move(sampleData));
 
             ++nIntersectionTests;
             ++nCameraRays;
@@ -190,15 +188,27 @@ void CloudIntegrator::Render(const Scene &scene) {
         }
     }
 
+    struct Sample {
+        Point2f pFilm;
+        Spectrum L{0.f};
+        Float weight{0.f};
+    };
+
+    unordered_map<size_t, Sample> allSamples;
+
     for (const auto &state : finishedRays) {
+        if (allSamples.count(state.sample.id) == 0) {
+            allSamples[state.sample.id].pFilm = state.sample.pFilm;
+            allSamples[state.sample.id].weight = state.sample.weight;
+        }
+
         Spectrum L = state.beta * state.Ld;
         if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) L = Spectrum(0.f);
-        cameraSamples[state.sample.id].L += L;
+        allSamples[state.sample.id].L += L;
     }
 
-    for (const auto &sampleData : cameraSamples) {
-        filmTile->AddSample(sampleData.sample.pFilm, sampleData.L,
-                            sampleData.weight);
+    for (const auto &kv : allSamples) {
+        filmTile->AddSample(kv.second.pFilm, kv.second.L, kv.second.weight);
     }
 
     /* Create the final output */
