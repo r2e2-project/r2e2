@@ -65,11 +65,13 @@ def main():
 
     function_name = 'pbrt-lambda-function'
     function_file = "{}.zip".format(function_name)
-    create_function_package(function_file, args.pbrt_lambda_worker)
-    print("Installing lambda function {}... ".format(function_name), end='')
-    install_lambda_package(function_file, function_name, args.role, args.region,
-                           delete=args.delete)
-    os.remove(function_file)
+    try:
+        create_function_package(function_file, args.pbrt_lambda_worker)
+        print("Installing lambda function {}... ".format(function_name), end='')
+        install_lambda_package(function_file, function_name, args.role, args.region,
+                               delete=args.delete)
+    finally:
+        os.remove(function_file)
 
 if __name__ == '__main__':
     main()
