@@ -40,7 +40,7 @@ class SceneManager {
         SceneManager::Type type;
         SceneManager::ObjectID id;
 
-        bool operator<(const ObjectTypeID &other) const {
+        bool operator<(const ObjectTypeID& other) const {
             if (type == other.type) {
                 return id < other.id;
             }
@@ -70,7 +70,7 @@ class SceneManager {
     std::map<Type, std::vector<Object>> listObjects();
     std::map<ObjectTypeID, std::set<ObjectTypeID>> listObjectDependencies();
 
-  const std::string& getScenePath() { return scenePath; }
+    const std::string& getScenePath() { return scenePath; }
 
   private:
     static std::string getFileName(const Type type, const uint32_t id);

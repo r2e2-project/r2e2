@@ -2,19 +2,22 @@
 
 #include <fcntl.h>
 
-#include "util/exception.h"
 #include "messages/utils.h"
+#include "util/exception.h"
 
 using namespace std;
 
 namespace pbrt {
 
-static const std::string TYPE_PREFIXES[] = {
-    "T",     "TM",  "LIGHTS", "SAMPLER", "CAMERA",
-    "SCENE", "MAT", "FTEX",   "STEX",    "MANIFEST"};
+static const string TYPE_PREFIXES[] = {"T",      "TM",      "LIGHTS", "SAMPLER",
+                                       "CAMERA", "SCENE",   "MAT",    "FTEX",
+                                       "STEX",   "MANIFEST"};
 
-std::string SceneManager::ObjectTypeID::to_string() const {
-  return SceneManager::getFileName(type, id);
+static_assert(sizeof(TYPE_PREFIXES) / sizeof(string) ==
+              to_underlying(SceneManager::Type::COUNT));
+
+string SceneManager::ObjectTypeID::to_string() const {
+    return SceneManager::getFileName(type, id);
 }
 
 void SceneManager::init(const string& scenePath) {
@@ -106,39 +109,39 @@ protobuf::Manifest SceneManager::makeManifest() const {
     return manifest;
 }
 
-std::map<SceneManager::Type, vector<SceneManager::Object>>
+map<SceneManager::Type, vector<SceneManager::Object>>
 SceneManager::listObjects() {
     if (!sceneFD.initialized()) {
         throw runtime_error("SceneManager is not initialized");
     }
 
     if (dependencies.empty()) {
-      loadManifest();
+        loadManifest();
     }
 
-    std::map<Type, vector<Object>> result;
+    map<Type, vector<Object>> result;
     /* read the list of objects from the manifest file */
     for (auto& kv : dependencies) {
-      const ObjectTypeID& id = kv.first;
-      size_t size = 0;
-      if (id.type != Type::TriangleMesh) {
-          std::string filename = getFileName(id.type, id.id);
-          size = roost::file_size_at(*sceneFD, filename);
-      }
-      result[id.type].push_back(Object(id.id, size));
+        const ObjectTypeID& id = kv.first;
+        size_t size = 0;
+        if (id.type != Type::TriangleMesh) {
+            string filename = getFileName(id.type, id.id);
+            size = roost::file_size_at(*sceneFD, filename);
+        }
+        result[id.type].push_back(Object(id.id, size));
     }
 
     return result;
 }
 
-std::map<SceneManager::ObjectTypeID, std::set<SceneManager::ObjectTypeID>>
+map<SceneManager::ObjectTypeID, set<SceneManager::ObjectTypeID>>
 SceneManager::listObjectDependencies() {
     if (!sceneFD.initialized()) {
         throw runtime_error("SceneManager is not initialized");
     }
 
     if (dependencies.empty()) {
-      loadManifest();
+        loadManifest();
     }
 
     return dependencies;
