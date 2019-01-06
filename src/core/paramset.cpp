@@ -34,6 +34,7 @@
 #include "paramset.h"
 #include "floatfile.h"
 #include "textures/constant.h"
+#include "util/path.h"
 
 #include <fstream>
 
@@ -449,10 +450,9 @@ std::string ParamSet::FindOneFilename(const std::string &name,
         std::string remappedFilename =
             remappingBasePath + "/" + randPrefix + "_" + basename;
         remappedFilenames[filename] = remappedFilename;
+
         /* copy file to remapped location */
-        std::ifstream src(filename, std::ios::binary);
-        std::ofstream dst(remappedFilename, std::ios::binary);
-        dst << src.rdbuf();
+        roost::copy_then_rename(filename, remappedFilename);
         filename = remappedFilename;
     }
     return filename;
