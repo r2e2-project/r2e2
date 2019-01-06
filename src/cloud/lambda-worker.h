@@ -112,10 +112,6 @@ class LambdaWorker {
     TimerFD peerTimer;
     TimerFD statusPrintTimer;
     TimerFD workerStatsTimer;
-
-    /* Stats */
-    uint64_t sentRays{0};
-    uint64_t receivedRays{0};
 };
 
 }  // namespace pbrt
