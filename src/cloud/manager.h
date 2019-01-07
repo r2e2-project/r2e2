@@ -24,6 +24,7 @@ class SceneManager {
         FloatTexture,
         SpectrumTexture,
         Manifest,
+        Texture,
         COUNT
     };
 

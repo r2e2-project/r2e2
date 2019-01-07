@@ -9,9 +9,9 @@ using namespace std;
 
 namespace pbrt {
 
-static const string TYPE_PREFIXES[] = {"T",      "TM",      "LIGHTS", "SAMPLER",
-                                       "CAMERA", "SCENE",   "MAT",    "FTEX",
-                                       "STEX",   "MANIFEST"};
+static const string TYPE_PREFIXES[] = {
+    "T",   "TM",   "LIGHTS", "SAMPLER",  "CAMERA", "SCENE",
+    "MAT", "FTEX", "STEX",   "MANIFEST", "TEX"};
 
 static_assert(sizeof(TYPE_PREFIXES) / sizeof(string) ==
               to_underlying(SceneManager::Type::COUNT));
@@ -57,6 +57,7 @@ string SceneManager::getFileName(const Type type, const uint32_t id) {
     case Type::Material:
     case Type::FloatTexture:
     case Type::SpectrumTexture:
+    case Type::Texture:
         return TYPE_PREFIXES[to_underlying(type)] + to_string(id);
 
     case Type::Sampler:
