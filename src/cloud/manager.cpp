@@ -80,6 +80,14 @@ uint32_t SceneManager::getNextId(const Type type, const void* ptr) {
     return id;
 }
 
+uint32_t SceneManager::getTextureId(const std::string &path) {
+    if (textureNameToId.count(path)) {
+        return textureNameToId[path];
+    }
+
+    return (textureNameToId[path] = autoIds[to_underlying(Type::Texture)]++);
+}
+
 void SceneManager::recordDependency(const ObjectTypeID& from,
                                     const ObjectTypeID& to) {
     dependencies[from].insert(to);

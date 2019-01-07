@@ -68,6 +68,8 @@ class SceneManager {
     void recordDependency(const ObjectTypeID& from, const ObjectTypeID& to);
     protobuf::Manifest makeManifest() const;
 
+    uint32_t getTextureId(const std::string &path);
+
     std::map<Type, std::vector<Object>> listObjects();
     std::map<ObjectTypeID, std::set<ObjectTypeID>> listObjectDependencies();
 
@@ -82,6 +84,7 @@ class SceneManager {
     Optional<FileDescriptor> sceneFD{};
     std::unordered_map<const void*, uint32_t> ptrIds{};
     std::map<ObjectTypeID, std::set<ObjectTypeID>> dependencies;
+    std::map<std::string, uint32_t> textureNameToId;
 };
 
 namespace global {
