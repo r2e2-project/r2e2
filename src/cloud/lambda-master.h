@@ -115,6 +115,7 @@ class LambdaMaster {
     /* Scene Objects */
     Bounds2i sampleBounds;
     std::map<ObjectTypeID, SceneObjectInfo> sceneObjects;
+    std::set<ObjectTypeID> treeletIds;
     std::map<ObjectTypeID, std::set<ObjectTypeID>> requiredDependentObjects;
     std::stack<ObjectTypeID> unassignedTreelets;
 

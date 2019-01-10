@@ -74,6 +74,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             sceneObjects.insert({id, info});
             if (type == SceneManager::Type::Treelet) {
                 unassignedTreelets.push(id);
+                treeletIds.insert(id);
             }
         }
     }
@@ -429,13 +430,10 @@ vector<ObjectTypeID> LambdaMaster::assignTreelets(Worker &worker) {
     /* otherwise, find the object with the largest discrepancy between rays
      * requested and rays processed */
     if (objectsToAssign.empty()) {
-        ObjectTypeID highestID;
-        float highestLoad = numeric_limits<float>::min();
-        for (auto &kv : sceneObjects) {
-            const ObjectTypeID &id = kv.first;
-            const SceneObjectInfo &info = kv.second;
-
-            if (id.type != SceneManager::Type::Treelet) continue;
+        ObjectTypeID highestID = sceneObjects.begin()->first;
+        float highestLoad = -1;
+        for (const ObjectTypeID &id : treeletIds) {
+            const SceneObjectInfo &info = sceneObjects.at(id);
 
             constexpr float EPS = 1e-10;
             float load =
@@ -445,6 +443,11 @@ vector<ObjectTypeID> LambdaMaster::assignTreelets(Worker &worker) {
                 highestID = id;
                 highestLoad = load;
             }
+        }
+        /* if we have not received stats info about the load of any scene
+         * object, randomly pick a treelet */
+        if (highestLoad < 0) {
+            highestID = *random::sample(treeletIds.begin(), treeletIds.end());
         }
         objectsToAssign.push_back(highestID);
         assignObject(worker, highestID);
