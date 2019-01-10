@@ -11,6 +11,8 @@
 using namespace std;
 using namespace PollerShortNames;
 
+constexpr std::chrono::microseconds UDPConnection::pace_;
+
 ExecutionLoop::ExecutionLoop()
   : signals_( { SIGCHLD, SIGCONT, SIGHUP, SIGTERM, SIGQUIT } ),
     signal_fd_( signals_ )
