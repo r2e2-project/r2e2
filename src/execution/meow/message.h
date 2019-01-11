@@ -27,6 +27,7 @@ namespace meow {
       ConnectionResponse,
       WorkerStats,
       SendRays,
+      FinishedRays,
       Bye,
 
       COUNT

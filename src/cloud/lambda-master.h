@@ -68,6 +68,7 @@ class LambdaMaster {
 
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleWorkerRequests();
+    Poller::Action::Result::Type handleWriteOutput();
 
     bool processMessage(const WorkerId workerId, const meow::Message &message);
     bool processWorkerRequest(const WorkerId workerId,
@@ -110,6 +111,7 @@ class LambdaMaster {
     /* Scene Data */
     std::vector<std::unique_ptr<Transform>> transformCache{};
     std::shared_ptr<Camera> camera{};
+    std::unique_ptr<FilmTile> filmTile{};
     size_t totalPaths{0};
 
     /* Scene Objects */
@@ -125,8 +127,9 @@ class LambdaMaster {
     /* Timers */
     TimerFD workerRequestTimer;
     TimerFD statusPrintTimer;
+    TimerFD writeOutputTimer;
 
-    std::chrono::steady_clock::time_point startTime{
+    const std::chrono::steady_clock::time_point startTime{
         std::chrono::steady_clock::now()};
 
     /* Worker stats */

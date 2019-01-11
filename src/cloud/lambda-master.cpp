@@ -35,6 +35,7 @@ using ObjectTypeID = SceneManager::ObjectTypeID;
 
 constexpr chrono::milliseconds WORKER_REQUEST_INTERVAL{500};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
+constexpr chrono::milliseconds WRITE_OUTPUT_INTERVAL{1'000};
 
 void sigint_handler(int) { throw runtime_error("killed by signal"); }
 
@@ -57,7 +58,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
       awsRegion(awsRegion),
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
       workerRequestTimer(WORKER_REQUEST_INTERVAL),
-      statusPrintTimer(STATUS_PRINT_INTERVAL) {
+      statusPrintTimer(STATUS_PRINT_INTERVAL),
+      writeOutputTimer(WRITE_OUTPUT_INTERVAL) {
     global::manager.init(scenePath);
     loadCamera();
 
@@ -95,7 +97,6 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
     udpConnection->socket().bind({"0.0.0.0", listenPort});
 
-    sampleBounds = camera->film->GetSampleBounds();
     Vector2i sampleExtent = sampleBounds.Diagonal();
     Point2i nTiles((sampleExtent.x + TILE_SIZE - 1) / TILE_SIZE,
                    (sampleExtent.y + TILE_SIZE - 1) / TILE_SIZE);
@@ -115,6 +116,11 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         []() { throw runtime_error("worker requests failed"); }));
 
     loop.poller().add_action(Poller::Action(
+        writeOutputTimer.fd, Direction::In,
+        bind(&LambdaMaster::handleWriteOutput, this), [this]() { return true; },
+        []() { throw runtime_error("worker requests failed"); }));
+
+    loop.poller().add_action(Poller::Action(
         statusPrintTimer.fd, Direction::In,
         [this]() {
             statusPrintTimer.reset();
@@ -131,9 +137,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                 << (100.0 * workerStats.finishedPaths / totalPaths) << "%)"
                 << " | workers: " << workers.size()
                 << " | requests: " << pendingWorkerRequests.size()
-                << " | \u2191 " << workerStats.sentRays
-                << " | \u2193 " << workerStats.receivedRays << " (" << fixed
-                << setprecision(1)
+                << " | \u2191 " << workerStats.sentRays << " | \u2193 "
+                << workerStats.receivedRays << " (" << fixed << setprecision(1)
                 << (workerStats.sentRays == 0
                         ? 0
                         : (100.0 * workerStats.receivedRays /
@@ -249,6 +254,16 @@ ResultType LambdaMaster::handleWorkerRequests() {
     return ResultType::Continue;
 }
 
+ResultType LambdaMaster::handleWriteOutput() {
+    writeOutputTimer.reset();
+
+    camera->film->MergeFilmTile(move(filmTile));
+    camera->film->WriteImage();
+    filmTile = camera->film->GetFilmTile(sampleBounds);
+
+    return ResultType::Continue;
+}
+
 bool LambdaMaster::processWorkerRequest(const WorkerId workerId,
                                         const Message &message) {
     auto &worker = workers.at(workerId);
@@ -332,6 +347,20 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         break;
     }
 
+    case OpCode::FinishedRays: {
+        protobuf::RecordReader finishedReader{istringstream(message.payload())};
+
+        while (!finishedReader.eof()) {
+            protobuf::FinishedRay proto;
+            if (finishedReader.read(&proto)) {
+                filmTile->AddSample(from_protobuf(proto.p_film()),
+                                    from_protobuf(proto.l()), proto.weight());
+            }
+        }
+
+        break;
+    }
+
     default:
         throw runtime_error("unhandled message opcode");
     }
@@ -364,6 +393,8 @@ void LambdaMaster::loadCamera() {
     protobuf::Camera proto_camera;
     reader->read(&proto_camera);
     camera = camera::from_protobuf(proto_camera, transformCache);
+    sampleBounds = camera->film->GetSampleBounds();
+    filmTile = camera->film->GetFilmTile(sampleBounds);
 }
 
 vector<ObjectTypeID> LambdaMaster::assignAllTreelets(Worker &worker) {
