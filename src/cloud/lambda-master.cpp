@@ -362,7 +362,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
     }
 
     default:
-        throw runtime_error("unhandled message opcode");
+        throw runtime_error("unhandled message opcode: " + to_string(to_underlying(message.opcode())));
     }
 
     return true;

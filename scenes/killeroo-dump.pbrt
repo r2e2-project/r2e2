@@ -10,7 +10,7 @@ Film "image"
 # "integer xresolution" [1500] "integer yresolution" [1500]
 #	"float cropwindow" [ .34 .49  .67 .8 ]
 
-Sampler "halton" "integer pixelsamples" [8]
+Sampler "halton" "integer pixelsamples" [4]
 
 Integrator "path" "integer maxdepth" [5]
 
@@ -34,14 +34,14 @@ Shape "trianglemesh" "point P" [ -400 -1000 -1000   -400 1000 -1000   -400 1000 
 AttributeEnd
 
 AttributeBegin
-Texture "Test" "color" "ptex" "string filename" "textures/test.ptx"
+#Texture "Test" "color" "ptex" "string filename" "textures/test.ptx"
 
 Scale .5 .5 .5
 Rotate -60 0 0 1
 Translate 400 200 -140
     ObjectInstance "killeroo"
     #Include "geometry/killeroo.pbrt"
-    Material "matte" "texture Kd" "Test"
+    #Material "matte" "texture Kd" "Test"
 Translate -100 0 0
     ObjectInstance "killeroo"
 Translate -100 0 0

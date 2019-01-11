@@ -42,7 +42,7 @@ using PollerResult = Poller::Result::Type;
 class ProgramFinished : public exception {};
 
 constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
-constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{2'000};
+constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{10'000};
 constexpr chrono::milliseconds WORKER_STATS_INTERVAL{2'000};
 
 protobuf::FinishedRay createFinishedRay(const size_t sampleId,
@@ -85,29 +85,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             return true;
         },
         []() { cerr << "Connection to coordinator failed." << endl; },
-        [this]() {
-            if (outputName.length()) {
-                {
-                    protobuf::RecordWriter writer{outputName};
-                    for (const RayState& ray : finishedQueue) {
-                        Spectrum L{ray.beta * ray.Ld};
-
-                        if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
-                            L = Spectrum(0.f);
-                        }
-
-                        writer.write(createFinishedRay(ray.sample.id,
-                                                       ray.sample.pFilm,
-                                                       ray.sample.weight, L));
-                    }
-                }
-
-                storage::PutRequest putOutputRequest{outputName, outputName};
-                storageBackend->put({putOutputRequest});
-            }
-
-            throw ProgramFinished();
-        });
+        [this]() { throw ProgramFinished(); });
 
     udpConnection = loop.make_udp_connection(
         [this](shared_ptr<UDPConnection>, Address&& addr, string&& data) {
@@ -127,10 +105,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return outQueueSize > 0; },
         []() { throw runtime_error("out queue failed"); }));
 
-    /* loop.poller().add_action(Poller::Action(
+    loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
         [this]() { return !finishedQueue.empty(); },
-        []() { throw runtime_error("finished queue failed"); })); */
+        []() { throw runtime_error("finished queue failed"); }));
 
     loop.poller().add_action(Poller::Action(
         peerTimer.fd, Direction::In, bind(&LambdaWorker::handlePeers, this),
@@ -303,17 +281,30 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
-    while (!finishedQueue.empty()) {
-        RayState ray = move(finishedQueue.front());
-        finishedQueue.pop_front();
+    ostringstream oss;
 
-        Spectrum L{ray.Ld * ray.beta};
-        if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
-            L = Spectrum(0.f);
+    {
+        protobuf::RecordWriter writer{&oss};
+
+        while (!finishedQueue.empty()) {
+            RayState ray = move(finishedQueue.front());
+            finishedQueue.pop_front();
+
+            Spectrum L{ray.beta * ray.Ld};
+
+            if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
+                L = Spectrum(0.f);
+            }
+
+            writer.write(createFinishedRay(ray.sample.id, ray.sample.pFilm,
+                                           ray.sample.weight, L));
         }
-
-        filmTile->AddSample(ray.sample.pFilm, L, ray.sample.weight);
     }
+
+    oss.flush();
+    Message message{OpCode::FinishedRays, oss.str()};
+    auto messageStr = message.str();
+    coordinatorConnection->enqueue_write(move(messageStr));
 
     return ResultType::Continue;
 }
@@ -460,8 +451,6 @@ bool LambdaWorker::processMessage(const Message& message) {
         protobuf::ConnectTo proto;
         protoutil::from_string(message.payload(), proto);
 
-        cerr << protoutil::to_json(proto) << endl;
-
         if (peers.count(proto.worker_id()) == 0) {
             const auto dest = Address::decompose(proto.address());
             peers.emplace(proto.worker_id(),
@@ -503,7 +492,6 @@ bool LambdaWorker::processMessage(const Message& message) {
         if (peer.state != Worker::State::Connected &&
             proto.your_seed() == mySeed) {
             peer.state = Worker::State::Connected;
-            cerr << "* connected to worker " << otherWorkerId << endl;
 
             for (const auto treeletId : proto.treelet_ids()) {
                 peer.treelets.insert(treeletId);
