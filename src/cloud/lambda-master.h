@@ -66,13 +66,20 @@ class LambdaMaster {
             : id(id), connection(std::move(connection)) {}
     };
 
+    struct WorkerRequest {
+        WorkerId worker;
+        TreeletId treelet;
+
+        WorkerRequest(const WorkerId worker, const TreeletId treelet)
+            : worker(worker), treelet(treelet) {}
+    };
+
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleWorkerRequests();
     Poller::Action::Result::Type handleWriteOutput();
 
     bool processMessage(const WorkerId workerId, const meow::Message &message);
-    bool processWorkerRequest(const WorkerId workerId,
-                              const meow::Message &message);
+    bool processWorkerRequest(const WorkerRequest &request);
     void loadCamera();
 
     /* Assigning Objects */
@@ -106,7 +113,9 @@ class LambdaMaster {
 
     /* Message Queues */
     std::deque<std::pair<WorkerId, meow::Message>> incomingMessages;
-    std::deque<std::pair<WorkerId, meow::Message>> pendingWorkerRequests;
+
+    /* Worker Requests */
+    std::deque<WorkerRequest> pendingWorkerRequests;
 
     /* Scene Data */
     std::vector<std::unique_ptr<Transform>> transformCache{};
@@ -134,6 +143,7 @@ class LambdaMaster {
 
     /* Worker stats */
     WorkerStats workerStats;
+    size_t initializedWorkers{0};
 };
 
 class Schedule {
