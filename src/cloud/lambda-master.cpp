@@ -124,12 +124,12 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         statusPrintTimer.fd, Direction::In,
         [this]() {
             statusPrintTimer.reset();
+
+            auto elapsedTime = chrono::duration_cast<chrono::seconds>(
+                                   chrono::steady_clock::now() - startTime)
+                                   .count();
+
             ostringstream oss;
-
-            auto duration = chrono::duration_cast<chrono::seconds>(
-                                chrono::steady_clock::now() - startTime)
-                                .count();
-
             oss << "\033[0m"
                 << "\033[48;5;022m"
                 << " finished paths: " << workerStats.finishedPaths << " ("
@@ -144,8 +144,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                         : (100.0 * workerStats.receivedRays /
                            workerStats.sentRays))
                 << "%)"
-                << " | time: " << setfill('0') << setw(2) << (duration / 60)
-                << ":" << setw(2) << (duration % 60);
+                << " | time: " << setfill('0') << setw(2) << (elapsedTime / 60)
+                << ":" << setw(2) << (elapsedTime % 60);
 
             StatusBar::set_text(oss.str());
             return ResultType::Continue;
@@ -362,7 +362,8 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
     }
 
     default:
-        throw runtime_error("unhandled message opcode: " + to_string(to_underlying(message.opcode())));
+        throw runtime_error("unhandled message opcode: " +
+                            to_string(to_underlying(message.opcode())));
     }
 
     return true;
@@ -583,6 +584,7 @@ int main(int argc, char const *argv[]) {
 
         signal(SIGINT, sigint_handler);
 
+        FLAGS_logtostderr = 1;
         google::InitGoogleLogging(argv[0]);
 
         const string scenePath{argv[1]};
