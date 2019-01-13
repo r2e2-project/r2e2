@@ -84,8 +84,13 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     requiredDependentObjects = global::manager.listObjectDependencies();
 
     udpConnection = loop.make_udp_connection(
-        [&](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
-            const WorkerId workerId = stoull(data);
+        [&](shared_ptr<UDPConnection> conn, Address &&addr, string &&data) {
+            Message message{data};
+            if (message.opcode() != OpCode::ConnectionRequest) return true;
+
+            protobuf::ConnectRequest req;
+            protoutil::from_string(message.payload(), req);
+            const WorkerId workerId = req.worker_id();
 
             if (!workers.count(workerId)) {
                 throw runtime_error("unexpected worker id");
@@ -97,6 +102,16 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             }
 
             worker.udpAddress.reset(move(addr));
+
+            /* create connection response */
+            protobuf::ConnectResponse resp;
+            resp.set_worker_id(0);
+            resp.set_my_seed(121212);
+            resp.set_your_seed(req.my_seed());
+            Message responseMsg{OpCode::ConnectionResponse,
+                                protoutil::to_string(resp)};
+            conn->enqueue_datagram(addr, responseMsg.str());
+
             return true;
         },
         []() { throw runtime_error("udp connection error"); },

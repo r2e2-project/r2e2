@@ -420,11 +420,19 @@ bool LambdaWorker::processMessage(const Message& message) {
          << "]\n"; */
 
     switch (message.opcode()) {
-    case OpCode::Hey:
+    case OpCode::Hey: {
         workerId.reset(stoull(message.payload()));
-        udpConnection->enqueue_datagram(coordinatorAddr, to_string(*workerId));
         outputName = to_string(*workerId) + ".rays";
+
+        Address addrCopy{coordinatorAddr};
+        peers.emplace(0, Worker{0, move(addrCopy)});
+
+        /* send connection request */
+        Message connRequest = createConnectionRequest(peers.at(0));
+        udpConnection->enqueue_datagram(coordinatorAddr, connRequest.str());
+
         break;
+    }
 
     case OpCode::Ping: {
         Message pong{OpCode::Pong, ""};

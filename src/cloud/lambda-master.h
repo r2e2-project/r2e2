@@ -107,7 +107,7 @@ class LambdaMaster {
     ExecutionLoop loop{};
     std::shared_ptr<UDPConnection> udpConnection{};
 
-    WorkerId currentWorkerID = 0;
+    WorkerId currentWorkerID{1};
     std::map<WorkerId, Worker> workers{};
     std::map<TreeletId, std::vector<WorkerId>> treeletToWorker{};
 
