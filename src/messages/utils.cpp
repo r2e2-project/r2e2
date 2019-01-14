@@ -296,7 +296,7 @@ protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
     protobuf::WorkerStats proto;
     proto.set_finished_paths(stats.finishedPaths);
     proto.set_sent_rays(stats.sentRays);
-    proto.set_received_rays(stats.sentRays);
+    proto.set_received_rays(stats.receivedRays);
     return proto;
 }
 
