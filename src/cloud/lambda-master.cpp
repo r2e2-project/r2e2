@@ -212,10 +212,10 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         this->assignBaseSceneObjects(workerIt->second);
 
         /* assign a tile to the worker, if we need to */
-        if (currentWorkerID < nTiles.x * nTiles.y) {
+        if (currentWorkerID <= nTiles.x * nTiles.y) {
             /* compute the crop window */
-            const int tileX = currentWorkerID % nTiles.x;
-            const int tileY = currentWorkerID / nTiles.x;
+            const int tileX = (currentWorkerID - 1) % nTiles.x;
+            const int tileY = (currentWorkerID - 1) / nTiles.x;
             const int x0 = this->sampleBounds.pMin.x + tileX * TILE_SIZE;
             const int x1 = min(x0 + TILE_SIZE, this->sampleBounds.pMax.x);
             const int y0 = this->sampleBounds.pMin.y + tileY * TILE_SIZE;
