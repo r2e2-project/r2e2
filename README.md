@@ -47,7 +47,7 @@ them. :-)
 Building pbrt
 -------------
 
-To check out pbrt together with all dependencies, be sure to use the
+To check out pbrt together with all source dependencies, be sure to use the
 `--recursive` flag when cloning the repository, i.e.
 ```bash
 $ git clone --recursive https://github.com/mmp/pbrt-v3/
@@ -59,6 +59,21 @@ command to also fetch the dependencies:
 $ git submodule update --init --recursive
 ```
 
+### Library Dependencies
+
+Our version of pbrt is dependent on the following libraries (listed by their
+apt package name):
+* `libprotobuf-dev`
+* `libcrypto++-dev`
+* `libssl-dev`
+
+Before building, you'll need to install each of these using your package manager.
+On Ubuntu this is done by running something of the form:
+
+    apt install <package-name>
+
+
+### CMake
 pbrt uses [cmake](http://www.cmake.org/) for its build system.  On Linux
 and OS X, cmake is available via most package management systems.  To get
 cmake for Windows, or to build it from source, see the [cmake downloads
