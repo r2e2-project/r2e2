@@ -65,6 +65,9 @@ vector<RayState> CloudIntegrator::Shade(RayState &&rayState,
             newRays.push_back(move(newRay));
 
             ++nIntersectionTests;
+        } else {
+            global::workerStats.finishedPaths++;
+            ReportValue(pathLength, rayState.bounces);
         }
     } else {
         /* we're done with this path */
@@ -178,8 +181,7 @@ void CloudIntegrator::Render(const Scene &scene) {
                 }
             } else if (!emptyVisit || hit) {
                 rayQueue.push_back(move(newRay));
-            }
-            else {
+            } else {
                 newRay.Ld = 0.f;
                 finishedRays.push_back(move(newRay));
             }
