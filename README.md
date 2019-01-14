@@ -72,6 +72,14 @@ On Ubuntu this is done by running something of the form:
 
     apt install <package-name>
 
+### Tool Dependencies
+
+Building our version of pbrt requires that you have the following tools
+installed on your system (listed by their apt package name):
+* `protobuf-compiler`
+
+Before building you should install them using your package manager.
+
 
 ### CMake
 pbrt uses [cmake](http://www.cmake.org/) for its build system.  On Linux
