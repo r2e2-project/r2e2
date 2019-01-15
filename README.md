@@ -155,3 +155,56 @@ in the list of configuration variables; set them as desired before choosing
 
 With command-line cmake, their values can be specified when you cmake via
 `-DPBRT_FLOAT_AS_DOUBLE=1`, for example.
+
+Running Distributed PBRT
+------------------------
+
+### Environmental Variables
+
+Before running the distributed version of pbrt, you must have the following environmental variables set:
+   * `AWS_ACCESS_KEY_ID`
+   * `AWS_SECRET_ACCESS_KEY`
+   * `AWS_REGION`
+   * `PBRT_LAMBDA_ROLE`
+
+### Network
+
+Your machine must have a public IP.
+
+### Storage
+
+You must (in advance) create a pbrt dump of a scene, and copy that dump to an s3 bucket.
+
+You can copy folders to buckets using `aws s3 cp --recursive <path-to-folder>
+s3://<s3-bucket-name>`
+
+### Runnning
+
+Distributed pbrt has two programs, a master and a worker. The master can be invoked as
+
+```
+pbrt-lambda-master <path-to-pdrt-dump> <public-port> <n-lambdas> <public-ip>:<public-port> s3://<s3-bucket-name>?region=<aws-region> <aws-region>
+```
+
+And the worker as
+
+```
+pbrt-lambda-worker <public-ip> <public-port> s3://<s3-bucket-name>?region=<aws-region>
+```
+
+You may actually run all of these locally! However, by setting <n-lambdas> to
+be greater than 0, the master will fire up lambda instances running the worker
+program.
+
+### Changing the worker binary
+
+To change the binary that the AWS Lambda workers run, you must execute
+
+```
+./src/remote/create-function.py --pbrt-lambda-worker <path-to-pbrt-lambda-worker> --delete
+```
+
+### Seeing the result
+
+In the folder where the master is executing, you will find an image file with
+the result. It is updated in real time.
