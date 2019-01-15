@@ -624,7 +624,7 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
             name.c_str(), renderOptions->IntegratorName.c_str());
 
     if (PbrtOptions.dumpScene && material) {
-        int id =
+        const uint32_t id =
             global::manager.getNextId(SceneManager::Type::Material, material);
         auto writer =
             global::manager.GetWriter(SceneManager::Type::Material, id);
@@ -633,7 +633,7 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
         for (const std::string& name : mp.GetUsedFloatTextures()) {
           auto tex = mp.GetFloatTextureOrNull(name).get();
           if (global::manager.hasId(tex)) {
-              int tex_id = global::manager.getId(tex);
+              const uint32_t tex_id = global::manager.getId(tex);
               global::manager.recordDependency(
                   SceneManager::ObjectTypeID{SceneManager::Type::Material, id},
                   SceneManager::ObjectTypeID{SceneManager::Type::FloatTexture,
@@ -643,7 +643,7 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
         for (const std::string &name : mp.GetUsedSpectrumTextures()) {
             auto tex = mp.GetSpectrumTextureOrNull(name).get();
             if (global::manager.hasId(tex)) {
-                int tex_id = global::manager.getId(tex);
+                const uint32_t tex_id = global::manager.getId(tex);
                 global::manager.recordDependency(
                     SceneManager::ObjectTypeID{SceneManager::Type::Material,
                                                id},
@@ -659,6 +659,31 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
     else ++nMaterialsCreated;
 
     return std::shared_ptr<Material>(material);
+}
+
+void storeTexture(const std::string &name, ParamSet &tp) {
+    if (name == "ptex" || name == "imagemap") {
+        std::string currentName = tp.FindOneFilename("filename", "");
+        if (currentName.length() == 0) {
+            return;
+        }
+
+        tp.EraseString("filename");
+
+        const uint32_t textureId = global::manager.getTextureId(currentName);
+        const std::string newFilename =
+            SceneManager::getFileName(SceneManager::Type::Texture, textureId);
+        const std::string newPath =
+            global::manager.getScenePath() + "/" + newFilename;
+
+        if (!roost::exists(newPath)) {
+            roost::copy_then_rename(currentName, newPath);
+        }
+
+        std::unique_ptr<std::string[]> filename(new std::string[1]);
+        filename[0] = std::string(newFilename);
+        tp.AddString("filename", move(filename), 1);
+    }
 }
 
 std::shared_ptr<Texture<Float>> MakeFloatTexture(const std::string &name,
@@ -696,10 +721,22 @@ std::shared_ptr<Texture<Float>> MakeFloatTexture(const std::string &name,
     tp.ReportUnused();
 
     if (PbrtOptions.dumpScene) {
-      int id = global::manager.getNextId(SceneManager::Type::FloatTexture, tex);
-      auto writer =
-          global::manager.GetWriter(SceneManager::Type::FloatTexture, id);
-      writer->write(float_texture::to_protobuf(name, tex2world, tp));
+        /* step one: if there are any path names, rewrite them and copy files */
+        ParamSet params{tp.GetGeomParams()};
+        storeTexture(name, params);
+        auto floatTexturesCopy = tp.GetFloatTextures();
+        auto spectrumTexturesCopy = tp.GetSpectrumTextures();
+        TextureParams newTp{params, params, floatTexturesCopy,
+                            spectrumTexturesCopy};
+
+        /* step two: write the texture */
+        const uint32_t id =
+            global::manager.getNextId(SceneManager::Type::FloatTexture, tex);
+        auto writer =
+            global::manager.GetWriter(SceneManager::Type::FloatTexture, id);
+        writer->write(float_texture::to_protobuf(name, tex2world, newTp));
+
+        /* step three: record the dependencies */
     }
 
     return std::shared_ptr<Texture<Float>>(tex);
@@ -740,10 +777,18 @@ std::shared_ptr<Texture<Spectrum>> MakeSpectrumTexture(
     tp.ReportUnused();
 
     if (PbrtOptions.dumpScene) {
-      int id = global::manager.getNextId(SceneManager::Type::SpectrumTexture, tex);
-      auto writer =
-          global::manager.GetWriter(SceneManager::Type::SpectrumTexture, id);
-      writer->write(spectrum_texture::to_protobuf(name, tex2world, tp));
+        ParamSet params{tp.GetGeomParams()};
+        storeTexture(name, params);
+        auto floatTexturesCopy = tp.GetFloatTextures();
+        auto spectrumTexturesCopy = tp.GetSpectrumTextures();
+        TextureParams newTp{params, params, floatTexturesCopy,
+                            spectrumTexturesCopy};
+
+        const uint32_t id =
+            global::manager.getNextId(SceneManager::Type::SpectrumTexture, tex);
+        auto writer =
+            global::manager.GetWriter(SceneManager::Type::SpectrumTexture, id);
+        writer->write(spectrum_texture::to_protobuf(name, tex2world, newTp));
     }
 
     return std::shared_ptr<Texture<Spectrum>>(tex);
@@ -1272,9 +1317,7 @@ void pbrtTexture(const std::string &name, const std::string &type,
 
     TextureParams tp(params, params, *graphicsState.floatTextures,
                      *graphicsState.spectrumTextures);
-    if (PbrtOptions.dumpScene) {
-      tp.RemapFilenames(global::manager.getScenePath());
-    }
+
     if (type == "float") {
         // Create _Float_ texture and store in _floatTextures_
         if (graphicsState.floatTextures->find(name) !=

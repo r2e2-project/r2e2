@@ -123,10 +123,6 @@ class ParamSet {
     void Print(int indent) const;
     void StartRecordingUsage() const;
     void StopRecordingUsage() const;
-    void RemapFilenames(const std::string &basepath) const;
-    const std::map<std::string, std::string> &GetRemappedFilenames() const {
-        return remappedFilenames;
-    }
 
   private:
     friend class TextureParams;
@@ -146,9 +142,6 @@ class ParamSet {
     std::vector<std::shared_ptr<ParamSetItem<std::string>>> strings;
     std::vector<std::shared_ptr<ParamSetItem<std::string>>> textures;
     static std::map<std::string, Spectrum> cachedSpectra;
-
-    mutable std::string remappingBasePath = "";
-    mutable std::map<std::string, std::string> remappedFilenames;
 };
 
 template <typename T>
@@ -227,8 +220,6 @@ class TextureParams {
     }
     void StartRecordingUsage() const;
     void StopRecordingUsage() const;
-    void RemapFilenames(const std::string &basepath) const;
-    std::map<std::string, std::string> GetRemappedFilenames() const;
     std::vector<std::string> GetUsedFloatTextures() const;
     std::vector<std::string> GetUsedSpectrumTextures() const;
     void ReportUnused() const;
@@ -241,6 +232,16 @@ class TextureParams {
     }
     const std::map<std::string, std::shared_ptr<Texture<Spectrum>>>
         &GetSpectrumTextures() const {
+        return spectrumTextures;
+    }
+
+    std::map<std::string, std::shared_ptr<Texture<Float>>>
+        &GetFloatTextures() {
+        return floatTextures;
+    }
+
+    std::map<std::string, std::shared_ptr<Texture<Spectrum>>>
+        &GetSpectrumTextures() {
         return spectrumTextures;
     }
 

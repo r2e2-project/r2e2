@@ -440,21 +440,6 @@ std::string ParamSet::FindOneFilename(const std::string &name,
     std::string filename = FindOneString(name, "");
     if (filename == "") return d;
     filename = AbsolutePath(ResolveFilename(filename));
-    if (remappedFilenames.count(filename) > 0) {
-      filename = remappedFilenames[filename];
-    } else if (remappingBasePath != "") {
-        std::string basename = BaseFilename(filename);
-        /* add a random prefix to avoid overwritting files with the same
-         * basename */
-        std::string randPrefix = RandomString(6);
-        std::string remappedFilename =
-            remappingBasePath + "/" + randPrefix + "_" + basename;
-        remappedFilenames[filename] = remappedFilename;
-
-        /* copy file to remapped location */
-        roost::copy_then_rename(filename, remappedFilename);
-        filename = remappedFilename;
-    }
     return filename;
 }
 
@@ -776,10 +761,6 @@ void ParamSet::StopRecordingUsage() const {
     UPDATE_USAGE(textures);
 }
 
-void ParamSet::RemapFilenames(const std::string &basepath) const {
-  remappingBasePath = basepath;
-}
-
 // TextureParams Method Definitions
 std::shared_ptr<Texture<Spectrum>> TextureParams::GetSpectrumTexture(
     const std::string &n, const Spectrum &def) const {
@@ -907,21 +888,6 @@ void TextureParams::StartRecordingUsage() const {
 void TextureParams::StopRecordingUsage() const {
     geomParams.StopRecordingUsage();
     materialParams.StopRecordingUsage();
-}
-
-void TextureParams::RemapFilenames(const std::string &basepath) const {
-    geomParams.RemapFilenames(basepath);
-    materialParams.RemapFilenames(basepath);
-}
-
-std::map<std::string, std::string> TextureParams::GetRemappedFilenames() const {
-  auto geomFilenames = geomParams.GetRemappedFilenames();
-  auto materialFilenames = materialParams.GetRemappedFilenames();
-  std::map<std::string, std::string> filenames(materialFilenames);
-  for (auto& kv : geomFilenames) {
-    filenames[kv.first] = kv.second;
-  }
-  return filenames;
 }
 
 std::vector<std::string> TextureParams::GetUsedFloatTextures() const {
