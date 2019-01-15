@@ -372,19 +372,18 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
     const auto samplesPerPixel = sampler->samplesPerPixel;
     const Float rayScale = 1 / sqrt((Float)samplesPerPixel);
 
-    for (const Point2i pixel : bounds) {
-        sampler->StartPixel(pixel);
-        if (!InsideExclusive(pixel, sampleBounds)) continue;
+    for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
+        for (const Point2i pixel : bounds) {
+            sampler->StartPixel(pixel);
+            if (!InsideExclusive(pixel, sampleBounds)) continue;
+            sampler->SetSampleNumber(sample);
 
-        size_t sampleNum = 0;
-        do {
             CameraSample cameraSample = sampler->GetCameraSample(pixel);
 
             RayState state;
             state.sample.id =
-                (pixel.x + pixel.y * sampleExtent.x) * samplesPerPixel +
-                sampleNum;
-            state.sample.num = sampleNum++;
+                (pixel.x + pixel.y * sampleExtent.x) * samplesPerPixel + sample;
+            state.sample.num = sample;
             state.sample.pixel = pixel;
             state.sample.pFilm = cameraSample.pFilm;
             state.sample.weight =
@@ -394,7 +393,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             state.StartTrace();
 
             rayQueue.push_back(move(state));
-        } while (sampler->StartNextSample());
+        }
     }
 }
 

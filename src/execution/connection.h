@@ -54,7 +54,7 @@ private:
 
   static constexpr std::chrono::microseconds pace_ { 3'000 };
   bool pacing_ { false };
-  int packet_per_pace_ { 10 };
+  int packet_per_pace_ { 5 };
   int sent_packets_ { 0 };
   std::chrono::steady_clock::time_point when_next_;
 
