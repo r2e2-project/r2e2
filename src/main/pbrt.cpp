@@ -148,8 +148,10 @@ int main(int argc, char *argv[]) {
                    !strcmp(argv[i], "-loadscene")) {
             if (i + 1 == argc)
                 usage("missing value after --loadscene argument");
+            options.loadScene = true;
             global::manager.init(argv[++i]);
         } else if (!strncmp(argv[i], "--loadscene=", 12)) {
+            options.loadScene = true;
             global::manager.init(&argv[i][12]);
         } else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-help") ||
                    !strcmp(argv[i], "-h")) {

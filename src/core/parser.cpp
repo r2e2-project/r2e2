@@ -37,6 +37,7 @@
 #include "memory.h"
 #include "paramset.h"
 #include "stats.h"
+#include "cloud/manager.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -784,6 +785,10 @@ extern int catIndentCount;
 
 // Parsing Global Interface
 static void parse(std::unique_ptr<Tokenizer> t) {
+    if (PbrtOptions.loadScene) {
+        SetSearchDirectory(global::manager.getScenePath());
+    }
+
     std::vector<std::unique_ptr<Tokenizer>> fileStack;
     fileStack.push_back(std::move(t));
     parserLoc = &fileStack.back()->loc;
