@@ -1052,7 +1052,7 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
           TriangleMesh* mesh = kv.first;
           const Material* material = kv.second;
 
-          const int material_id = global::manager.getId(material);
+          const uint32_t material_id = global::manager.getId(material);
           triangle_mesh_material_ids[mesh] = material_id;
         }
 
@@ -1073,10 +1073,10 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
           TriangleMesh* mesh = kv.first;
           std::vector<size_t> &triangle_nums = kv.second;
 
-          int material_id = triangle_mesh_material_ids[mesh];
+          const uint32_t material_id = triangle_mesh_material_ids[mesh];
 
           /* assign each mesh a unique id */
-          const int tm_id =
+          const uint32_t tm_id =
               global::manager.getNextId(SceneManager::Type::TriangleMesh);
           /* generate the sub-mesh */
           std::shared_ptr<TriangleMesh> sub_mesh;

@@ -110,11 +110,14 @@ protobuf::Manifest SceneManager::makeManifest() const {
             }
         }
     };
+
     add_to_manifest(SceneManager::Type::Treelet);
     add_to_manifest(SceneManager::Type::TriangleMesh);
     add_to_manifest(SceneManager::Type::Material);
     add_to_manifest(SceneManager::Type::FloatTexture);
     add_to_manifest(SceneManager::Type::SpectrumTexture);
+    add_to_manifest(SceneManager::Type::Texture);
+
     return manifest;
 }
 
