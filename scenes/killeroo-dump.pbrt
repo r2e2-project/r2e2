@@ -34,14 +34,14 @@ Shape "trianglemesh" "point P" [ -400 -1000 -1000   -400 1000 -1000   -400 1000 
 AttributeEnd
 
 AttributeBegin
-#Texture "Test" "color" "ptex" "string filename" "textures/test.ptx"
+Texture "Test" "color" "ptex" "string filename" "textures/test.ptx"
 
 Scale .5 .5 .5
 Rotate -60 0 0 1
 Translate 400 200 -140
     ObjectInstance "killeroo"
     #Include "geometry/killeroo.pbrt"
-    #Material "matte" "texture Kd" "Test"
+    Material "matte" "texture Kd" "Test"
 Translate -100 0 0
     ObjectInstance "killeroo"
 Translate -100 0 0
