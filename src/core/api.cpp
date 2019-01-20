@@ -555,10 +555,6 @@ STAT_COUNTER("Scene/Materials created", nMaterialsCreated);
 
 std::shared_ptr<Material> MakeMaterial(const std::string &name,
                                        const TextureParams &mp) {
-    if (PbrtOptions.dumpScene) {
-      mp.StartRecordingUsage();
-    }
-
     Material *material = nullptr;
     if (name == "" || name == "none")
         return nullptr;
@@ -650,8 +646,6 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
                     {SceneManager::Type::SpectrumTexture, texId});
             }
         }
-
-        mp.StopRecordingUsage();
     }
 
     mp.ReportUnused();
