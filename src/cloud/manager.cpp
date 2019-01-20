@@ -13,8 +13,11 @@ static const string TYPE_PREFIXES[] = {
     "T",   "TM",   "LIGHTS", "SAMPLER",  "CAMERA", "SCENE",
     "MAT", "FTEX", "STEX",   "MANIFEST", "TEX"};
 
-static_assert(sizeof(TYPE_PREFIXES) / sizeof(string) ==
-              to_underlying(SceneManager::Type::COUNT));
+static_assert(
+    sizeof(TYPE_PREFIXES) / sizeof(string) ==
+        to_underlying(SceneManager::Type::COUNT),
+    "COUNT enum value for SceneManager Type must be the last entry in "
+    "the enum declaration.");
 
 string SceneManager::ObjectTypeID::to_string() const {
     return SceneManager::getFileName(type, id);
