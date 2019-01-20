@@ -109,7 +109,6 @@ class LambdaMaster {
 
     WorkerId currentWorkerID{1};
     std::map<WorkerId, Worker> workers{};
-    std::map<TreeletId, std::vector<WorkerId>> treeletToWorker{};
 
     /* Message Queues */
     std::deque<std::pair<WorkerId, meow::Message>> incomingMessages;

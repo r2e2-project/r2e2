@@ -293,11 +293,14 @@ bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
     const auto treeletId = request.treelet;
 
     /* let's see if we have a worker that has that treelet */
-    if (treeletToWorker.count(treeletId) == 0) {
+    const SceneObjectInfo &info = sceneObjects.at(
+        SceneManager::ObjectTypeID{SceneManager::Type::Treelet, treeletId});
+    if (info.workers.size() == 0) {
+        cerr << "No worker found for treelet " << treeletId << endl;
         return false;
     }
 
-    const auto &workerIdList = treeletToWorker[treeletId];
+    const auto &workerIdList = info.workers;
     const auto selectedWorkerId =
         *random::sample(workerIdList.cbegin(), workerIdList.cend());
     const auto &selectedWorker = workers.at(selectedWorkerId);
@@ -527,11 +530,6 @@ vector<ObjectTypeID> LambdaMaster::assignBaseSceneObjects(Worker &worker) {
 
 void LambdaMaster::assignObject(Worker &worker, const ObjectTypeID &object) {
     /* assign object and all its dependencies */
-
-    if (object.type == SceneManager::Type::Treelet) {
-        treeletToWorker[object.id].push_back(worker.id);
-    }
-
     vector<ObjectTypeID> objectsToAssign = {object};
     for (const ObjectTypeID &id : getRecursiveDependencies(object)) {
         objectsToAssign.push_back(id);
