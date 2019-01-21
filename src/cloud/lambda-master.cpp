@@ -38,7 +38,13 @@ constexpr milliseconds WORKER_REQUEST_INTERVAL{500};
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
-void sigint_handler(int) { throw runtime_error("killed by signal"); }
+class interrupt_error : public runtime_error
+{
+public:
+  interrupt_error(const std::string &s) : runtime_error(s) {}
+};
+
+void sigint_handler(int) { throw interrupt_error("killed by interupt signal"); }
 
 shared_ptr<Sampler> loadSampler() {
     auto reader = global::manager.GetReader(SceneManager::Type::Sampler);
@@ -122,6 +128,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     Vector2i sampleExtent = sampleBounds.Diagonal();
     Point2i nTiles((sampleExtent.x + TILE_SIZE - 1) / TILE_SIZE,
                    (sampleExtent.y + TILE_SIZE - 1) / TILE_SIZE);
+    LOG(INFO) << "Total tiles: " << nTiles.x * nTiles.y;
 
     totalPaths =
         sampleExtent.x * sampleExtent.y * loadSampler()->samplesPerPixel;
@@ -153,18 +160,19 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             ostringstream oss;
             oss << "\033[0m"
                 << "\033[48;5;022m"
-                << " done paths: " << workerStats.finishedPaths << " (" << fixed
-                << setprecision(1)
-                << (100.0 * workerStats.finishedPaths / totalPaths) << "%)"
+                << " done paths: " << workerStats.finishedPaths() << " ("
+                << fixed << setprecision(1)
+                << (100.0 * workerStats.finishedPaths() / totalPaths) << "%)"
                 << " | workers: " << workers.size() << " ("
                 << initializedWorkers << ")"
                 << " | requests: " << pendingWorkerRequests.size()
-                << " | \u2191 " << workerStats.sentRays << " | \u2193 "
-                << workerStats.receivedRays << " (" << fixed << setprecision(1)
-                << (workerStats.sentRays == 0
+                << " | \u2191 " << workerStats.sentRays() << " | \u2193 "
+                << workerStats.receivedRays() << " (" << fixed
+                << setprecision(1)
+                << (workerStats.sentRays() == 0
                         ? 0
-                        : (100.0 * workerStats.receivedRays /
-                           workerStats.sentRays))
+                        : (100.0 * workerStats.receivedRays() /
+                           workerStats.sentRays()))
                 << "%)"
                 << " | time: " << setfill('0') << setw(2) << (elapsedTime / 60)
                 << ":" << setw(2) << (elapsedTime % 60);
@@ -205,6 +213,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                          forward_as_tuple(currentWorkerID, move(connection)))
                 .first;
         auto &this_worker = workerIt->second;
+        this_worker.stats.start = now();
 
         /* assigns the minimal necessary scene objects for working with a
          * scene
@@ -229,8 +238,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         }
         /* assign treelet to worker based on most in-demand treelets */
         else {
-            // this->assignTreelets(workerIt->second);
-            this->assignAllTreelets(workerIt->second);
+            this->assignTreelets(workerIt->second);
+            //this->assignAllTreelets(workerIt->second);
         }
 
         currentWorkerID++;
@@ -366,7 +375,11 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
     case OpCode::WorkerStats: {
         protobuf::WorkerStats proto;
         protoutil::from_string(message.payload(), proto);
-        workerStats.merge(from_protobuf(proto));
+        auto stats = from_protobuf(proto);
+        /* merge into global worker stats */
+        workerStats.merge(stats);
+        /* merge into local worker stats */
+        workers.at(workerId).stats.merge(stats);
         break;
     }
 
@@ -410,6 +423,51 @@ void LambdaMaster::run() {
         auto res = loop.loop_once().result;
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
+}
+
+std::string LambdaMaster::getSummary() {
+    ostringstream oss;
+
+    auto duration = chrono::duration_cast<chrono::seconds>(
+                        chrono::steady_clock::now() - startTime)
+                        .count();
+
+    oss << std::endl
+        << "Summary: " << std::endl
+        << " finished paths: " << workerStats.finishedPaths() << " (" << fixed
+        << setprecision(1) << (100.0 * workerStats.finishedPaths() / totalPaths)
+        << "%)"
+        << " | workers: " << workers.size()
+        << " | requests: " << pendingWorkerRequests.size() << " | \u2191 "
+        << workerStats.sentRays() << " | \u2193 " << workerStats.receivedRays()
+        << " (" << fixed << setprecision(1)
+        << (workerStats.sentRays() == 0
+                ? 0
+            : (100.0 * workerStats.receivedRays() / workerStats.sentRays()))
+        << "%)"
+        << " | time: " << setfill('0') << setw(2) << (duration / 60) << ":"
+        << setw(2) << (duration % 60);
+    oss << std::endl;
+
+    std::vector<uint64_t> durations;
+    for (const auto& kv : workers) {
+      const Worker& worker = kv.second;
+      auto milliseconds = (worker.stats.end - worker.stats.start).count();
+      if (milliseconds == 0) {
+        printf("skipping worker\n");
+        continue;
+      }
+      durations.push_back(milliseconds);
+    }
+    std::sort(durations.begin(), durations.end());
+    if (durations.size() > 0) {
+        oss << "Shortest worker: " << durations[0] << std::endl;
+        oss << "Median worker: " << durations[durations.size() / 2]
+            << std::endl;
+        oss << "Longest worker: " << durations[durations.size() - 1]
+            << std::endl;
+    }
+    std::cout << oss.str() << std::endl;
 }
 
 void LambdaMaster::loadCamera() {
@@ -590,31 +648,38 @@ void usage(const char *argv0) {
 }
 
 int main(int argc, char const *argv[]) {
+    if (argc <= 0) {
+        abort();
+    }
+
+    if (argc != 7) {
+        usage(argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    signal(SIGINT, sigint_handler);
+
+    FLAGS_logtostderr = 1;
+    google::InitGoogleLogging(argv[0]);
+
+    const string scenePath{argv[1]};
+    const uint16_t listenPort = stoi(argv[2]);
+    const uint32_t numberOfLambdas = stoul(argv[3]);
+    const string publicAddress = argv[4];
+    const string storageBackend = argv[5];
+    const string awsRegion = argv[6];
+
     try {
-        if (argc <= 0) {
-            abort();
-        }
-
-        if (argc != 7) {
-            usage(argv[0]);
-            return EXIT_FAILURE;
-        }
-
-        signal(SIGINT, sigint_handler);
-
-        FLAGS_logtostderr = 1;
-        google::InitGoogleLogging(argv[0]);
-
-        const string scenePath{argv[1]};
-        const uint16_t listenPort = stoi(argv[2]);
-        const uint32_t numberOfLambdas = stoul(argv[3]);
-        const string publicAddress = argv[4];
-        const string storageBackend = argv[5];
-        const string awsRegion = argv[6];
-
         LambdaMaster master{scenePath,     listenPort,     numberOfLambdas,
                             publicAddress, storageBackend, awsRegion};
-        master.run();
+        try {
+            master.run();
+        } catch (const interrupt_error &e) {
+            /* if we Ctrl+C while running the master, print out a summary of the
+             * run */
+            master.getSummary();
+            return EXIT_FAILURE;
+        }
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;

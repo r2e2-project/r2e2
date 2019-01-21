@@ -35,6 +35,8 @@ class LambdaMaster {
 
     void run();
 
+    std::string getSummary();
+
     static constexpr int TILE_SIZE = 32;
 
   private:
@@ -61,6 +63,7 @@ class LambdaMaster {
         std::set<ObjectTypeID> objects;
         size_t freeSpace{2 * 1000 * 1000 *
                          1000}; /* in bytes (assuming 2 GBs free to start) */
+        WorkerStats stats;
 
         Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}

@@ -6,6 +6,7 @@
 #include <iterator>
 
 #include "cloud/stats.h"
+#include "cloud/manager.h"
 #include "core/paramset.h"
 
 using namespace std;
@@ -66,12 +67,12 @@ vector<RayState> CloudIntegrator::Shade(RayState &&rayState,
 
             ++nIntersectionTests;
         } else {
-            global::workerStats.finishedPaths++;
+            global::workerStats.recordFinishedPath();
             ReportValue(pathLength, rayState.bounces);
         }
     } else {
         /* we're done with this path */
-        global::workerStats.finishedPaths++;
+        global::workerStats.recordFinishedPath();
         ReportValue(pathLength, rayState.bounces);
     }
 

@@ -71,6 +71,7 @@ protobuf::Scene to_protobuf(const Scene& scene);
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
 protobuf::ObjectTypeID to_protobuf(
     const SceneManager::ObjectTypeID& objectTypeID);
+protobuf::RayStats to_protobuf(const RayStats& state);
 protobuf::WorkerStats to_protobuf(const WorkerStats& state);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
@@ -98,6 +99,7 @@ TextureParams from_protobuf(
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex);
 SceneManager::ObjectTypeID from_protobuf(
     const protobuf::ObjectTypeID& objectTypeID);
+RayStats from_protobuf(const protobuf::RayStats& state);
 WorkerStats from_protobuf(const protobuf::WorkerStats& state);
 
 namespace light {

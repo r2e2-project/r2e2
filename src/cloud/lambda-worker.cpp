@@ -95,37 +95,44 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { cerr << "UDP connection to coordinator failed." << endl; },
         []() { throw ProgramFinished(); }, true);
 
+    /* trace rays */
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleRayQueue, this),
         [this]() { return !rayQueue.empty(); },
         []() { throw runtime_error("ray queue failed"); }));
 
+    /* send processed rays */
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleOutQueue, this),
         [this]() { return outQueueSize > 0; },
         []() { throw runtime_error("out queue failed"); }));
 
+    /* send finished rays */
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
         [this]() { return !finishedQueue.empty(); },
         []() { throw runtime_error("finished queue failed"); }));
 
+    /* handle peers */
     loop.poller().add_action(Poller::Action(
         peerTimer.fd, Direction::In, bind(&LambdaWorker::handlePeers, this),
         [this]() { return !peers.empty(); },
         []() { throw runtime_error("peers failed"); }));
 
+    /* handle received messages */
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleMessages, this),
         [this]() { return !messageParser.empty(); },
         []() { throw runtime_error("messages failed"); }));
 
+    /* request new peers for neighboring treelets */
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out,
         bind(&LambdaWorker::handleNeededTreelets, this),
         [this]() { return !neededTreelets.empty(); },
         []() { throw runtime_error("treelet request failed"); }));
 
+    /* send updated stats */
     loop.poller().add_action(Poller::Action(
         workerStatsTimer.fd, Direction::In,
         [this]() {
@@ -139,6 +146,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return true; },
         []() { throw runtime_error("worker stats failed"); }));
 
+    /* print stats */
     loop.poller().add_action(
         Poller::Action(statusPrintTimer.fd, Direction::In,
                        [this]() {
@@ -206,7 +214,7 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
             } else if (emptyVisit) {
                 newRay.Ld = 0.f;
                 finishedQueue.push_back(move(newRay));
-                global::workerStats.finishedPaths++;
+                global::workerStats.recordFinishedPath();
             }
         } else if (ray.hit.initialized()) {
             auto newRays = CloudIntegrator::Shade(move(ray), treelet, lights,
@@ -260,7 +268,8 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
                     q.second.pop_front();
 
                     outQueueSize--;
-                    global::workerStats.sentRays++;
+                    global::workerStats.recordSentRay(SceneManager::ObjectTypeID{
+                        SceneManager::Type::Treelet, q.first});
 
                     const string& rayStr =
                         protoutil::to_string(to_protobuf(ray));
@@ -529,7 +538,16 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         while (!reader.eof()) {
             if (reader.read(&proto)) {
-                global::workerStats.receivedRays++;
+                if (proto.to_visit_size() > 0) {
+                    SceneManager::ObjectTypeID treeletID{
+                        SceneManager::Type::Treelet,
+                        proto.to_visit(0).treelet()};
+                    global::workerStats.recordReceivedRay(treeletID);
+                } else {
+                    SceneManager::ObjectTypeID treeletID{
+                        SceneManager::Type::Treelet, proto.hit().treelet()};
+                    global::workerStats.recordReceivedRay(treeletID);
+                }
                 rayQueue.push_back(move(from_protobuf(proto)));
             }
         }

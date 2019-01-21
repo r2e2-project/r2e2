@@ -292,11 +292,29 @@ protobuf::ObjectTypeID to_protobuf(
     return proto;
 }
 
+protobuf::RayStats to_protobuf(const RayStats& stats) {
+  protobuf::RayStats proto;
+  proto.set_finished_paths(stats.finishedPaths);
+  proto.set_sent_rays(stats.sentRays);
+  proto.set_received_rays(stats.receivedRays);
+  for (double d : stats.traceDurationPercentiles) {
+    proto.add_trace_duration_percentiles(d);
+  }
+  for (double d : stats.rayDurations) {
+    proto.add_ray_durations(d);
+  }
+  return proto;
+}
+
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
     protobuf::WorkerStats proto;
-    proto.set_finished_paths(stats.finishedPaths);
-    proto.set_sent_rays(stats.sentRays);
-    proto.set_received_rays(stats.receivedRays);
+    (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
+    for (const auto& kv : stats.objectStats) {
+        protobuf::WorkerStats::ObjectRayStats* ray_stats =
+            proto.add_object_stats();
+        (*ray_stats->mutable_id()) = to_protobuf(kv.first);
+        (*ray_stats->mutable_stats()) = to_protobuf(kv.second);
+    }
     return proto;
 }
 
@@ -825,11 +843,36 @@ protobuf::SpectrumTexture spectrum_texture::to_protobuf(
     return texture;
 }
 
-WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
-    WorkerStats stats;
+RayStats from_protobuf(const protobuf::RayStats& proto) {
+    RayStats stats;
     stats.finishedPaths = proto.finished_paths();
     stats.sentRays = proto.sent_rays();
     stats.receivedRays = proto.received_rays();
+
+    for (int i = 0; i < NUM_PERCENTILES; ++i) {
+      double d = proto.trace_duration_percentiles(i);
+      stats.traceDurationPercentiles[i] = d;
+    }
+    stats.rayDurations.reserve(proto.ray_durations_size());
+    for (double d : proto.ray_durations()) {
+      stats.rayDurations.push_back(d);
+    }
+    return stats;
+}
+
+WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
+    WorkerStats stats;
+    stats.aggregateStats = from_protobuf(proto.aggregate_stats());
+    for (const protobuf::WorkerStats::ObjectRayStats& object_stats :
+         proto.object_stats()) {
+        auto id = from_protobuf(object_stats.id());
+        stats.objectStats[id] = from_protobuf(object_stats.stats());
+    }
+    for (const auto& kv : proto.time_per_action()) {
+        stats.timePerAction[kv.first] = kv.second;
+    }
+    stats.totalTime = proto.total_time();
+
     return stats;
 }
 

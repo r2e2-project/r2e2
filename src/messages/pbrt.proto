@@ -266,10 +266,25 @@ message ConnectResponse {
     repeated uint32 treelet_ids = 4;
 }
 
-message WorkerStats {
+message RayStats {
     uint64 finished_paths = 1;
     uint64 sent_rays = 2;
     uint64 received_rays = 3;
+
+    repeated float trace_duration_percentiles = 4;
+    repeated float ray_durations = 5;
+}
+
+message WorkerStats {
+  message ObjectRayStats {
+    ObjectTypeID id = 1;
+    RayStats stats = 2;
+  }
+
+  RayStats aggregate_stats = 1;
+  repeated ObjectRayStats object_stats = 2;
+  map<string, float> time_per_action = 3;
+  float total_time = 4;
 }
 
 // Materials & Textures
