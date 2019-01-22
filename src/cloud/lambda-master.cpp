@@ -478,7 +478,7 @@ std::string LambdaMaster::getSummary() {
         oss << "Longest worker: " << durations[durations.size() - 1]
             << std::endl;
     }
-    std::cout << oss.str() << std::endl;
+    return oss.str();
 }
 
 void LambdaMaster::loadCamera() {
@@ -688,7 +688,7 @@ int main(int argc, char const *argv[]) {
         } catch (const interrupt_error &e) {
             /* if we Ctrl+C while running the master, print out a summary of the
              * run */
-            master.getSummary();
+            std::cout << master.getSummary() << std::endl;
             return EXIT_FAILURE;
         }
     } catch (const exception &e) {
