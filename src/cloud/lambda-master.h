@@ -47,10 +47,6 @@ class LambdaMaster {
         size_t size;
         std::set<uint64_t>
             workers; /* the set of workers which have this scene object */
-        float rayRequestsPerSecond{
-            1}; /* the production rate for rays that need this scene object */
-        float raysProcessedPerSecond{
-            1}; /* the processing rate of rays for this scene object */
     };
 
     struct Worker {
@@ -131,6 +127,7 @@ class LambdaMaster {
     std::set<ObjectTypeID> treeletIds;
     std::map<ObjectTypeID, std::set<ObjectTypeID>> requiredDependentObjects;
     std::stack<ObjectTypeID> unassignedTreelets;
+    std::vector<std::tuple<uint64_t, uint64_t>> treeletPriority;
 
     /* Always-on FD */
     FileDescriptor dummyFD{STDOUT_FILENO};

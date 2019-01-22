@@ -390,6 +390,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         }
         std::sort(treeletLoads.begin(), treeletLoads.end(),
                   std::greater<std::tuple<uint64_t, uint64_t>>());
+        treeletPriority = treeletLoads;
         break;
     }
 
@@ -555,21 +556,21 @@ vector<ObjectTypeID> LambdaMaster::assignTreelets(Worker &worker) {
     if (objectsToAssign.empty()) {
         ObjectTypeID highestID = sceneObjects.begin()->first;
         float highestLoad = -1;
-        for (const ObjectTypeID &id : treeletIds) {
-            const SceneObjectInfo &info = sceneObjects.at(id);
+        for (auto& tup : treeletPriority) {
+          uint64_t id = std::get<1>(tup);
+          uint64_t load = std::get<0>(tup);
+          ObjectTypeID objectID{SceneManager::Type::Treelet, id};
+          const SceneObjectInfo &info = sceneObjects.at(objectID);
 
-            constexpr float EPS = 1e-10;
-            float load =
-                info.rayRequestsPerSecond / (info.raysProcessedPerSecond + EPS);
-            size_t size = getObjectSizeWithDependencies(worker, highestID);
-            if (load > highestLoad && info.size < freeSpace) {
-                highestID = id;
-                highestLoad = load;
-            }
+          size_t size = getObjectSizeWithDependencies(worker, objectID);
+          if (load > highestLoad && size < freeSpace) {
+              highestID = objectID;
+              highestLoad = load;
+          }
         }
         /* if we have not received stats info about the load of any scene
          * object, randomly pick a treelet */
-        if (highestLoad < 0) {
+        if (highestLoad == 0) {
             highestID = *random::sample(treeletIds.begin(), treeletIds.end());
         }
         objectsToAssign.push_back(highestID);
