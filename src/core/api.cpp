@@ -619,7 +619,7 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
             "Use \"path\" or \"volpath\".",
             name.c_str(), renderOptions->IntegratorName.c_str());
 
-    if (PbrtOptions.dumpScene && material) {
+    if (PbrtOptions.dumpScene && PbrtOptions.dumpMaterials && material) {
         const uint32_t id =
             global::manager.getNextId(SceneManager::Type::Material, material);
         auto writer =
@@ -718,7 +718,7 @@ std::shared_ptr<Texture<Float>> MakeFloatTexture(const std::string &name,
         Warning("Float texture \"%s\" unknown.", name.c_str());
     tp.ReportUnused();
 
-    if (PbrtOptions.dumpScene) {
+    if (PbrtOptions.dumpScene && PbrtOptions.dumpMaterials) {
         /* step one: if there are any path names, rewrite them and copy files */
         ParamSet params{tp.GetGeomParams()};
         const auto textureId = storeTexture(name, params);
@@ -777,7 +777,7 @@ std::shared_ptr<Texture<Spectrum>> MakeSpectrumTexture(
         Warning("Spectrum texture \"%s\" unknown.", name.c_str());
     tp.ReportUnused();
 
-    if (PbrtOptions.dumpScene) {
+    if (PbrtOptions.dumpScene && PbrtOptions.dumpMaterials) {
         ParamSet params{tp.GetGeomParams()};
         const auto textureId = storeTexture(name, params);
         TextureParams newTp{params, params, *graphicsState.floatTextures,

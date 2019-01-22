@@ -73,6 +73,7 @@ Reformatting options:
 Cloud:
   --dumpscene <dir>    Dump scene data to <dir>
   --loadscene <dir>    Load scene data from <dir>
+  --nomaterial          Don't dump the texture information
 
 )");
     exit(msg ? 1 : 0);
@@ -153,6 +154,8 @@ int main(int argc, char *argv[]) {
         } else if (!strncmp(argv[i], "--loadscene=", 12)) {
             options.loadScene = true;
             global::manager.init(&argv[i][12]);
+        } else if (!strcmp(argv[i], "--nomaterial")) {
+            PbrtOptions.dumpMaterials = false;
         } else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-help") ||
                    !strcmp(argv[i], "-h")) {
             usage();

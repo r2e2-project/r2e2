@@ -1052,7 +1052,9 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
           TriangleMesh* mesh = kv.first;
           const Material* material = kv.second;
 
-          const uint32_t material_id = global::manager.getId(material);
+          const uint32_t material_id =
+              PbrtOptions.dumpMaterials ? global::manager.getId(material) : 0;
+
           triangle_mesh_material_ids[mesh] = material_id;
         }
 
