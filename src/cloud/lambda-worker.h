@@ -67,6 +67,8 @@ class LambdaWorker {
 
     void generateRays(const Bounds2i& cropWindow);
     void getObjects(const protobuf::GetObjects& objects);
+    void pushRayQueue(RayState&& state);
+    RayState popRayQueue();
 
     Address coordinatorAddr;
     ExecutionLoop loop{};

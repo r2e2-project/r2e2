@@ -267,12 +267,13 @@ message ConnectResponse {
 }
 
 message RayStats {
-    uint64 finished_paths = 1;
-    uint64 sent_rays = 2;
-    uint64 received_rays = 3;
+    uint64 sent_rays = 1;
+    uint64 received_rays = 2;
+    uint64 waiting_rays = 3;
+    uint64 processed_rays = 4;
 
-    repeated float trace_duration_percentiles = 4;
-    repeated float ray_durations = 5;
+    repeated float trace_duration_percentiles = 5;
+    repeated float ray_durations = 6;
 }
 
 message WorkerStats {
@@ -281,10 +282,11 @@ message WorkerStats {
     RayStats stats = 2;
   }
 
-  RayStats aggregate_stats = 1;
-  repeated ObjectRayStats object_stats = 2;
-  map<string, float> time_per_action = 3;
-  float total_time = 4;
+  uint64 finished_paths = 1;
+  RayStats aggregate_stats = 2;
+  repeated ObjectRayStats object_stats = 3;
+  map<string, float> time_per_action = 4;
+  float total_time = 5;
 }
 
 // Materials & Textures

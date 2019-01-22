@@ -380,6 +380,16 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         workerStats.merge(stats);
         /* merge into local worker stats */
         workers.at(workerId).stats.merge(stats);
+        /* sort treelet load */
+        int treeletID = 0;
+        std::vector<std::tuple<uint64_t, uint64_t>> treeletLoads;
+        for (auto &kv : workerStats.objectStats) {
+            auto &rayStats = kv.second;
+            uint64_t load = rayStats.waitingRays - rayStats.processedRays;
+            treeletLoads.push_back(std::make_tuple(load, kv.first.id));
+        }
+        std::sort(treeletLoads.begin(), treeletLoads.end(),
+                  std::greater<std::tuple<uint64_t, uint64_t>>());
         break;
     }
 

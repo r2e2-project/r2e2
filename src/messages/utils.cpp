@@ -294,9 +294,10 @@ protobuf::ObjectTypeID to_protobuf(
 
 protobuf::RayStats to_protobuf(const RayStats& stats) {
   protobuf::RayStats proto;
-  proto.set_finished_paths(stats.finishedPaths);
   proto.set_sent_rays(stats.sentRays);
   proto.set_received_rays(stats.receivedRays);
+  proto.set_waiting_rays(stats.waitingRays);
+  proto.set_processed_rays(stats.processedRays);
   for (double d : stats.traceDurationPercentiles) {
     proto.add_trace_duration_percentiles(d);
   }
@@ -308,6 +309,7 @@ protobuf::RayStats to_protobuf(const RayStats& stats) {
 
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
     protobuf::WorkerStats proto;
+    proto.set_finished_paths(stats._finishedPaths);
     (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
     for (const auto& kv : stats.objectStats) {
         protobuf::WorkerStats::ObjectRayStats* ray_stats =
@@ -845,9 +847,10 @@ protobuf::SpectrumTexture spectrum_texture::to_protobuf(
 
 RayStats from_protobuf(const protobuf::RayStats& proto) {
     RayStats stats;
-    stats.finishedPaths = proto.finished_paths();
     stats.sentRays = proto.sent_rays();
     stats.receivedRays = proto.received_rays();
+    stats.waitingRays = proto.waiting_rays();
+    stats.processedRays = proto.processed_rays();
 
     for (int i = 0; i < NUM_PERCENTILES; ++i) {
       double d = proto.trace_duration_percentiles(i);
@@ -862,6 +865,7 @@ RayStats from_protobuf(const protobuf::RayStats& proto) {
 
 WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
     WorkerStats stats;
+    stats._finishedPaths = proto.finished_paths();
     stats.aggregateStats = from_protobuf(proto.aggregate_stats());
     for (const protobuf::WorkerStats::ObjectRayStats& object_stats :
          proto.object_stats()) {

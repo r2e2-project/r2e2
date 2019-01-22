@@ -192,9 +192,7 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
     constexpr size_t MAX_RAYS = 10'000;
 
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
-        RayState ray = move(rayQueue.front());
-        rayQueue.pop_front();
-
+        RayState ray = popRayQueue();
         if (!ray.toVisit.empty()) {
             auto newRay = CloudIntegrator::Trace(move(ray), treelet);
             const bool hit = newRay.hit.initialized();
@@ -232,7 +230,7 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
         const TreeletId nextTreelet = ray.currentTreelet();
 
         if (treeletIds.count(nextTreelet)) {
-            rayQueue.push_back(move(ray));
+          pushRayQueue(move(ray));
         } else {
             if (treeletToWorker.count(nextTreelet)) {
                 outQueue[nextTreelet].push_back(move(ray));
@@ -401,7 +399,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             state.remainingBounces = maxDepth;
             state.StartTrace();
 
-            rayQueue.push_back(move(state));
+            pushRayQueue(std::move(state));
         }
     }
 }
@@ -421,6 +419,32 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
         requests.emplace_back(filePath, filePath);
     }
     storageBackend->get(requests);
+}
+
+void LambdaWorker::pushRayQueue(RayState&& state) {
+  uint32_t treelet_id;
+  if (state.toVisit.size() > 0) {
+      treelet_id = state.toVisit.front().treelet;
+  } else {
+    treelet_id = state.hit.get().treelet;
+  }
+  global::workerStats.recordWaitingRay(
+      SceneManager::ObjectTypeID{SceneManager::Type::Treelet, treelet_id});
+  rayQueue.push_back(move(state));
+}
+
+RayState LambdaWorker::popRayQueue() {
+    RayState state = move(rayQueue.front());
+    rayQueue.pop_front();
+    uint32_t treeletID;
+    if (state.toVisit.size() > 0) {
+        treeletID = state.toVisit.front().treelet;
+    } else {
+        treeletID = state.hit.get().treelet;
+    }
+    global::workerStats.recordProcessedRay(
+        SceneManager::ObjectTypeID{SceneManager::Type::Treelet, treeletID});
+    return state;
 }
 
 bool LambdaWorker::processMessage(const Message& message) {
@@ -548,7 +572,7 @@ bool LambdaWorker::processMessage(const Message& message) {
                         SceneManager::Type::Treelet, proto.hit().treelet()};
                     global::workerStats.recordReceivedRay(treeletID);
                 }
-                rayQueue.push_back(move(from_protobuf(proto)));
+                pushRayQueue(move(from_protobuf(proto)));
             }
         }
 

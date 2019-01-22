@@ -6,9 +6,10 @@ WorkerStats workerStats;
 }
 
 void RayStats::reset() {
-    finishedPaths = 0;
     sentRays = 0;
     receivedRays = 0;
+    waitingRays = 0;
+    processedRays = 0;
     for (double& d : traceDurationPercentiles) {
         d = 0;
     }
@@ -18,9 +19,10 @@ void RayStats::reset() {
 }
 
 void RayStats::merge(const RayStats& other) {
-    finishedPaths += other.finishedPaths;
     sentRays += other.sentRays;
     receivedRays += other.receivedRays;
+    waitingRays += other.waitingRays;
+    processedRays += other.processedRays;
     for (int i = 0; i < NUM_PERCENTILES; ++i) {
         traceDurationPercentiles[i] += other.traceDurationPercentiles[i];
     }
@@ -36,21 +38,26 @@ void RayStats::merge(const RayStats& other) {
         objectStats[type].name__ += 1; \
     } while (false)
 
-void WorkerStats::recordFinishedPath() { aggregateStats.finishedPaths += 1; }
+void WorkerStats::recordFinishedPath() { _finishedPaths += 1; }
 
 void WorkerStats::recordSentRay(const SceneManager::ObjectTypeID& type) {
     INCREMENT_FIELD(sentRays);
 }
+
 void WorkerStats::recordReceivedRay(const SceneManager::ObjectTypeID& type) {
     INCREMENT_FIELD(receivedRays);
 }
-void WorkerStats::recordRayTraversal(const SceneManager::ObjectTypeID& type) {
-    INCREMENT_FIELD(rayTraversals);
+void WorkerStats::recordWaitingRay(const SceneManager::ObjectTypeID& type) {
+    INCREMENT_FIELD(waitingRays);
+}
+void WorkerStats::recordProcessedRay(const SceneManager::ObjectTypeID& type) {
+    INCREMENT_FIELD(processedRays);
 }
 
 #undef INCREMENT_FIELD
 
 void WorkerStats::reset() {
+    _finishedPaths = 0;
     aggregateStats.reset();
     objectStats.clear();
     timePerAction.clear();
@@ -58,6 +65,7 @@ void WorkerStats::reset() {
 }
 
 void WorkerStats::merge(const WorkerStats& other) {
+    _finishedPaths += other._finishedPaths;
     aggregateStats.merge(other.aggregateStats);
     for (const auto& kv : other.objectStats) {
         objectStats[kv.first].merge(kv.second);
