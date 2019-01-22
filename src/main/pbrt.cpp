@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
             options.loadScene = true;
             global::manager.init(&argv[i][12]);
         } else if (!strcmp(argv[i], "--nomaterial")) {
-            PbrtOptions.dumpMaterials = false;
+            options.dumpMaterials = false;
         } else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-help") ||
                    !strcmp(argv[i], "-h")) {
             usage();
