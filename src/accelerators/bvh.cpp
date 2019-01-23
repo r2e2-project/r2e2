@@ -1157,13 +1157,13 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
 
           /* track the dependency of the mesh on the material */
           global::manager.recordDependency(
-              SceneManager::ObjectTypeID{ObjectType::TriangleMesh, tm_id},
-              SceneManager::ObjectTypeID{ObjectType::Material, material_id});
+              SceneManager::ObjectKey{ObjectType::TriangleMesh, tm_id},
+              SceneManager::ObjectKey{ObjectType::Material, material_id});
 
           /* track the dependency of the treelet on the mesh */
           global::manager.recordDependency(
-              SceneManager::ObjectTypeID{ObjectType::Treelet, treelet_id},
-              SceneManager::ObjectTypeID{ObjectType::TriangleMesh, tm_id});
+              SceneManager::ObjectKey{ObjectType::Treelet, treelet_id},
+              SceneManager::ObjectKey{ObjectType::TriangleMesh, tm_id});
         }
 
         const uint32_t current_treelet = labels[root_index];

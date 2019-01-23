@@ -19,7 +19,7 @@ static_assert(
     "COUNT enum value for SceneManager Type must be the last entry in "
     "the enum declaration.");
 
-string SceneManager::ObjectTypeID::to_string() const {
+string SceneManager::ObjectKey::to_string() const {
     return SceneManager::getFileName(type, id);
 }
 
@@ -91,8 +91,8 @@ uint32_t SceneManager::getTextureId(const std::string &path) {
     return (textureNameToId[path] = autoIds[to_underlying(ObjectType::Texture)]++);
 }
 
-void SceneManager::recordDependency(const ObjectTypeID& from,
-                                    const ObjectTypeID& to) {
+void SceneManager::recordDependency(const ObjectKey& from,
+                                    const ObjectKey& to) {
     dependencies[from].insert(to);
 }
 
@@ -102,12 +102,12 @@ protobuf::Manifest SceneManager::makeManifest() const {
     auto add_to_manifest = [this, &manifest](const ObjectType& type) {
         size_t total_ids = autoIds[to_underlying(type)];
         for (size_t id = 0; id < total_ids; ++id) {
-            ObjectTypeID type_id{type, id};
+            ObjectKey type_id{type, id};
             protobuf::Manifest::Object* obj = manifest.add_objects();
             (*obj->mutable_id()) = to_protobuf(type_id);
             if (dependencies.count(type_id) > 0) {
-                for (const ObjectTypeID& dep : dependencies.at(type_id)) {
-                    protobuf::ObjectTypeID* dep_id = obj->add_dependencies();
+                for (const ObjectKey& dep : dependencies.at(type_id)) {
+                    protobuf::ObjectKey* dep_id = obj->add_dependencies();
                     (*dep_id) = to_protobuf(dep);
                 }
             }
@@ -137,7 +137,7 @@ SceneManager::listObjects() {
     map<ObjectType, vector<Object>> result;
     /* read the list of objects from the manifest file */
     for (auto& kv : dependencies) {
-        const ObjectTypeID& id = kv.first;
+        const ObjectKey& id = kv.first;
         size_t size = 0;
         if (id.type != ObjectType::TriangleMesh) {
             string filename = getFileName(id.type, id.id);
@@ -149,7 +149,7 @@ SceneManager::listObjects() {
     return result;
 }
 
-map<SceneManager::ObjectTypeID, set<SceneManager::ObjectTypeID>>
+map<SceneManager::ObjectKey, set<SceneManager::ObjectKey>>
 SceneManager::listObjectDependencies() {
     if (!sceneFD.initialized()) {
         throw runtime_error("SceneManager is not initialized");
@@ -167,16 +167,16 @@ void SceneManager::loadManifest() {
     protobuf::Manifest manifest;
     reader->read(&manifest);
     for (const protobuf::Manifest::Object& obj : manifest.objects()) {
-        ObjectTypeID id = from_protobuf(obj.id());
+        ObjectKey id = from_protobuf(obj.id());
         dependencies[id] = {};
-        for (const protobuf::ObjectTypeID& dep : obj.dependencies()) {
+        for (const protobuf::ObjectKey& dep : obj.dependencies()) {
             dependencies[id].insert(from_protobuf(dep));
         }
     }
-    dependencies[ObjectTypeID{ObjectType::Scene, 0}];
-    dependencies[ObjectTypeID{ObjectType::Camera, 0}];
-    dependencies[ObjectTypeID{ObjectType::Lights, 0}];
-    dependencies[ObjectTypeID{ObjectType::Sampler, 0}];
+    dependencies[ObjectKey{ObjectType::Scene, 0}];
+    dependencies[ObjectKey{ObjectType::Camera, 0}];
+    dependencies[ObjectKey{ObjectType::Lights, 0}];
+    dependencies[ObjectKey{ObjectType::Sampler, 0}];
 }
 
 namespace global {

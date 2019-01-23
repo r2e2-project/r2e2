@@ -41,7 +41,7 @@ struct RayStats {
 struct WorkerStats {
     uint64_t _finishedPaths{0};
     RayStats aggregateStats;
-    std::map<SceneManager::ObjectTypeID, RayStats> objectStats;
+    std::map<SceneManager::ObjectKey, RayStats> objectStats;
 
     std::map<std::string, double> timePerAction;
     double totalTime{0};
@@ -56,10 +56,10 @@ struct WorkerStats {
     uint64_t processedRays() const { return aggregateStats.processedRays; }
 
     void recordFinishedPath();
-    void recordSentRay(const SceneManager::ObjectTypeID& type);
-    void recordReceivedRay(const SceneManager::ObjectTypeID& type);
-    void recordWaitingRay(const SceneManager::ObjectTypeID& type);
-    void recordProcessedRay(const SceneManager::ObjectTypeID& type);
+    void recordSentRay(const SceneManager::ObjectKey& type);
+    void recordReceivedRay(const SceneManager::ObjectKey& type);
+    void recordWaitingRay(const SceneManager::ObjectKey& type);
+    void recordProcessedRay(const SceneManager::ObjectKey& type);
 
     void reset();
 

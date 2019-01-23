@@ -40,17 +40,17 @@ void RayStats::merge(const RayStats& other) {
 
 void WorkerStats::recordFinishedPath() { _finishedPaths += 1; }
 
-void WorkerStats::recordSentRay(const SceneManager::ObjectTypeID& type) {
+void WorkerStats::recordSentRay(const SceneManager::ObjectKey& type) {
     INCREMENT_FIELD(sentRays);
 }
 
-void WorkerStats::recordReceivedRay(const SceneManager::ObjectTypeID& type) {
+void WorkerStats::recordReceivedRay(const SceneManager::ObjectKey& type) {
     INCREMENT_FIELD(receivedRays);
 }
-void WorkerStats::recordWaitingRay(const SceneManager::ObjectTypeID& type) {
+void WorkerStats::recordWaitingRay(const SceneManager::ObjectKey& type) {
     INCREMENT_FIELD(waitingRays);
 }
-void WorkerStats::recordProcessedRay(const SceneManager::ObjectTypeID& type) {
+void WorkerStats::recordProcessedRay(const SceneManager::ObjectKey& type) {
     INCREMENT_FIELD(processedRays);
 }
 

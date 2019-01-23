@@ -40,7 +40,7 @@ class LambdaMaster {
     static constexpr int TILE_SIZE = 32;
 
   private:
-    using ObjectTypeID = SceneManager::ObjectTypeID;
+    using ObjectKey = SceneManager::ObjectKey;
 
     struct SceneObjectInfo {
         SceneManager::ObjectID id;
@@ -56,7 +56,7 @@ class LambdaMaster {
         std::shared_ptr<TCPConnection> connection;
         Optional<Address> udpAddress{};
         Optional<Bounds2i> tile;
-        std::set<ObjectTypeID> objects;
+        std::set<ObjectKey> objects;
         size_t freeSpace{2 * 1000 * 1000 *
                          1000}; /* in bytes (assuming 2 GBs free to start) */
         WorkerStats stats;
@@ -82,9 +82,9 @@ class LambdaMaster {
     void loadCamera();
 
     /* Assigning Objects */
-    std::set<ObjectTypeID> getRecursiveDependencies(const ObjectTypeID &object);
-    void assignObject(Worker &worker, const ObjectTypeID &object);
-    void assignTreelet(Worker &worker, const ObjectTypeID &treeletId);
+    std::set<ObjectKey> getRecursiveDependencies(const ObjectKey &object);
+    void assignObject(Worker &worker, const ObjectKey &object);
+    void assignTreelet(Worker &worker, const ObjectKey &treeletId);
 
     void assignBaseSceneObjects(Worker &worker);
     void assignAllTreelets(Worker &worker);
@@ -123,14 +123,14 @@ class LambdaMaster {
 
     /* Scene Objects */
     Bounds2i sampleBounds;
-    std::map<ObjectTypeID, SceneObjectInfo> sceneObjects;
+    std::map<ObjectKey, SceneObjectInfo> sceneObjects;
 
-    std::set<ObjectTypeID> treeletIds;
-    std::stack<ObjectTypeID> unassignedTreelets;
+    std::set<ObjectKey> treeletIds;
+    std::stack<ObjectKey> unassignedTreelets;
     std::vector<std::tuple<uint64_t, uint64_t>> treeletPriority;
 
-    std::map<ObjectTypeID, std::set<ObjectTypeID>> requiredDependentObjects;
-    std::map<TreeletId, std::set<ObjectTypeID>> treeletFlattenDependencies;
+    std::map<ObjectKey, std::set<ObjectKey>> requiredDependentObjects;
+    std::map<TreeletId, std::set<ObjectKey>> treeletFlattenDependencies;
     std::map<TreeletId, size_t> treeletTotalSizes;
 
     /* Always-on FD */

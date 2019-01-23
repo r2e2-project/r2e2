@@ -230,13 +230,13 @@ message InvocationPayload {
     string coordinator = 2;
 }
 
-message ObjectTypeID {
+message ObjectKey {
     uint32 type = 1;
     uint64 id = 2;
 };
 
 message GetObjects {
-    repeated ObjectTypeID object_ids = 1;
+    repeated ObjectKey object_ids = 1;
 }
 
 message GenerateRays {
@@ -278,7 +278,7 @@ message RayStats {
 
 message WorkerStats {
   message ObjectRayStats {
-    ObjectTypeID id = 1;
+    ObjectKey id = 1;
     RayStats stats = 2;
   }
 
@@ -322,8 +322,8 @@ message SpectrumTexture {
 
 message Manifest {
   message Object {
-    ObjectTypeID id = 1;
-    repeated ObjectTypeID dependencies = 2;
+    ObjectKey id = 1;
+    repeated ObjectKey dependencies = 2;
   };
   repeated Object objects = 1;
 }

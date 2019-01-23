@@ -32,7 +32,7 @@ using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
-using ObjectTypeID = SceneManager::ObjectTypeID;
+using ObjectKey = SceneManager::ObjectKey;
 
 constexpr milliseconds WORKER_REQUEST_INTERVAL{500};
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
@@ -40,7 +40,7 @@ constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
 class interrupt_error : public runtime_error {
   public:
-    interrupt_error(const std::string &s) : runtime_error(s) {}
+    interrupt_error(const string &s) : runtime_error(s) {}
 };
 
 void sigint_handler(int) { throw interrupt_error("killed by interupt signal"); }
@@ -75,7 +75,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         const ObjectType &type = kv.first;
         const vector<SceneManager::Object> &objects = kv.second;
         for (const SceneManager::Object &obj : objects) {
-            ObjectTypeID id{type, obj.id};
+            ObjectKey id{type, obj.id};
             SceneObjectInfo info{};
             info.id = obj.id;
             info.size = obj.size;
@@ -217,7 +217,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                 return true;
             },
             []() { throw runtime_error("error occured"); },
-            []() { throw runtime_error("worker died"); });
+            [ID = currentWorkerID]() {
+                throw runtime_error("worker died: " + to_string(ID));
+            });
 
         auto workerIt =
             workers
@@ -315,9 +317,9 @@ bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
 
     /* let's see if we have a worker that has that treelet */
     const SceneObjectInfo &info = sceneObjects.at(
-        SceneManager::ObjectTypeID{ObjectType::Treelet, treeletId});
+        SceneManager::ObjectKey{ObjectType::Treelet, treeletId});
     if (info.workers.size() == 0) {
-        cerr << "No worker found for treelet " << treeletId << endl;
+        /* cerr << "No worker found for treelet " << treeletId << endl; */
         return false;
     }
 
@@ -359,7 +361,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         {
             /* send the list of assigned objects to the worker */
             protobuf::GetObjects getObjectsProto;
-            for (const ObjectTypeID &id : worker.objects) {
+            for (const ObjectKey &id : worker.objects) {
                 *getObjectsProto.add_object_ids() = to_protobuf(id);
             }
             Message getObjectsMessage{Message::OpCode::GetObjects,
@@ -394,14 +396,14 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         workers.at(workerId).stats.merge(stats);
         /* sort treelet load */
         int treeletID = 0;
-        std::vector<std::tuple<uint64_t, uint64_t>> treeletLoads;
+        vector<tuple<uint64_t, uint64_t>> treeletLoads;
         for (auto &kv : workerStats.objectStats) {
             auto &rayStats = kv.second;
             uint64_t load = rayStats.waitingRays - rayStats.processedRays;
-            treeletLoads.push_back(std::make_tuple(load, kv.first.id));
+            treeletLoads.push_back(make_tuple(load, kv.first.id));
         }
-        std::sort(treeletLoads.begin(), treeletLoads.end(),
-                  std::greater<std::tuple<uint64_t, uint64_t>>());
+        sort(treeletLoads.begin(), treeletLoads.end(),
+             greater<tuple<uint64_t, uint64_t>>());
         treeletPriority = treeletLoads;
         break;
     }
@@ -448,15 +450,15 @@ void LambdaMaster::run() {
     }
 }
 
-std::string LambdaMaster::getSummary() {
+string LambdaMaster::getSummary() {
     ostringstream oss;
 
     auto duration = chrono::duration_cast<chrono::seconds>(
                         chrono::steady_clock::now() - startTime)
                         .count();
 
-    oss << std::endl
-        << "Summary: " << std::endl
+    oss << endl
+        << "Summary: " << endl
         << " finished paths: " << workerStats.finishedPaths() << " (" << fixed
         << setprecision(1) << (100.0 * workerStats.finishedPaths() / totalPaths)
         << "%)"
@@ -470,9 +472,9 @@ std::string LambdaMaster::getSummary() {
         << "%)"
         << " | time: " << setfill('0') << setw(2) << (duration / 60) << ":"
         << setw(2) << (duration % 60);
-    oss << std::endl;
+    oss << endl;
 
-    std::vector<uint64_t> durations;
+    vector<uint64_t> durations;
     for (const auto &kv : workers) {
         const Worker &worker = kv.second;
         auto milliseconds = (worker.stats.end - worker.stats.start).count();
@@ -482,13 +484,11 @@ std::string LambdaMaster::getSummary() {
         }
         durations.push_back(milliseconds);
     }
-    std::sort(durations.begin(), durations.end());
+    sort(durations.begin(), durations.end());
     if (durations.size() > 0) {
-        oss << "Shortest worker: " << durations[0] << std::endl;
-        oss << "Median worker: " << durations[durations.size() / 2]
-            << std::endl;
-        oss << "Longest worker: " << durations[durations.size() - 1]
-            << std::endl;
+        oss << "Shortest worker: " << durations[0] << endl;
+        oss << "Median worker: " << durations[durations.size() / 2] << endl;
+        oss << "Longest worker: " << durations[durations.size() - 1] << endl;
     }
     return oss.str();
 }
@@ -502,10 +502,9 @@ void LambdaMaster::loadCamera() {
     filmTile = camera->film->GetFilmTile(sampleBounds);
 }
 
-set<ObjectTypeID> LambdaMaster::getRecursiveDependencies(
-    const ObjectTypeID &object) {
-    set<ObjectTypeID> allDeps;
-    for (const ObjectTypeID &id : requiredDependentObjects[object]) {
+set<ObjectKey> LambdaMaster::getRecursiveDependencies(const ObjectKey &object) {
+    set<ObjectKey> allDeps;
+    for (const ObjectKey &id : requiredDependentObjects[object]) {
         allDeps.insert(id);
         auto deps = getRecursiveDependencies(id);
         allDeps.insert(deps.begin(), deps.end());
@@ -513,7 +512,7 @@ set<ObjectTypeID> LambdaMaster::getRecursiveDependencies(
     return allDeps;
 }
 
-void LambdaMaster::assignObject(Worker &worker, const ObjectTypeID &object) {
+void LambdaMaster::assignObject(Worker &worker, const ObjectKey &object) {
     if (worker.objects.count(object) == 0) {
         SceneObjectInfo &info = sceneObjects.at(object);
         info.workers.insert(worker.id);
@@ -522,7 +521,7 @@ void LambdaMaster::assignObject(Worker &worker, const ObjectTypeID &object) {
     }
 }
 
-void LambdaMaster::assignTreelet(Worker &worker, const ObjectTypeID &treelet) {
+void LambdaMaster::assignTreelet(Worker &worker, const ObjectKey &treelet) {
     if (treelet.type != ObjectType::Treelet) {
         throw runtime_error("assignTreelet: object is not a treelet");
     }
@@ -535,10 +534,10 @@ void LambdaMaster::assignTreelet(Worker &worker, const ObjectTypeID &treelet) {
 }
 
 void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
-    assignObject(worker, ObjectTypeID{ObjectType::Scene, 0});
-    assignObject(worker, ObjectTypeID{ObjectType::Camera, 0});
-    assignObject(worker, ObjectTypeID{ObjectType::Sampler, 0});
-    assignObject(worker, ObjectTypeID{ObjectType::Lights, 0});
+    assignObject(worker, ObjectKey{ObjectType::Scene, 0});
+    assignObject(worker, ObjectKey{ObjectType::Camera, 0});
+    assignObject(worker, ObjectKey{ObjectType::Sampler, 0});
+    assignObject(worker, ObjectKey{ObjectType::Lights, 0});
 }
 
 void LambdaMaster::assignAllTreelets(Worker &worker) {
@@ -566,7 +565,7 @@ void LambdaMaster::assignTreelets(Worker &worker) {
 
     /* if some objects are unassigned, assign them */
     while (!unassignedTreelets.empty()) {
-        ObjectTypeID id = unassignedTreelets.top();
+        ObjectKey id = unassignedTreelets.top();
         size_t size = treeletTotalSizes.at(id.id);
         if (size < freeSpace) {
             assignTreelet(worker, id);
@@ -577,12 +576,12 @@ void LambdaMaster::assignTreelets(Worker &worker) {
 
     /* otherwise, find the object with the largest discrepancy between rays
      * requested and rays processed */
-    ObjectTypeID highestID = *treeletIds.begin();
+    ObjectKey highestID = *treeletIds.begin();
     float highestLoad = -1;
     for (auto &tup : treeletPriority) {
-        uint64_t id = std::get<1>(tup);
-        uint64_t load = std::get<0>(tup);
-        ObjectTypeID treeletId{ObjectType::Treelet, id};
+        uint64_t id = get<1>(tup);
+        uint64_t load = get<0>(tup);
+        ObjectKey treeletId{ObjectType::Treelet, id};
         const SceneObjectInfo &info = sceneObjects.at(treeletId);
 
         size_t size = treeletTotalSizes[id];

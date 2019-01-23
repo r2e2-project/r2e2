@@ -266,7 +266,7 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
                     q.second.pop_front();
 
                     outQueueSize--;
-                    global::workerStats.recordSentRay(SceneManager::ObjectTypeID{
+                    global::workerStats.recordSentRay(SceneManager::ObjectKey{
                         ObjectType::Treelet, q.first});
 
                     const string& rayStr =
@@ -406,8 +406,8 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
 void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
     vector<storage::GetRequest> requests;
-    for (const protobuf::ObjectTypeID& objectTypeID : objects.object_ids()) {
-        SceneManager::ObjectTypeID id = from_protobuf(objectTypeID);
+    for (const protobuf::ObjectKey& ObjectKey : objects.object_ids()) {
+        SceneManager::ObjectKey id = from_protobuf(ObjectKey);
         if (id.type == ObjectType::TriangleMesh) {
             /* triangle meshes are packed into treelets, so ignore */
             continue;
@@ -429,7 +429,7 @@ void LambdaWorker::pushRayQueue(RayState&& state) {
     treelet_id = state.hit.get().treelet;
   }
   global::workerStats.recordWaitingRay(
-      SceneManager::ObjectTypeID{ObjectType::Treelet, treelet_id});
+      SceneManager::ObjectKey{ObjectType::Treelet, treelet_id});
   rayQueue.push_back(move(state));
 }
 
@@ -443,7 +443,7 @@ RayState LambdaWorker::popRayQueue() {
         treeletID = state.hit.get().treelet;
     }
     global::workerStats.recordProcessedRay(
-        SceneManager::ObjectTypeID{ObjectType::Treelet, treeletID});
+        SceneManager::ObjectKey{ObjectType::Treelet, treeletID});
     return state;
 }
 
@@ -563,12 +563,12 @@ bool LambdaWorker::processMessage(const Message& message) {
         while (!reader.eof()) {
             if (reader.read(&proto)) {
                 if (proto.to_visit_size() > 0) {
-                    SceneManager::ObjectTypeID treeletID{
+                    SceneManager::ObjectKey treeletID{
                         ObjectType::Treelet,
                         proto.to_visit(0).treelet()};
                     global::workerStats.recordReceivedRay(treeletID);
                 } else {
-                    SceneManager::ObjectTypeID treeletID{
+                    SceneManager::ObjectKey treeletID{
                         ObjectType::Treelet, proto.hit().treelet()};
                     global::workerStats.recordReceivedRay(treeletID);
                 }

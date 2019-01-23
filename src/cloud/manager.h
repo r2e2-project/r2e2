@@ -37,11 +37,11 @@ class SceneManager {
         Object(const size_t id, const off_t size) : id(id), size(size) {}
     };
 
-    struct ObjectTypeID {
+    struct ObjectKey {
         ObjectType type;
         ObjectID id;
 
-        bool operator<(const ObjectTypeID& other) const {
+        bool operator<(const ObjectKey& other) const {
             if (type == other.type) {
                 return id < other.id;
             }
@@ -65,13 +65,13 @@ class SceneManager {
     uint32_t getNextId(const ObjectType type, const void* ptr = nullptr);
     uint32_t getId(const void* ptr) const { return ptrIds.at(ptr); }
     bool hasId(const void* ptr) const { return ptrIds.count(ptr) > 0; }
-    void recordDependency(const ObjectTypeID& from, const ObjectTypeID& to);
+    void recordDependency(const ObjectKey& from, const ObjectKey& to);
     protobuf::Manifest makeManifest() const;
 
     uint32_t getTextureId(const std::string& path);
 
     std::map<ObjectType, std::vector<Object>> listObjects();
-    std::map<ObjectTypeID, std::set<ObjectTypeID>> listObjectDependencies();
+    std::map<ObjectKey, std::set<ObjectKey>> listObjectDependencies();
 
     static std::string getFileName(const ObjectType type, const uint32_t id);
     const std::string& getScenePath() { return scenePath; }
@@ -83,7 +83,7 @@ class SceneManager {
     std::string scenePath{};
     Optional<FileDescriptor> sceneFD{};
     std::unordered_map<const void*, uint32_t> ptrIds{};
-    std::map<ObjectTypeID, std::set<ObjectTypeID>> dependencies;
+    std::map<ObjectKey, std::set<ObjectKey>> dependencies;
     std::map<std::string, uint32_t> textureNameToId;
 };
 

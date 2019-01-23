@@ -69,8 +69,8 @@ protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample);
 protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 protobuf::Scene to_protobuf(const Scene& scene);
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
-protobuf::ObjectTypeID to_protobuf(
-    const SceneManager::ObjectTypeID& objectTypeID);
+protobuf::ObjectKey to_protobuf(
+    const SceneManager::ObjectKey& ObjectKey);
 protobuf::RayStats to_protobuf(const RayStats& state);
 protobuf::WorkerStats to_protobuf(const WorkerStats& state);
 
@@ -97,8 +97,8 @@ TextureParams from_protobuf(
     ParamSet& material_params,
     std::map<std::string, std::shared_ptr<Texture<Float>>>& fTex,
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex);
-SceneManager::ObjectTypeID from_protobuf(
-    const protobuf::ObjectTypeID& objectTypeID);
+SceneManager::ObjectKey from_protobuf(
+    const protobuf::ObjectKey& ObjectKey);
 RayStats from_protobuf(const protobuf::RayStats& state);
 WorkerStats from_protobuf(const protobuf::WorkerStats& state);
 
