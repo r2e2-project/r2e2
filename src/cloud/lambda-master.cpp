@@ -38,10 +38,9 @@ constexpr milliseconds WORKER_REQUEST_INTERVAL{500};
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
-class interrupt_error : public runtime_error
-{
-public:
-  interrupt_error(const std::string &s) : runtime_error(s) {}
+class interrupt_error : public runtime_error {
+  public:
+    interrupt_error(const std::string &s) : runtime_error(s) {}
 };
 
 void sigint_handler(int) { throw interrupt_error("killed by interupt signal"); }
@@ -87,7 +86,20 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             }
         }
     }
+
     requiredDependentObjects = global::manager.listObjectDependencies();
+
+    for (const auto &treeletId : treeletIds) {
+        treeletFlattenDependencies[treeletId.id] =
+            getRecursiveDependencies(treeletId);
+
+        auto &treeletSize = treeletTotalSizes[treeletId.id];
+        treeletSize = sceneObjects.at(treeletId).size;
+
+        for (const auto &obj : treeletFlattenDependencies[treeletId.id]) {
+            treeletSize += sceneObjects.at(obj).size;
+        }
+    }
 
     udpConnection = loop.make_udp_connection(
         [&](shared_ptr<UDPConnection> conn, Address &&addr, string &&data) {
@@ -239,7 +251,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         /* assign treelet to worker based on most in-demand treelets */
         else {
             this->assignTreelets(workerIt->second);
-            //this->assignAllTreelets(workerIt->second);
+            // this->assignAllTreelets(workerIt->second);
         }
 
         currentWorkerID++;
@@ -454,21 +466,21 @@ std::string LambdaMaster::getSummary() {
         << " (" << fixed << setprecision(1)
         << (workerStats.sentRays() == 0
                 ? 0
-            : (100.0 * workerStats.receivedRays() / workerStats.sentRays()))
+                : (100.0 * workerStats.receivedRays() / workerStats.sentRays()))
         << "%)"
         << " | time: " << setfill('0') << setw(2) << (duration / 60) << ":"
         << setw(2) << (duration % 60);
     oss << std::endl;
 
     std::vector<uint64_t> durations;
-    for (const auto& kv : workers) {
-      const Worker& worker = kv.second;
-      auto milliseconds = (worker.stats.end - worker.stats.start).count();
-      if (milliseconds == 0) {
-        printf("skipping worker\n");
-        continue;
-      }
-      durations.push_back(milliseconds);
+    for (const auto &kv : workers) {
+        const Worker &worker = kv.second;
+        auto milliseconds = (worker.stats.end - worker.stats.start).count();
+        if (milliseconds == 0) {
+            printf("skipping worker\n");
+            continue;
+        }
+        durations.push_back(milliseconds);
     }
     std::sort(durations.begin(), durations.end());
     if (durations.size() > 0) {
@@ -490,41 +502,53 @@ void LambdaMaster::loadCamera() {
     filmTile = camera->film->GetFilmTile(sampleBounds);
 }
 
-vector<ObjectTypeID> LambdaMaster::assignAllTreelets(Worker &worker) {
-    vector<ObjectTypeID> objectsToAssign;
-    for (auto &kv : sceneObjects) {
-        const ObjectTypeID &id = kv.first;
-        const SceneObjectInfo &info = kv.second;
-
-        if (id.type != SceneManager::Type::Treelet ||
-            (id.id != 0 && ((id.id % 4) != (worker.id % 4))))
-            continue;
-
-        objectsToAssign.push_back(id);
+set<ObjectTypeID> LambdaMaster::getRecursiveDependencies(
+    const ObjectTypeID &object) {
+    set<ObjectTypeID> allDeps;
+    for (const ObjectTypeID &id : requiredDependentObjects[object]) {
+        allDeps.insert(id);
+        auto deps = getRecursiveDependencies(id);
+        allDeps.insert(deps.begin(), deps.end());
     }
-    /* update scene objects assignment to track that this lambda now has the
-     * assigned objects */
-    for (ObjectTypeID &id : objectsToAssign) {
-        assignObject(worker, id);
-    }
-
-    return objectsToAssign;
+    return allDeps;
 }
 
-vector<ObjectTypeID> LambdaMaster::assignRootTreelet(Worker &worker) {
-    vector<ObjectTypeID> objectsToAssign = {
-        ObjectTypeID{SceneManager::Type::Treelet, 0}};
-
-    /* update scene objects assignment to track that this worker now has the
-     * assigned objects */
-    for (ObjectTypeID &id : objectsToAssign) {
-        assignObject(worker, id);
+void LambdaMaster::assignObject(Worker &worker, const ObjectTypeID &object) {
+    if (worker.objects.count(object) == 0) {
+        SceneObjectInfo &info = sceneObjects.at(object);
+        info.workers.insert(worker.id);
+        worker.objects.insert(object);
+        worker.freeSpace -= info.size;
     }
-
-    return objectsToAssign;
 }
 
-vector<ObjectTypeID> LambdaMaster::assignTreelets(Worker &worker) {
+void LambdaMaster::assignTreelet(Worker &worker, const ObjectTypeID &treelet) {
+    if (treelet.type != SceneManager::Type::Treelet) {
+        throw runtime_error("assignTreelet: object is not a treelet");
+    }
+
+    assignObject(worker, treelet);
+
+    for (const auto &obj : treeletFlattenDependencies[treelet.id]) {
+        assignObject(worker, obj);
+    }
+}
+
+void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
+    assignObject(worker, ObjectTypeID{SceneManager::Type::Scene, 0});
+    assignObject(worker, ObjectTypeID{SceneManager::Type::Camera, 0});
+    assignObject(worker, ObjectTypeID{SceneManager::Type::Sampler, 0});
+    assignObject(worker, ObjectTypeID{SceneManager::Type::Lights, 0});
+}
+
+void LambdaMaster::assignAllTreelets(Worker &worker) {
+    for (const auto &treeletId : treeletIds) {
+        if (treeletId.id == 0 || (treeletId.id % 100 == worker.id % 100))
+            assignTreelet(worker, treeletId);
+    }
+}
+
+void LambdaMaster::assignTreelets(Worker &worker) {
     /* Scene assignment strategy
 
        When a worker connects to the master:
@@ -538,102 +562,43 @@ vector<ObjectTypeID> LambdaMaster::assignTreelets(Worker &worker) {
     /* NOTE(apoms): for now, we only assign one treelet to each worker, but
      * should be able to support assigning multiple based on freeSpace in the
      * future */
-    vector<ObjectTypeID> objectsToAssign;
-    size_t &freeSpace = worker.freeSpace;
+    const size_t freeSpace = worker.freeSpace;
+
     /* if some objects are unassigned, assign them */
     while (!unassignedTreelets.empty()) {
         ObjectTypeID id = unassignedTreelets.top();
-        size_t size = getObjectSizeWithDependencies(worker, id);
+        size_t size = treeletTotalSizes.at(id.id);
         if (size < freeSpace) {
-            objectsToAssign.push_back(id);
-            assignObject(worker, id);
+            assignTreelet(worker, id);
             unassignedTreelets.pop();
-            break;
+            return;
         }
     }
+
     /* otherwise, find the object with the largest discrepancy between rays
      * requested and rays processed */
-    if (objectsToAssign.empty()) {
-        ObjectTypeID highestID = sceneObjects.begin()->first;
-        float highestLoad = -1;
-        for (auto& tup : treeletPriority) {
-          uint64_t id = std::get<1>(tup);
-          uint64_t load = std::get<0>(tup);
-          ObjectTypeID objectID{SceneManager::Type::Treelet, id};
-          const SceneObjectInfo &info = sceneObjects.at(objectID);
+    ObjectTypeID highestID = *treeletIds.begin();
+    float highestLoad = -1;
+    for (auto &tup : treeletPriority) {
+        uint64_t id = std::get<1>(tup);
+        uint64_t load = std::get<0>(tup);
+        ObjectTypeID treeletId{SceneManager::Type::Treelet, id};
+        const SceneObjectInfo &info = sceneObjects.at(treeletId);
 
-          size_t size = getObjectSizeWithDependencies(worker, objectID);
-          if (load > highestLoad && size < freeSpace) {
-              highestID = objectID;
-              highestLoad = load;
-          }
-        }
-        /* if we have not received stats info about the load of any scene
-         * object, randomly pick a treelet */
-        if (highestLoad == 0) {
-            highestID = *random::sample(treeletIds.begin(), treeletIds.end());
-        }
-        objectsToAssign.push_back(highestID);
-        assignObject(worker, highestID);
-    }
-
-    return objectsToAssign;
-}
-
-vector<ObjectTypeID> LambdaMaster::assignBaseSceneObjects(Worker &worker) {
-    vector<ObjectTypeID> objectsToAssign = {
-        ObjectTypeID{SceneManager::Type::Scene, 0},
-        ObjectTypeID{SceneManager::Type::Camera, 0},
-        ObjectTypeID{SceneManager::Type::Sampler, 0},
-        ObjectTypeID{SceneManager::Type::Lights, 0},
-    };
-
-    /* update scene objects assignment to track that this worker now has the
-     * assigned objects */
-    for (ObjectTypeID &id : objectsToAssign) {
-        assignObject(worker, id);
-    }
-
-    return objectsToAssign;
-}
-
-void LambdaMaster::assignObject(Worker &worker, const ObjectTypeID &object) {
-    /* assign object and all its dependencies */
-    vector<ObjectTypeID> objectsToAssign = {object};
-    for (const ObjectTypeID &id : getRecursiveDependencies(object)) {
-        objectsToAssign.push_back(id);
-    }
-
-    for (ObjectTypeID &obj : objectsToAssign) {
-        SceneObjectInfo &info = sceneObjects.at(obj);
-        if (worker.objects.count(obj) == 0) {
-            info.workers.insert(worker.id);
-            worker.objects.insert(obj);
-            worker.freeSpace -= info.size;
+        size_t size = treeletTotalSizes[id];
+        if (load > highestLoad && size < freeSpace) {
+            highestID = treeletId;
+            highestLoad = load;
         }
     }
-}
 
-set<ObjectTypeID> LambdaMaster::getRecursiveDependencies(
-    const ObjectTypeID &object) {
-    set<ObjectTypeID> allDeps;
-    for (const ObjectTypeID &id : requiredDependentObjects[object]) {
-        allDeps.insert(id);
-        auto deps = getRecursiveDependencies(id);
-        allDeps.insert(deps.begin(), deps.end());
+    /* if we have not received stats info about the load of any scene
+     * object, randomly pick a treelet */
+    if (highestLoad == 0) {
+        highestID = *random::sample(treeletIds.begin(), treeletIds.end());
     }
-    return allDeps;
-}
 
-size_t LambdaMaster::getObjectSizeWithDependencies(Worker &worker,
-                                                   const ObjectTypeID &object) {
-    size_t size = sceneObjects.at(object).size;
-    for (const ObjectTypeID &id : getRecursiveDependencies(object)) {
-        if (worker.objects.count(id) == 0) {
-            size += sceneObjects.at(id).size;
-        }
-    }
-    return size;
+    assignTreelet(worker, highestID);
 }
 
 void LambdaMaster::updateObjectUsage(const Worker &worker) {}
@@ -673,24 +638,22 @@ int main(int argc, char const *argv[]) {
     FLAGS_logtostderr = 1;
     google::InitGoogleLogging(argv[0]);
 
-    const string scenePath{argv[1]};
+    const string scene{argv[1]};
     const uint16_t listenPort = stoi(argv[2]);
-    const uint32_t numberOfLambdas = stoul(argv[3]);
+    const uint32_t numLambdas = stoul(argv[3]);
     const string publicAddress = argv[4];
-    const string storageBackend = argv[5];
-    const string awsRegion = argv[6];
+    const string storage = argv[5];
+    const string region = argv[6];
+
+    unique_ptr<LambdaMaster> master;
 
     try {
-        LambdaMaster master{scenePath,     listenPort,     numberOfLambdas,
-                            publicAddress, storageBackend, awsRegion};
-        try {
-            master.run();
-        } catch (const interrupt_error &e) {
-            /* if we Ctrl+C while running the master, print out a summary of the
-             * run */
-            std::cout << master.getSummary() << std::endl;
-            return EXIT_FAILURE;
-        }
+        master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,
+                                           publicAddress, storage, region);
+        master->run();
+    } catch (const interrupt_error &e) {
+        if (master) cout << master->getSummary() << endl;
+        return EXIT_FAILURE;
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;

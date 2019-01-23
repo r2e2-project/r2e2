@@ -82,14 +82,14 @@ class LambdaMaster {
     void loadCamera();
 
     /* Assigning Objects */
-    std::vector<ObjectTypeID> assignAllTreelets(Worker &worker);
-    std::vector<ObjectTypeID> assignRootTreelet(Worker &worker);
-    std::vector<ObjectTypeID> assignTreelets(Worker &worker);
-    std::vector<ObjectTypeID> assignBaseSceneObjects(Worker &worker);
-    void assignObject(Worker &worker, const ObjectTypeID &object);
     std::set<ObjectTypeID> getRecursiveDependencies(const ObjectTypeID &object);
-    size_t getObjectSizeWithDependencies(Worker &worker,
-                                         const ObjectTypeID &object);
+    void assignObject(Worker &worker, const ObjectTypeID &object);
+    void assignTreelet(Worker &worker, const ObjectTypeID &treeletId);
+
+    void assignBaseSceneObjects(Worker &worker);
+    void assignAllTreelets(Worker &worker);
+    void assignTreelets(Worker &worker);
+
     void updateObjectUsage(const Worker &worker);
 
     /* AWS Lambda */
@@ -124,10 +124,14 @@ class LambdaMaster {
     /* Scene Objects */
     Bounds2i sampleBounds;
     std::map<ObjectTypeID, SceneObjectInfo> sceneObjects;
+
     std::set<ObjectTypeID> treeletIds;
-    std::map<ObjectTypeID, std::set<ObjectTypeID>> requiredDependentObjects;
     std::stack<ObjectTypeID> unassignedTreelets;
     std::vector<std::tuple<uint64_t, uint64_t>> treeletPriority;
+
+    std::map<ObjectTypeID, std::set<ObjectTypeID>> requiredDependentObjects;
+    std::map<TreeletId, std::set<ObjectTypeID>> treeletFlattenDependencies;
+    std::map<TreeletId, size_t> treeletTotalSizes;
 
     /* Always-on FD */
     FileDescriptor dummyFD{STDOUT_FILENO};
