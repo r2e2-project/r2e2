@@ -58,7 +58,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
 
     vector<TreeletNode> nodes;
     auto reader =
-        global::manager.GetReader(SceneManager::Type::Treelet, root_id);
+        global::manager.GetReader(ObjectType::Treelet, root_id);
 
     stack<pair<uint32_t, Child>> q;
 
@@ -159,7 +159,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
                 /* load the Material if necessary */
                 if (materials_.count(material_id) == 0) {
                     auto material_reader = global::manager.GetReader(
-                        SceneManager::Type::Material, material_id);
+                        ObjectType::Material, material_id);
                     protobuf::Material material;
                     material_reader->read(&material);
                     materials_[material_id] =

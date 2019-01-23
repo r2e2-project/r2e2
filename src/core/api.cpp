@@ -218,9 +218,9 @@ struct GraphicsState {
 
         if (PbrtOptions.dumpScene) {
           int id =
-              global::manager.getNextId(SceneManager::Type::Material, mtl.get());
+              global::manager.getNextId(ObjectType::Material, mtl.get());
           auto writer =
-              global::manager.GetWriter(SceneManager::Type::Material, id);
+              global::manager.GetWriter(ObjectType::Material, id);
           writer->write(material::to_protobuf("matte", tp));
         }
     }
@@ -621,9 +621,9 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
 
     if (PbrtOptions.dumpScene && PbrtOptions.dumpMaterials && material) {
         const uint32_t id =
-            global::manager.getNextId(SceneManager::Type::Material, material);
+            global::manager.getNextId(ObjectType::Material, material);
         auto writer =
-            global::manager.GetWriter(SceneManager::Type::Material, id);
+            global::manager.GetWriter(ObjectType::Material, id);
         writer->write(material::to_protobuf(name, mp));
 
         /* record dependencies from material to textures */
@@ -632,8 +632,8 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
             if (global::manager.hasId(tex)) {
                 const uint32_t texId = global::manager.getId(tex);
                 global::manager.recordDependency(
-                    {SceneManager::Type::Material, id},
-                    {SceneManager::Type::FloatTexture, texId});
+                    {ObjectType::Material, id},
+                    {ObjectType::FloatTexture, texId});
             }
         }
 
@@ -642,8 +642,8 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
             if (global::manager.hasId(tex)) {
                 const uint32_t texId = global::manager.getId(tex);
                 global::manager.recordDependency(
-                    {SceneManager::Type::Material, id},
-                    {SceneManager::Type::SpectrumTexture, texId});
+                    {ObjectType::Material, id},
+                    {ObjectType::SpectrumTexture, texId});
             }
         }
     }
@@ -666,7 +666,7 @@ Optional<uint32_t> storeTexture(const std::string &name, ParamSet &tp) {
 
         const uint32_t textureId = global::manager.getTextureId(currentName);
         const std::string newFilename =
-            SceneManager::getFileName(SceneManager::Type::Texture, textureId);
+            SceneManager::getFileName(ObjectType::Texture, textureId);
         const std::string newPath =
             global::manager.getScenePath() + "/" + newFilename;
 
@@ -727,16 +727,16 @@ std::shared_ptr<Texture<Float>> MakeFloatTexture(const std::string &name,
 
         /* step two: write the texture */
         const uint32_t id =
-            global::manager.getNextId(SceneManager::Type::FloatTexture, tex);
+            global::manager.getNextId(ObjectType::FloatTexture, tex);
         auto writer =
-            global::manager.GetWriter(SceneManager::Type::FloatTexture, id);
+            global::manager.GetWriter(ObjectType::FloatTexture, id);
         writer->write(float_texture::to_protobuf(name, tex2world, newTp));
 
         /* step three: record the dependencies */
         if (textureId.initialized()) {
             global::manager.recordDependency(
-                {SceneManager::Type::FloatTexture, id},
-                {SceneManager::Type::Texture, *textureId});
+                {ObjectType::FloatTexture, id},
+                {ObjectType::Texture, *textureId});
         }
     }
 
@@ -784,15 +784,15 @@ std::shared_ptr<Texture<Spectrum>> MakeSpectrumTexture(
                             *graphicsState.spectrumTextures};
 
         const uint32_t id =
-            global::manager.getNextId(SceneManager::Type::SpectrumTexture, tex);
+            global::manager.getNextId(ObjectType::SpectrumTexture, tex);
         auto writer =
-            global::manager.GetWriter(SceneManager::Type::SpectrumTexture, id);
+            global::manager.GetWriter(ObjectType::SpectrumTexture, id);
         writer->write(spectrum_texture::to_protobuf(name, tex2world, newTp));
 
         if (textureId.initialized()) {
             global::manager.recordDependency(
-                {SceneManager::Type::SpectrumTexture, id},
-                {SceneManager::Type::Texture, *textureId});
+                {ObjectType::SpectrumTexture, id},
+                {ObjectType::Texture, *textureId});
         }
     }
 
@@ -1737,12 +1737,12 @@ void pbrtWorldEnd() {
         std::unique_ptr<Scene> scene(renderOptions->MakeScene());
 
         if (PbrtOptions.dumpScene) {
-            auto writer = global::manager.GetWriter(SceneManager::Type::Scene);
+            auto writer = global::manager.GetWriter(ObjectType::Scene);
             writer->write(to_protobuf(*scene));
 
             /* dump the manifest file for this render */
             auto manifestWriter =
-                global::manager.GetWriter(SceneManager::Type::Manifest);
+                global::manager.GetWriter(ObjectType::Manifest);
             manifestWriter->write(global::manager.makeManifest());
         }
 
@@ -1799,7 +1799,7 @@ Scene *RenderOptions::MakeScene() {
     /* Do we need to dump the lights? */
     if (PbrtOptions.dumpScene) {
         // let's dump the lights
-        auto writer = global::manager.GetWriter(SceneManager::Type::Lights);
+        auto writer = global::manager.GetWriter(ObjectType::Lights);
         for (const auto &light : renderOptions->protoLights) {
             writer->write(light);
         }
@@ -1832,7 +1832,7 @@ Integrator *RenderOptions::MakeIntegrator() const {
 
     if (PbrtOptions.dumpScene) {
         // let's dump the sampler
-        auto writer = global::manager.GetWriter(SceneManager::Type::Sampler);
+        auto writer = global::manager.GetWriter(ObjectType::Sampler);
         writer->write(sampler::to_protobuf(SamplerName, SamplerParams,
                                           camera->film->GetSampleBounds()));
     }
@@ -1894,7 +1894,7 @@ Camera *RenderOptions::MakeCamera() const {
         AnimatedTransform ac2w{
             &CameraToWorld[0], renderOptions->transformStartTime,
             &CameraToWorld[1], renderOptions->transformEndTime};
-        auto writer = global::manager.GetWriter(SceneManager::Type::Camera);
+        auto writer = global::manager.GetWriter(ObjectType::Camera);
         writer->write(camera::to_protobuf(CameraName, CameraParams, ac2w,
                                          FilmName, FilmParams, FilterName,
                                          FilterParams));

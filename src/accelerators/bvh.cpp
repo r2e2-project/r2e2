@@ -946,7 +946,7 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
                                 const size_t max_treelet_nodes) const {
     std::map<BVHAccel *, size_t> bvh_instances;
     const uint32_t bvh_root_id =
-        global::manager.getNextId(SceneManager::Type::Treelet, &nodes[0]);
+        global::manager.getNextId(ObjectType::Treelet, &nodes[0]);
 
     for (int root_index = 0; root_index < nodeCount; root_index++) {
         if (not labels[root_index]) {
@@ -1029,7 +1029,7 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
                 }
 
                 if (labels[node.secondChildOffset] != current_treelet) {
-                    global::manager.getNextId(SceneManager::Type::Treelet,
+                    global::manager.getNextId(ObjectType::Treelet,
                                               &nodes[node.secondChildOffset]);
                     q.push(-1);
                 } else {
@@ -1037,7 +1037,7 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
                 }
 
                 if (labels[node_index + 1] != current_treelet) {
-                    global::manager.getNextId(SceneManager::Type::Treelet,
+                    global::manager.getNextId(ObjectType::Treelet,
                                               &nodes[node_index + 1]);
                     q.push(-1);
                 } else {
@@ -1059,7 +1059,7 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
         }
 
         auto writer =
-            global::manager.GetWriter(SceneManager::Type::Treelet, treelet_id);
+            global::manager.GetWriter(ObjectType::Treelet, treelet_id);
 
         uint32_t num_triangle_meshes = triangles_in_treelet.size();
         writer->write(num_triangle_meshes);
@@ -1079,7 +1079,7 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
 
           /* assign each mesh a unique id */
           const uint32_t tm_id =
-              global::manager.getNextId(SceneManager::Type::TriangleMesh);
+              global::manager.getNextId(ObjectType::TriangleMesh);
           /* generate the sub-mesh */
           std::shared_ptr<TriangleMesh> sub_mesh;
           {
@@ -1157,13 +1157,13 @@ uint32_t BVHAccel::dumpTreelets(uint32_t *labels,
 
           /* track the dependency of the mesh on the material */
           global::manager.recordDependency(
-              SceneManager::ObjectTypeID{SceneManager::Type::TriangleMesh, tm_id},
-              SceneManager::ObjectTypeID{SceneManager::Type::Material, material_id});
+              SceneManager::ObjectTypeID{ObjectType::TriangleMesh, tm_id},
+              SceneManager::ObjectTypeID{ObjectType::Material, material_id});
 
           /* track the dependency of the treelet on the mesh */
           global::manager.recordDependency(
-              SceneManager::ObjectTypeID{SceneManager::Type::Treelet, treelet_id},
-              SceneManager::ObjectTypeID{SceneManager::Type::TriangleMesh, tm_id});
+              SceneManager::ObjectTypeID{ObjectType::Treelet, treelet_id},
+              SceneManager::ObjectTypeID{ObjectType::TriangleMesh, tm_id});
         }
 
         const uint32_t current_treelet = labels[root_index];

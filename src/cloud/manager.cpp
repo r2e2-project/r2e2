@@ -15,7 +15,7 @@ static const string TYPE_PREFIXES[] = {
 
 static_assert(
     sizeof(TYPE_PREFIXES) / sizeof(string) ==
-        to_underlying(SceneManager::Type::COUNT),
+        to_underlying(ObjectType::COUNT),
     "COUNT enum value for SceneManager Type must be the last entry in "
     "the enum declaration.");
 
@@ -30,7 +30,7 @@ void SceneManager::init(const string& scenePath) {
 }
 
 unique_ptr<protobuf::RecordReader> SceneManager::GetReader(
-    const Type type, const uint32_t id) const {
+    const ObjectType type, const uint32_t id) const {
     if (!sceneFD.initialized()) {
         throw runtime_error("SceneManager is not initialized");
     }
@@ -41,7 +41,7 @@ unique_ptr<protobuf::RecordReader> SceneManager::GetReader(
 }
 
 unique_ptr<protobuf::RecordWriter> SceneManager::GetWriter(
-    const Type type, const uint32_t id) const {
+    const ObjectType type, const uint32_t id) const {
     if (!sceneFD.initialized()) {
         throw runtime_error("SceneManager is not initialized");
     }
@@ -53,21 +53,21 @@ unique_ptr<protobuf::RecordWriter> SceneManager::GetWriter(
                S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH))));
 }
 
-string SceneManager::getFileName(const Type type, const uint32_t id) {
+string SceneManager::getFileName(const ObjectType type, const uint32_t id) {
     switch (type) {
-    case Type::Treelet:
-    case Type::TriangleMesh:
-    case Type::Material:
-    case Type::FloatTexture:
-    case Type::SpectrumTexture:
-    case Type::Texture:
+    case ObjectType::Treelet:
+    case ObjectType::TriangleMesh:
+    case ObjectType::Material:
+    case ObjectType::FloatTexture:
+    case ObjectType::SpectrumTexture:
+    case ObjectType::Texture:
         return TYPE_PREFIXES[to_underlying(type)] + to_string(id);
 
-    case Type::Sampler:
-    case Type::Camera:
-    case Type::Lights:
-    case Type::Scene:
-    case Type::Manifest:
+    case ObjectType::Sampler:
+    case ObjectType::Camera:
+    case ObjectType::Lights:
+    case ObjectType::Scene:
+    case ObjectType::Manifest:
         return TYPE_PREFIXES[to_underlying(type)];
 
     default:
@@ -75,7 +75,7 @@ string SceneManager::getFileName(const Type type, const uint32_t id) {
     }
 }
 
-uint32_t SceneManager::getNextId(const Type type, const void* ptr) {
+uint32_t SceneManager::getNextId(const ObjectType type, const void* ptr) {
     const uint32_t id = autoIds[to_underlying(type)]++;
     if (ptr) {
         ptrIds[ptr] = id;
@@ -88,7 +88,7 @@ uint32_t SceneManager::getTextureId(const std::string &path) {
         return textureNameToId[path];
     }
 
-    return (textureNameToId[path] = autoIds[to_underlying(Type::Texture)]++);
+    return (textureNameToId[path] = autoIds[to_underlying(ObjectType::Texture)]++);
 }
 
 void SceneManager::recordDependency(const ObjectTypeID& from,
@@ -99,7 +99,7 @@ void SceneManager::recordDependency(const ObjectTypeID& from,
 protobuf::Manifest SceneManager::makeManifest() const {
     protobuf::Manifest manifest;
     /* add ids for all objects */
-    auto add_to_manifest = [this, &manifest](const SceneManager::Type& type) {
+    auto add_to_manifest = [this, &manifest](const ObjectType& type) {
         size_t total_ids = autoIds[to_underlying(type)];
         for (size_t id = 0; id < total_ids; ++id) {
             ObjectTypeID type_id{type, id};
@@ -114,17 +114,17 @@ protobuf::Manifest SceneManager::makeManifest() const {
         }
     };
 
-    add_to_manifest(SceneManager::Type::Treelet);
-    add_to_manifest(SceneManager::Type::TriangleMesh);
-    add_to_manifest(SceneManager::Type::Material);
-    add_to_manifest(SceneManager::Type::FloatTexture);
-    add_to_manifest(SceneManager::Type::SpectrumTexture);
-    add_to_manifest(SceneManager::Type::Texture);
+    add_to_manifest(ObjectType::Treelet);
+    add_to_manifest(ObjectType::TriangleMesh);
+    add_to_manifest(ObjectType::Material);
+    add_to_manifest(ObjectType::FloatTexture);
+    add_to_manifest(ObjectType::SpectrumTexture);
+    add_to_manifest(ObjectType::Texture);
 
     return manifest;
 }
 
-map<SceneManager::Type, vector<SceneManager::Object>>
+map<ObjectType, vector<SceneManager::Object>>
 SceneManager::listObjects() {
     if (!sceneFD.initialized()) {
         throw runtime_error("SceneManager is not initialized");
@@ -134,12 +134,12 @@ SceneManager::listObjects() {
         loadManifest();
     }
 
-    map<Type, vector<Object>> result;
+    map<ObjectType, vector<Object>> result;
     /* read the list of objects from the manifest file */
     for (auto& kv : dependencies) {
         const ObjectTypeID& id = kv.first;
         size_t size = 0;
-        if (id.type != Type::TriangleMesh) {
+        if (id.type != ObjectType::TriangleMesh) {
             string filename = getFileName(id.type, id.id);
             size = roost::file_size_at(*sceneFD, filename);
         }
@@ -163,7 +163,7 @@ SceneManager::listObjectDependencies() {
 }
 
 void SceneManager::loadManifest() {
-    auto reader = GetReader(SceneManager::Type::Manifest);
+    auto reader = GetReader(ObjectType::Manifest);
     protobuf::Manifest manifest;
     reader->read(&manifest);
     for (const protobuf::Manifest::Object& obj : manifest.objects()) {
@@ -173,10 +173,10 @@ void SceneManager::loadManifest() {
             dependencies[id].insert(from_protobuf(dep));
         }
     }
-    dependencies[ObjectTypeID{Type::Scene, 0}];
-    dependencies[ObjectTypeID{Type::Camera, 0}];
-    dependencies[ObjectTypeID{Type::Lights, 0}];
-    dependencies[ObjectTypeID{Type::Sampler, 0}];
+    dependencies[ObjectTypeID{ObjectType::Scene, 0}];
+    dependencies[ObjectTypeID{ObjectType::Camera, 0}];
+    dependencies[ObjectTypeID{ObjectType::Lights, 0}];
+    dependencies[ObjectTypeID{ObjectType::Sampler, 0}];
 }
 
 namespace global {

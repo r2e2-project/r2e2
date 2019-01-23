@@ -18,7 +18,7 @@ void usage(const char *argv0) {
 
 vector<shared_ptr<Light>> loadLights() {
     vector<shared_ptr<Light>> lights;
-    auto reader = global::manager.GetReader(SceneManager::Type::Lights);
+    auto reader = global::manager.GetReader(ObjectType::Lights);
 
     while (!reader->eof()) {
         protobuf::Light proto_light;
@@ -30,14 +30,14 @@ vector<shared_ptr<Light>> loadLights() {
 }
 
 shared_ptr<Sampler> loadSampler() {
-    auto reader = global::manager.GetReader(SceneManager::Type::Sampler);
+    auto reader = global::manager.GetReader(ObjectType::Sampler);
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);
     return sampler::from_protobuf(proto_sampler);
 }
 
 Scene loadFakeScene() {
-    auto reader = global::manager.GetReader(SceneManager::Type::Scene);
+    auto reader = global::manager.GetReader(ObjectType::Scene);
     protobuf::Scene proto_scene;
     reader->read(&proto_scene);
     return from_protobuf(proto_scene);

@@ -11,23 +11,23 @@
 
 namespace pbrt {
 
+enum class ObjectType {
+    Treelet,
+    TriangleMesh,
+    Lights,
+    Sampler,
+    Camera,
+    Scene,
+    Material,
+    FloatTexture,
+    SpectrumTexture,
+    Manifest,
+    Texture,
+    COUNT
+};
+
 class SceneManager {
   public:
-    enum class Type {
-        Treelet,
-        TriangleMesh,
-        Lights,
-        Sampler,
-        Camera,
-        Scene,
-        Material,
-        FloatTexture,
-        SpectrumTexture,
-        Manifest,
-        Texture,
-        COUNT
-    };
-
     using ObjectID = size_t;
 
     struct Object {
@@ -38,8 +38,8 @@ class SceneManager {
     };
 
     struct ObjectTypeID {
-        SceneManager::Type type;
-        SceneManager::ObjectID id;
+        ObjectType type;
+        ObjectID id;
 
         bool operator<(const ObjectTypeID& other) const {
             if (type == other.type) {
@@ -58,28 +58,28 @@ class SceneManager {
 
     void init(const std::string& scenePath);
     bool initialized() const { return sceneFD.initialized(); }
-    ReaderPtr GetReader(const Type type, const uint32_t id = 0) const;
-    WriterPtr GetWriter(const Type type, const uint32_t id = 0) const;
+    ReaderPtr GetReader(const ObjectType type, const uint32_t id = 0) const;
+    WriterPtr GetWriter(const ObjectType type, const uint32_t id = 0) const;
 
     /* used during dumping */
-    uint32_t getNextId(const Type type, const void* ptr = nullptr);
+    uint32_t getNextId(const ObjectType type, const void* ptr = nullptr);
     uint32_t getId(const void* ptr) const { return ptrIds.at(ptr); }
     bool hasId(const void* ptr) const { return ptrIds.count(ptr) > 0; }
     void recordDependency(const ObjectTypeID& from, const ObjectTypeID& to);
     protobuf::Manifest makeManifest() const;
 
-    uint32_t getTextureId(const std::string &path);
+    uint32_t getTextureId(const std::string& path);
 
-    std::map<Type, std::vector<Object>> listObjects();
+    std::map<ObjectType, std::vector<Object>> listObjects();
     std::map<ObjectTypeID, std::set<ObjectTypeID>> listObjectDependencies();
 
-    static std::string getFileName(const Type type, const uint32_t id);
+    static std::string getFileName(const ObjectType type, const uint32_t id);
     const std::string& getScenePath() { return scenePath; }
 
   private:
     void loadManifest();
 
-    size_t autoIds[to_underlying(Type::COUNT)] = {0};
+    size_t autoIds[to_underlying(ObjectType::COUNT)] = {0};
     std::string scenePath{};
     Optional<FileDescriptor> sceneFD{};
     std::unordered_map<const void*, uint32_t> ptrIds{};

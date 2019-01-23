@@ -575,7 +575,7 @@ TextureParams from_protobuf(
 
     for (auto& kv : texture_params.float_textures()) {
         auto texture_reader = global::manager.GetReader(
-            SceneManager::Type::FloatTexture, kv.second);
+            ObjectType::FloatTexture, kv.second);
         protobuf::FloatTexture texture;
         texture_reader->read(&texture);
         fTex[kv.first] = float_texture::from_protobuf(texture);
@@ -583,7 +583,7 @@ TextureParams from_protobuf(
     for (auto& kv : texture_params.spectrum_textures()) {
         // Load the texture
         auto texture_reader = global::manager.GetReader(
-            SceneManager::Type::SpectrumTexture, kv.second);
+            ObjectType::SpectrumTexture, kv.second);
         protobuf::SpectrumTexture texture;
         texture_reader->read(&texture);
         sTex[kv.first] = spectrum_texture::from_protobuf(texture);
@@ -596,7 +596,7 @@ TextureParams from_protobuf(
 SceneManager::ObjectTypeID from_protobuf(
     const protobuf::ObjectTypeID& objectTypeID) {
     return SceneManager::ObjectTypeID{
-        static_cast<SceneManager::Type>(objectTypeID.type()),
+        static_cast<ObjectType>(objectTypeID.type()),
         objectTypeID.id()};
 }
 

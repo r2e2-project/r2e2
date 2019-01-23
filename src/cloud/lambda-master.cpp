@@ -46,7 +46,7 @@ class interrupt_error : public runtime_error {
 void sigint_handler(int) { throw interrupt_error("killed by interupt signal"); }
 
 shared_ptr<Sampler> loadSampler() {
-    auto reader = global::manager.GetReader(SceneManager::Type::Sampler);
+    auto reader = global::manager.GetReader(ObjectType::Sampler);
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);
     return sampler::from_protobuf(proto_sampler);
@@ -72,7 +72,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     /* get the list of all objects and create entries for tracking their
      * assignment to workers for each */
     for (auto &kv : global::manager.listObjects()) {
-        const SceneManager::Type &type = kv.first;
+        const ObjectType &type = kv.first;
         const vector<SceneManager::Object> &objects = kv.second;
         for (const SceneManager::Object &obj : objects) {
             ObjectTypeID id{type, obj.id};
@@ -80,7 +80,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             info.id = obj.id;
             info.size = obj.size;
             sceneObjects.insert({id, info});
-            if (type == SceneManager::Type::Treelet) {
+            if (type == ObjectType::Treelet) {
                 unassignedTreelets.push(id);
                 treeletIds.insert(id);
             }
@@ -315,7 +315,7 @@ bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
 
     /* let's see if we have a worker that has that treelet */
     const SceneObjectInfo &info = sceneObjects.at(
-        SceneManager::ObjectTypeID{SceneManager::Type::Treelet, treeletId});
+        SceneManager::ObjectTypeID{ObjectType::Treelet, treeletId});
     if (info.workers.size() == 0) {
         cerr << "No worker found for treelet " << treeletId << endl;
         return false;
@@ -494,7 +494,7 @@ std::string LambdaMaster::getSummary() {
 }
 
 void LambdaMaster::loadCamera() {
-    auto reader = global::manager.GetReader(SceneManager::Type::Camera);
+    auto reader = global::manager.GetReader(ObjectType::Camera);
     protobuf::Camera proto_camera;
     reader->read(&proto_camera);
     camera = camera::from_protobuf(proto_camera, transformCache);
@@ -523,7 +523,7 @@ void LambdaMaster::assignObject(Worker &worker, const ObjectTypeID &object) {
 }
 
 void LambdaMaster::assignTreelet(Worker &worker, const ObjectTypeID &treelet) {
-    if (treelet.type != SceneManager::Type::Treelet) {
+    if (treelet.type != ObjectType::Treelet) {
         throw runtime_error("assignTreelet: object is not a treelet");
     }
 
@@ -535,10 +535,10 @@ void LambdaMaster::assignTreelet(Worker &worker, const ObjectTypeID &treelet) {
 }
 
 void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
-    assignObject(worker, ObjectTypeID{SceneManager::Type::Scene, 0});
-    assignObject(worker, ObjectTypeID{SceneManager::Type::Camera, 0});
-    assignObject(worker, ObjectTypeID{SceneManager::Type::Sampler, 0});
-    assignObject(worker, ObjectTypeID{SceneManager::Type::Lights, 0});
+    assignObject(worker, ObjectTypeID{ObjectType::Scene, 0});
+    assignObject(worker, ObjectTypeID{ObjectType::Camera, 0});
+    assignObject(worker, ObjectTypeID{ObjectType::Sampler, 0});
+    assignObject(worker, ObjectTypeID{ObjectType::Lights, 0});
 }
 
 void LambdaMaster::assignAllTreelets(Worker &worker) {
@@ -582,7 +582,7 @@ void LambdaMaster::assignTreelets(Worker &worker) {
     for (auto &tup : treeletPriority) {
         uint64_t id = std::get<1>(tup);
         uint64_t load = std::get<0>(tup);
-        ObjectTypeID treeletId{SceneManager::Type::Treelet, id};
+        ObjectTypeID treeletId{ObjectType::Treelet, id};
         const SceneObjectInfo &info = sceneObjects.at(treeletId);
 
         size_t size = treeletTotalSizes[id];

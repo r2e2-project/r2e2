@@ -267,7 +267,7 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
 
                     outQueueSize--;
                     global::workerStats.recordSentRay(SceneManager::ObjectTypeID{
-                        SceneManager::Type::Treelet, q.first});
+                        ObjectType::Treelet, q.first});
 
                     const string& rayStr =
                         protoutil::to_string(to_protobuf(ray));
@@ -408,11 +408,11 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
     vector<storage::GetRequest> requests;
     for (const protobuf::ObjectTypeID& objectTypeID : objects.object_ids()) {
         SceneManager::ObjectTypeID id = from_protobuf(objectTypeID);
-        if (id.type == SceneManager::Type::TriangleMesh) {
+        if (id.type == ObjectType::TriangleMesh) {
             /* triangle meshes are packed into treelets, so ignore */
             continue;
         }
-        if (id.type == SceneManager::Type::Treelet) {
+        if (id.type == ObjectType::Treelet) {
             treeletIds.insert(id.id);
         }
         string filePath = id.to_string();
@@ -429,7 +429,7 @@ void LambdaWorker::pushRayQueue(RayState&& state) {
     treelet_id = state.hit.get().treelet;
   }
   global::workerStats.recordWaitingRay(
-      SceneManager::ObjectTypeID{SceneManager::Type::Treelet, treelet_id});
+      SceneManager::ObjectTypeID{ObjectType::Treelet, treelet_id});
   rayQueue.push_back(move(state));
 }
 
@@ -443,7 +443,7 @@ RayState LambdaWorker::popRayQueue() {
         treeletID = state.hit.get().treelet;
     }
     global::workerStats.recordProcessedRay(
-        SceneManager::ObjectTypeID{SceneManager::Type::Treelet, treeletID});
+        SceneManager::ObjectTypeID{ObjectType::Treelet, treeletID});
     return state;
 }
 
@@ -564,12 +564,12 @@ bool LambdaWorker::processMessage(const Message& message) {
             if (reader.read(&proto)) {
                 if (proto.to_visit_size() > 0) {
                     SceneManager::ObjectTypeID treeletID{
-                        SceneManager::Type::Treelet,
+                        ObjectType::Treelet,
                         proto.to_visit(0).treelet()};
                     global::workerStats.recordReceivedRay(treeletID);
                 } else {
                     SceneManager::ObjectTypeID treeletID{
-                        SceneManager::Type::Treelet, proto.hit().treelet()};
+                        ObjectType::Treelet, proto.hit().treelet()};
                     global::workerStats.recordReceivedRay(treeletID);
                 }
                 pushRayQueue(move(from_protobuf(proto)));
@@ -598,7 +598,7 @@ void LambdaWorker::run() {
 }
 
 void LambdaWorker::loadCamera() {
-    auto reader = global::manager.GetReader(SceneManager::Type::Camera);
+    auto reader = global::manager.GetReader(ObjectType::Camera);
     protobuf::Camera proto_camera;
     reader->read(&proto_camera);
     camera = camera::from_protobuf(proto_camera, transformCache);
@@ -606,7 +606,7 @@ void LambdaWorker::loadCamera() {
 }
 
 void LambdaWorker::loadSampler() {
-    auto reader = global::manager.GetReader(SceneManager::Type::Sampler);
+    auto reader = global::manager.GetReader(ObjectType::Sampler);
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);
     sampler = sampler::from_protobuf(proto_sampler);
@@ -617,7 +617,7 @@ void LambdaWorker::loadSampler() {
 }
 
 void LambdaWorker::loadLights() {
-    auto reader = global::manager.GetReader(SceneManager::Type::Lights);
+    auto reader = global::manager.GetReader(ObjectType::Lights);
     while (!reader->eof()) {
         protobuf::Light proto_light;
         reader->read(&proto_light);
@@ -626,7 +626,7 @@ void LambdaWorker::loadLights() {
 }
 
 void LambdaWorker::loadFakeScene() {
-    auto reader = global::manager.GetReader(SceneManager::Type::Scene);
+    auto reader = global::manager.GetReader(ObjectType::Scene);
     protobuf::Scene proto_scene;
     reader->read(&proto_scene);
     fakeScene = make_unique<Scene>(from_protobuf(proto_scene));
