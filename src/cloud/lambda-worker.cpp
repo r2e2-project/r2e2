@@ -85,7 +85,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             return true;
         },
         []() { cerr << "Connection to coordinator failed." << endl; },
-        [this]() { throw ProgramFinished(); });
+        [this]() { this->terminate(); });
 
     udpConnection = loop.make_udp_connection(
         [this](shared_ptr<UDPConnection>, Address&& addr, string&& data) {
@@ -93,7 +93,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             return true;
         },
         []() { cerr << "UDP connection to coordinator failed." << endl; },
-        []() { throw ProgramFinished(); }, true);
+        [this]() { this->terminate(); }, true);
 
     /* trace rays */
     loop.poller().add_action(Poller::Action(
@@ -591,7 +591,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 }
 
 void LambdaWorker::run() {
-    while (true) {
+    while (!terminated) {
         auto res = loop.loop_once().result;
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }

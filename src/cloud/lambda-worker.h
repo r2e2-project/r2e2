@@ -31,6 +31,7 @@ class LambdaWorker {
 
     void run();
     void writeImage();
+    void terminate() { terminated = true; }
 
   private:
     struct Worker {
@@ -114,6 +115,8 @@ class LambdaWorker {
     TimerFD peerTimer;
     TimerFD statusPrintTimer;
     TimerFD workerStatsTimer;
+
+    bool terminated{false};
 };
 
 }  // namespace pbrt
