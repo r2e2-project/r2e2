@@ -123,6 +123,7 @@ class LambdaMaster {
 
     /* Scene Objects */
     Bounds2i sampleBounds;
+    std::vector<uint32_t> tiles;
     std::map<ObjectKey, SceneObjectInfo> sceneObjects;
 
     std::set<ObjectKey> treeletIds;

@@ -1,10 +1,13 @@
 #include "lambda-master.h"
 
 #include <glog/logging.h>
+#include <algorithm>
 #include <deque>
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <numeric>
+#include <random>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -140,6 +143,10 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     Vector2i sampleExtent = sampleBounds.Diagonal();
     Point2i nTiles((sampleExtent.x + TILE_SIZE - 1) / TILE_SIZE,
                    (sampleExtent.y + TILE_SIZE - 1) / TILE_SIZE);
+    tiles.resize(nTiles.x * nTiles.y);
+    iota(tiles.begin(), tiles.end(), 0);
+    shuffle(tiles.begin(), tiles.end(), mt19937{random_device{}()});
+
     LOG(INFO) << "Total tiles: " << nTiles.x * nTiles.y;
 
     totalPaths =
@@ -237,8 +244,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         /* assign a tile to the worker, if we need to */
         if (currentWorkerID <= nTiles.x * nTiles.y) {
             /* compute the crop window */
-            const int tileX = (currentWorkerID - 1) % nTiles.x;
-            const int tileY = (currentWorkerID - 1) / nTiles.x;
+            const int tileX = (tiles[currentWorkerID - 1]) % nTiles.x;
+            const int tileY = (tiles[currentWorkerID - 1]) / nTiles.x;
             const int x0 = this->sampleBounds.pMin.x + tileX * TILE_SIZE;
             const int x1 = min(x0 + TILE_SIZE, this->sampleBounds.pMax.x);
             const int y0 = this->sampleBounds.pMin.y + tileY * TILE_SIZE;
