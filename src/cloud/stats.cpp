@@ -23,6 +23,7 @@ void RayStats::merge(const RayStats& other) {
     receivedRays += other.receivedRays;
     waitingRays += other.waitingRays;
     processedRays += other.processedRays;
+
     for (int i = 0; i < NUM_PERCENTILES; ++i) {
         traceDurationPercentiles[i] += other.traceDurationPercentiles[i];
     }
@@ -67,6 +68,7 @@ void WorkerStats::reset() {
 void WorkerStats::merge(const WorkerStats& other) {
     _finishedPaths += other._finishedPaths;
     aggregateStats.merge(other.aggregateStats);
+    queueStats = other.queueStats;
     for (const auto& kv : other.objectStats) {
         objectStats[kv.first].merge(kv.second);
     }

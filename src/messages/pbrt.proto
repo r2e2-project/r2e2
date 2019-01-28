@@ -276,6 +276,13 @@ message RayStats {
     repeated float ray_durations = 6;
 }
 
+message QueueStats {
+    uint64 ray = 1;
+    uint64 finished = 2;
+    uint64 pending = 3;
+    uint64 out = 4;
+}
+
 message WorkerStats {
   message ObjectRayStats {
     ObjectKey id = 1;
@@ -284,9 +291,10 @@ message WorkerStats {
 
   uint64 finished_paths = 1;
   RayStats aggregate_stats = 2;
-  repeated ObjectRayStats object_stats = 3;
-  map<string, float> time_per_action = 4;
-  float total_time = 5;
+  QueueStats queue_stats = 3;
+  repeated ObjectRayStats object_stats = 4;
+  map<string, float> time_per_action = 5;
+  float total_time = 6;
 }
 
 // Materials & Textures

@@ -307,10 +307,20 @@ protobuf::RayStats to_protobuf(const RayStats& stats) {
   return proto;
 }
 
+protobuf::QueueStats to_protobuf(const QueueStats& stats) {
+    protobuf::QueueStats proto;
+    proto.set_ray(stats.ray);
+    proto.set_finished(stats.finished);
+    proto.set_pending(stats.pending);
+    proto.set_out(stats.out);
+    return proto;
+}
+
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
     protobuf::WorkerStats proto;
     proto.set_finished_paths(stats._finishedPaths);
     (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
+    (*proto.mutable_queue_stats()) = to_protobuf(stats.queueStats);
     for (const auto& kv : stats.objectStats) {
         protobuf::WorkerStats::ObjectRayStats* ray_stats =
             proto.add_object_stats();
@@ -863,10 +873,20 @@ RayStats from_protobuf(const protobuf::RayStats& proto) {
     return stats;
 }
 
+QueueStats from_protobuf(const protobuf::QueueStats& proto) {
+    QueueStats stats;
+    stats.ray = proto.ray();
+    stats.finished = proto.finished();
+    stats.pending = proto.pending();
+    stats.out = proto.out();
+    return stats;
+}
+
 WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
     WorkerStats stats;
     stats._finishedPaths = proto.finished_paths();
     stats.aggregateStats = from_protobuf(proto.aggregate_stats());
+    stats.queueStats = from_protobuf(proto.queue_stats());
     for (const protobuf::WorkerStats::ObjectRayStats& object_stats :
          proto.object_stats()) {
         auto id = from_protobuf(object_stats.id());

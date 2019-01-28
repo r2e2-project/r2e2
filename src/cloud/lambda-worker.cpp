@@ -137,6 +137,13 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         workerStatsTimer.fd, Direction::In,
         [this]() {
             workerStatsTimer.reset();
+
+            auto & qStats = global::workerStats.queueStats;
+            qStats.ray = rayQueue.size();
+            qStats.finished = finishedQueue.size();
+            qStats.pending = pendingQueueSize;
+            qStats.out = outQueueSize;
+
             auto proto = to_protobuf(global::workerStats);
             Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
             coordinatorConnection->enqueue_write(message.str());
@@ -220,6 +227,8 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
             for (auto& newRay : newRays) {
                 processedRays.push_back(move(newRay));
             }
+        } else {
+            throw runtime_error("invalid ray in ray queue");
         }
     }
 
@@ -580,7 +589,7 @@ bool LambdaWorker::processMessage(const Message& message) {
     }
 
     case OpCode::Bye:
-        throw ProgramFinished();
+        terminate();
         break;
 
     default:
@@ -672,8 +681,6 @@ int main(int argc, char const* argv[]) {
         const uint16_t coordinatorPort = stoi(argv[2]);
         LambdaWorker worker{argv[1], coordinatorPort, argv[3]};
         worker.run();
-    } catch (const ProgramFinished&) {
-        return EXIT_SUCCESS;
     } catch (const exception& e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;

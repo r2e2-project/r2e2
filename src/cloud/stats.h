@@ -38,9 +38,18 @@ struct RayStats {
     void merge(const RayStats& other);
 };
 
+struct QueueStats {
+    uint64_t ray{0};
+    uint64_t finished{0};
+    uint64_t pending{0};
+    uint64_t out{0};
+};
+
 struct WorkerStats {
     uint64_t _finishedPaths{0};
+
     RayStats aggregateStats;
+    QueueStats queueStats;
     std::map<SceneManager::ObjectKey, RayStats> objectStats;
 
     std::map<std::string, double> timePerAction;
