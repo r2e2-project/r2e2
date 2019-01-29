@@ -314,6 +314,7 @@ protobuf::QueueStats to_protobuf(const QueueStats& stats) {
     proto.set_pending(stats.pending);
     proto.set_out(stats.out);
     proto.set_connecting(stats.connecting);
+    proto.set_connected(stats.connected);
     return proto;
 }
 
@@ -881,6 +882,7 @@ QueueStats from_protobuf(const protobuf::QueueStats& proto) {
     stats.pending = proto.pending();
     stats.out = proto.out();
     stats.connecting = proto.connecting();
+    stats.connected = proto.connected();
     return stats;
 }
 

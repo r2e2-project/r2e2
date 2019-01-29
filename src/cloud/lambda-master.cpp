@@ -183,6 +183,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                  << " / pending: " << workerStats.queueStats.pending
                  << " / out: " << workerStats.queueStats.out
                  << " / connecting: " << workerStats.queueStats.connecting
+                 << " / connected: " << workerStats.queueStats.connected
                  << endl;
 
             ostringstream oss;
@@ -643,6 +644,7 @@ void LambdaMaster::aggregateQueueStats() {
         workerStats.queueStats.pending += worker.stats.queueStats.pending;
         workerStats.queueStats.out += worker.stats.queueStats.out;
         workerStats.queueStats.connecting += worker.stats.queueStats.connecting;
+        workerStats.queueStats.connected += worker.stats.queueStats.connected;
     }
 }
 
