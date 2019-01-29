@@ -173,8 +173,17 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         [this]() {
             statusPrintTimer.reset();
 
+            aggregateQueueStats();
+
             const auto elapsedTime =
                 duration_cast<seconds>(steady_clock::now() - startTime).count();
+
+            cerr << "ray: " << workerStats.queueStats.ray
+                 << " / finished: " << workerStats.queueStats.finished
+                 << " / pending: " << workerStats.queueStats.pending
+                 << " / out: " << workerStats.queueStats.out
+                 << " / connecting: " << workerStats.queueStats.connecting
+                 << endl;
 
             ostringstream oss;
             oss << "\033[0m"
@@ -622,6 +631,19 @@ HTTPRequest LambdaMaster::generateRequest() {
                LambdaInvocationRequest::InvocationType::EVENT,
                LambdaInvocationRequest::LogType::NONE)
         .to_http_request();
+}
+
+void LambdaMaster::aggregateQueueStats() {
+    workerStats.queueStats = QueueStats();
+
+    for (const auto &kv : workers) {
+        const auto &worker = kv.second;
+        workerStats.queueStats.ray += worker.stats.queueStats.ray;
+        workerStats.queueStats.finished += worker.stats.queueStats.finished;
+        workerStats.queueStats.pending += worker.stats.queueStats.pending;
+        workerStats.queueStats.out += worker.stats.queueStats.out;
+        workerStats.queueStats.connecting += worker.stats.queueStats.connecting;
+    }
 }
 
 void usage(const char *argv0) {

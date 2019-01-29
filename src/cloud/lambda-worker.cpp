@@ -138,11 +138,15 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() {
             workerStatsTimer.reset();
 
-            auto & qStats = global::workerStats.queueStats;
+            auto& qStats = global::workerStats.queueStats;
             qStats.ray = rayQueue.size();
             qStats.finished = finishedQueue.size();
             qStats.pending = pendingQueueSize;
             qStats.out = outQueueSize;
+            qStats.connecting =
+                count_if(peers.begin(), peers.end(), [](const auto& peer) {
+                    return peer.second.state == Worker::State::Connecting;
+                });
 
             auto proto = to_protobuf(global::workerStats);
             Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
@@ -239,7 +243,7 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
         const TreeletId nextTreelet = ray.currentTreelet();
 
         if (treeletIds.count(nextTreelet)) {
-          pushRayQueue(move(ray));
+            pushRayQueue(move(ray));
         } else {
             if (treeletToWorker.count(nextTreelet)) {
                 outQueue[nextTreelet].push_back(move(ray));
@@ -275,8 +279,8 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
                     q.second.pop_front();
 
                     outQueueSize--;
-                    global::workerStats.recordSentRay(SceneManager::ObjectKey{
-                        ObjectType::Treelet, q.first});
+                    global::workerStats.recordSentRay(
+                        SceneManager::ObjectKey{ObjectType::Treelet, q.first});
 
                     const string& rayStr =
                         protoutil::to_string(to_protobuf(ray));
@@ -431,15 +435,15 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
 }
 
 void LambdaWorker::pushRayQueue(RayState&& state) {
-  uint32_t treelet_id;
-  if (state.toVisit.size() > 0) {
-      treelet_id = state.toVisit.front().treelet;
-  } else {
-    treelet_id = state.hit.get().treelet;
-  }
-  global::workerStats.recordWaitingRay(
-      SceneManager::ObjectKey{ObjectType::Treelet, treelet_id});
-  rayQueue.push_back(move(state));
+    uint32_t treelet_id;
+    if (state.toVisit.size() > 0) {
+        treelet_id = state.toVisit.front().treelet;
+    } else {
+        treelet_id = state.hit.get().treelet;
+    }
+    global::workerStats.recordWaitingRay(
+        SceneManager::ObjectKey{ObjectType::Treelet, treelet_id});
+    rayQueue.push_back(move(state));
 }
 
 RayState LambdaWorker::popRayQueue() {
@@ -573,12 +577,11 @@ bool LambdaWorker::processMessage(const Message& message) {
             if (reader.read(&proto)) {
                 if (proto.to_visit_size() > 0) {
                     SceneManager::ObjectKey treeletID{
-                        ObjectType::Treelet,
-                        proto.to_visit(0).treelet()};
+                        ObjectType::Treelet, proto.to_visit(0).treelet()};
                     global::workerStats.recordReceivedRay(treeletID);
                 } else {
-                    SceneManager::ObjectKey treeletID{
-                        ObjectType::Treelet, proto.hit().treelet()};
+                    SceneManager::ObjectKey treeletID{ObjectType::Treelet,
+                                                      proto.hit().treelet()};
                     global::workerStats.recordReceivedRay(treeletID);
                 }
                 pushRayQueue(move(from_protobuf(proto)));

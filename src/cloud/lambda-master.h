@@ -92,6 +92,8 @@ class LambdaMaster {
 
     void updateObjectUsage(const Worker &worker);
 
+    void aggregateQueueStats();
+
     /* AWS Lambda */
     HTTPRequest generateRequest();
 

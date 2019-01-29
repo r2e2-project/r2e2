@@ -281,6 +281,7 @@ message QueueStats {
     uint64 finished = 2;
     uint64 pending = 3;
     uint64 out = 4;
+    uint64 connecting = 5;
 }
 
 message WorkerStats {

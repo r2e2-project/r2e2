@@ -43,6 +43,7 @@ struct QueueStats {
     uint64_t finished{0};
     uint64_t pending{0};
     uint64_t out{0};
+    uint64_t connecting{0};
 };
 
 struct WorkerStats {
