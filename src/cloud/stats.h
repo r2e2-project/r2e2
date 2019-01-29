@@ -62,10 +62,6 @@ struct WorkerStats {
 
     timepoint_t intervalStart{now()};
 
-    uint64_t bytesSent{0};
-    uint64_t bytesReceived{0};
-    std::chrono::milliseconds interval;
-
     timepoint_t intervalStart{now()};
 
     uint64_t finishedPaths() const { return _finishedPaths; }

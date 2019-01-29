@@ -74,6 +74,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     roost::chdir(workingDirectory.name());
     FLAGS_log_dir = ".";
     google::InitGoogleLogging(logBase.c_str());
+    global::workerStats.start = now();
 
     PbrtOptions.nThreads = 1;
     global::manager.init(".");

@@ -82,6 +82,7 @@ void WorkerStats::reset() {
     intervalStart = now();
     intervalsPerAction.clear();
     intervalStart = now();
+    intervalsPerAction.clear();
 }
 
 void WorkerStats::merge(const WorkerStats& other) {
