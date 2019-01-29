@@ -332,12 +332,20 @@ protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
         (*ray_stats->mutable_id()) = to_protobuf(kv.first);
         (*ray_stats->mutable_stats()) = to_protobuf(kv.second);
     }
-
-    proto.set_bytes_sent(stats.bytesSent);
-    proto.set_bytes_received(stats.bytesReceived);
-    proto.set_interval_ms(
-        duration_cast<milliseconds>(now() - stats.intervalStart).count());
-
+    for (const auto& kv : stats.timePerAction) {
+      (*proto.mutable_time_per_action())[kv.first] = kv.second;
+    }
+    for (const auto& kv : stats.intervalsPerAction) {
+        protobuf::WorkerStats::ActionIntervals* action_intervals =
+            proto.add_intervals_per_action();
+        action_intervals->set_name(kv.first);
+        for (std::tuple<uint64_t, uint64_t> interval : kv.second) {
+            protobuf::WorkerStats::Interval* proto_interval =
+                action_intervals->add_intervals();
+            proto_interval->set_start(std::get<0>(interval));
+            proto_interval->set_end(std::get<1>(interval));
+        }
+    }
     return proto;
 }
 
@@ -910,10 +918,13 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
     for (const auto& kv : proto.time_per_action()) {
         stats.timePerAction[kv.first] = kv.second;
     }
-
-    stats.bytesSent = proto.bytes_sent();
-    stats.bytesReceived = proto.bytes_received();
-    stats.interval = milliseconds{proto.interval_ms()};
+    for (const auto& action_interval : proto.intervals_per_action()) {
+      std::string name = action_interval.name();
+      for (const auto& interval : action_interval.intervals()) {
+          stats.intervalsPerAction[name].push_back(
+              std::make_tuple(interval.start(), interval.end()));
+      }
+    }
 
     return stats;
 }

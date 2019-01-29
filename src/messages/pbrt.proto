@@ -291,15 +291,22 @@ message WorkerStats {
     RayStats stats = 2;
   }
 
+  message Interval {
+    uint64 start = 1;
+    uint64 end = 2;
+  }
+
+  message ActionIntervals {
+    string name = 1;
+    repeated Interval intervals = 2;
+  }
+
   uint64 finished_paths = 1;
   RayStats aggregate_stats = 2;
   QueueStats queue_stats = 3;
   repeated ObjectRayStats object_stats = 4;
   map<string, float> time_per_action = 5;
-
-  uint64 bytes_sent = 6;
-  uint64 bytes_received = 7;
-  uint64 interval_ms = 8;
+  repeated ActionIntervals intervals_per_action = 6;
 }
 
 // Materials & Textures

@@ -5,6 +5,7 @@
 #include <deque>
 #include <iomanip>
 #include <iostream>
+#include <fstream>
 #include <memory>
 #include <numeric>
 #include <random>
@@ -488,7 +489,7 @@ string LambdaMaster::getSummary() {
                         .count();
 
     oss << endl
-        << "Summary: " << endl
+        << "Summary: "
         << " finished paths: " << workerStats.finishedPaths() << " (" << fixed
         << setprecision(1) << (100.0 * workerStats.finishedPaths() / totalPaths)
         << "%)"
@@ -502,8 +503,82 @@ string LambdaMaster::getSummary() {
         << "%)"
         << " | time: " << setfill('0') << setw(2) << (duration / 60) << ":"
         << setw(2) << (duration % 60);
+    oss << endl << endl;
+
+    /* Print worker intervals */
+    {
+        double totalTime = durations[durations.size() - 1] / 1000.0;
+
+        auto printActionTimes = [&](const WorkerStats &stats, double normalizer = 1.0) {
+            for (auto &kv : stats.timePerAction) {
+                auto actionTime = kv.second / 1e9 / normalizer;
+                oss << setfill(' ') << setw(20) << kv.first << ": " << setw(6)
+                    << setprecision(2) << actionTime / totalTime * 100.0 << ", "
+                    << setw(8) << setprecision(5) << actionTime << " seconds"
+                    << endl;
+            }
+            oss << endl;
+        };
+        oss << "Average actions:" << endl;
+        printActionTimes(workerStats, workers.size());
+
+        uint64_t maxWorkerID = 0;
+        double maxActionsLength = -1;
+        for (auto &kv : workers) {
+            Worker &worker = kv.second;
+            double actionsSum = 0;
+            for (auto &kv : worker.stats.timePerAction) {
+                auto actionTime = kv.second / 1e9;
+                actionsSum += actionTime;
+            }
+            if (actionsSum > maxActionsLength) {
+              maxWorkerID = worker.id;
+              maxActionsLength = actionsSum;
+            }
+        }
+        if (maxActionsLength > 0) {
+            oss << "Most busy worker intervals:" << endl;
+            printActionTimes(workers.at(maxWorkerID).stats);
+        }
+    }
+
+    /* Print ray duration percentiles */
+    vector<double> sortedRayDurations = workerStats.aggregateStats.rayDurations;
+    sort(sortedRayDurations.begin(), sortedRayDurations.end());
+    ofstream rayDurationsFile("ray_durations.txt");
+    oss << "Percentiles:" << endl;
+    if (sortedRayDurations.size() > 0) {
+        for (double d : sortedRayDurations) {
+            rayDurationsFile << d << " ";
+        }
+        for (size_t i = 0; i < NUM_PERCENTILES; ++i) {
+            oss << setprecision(5) << RAY_PERCENTILES[i] << " = "
+                << sortedRayDurations[sortedRayDurations.size() *
+                                      RAY_PERCENTILES[i]] /
+                       1e6
+                << " ms" << endl;
+        }
+    }
     oss << endl;
 
+    /* write out worker intervals */
+    ofstream workerIntervals("worker_intervals.txt");
+    for (auto &worker_kv : workers) {
+        const auto &worker = worker_kv.second;
+        const auto &intervals = worker.stats.intervalsPerAction;
+        workerIntervals << "worker " << worker.id << " " << intervals.size() << " ";
+        for (auto &kv : intervals) {
+            workerIntervals << kv.first << " ";
+            workerIntervals << kv.second.size() << " ";
+            for (tuple<uint64_t, uint64_t> tup : kv.second) {
+                workerIntervals << std::get<0>(tup) << "," << std::get<1>(tup)
+                                << " ";
+            }
+        }
+        workerIntervals << endl;
+    }
+
+>>>>>>> Add support for generating traces of worker actions
     return oss.str();
 }
 

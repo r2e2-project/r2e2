@@ -13,8 +13,9 @@ using timepoint_t = std::chrono::time_point<std::chrono::system_clock>;
 inline timepoint_t now() { return std::chrono::system_clock::now(); };
 
 #define PER_RAY_STATS
+#define PER_INTERVAL_STATS
 
-const double RAY_PERCENTILES[] = {0.5, 0.9, 0.99, 0.999};
+const double RAY_PERCENTILES[] = {0.5, 0.9, 0.99, 0.999, 0.9999};
 constexpr size_t NUM_PERCENTILES = sizeof(RAY_PERCENTILES) / sizeof(double);
 
 struct RayStats {
@@ -27,7 +28,8 @@ struct RayStats {
     /* rays processed for this scene object */
     uint64_t processedRays{0};
 
-    double traceDurationPercentiles[NUM_PERCENTILES] = {0.0, 0.0, 0.0, 0.0};
+    double traceDurationPercentiles[NUM_PERCENTILES] = {0.0, 0.0, 0.0, 0.0,
+                                                        0.0};
     std::vector<double> rayDurations;
 
     void reset();
@@ -51,6 +53,8 @@ struct WorkerStats {
     std::map<SceneManager::ObjectKey, RayStats> objectStats;
 
     std::map<std::string, double> timePerAction;
+    std::map<std::string, std::vector<std::tuple<uint64_t, uint64_t>>>
+        intervalsPerAction;
 
     uint64_t bytesSent{0};
     uint64_t bytesReceived{0};
@@ -69,6 +73,8 @@ struct WorkerStats {
     void recordReceivedRay(const SceneManager::ObjectKey& type);
     void recordWaitingRay(const SceneManager::ObjectKey& type);
     void recordProcessedRay(const SceneManager::ObjectKey& type);
+    void recordRayInterval(const SceneManager::ObjectKey& type,
+                           timepoint_t start, timepoint_t end);
 
     void reset();
 
