@@ -36,7 +36,7 @@ S3PutRequest::S3PutRequest( const AWSCredentials & credentials,
                             const string & content_hash )
   : AWSRequest( credentials, region, "PUT /" + object + " HTTP/1.1", contents )
 {
-  headers_[ "x-amz-acl" ] = "public-read";
+  headers_[ "x-amz-acl" ] = "private";
   headers_[ "host" ] = endpoint;
   headers_[ "content-length" ] = to_string( contents.length() );
 
@@ -159,9 +159,10 @@ void S3Client::upload_files( const string & bucket,
               s3.write( outgoing_request.str() );
             }
 
+            const size_t total = responses.pending_requests();
             size_t response_count = 0;
 
-            while ( responses.pending_requests() ) {
+            while ( response_count < total ) {
               /* drain responses */
               responses.parse( s3.read() );
               if ( not responses.empty() ) {

@@ -1,5 +1,6 @@
 #include "lambda-worker.h"
 
+#include <glog/logging.h>
 #include <sys/timerfd.h>
 #include <cstdlib>
 #include <iterator>
@@ -66,9 +67,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       workerStatsTimer(WORKER_STATS_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
+    roost::chdir(workingDirectory.name());
+    FLAGS_log_dir = ".";
+    google::InitGoogleLogging(logBase.c_str());
 
     PbrtOptions.nThreads = 1;
-    roost::chdir(workingDirectory.name());
     global::manager.init(".");
 
     treelet = make_shared<CloudBVH>();
@@ -84,7 +87,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             this->messageParser.parse(data);
             return true;
         },
-        []() { cerr << "Connection to coordinator failed." << endl; },
+        []() { LOG(INFO) << "Connection to coordinator failed."; },
         [this]() { this->terminate(); });
 
     udpConnection = loop.make_udp_connection(
@@ -92,7 +95,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             this->messageParser.parse(data);
             return true;
         },
-        []() { cerr << "UDP connection to coordinator failed." << endl; },
+        []() { LOG(INFO) << "UDP connection to coordinator failed."; },
         [this]() { this->terminate(); }, true);
 
     /* trace rays */
@@ -164,11 +167,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                        [this]() {
                            statusPrintTimer.reset();
 
-                           cerr << "ray: " << rayQueue.size()
-                                << " / finished: " << finishedQueue.size()
-                                << " / pending: " << pendingQueueSize
-                                << " / out: " << outQueueSize
-                                << " / peers: " << peers.size() << endl;
+                           LOG(INFO) << "ray: " << rayQueue.size()
+                                     << " / finished: " << finishedQueue.size()
+                                     << " / pending: " << pendingQueueSize
+                                     << " / out: " << outQueueSize
+                                     << " / peers: " << peers.size();
 
                            return ResultType::Continue;
                        },
@@ -665,11 +668,25 @@ void LambdaWorker::writeImage() {
     camera->film->WriteImage();
 }
 
+void LambdaWorker::uploadLog() const {
+    if (!workerId.initialized()) return;
+
+    google::FlushLogFiles(google::INFO);
+
+    vector<storage::PutRequest> putLogRequest = {
+        {infoLogName, logPrefix + to_string(*workerId)}};
+
+    storageBackend->put(putLogRequest);
+}
+
 void usage(const char* argv0) {
     cerr << "Usage: " << argv0 << " DESTINATION PORT STORAGE-BACKEND" << endl;
 }
 
 int main(int argc, char const* argv[]) {
+    int exit_status = EXIT_SUCCESS;
+    unique_ptr<LambdaWorker> worker;
+
     try {
         if (argc <= 0) {
             abort();
@@ -680,15 +697,17 @@ int main(int argc, char const* argv[]) {
             return EXIT_FAILURE;
         }
 
-        FLAGS_logtostderr = 1;
-        google::InitGoogleLogging(argv[0]);
         const uint16_t coordinatorPort = stoi(argv[2]);
-        LambdaWorker worker{argv[1], coordinatorPort, argv[3]};
-        worker.run();
+        worker = make_unique<LambdaWorker>(argv[1], coordinatorPort, argv[3]);
+        worker->run();
     } catch (const exception& e) {
-        print_exception(argv[0], e);
-        return EXIT_FAILURE;
+        LOG(INFO) << argv[0] << ": " << e.what();
+        exit_status = EXIT_FAILURE;
     }
 
-    return EXIT_SUCCESS;
+    if (worker) {
+        worker->uploadLog();
+    }
+
+    return exit_status;
 }

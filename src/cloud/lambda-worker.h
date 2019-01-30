@@ -32,6 +32,7 @@ class LambdaWorker {
     void run();
     void writeImage();
     void terminate() { terminated = true; }
+    void uploadLog() const;
 
   private:
     struct Worker {
@@ -70,6 +71,11 @@ class LambdaWorker {
     void getObjects(const protobuf::GetObjects& objects);
     void pushRayQueue(RayState&& state);
     RayState popRayQueue();
+
+    /* Logging */
+    const std::string logBase{"pbrt-worker"};
+    const std::string infoLogName{logBase + ".INFO"};
+    const std::string logPrefix{"logs/"};
 
     Address coordinatorAddr;
     ExecutionLoop loop{};
