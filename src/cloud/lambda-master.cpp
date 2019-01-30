@@ -620,14 +620,12 @@ void LambdaMaster::assignTreelets(Worker &worker) {
 void LambdaMaster::updateObjectUsage(const Worker &worker) {}
 
 HTTPRequest LambdaMaster::generateRequest() {
-    const string functionName = "pbrt-lambda-function";
-
     protobuf::InvocationPayload proto;
     proto.set_storage_backend(storageBackend);
     proto.set_coordinator(publicAddress);
 
     return LambdaInvocationRequest(
-               awsCredentials, awsRegion, functionName,
+               awsCredentials, awsRegion, lambdaFunctionName,
                protoutil::to_json(proto),
                LambdaInvocationRequest::InvocationType::EVENT,
                LambdaInvocationRequest::LogType::NONE)

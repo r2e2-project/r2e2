@@ -22,6 +22,7 @@
 #include "net/http_request.h"
 #include "util/optional.h"
 #include "util/timerfd.h"
+#include "util/util.h"
 
 namespace pbrt {
 
@@ -96,6 +97,9 @@ class LambdaMaster {
 
     /* AWS Lambda */
     HTTPRequest generateRequest();
+
+    const std::string lambdaFunctionName{
+        safe_getenv_or("PBRT_LAMBDA_FUNCTION", "pbrt-lambda-function")};
 
     const std::string scenePath;
     const uint32_t numberOfLambdas;

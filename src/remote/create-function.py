@@ -52,6 +52,7 @@ def main():
     parser.add_argument('--role', dest='role', action='store',
                         default=os.environ.get('PBRT_LAMBDA_ROLE'))
     parser.add_argument('--region', dest='region', default=os.environ.get('AWS_REGION'), action='store')
+    parser.add_argument('--name', dest='name', default=os.environ.get('PBRT_LAMBDA_FUNCTION', "pbrt-lambda-function"), action='store')
     parser.add_argument('--pbrt-lambda-worker', dest='pbrt_lambda_worker',
                         default=shutil.which("pbrt-lambda-worker"))
 
@@ -63,7 +64,7 @@ def main():
     if not args.role:
         raise Exception("Please provide function role (or set PBRT_LAMBDA_ROLE).")
 
-    function_name = 'pbrt-lambda-function'
+    function_name = args.name
     function_file = "{}.zip".format(function_name)
     try:
         create_function_package(function_file, args.pbrt_lambda_worker)
