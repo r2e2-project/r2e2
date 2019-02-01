@@ -344,6 +344,7 @@ Poller::Action::Result::Type LambdaWorker::handlePeers() {
         case Worker::State::Connecting: {
             auto message = createConnectionRequest(peer);
             udpConnection->enqueue_datagram(peer.address, message.str());
+            peer.tries++;
             break;
         }
 

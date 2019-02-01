@@ -42,6 +42,7 @@ class LambdaWorker {
         Address address;
         State state{State::Connecting};
         int32_t seed{0};
+        uint32_t tries{0};
 
         std::set<TreeletId> treelets{};
 

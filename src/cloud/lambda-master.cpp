@@ -105,7 +105,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     }
 
     udpConnection = loop.make_udp_connection(
-        [&](shared_ptr<UDPConnection> conn, Address &&addr, string &&data) {
+        [&](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
             Message message{data};
             if (message.opcode() != OpCode::ConnectionRequest) return true;
 
@@ -131,7 +131,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             resp.set_your_seed(req.my_seed());
             Message responseMsg{OpCode::ConnectionResponse,
                                 protoutil::to_string(resp)};
-            conn->enqueue_datagram(addr, responseMsg.str());
+            worker.connection->enqueue_write(responseMsg.str());
 
             return true;
         },
