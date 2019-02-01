@@ -377,13 +377,12 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 
         {
             /* send the list of assigned objects to the worker */
-            protobuf::GetObjects getObjectsProto;
+            protobuf::GetObjects proto;
             for (const ObjectKey &id : worker.objects) {
-                *getObjectsProto.add_object_ids() = to_protobuf(id);
+                *proto.add_object_ids() = to_protobuf(id);
             }
-            Message getObjectsMessage{Message::OpCode::GetObjects,
-                                      protoutil::to_string(getObjectsProto)};
-            worker.connection->enqueue_write(getObjectsMessage.str());
+            Message message{OpCode::GetObjects, protoutil::to_string(proto)};
+            worker.connection->enqueue_write(message.str());
         }
 
         if (worker.tile.initialized()) {

@@ -38,7 +38,7 @@ namespace meow {
         "Hey",
         "Ping",
         "Pong",
-        "Get",
+        "GetObjects",
         "GenerateRays",
         "GetWorker",
         "ConnectTo",
@@ -46,6 +46,7 @@ namespace meow {
         "ConnectionResponse",
         "WorkerStats",
         "SendRays",
+        "FinishedRays",
         "Bye"};
 
   private:
