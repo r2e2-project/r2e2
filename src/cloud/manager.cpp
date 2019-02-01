@@ -14,8 +14,7 @@ static const string TYPE_PREFIXES[] = {
     "MAT", "FTEX", "STEX",   "MANIFEST", "TEX"};
 
 static_assert(
-    sizeof(TYPE_PREFIXES) / sizeof(string) ==
-        to_underlying(ObjectType::COUNT),
+    sizeof(TYPE_PREFIXES) / sizeof(string) == to_underlying(ObjectType::COUNT),
     "COUNT enum value for SceneManager Type must be the last entry in "
     "the enum declaration.");
 
@@ -56,7 +55,6 @@ unique_ptr<protobuf::RecordWriter> SceneManager::GetWriter(
 string SceneManager::getFileName(const ObjectType type, const uint32_t id) {
     switch (type) {
     case ObjectType::Treelet:
-    case ObjectType::TriangleMesh:
     case ObjectType::Material:
     case ObjectType::FloatTexture:
     case ObjectType::SpectrumTexture:
@@ -69,6 +67,10 @@ string SceneManager::getFileName(const ObjectType type, const uint32_t id) {
     case ObjectType::Scene:
     case ObjectType::Manifest:
         return TYPE_PREFIXES[to_underlying(type)];
+
+    case ObjectType::TriangleMesh:
+        throw runtime_error(
+            "TriangleMesh is not supposed to be a separate file");
 
     default:
         throw runtime_error("invalid object type");
@@ -83,12 +85,13 @@ uint32_t SceneManager::getNextId(const ObjectType type, const void* ptr) {
     return id;
 }
 
-uint32_t SceneManager::getTextureId(const std::string &path) {
+uint32_t SceneManager::getTextureId(const std::string& path) {
     if (textureNameToId.count(path)) {
         return textureNameToId[path];
     }
 
-    return (textureNameToId[path] = autoIds[to_underlying(ObjectType::Texture)]++);
+    return (textureNameToId[path] =
+                autoIds[to_underlying(ObjectType::Texture)]++);
 }
 
 void SceneManager::recordDependency(const ObjectKey& from,
@@ -115,7 +118,6 @@ protobuf::Manifest SceneManager::makeManifest() const {
     };
 
     add_to_manifest(ObjectType::Treelet);
-    add_to_manifest(ObjectType::TriangleMesh);
     add_to_manifest(ObjectType::Material);
     add_to_manifest(ObjectType::FloatTexture);
     add_to_manifest(ObjectType::SpectrumTexture);
@@ -124,8 +126,7 @@ protobuf::Manifest SceneManager::makeManifest() const {
     return manifest;
 }
 
-map<ObjectType, vector<SceneManager::Object>>
-SceneManager::listObjects() {
+map<ObjectType, vector<SceneManager::Object>> SceneManager::listObjects() {
     if (!sceneFD.initialized()) {
         throw runtime_error("SceneManager is not initialized");
     }
