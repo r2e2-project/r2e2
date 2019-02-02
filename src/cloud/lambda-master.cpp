@@ -577,8 +577,6 @@ string LambdaMaster::getSummary() {
         }
         workerIntervals << endl;
     }
-
->>>>>>> Add support for generating traces of worker actions
     return oss.str();
 }
 
