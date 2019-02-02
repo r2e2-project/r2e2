@@ -55,10 +55,6 @@ struct WorkerStats {
     std::map<SceneManager::ObjectKey, RayStats> objectStats;
 
     std::map<std::string, double> timePerAction;
-    double totalTime{0};
-
-    timepoint_t start;
-    timepoint_t end;
 
     uint64_t finishedPaths() const { return _finishedPaths; }
     uint64_t sentRays() const { return aggregateStats.sentRays; }

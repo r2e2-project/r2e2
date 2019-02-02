@@ -62,7 +62,6 @@ void WorkerStats::reset() {
     aggregateStats.reset();
     objectStats.clear();
     timePerAction.clear();
-    totalTime = 0;
 }
 
 void WorkerStats::merge(const WorkerStats& other) {
@@ -75,7 +74,6 @@ void WorkerStats::merge(const WorkerStats& other) {
     for (const auto& kv : other.timePerAction) {
         timePerAction[kv.first] += kv.second;
     }
-    totalTime += other.totalTime;
 }
 
 WorkerStats::Recorder::~Recorder() {

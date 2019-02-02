@@ -891,15 +891,16 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
     stats._finishedPaths = proto.finished_paths();
     stats.aggregateStats = from_protobuf(proto.aggregate_stats());
     stats.queueStats = from_protobuf(proto.queue_stats());
+
     for (const protobuf::WorkerStats::ObjectRayStats& object_stats :
          proto.object_stats()) {
         auto id = from_protobuf(object_stats.id());
         stats.objectStats[id] = from_protobuf(object_stats.stats());
     }
+
     for (const auto& kv : proto.time_per_action()) {
         stats.timePerAction[kv.first] = kv.second;
     }
-    stats.totalTime = proto.total_time();
 
     return stats;
 }

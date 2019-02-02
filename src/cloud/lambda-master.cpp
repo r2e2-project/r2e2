@@ -243,8 +243,6 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                 .emplace(piecewise_construct, forward_as_tuple(currentWorkerID),
                          forward_as_tuple(currentWorkerID, move(connection)))
                 .first;
-        auto &this_worker = workerIt->second;
-        this_worker.stats.start = now();
 
         /* assigns the minimal necessary scene objects for working with a
          * scene
@@ -490,22 +488,6 @@ string LambdaMaster::getSummary() {
         << setw(2) << (duration % 60);
     oss << endl;
 
-    vector<uint64_t> durations;
-    for (const auto &kv : workers) {
-        const Worker &worker = kv.second;
-        auto milliseconds = (worker.stats.end - worker.stats.start).count();
-        if (milliseconds == 0) {
-            printf("skipping worker\n");
-            continue;
-        }
-        durations.push_back(milliseconds);
-    }
-    sort(durations.begin(), durations.end());
-    if (durations.size() > 0) {
-        oss << "Shortest worker: " << durations[0] << endl;
-        oss << "Median worker: " << durations[durations.size() / 2] << endl;
-        oss << "Longest worker: " << durations[durations.size() - 1] << endl;
-    }
     return oss.str();
 }
 
