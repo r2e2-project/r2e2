@@ -110,8 +110,10 @@ ExecutionLoop::add_connection( TCPSocket && socket,
         string::const_iterator last_write =
           connection->socket_.write( connection->write_buffer_.begin(),
                                      connection->write_buffer_.cend() );
+        const auto bytes_sent = last_write - connection->write_buffer_.cbegin();
+        connection->bytes_sent += bytes_sent;
+        connection->write_buffer_.erase( 0, bytes_sent );
 
-        connection->write_buffer_.erase( 0, last_write - connection->write_buffer_.cbegin() );
         return ResultType::Continue;
       },
       [connection] { return connection->write_buffer_.size(); },
@@ -127,6 +129,7 @@ ExecutionLoop::add_connection( TCPSocket && socket,
        close_callback { move( real_close_callback ) }] ()
       {
         string data { move( connection->socket_.read() ) };
+        connection->bytes_received = data.length();
 
         if ( data.empty() or not data_callback( connection, move( data ) ) ) {
           close_callback();
@@ -272,6 +275,7 @@ ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection
         auto datagram = move(connection->queue_front());
         connection->queue_pop();
 
+        connection->bytes_sent += datagram.second.length();
         connection->socket_.sendto(datagram.first, datagram.second);
         return ResultType::Continue;
       },
@@ -288,7 +292,7 @@ ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection
        close_callback { move( real_close_callback ) }] ()
       {
         auto datagram = connection->socket_.recvfrom();
-
+        connection->bytes_received += datagram.second.length();
         if ( not data_callback( connection, move( datagram.first ),
                                 move( datagram.second ) ) ) {
           close_callback();

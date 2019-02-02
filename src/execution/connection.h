@@ -42,6 +42,9 @@ public:
 
   void enqueue_write( const std::string & str ) { write_buffer_.append( str ); }
   SocketType & socket() { return socket_; }
+
+  size_t bytes_sent{0};
+  size_t bytes_received{0};
 };
 
 class UDPConnection
@@ -107,6 +110,9 @@ public:
   }
 
   UDPSocket & socket() { return socket_; }
+
+  size_t bytes_sent{0};
+  size_t bytes_received{0};
 };
 
 using TCPConnection = Connection<TCPSocket>;
