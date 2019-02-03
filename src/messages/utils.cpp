@@ -926,6 +926,10 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
       }
     }
 
+    stats.bytesSent = proto.bytes_sent();
+    stats.bytesReceived = proto.bytes_received();
+    stats.interval = milliseconds{proto.interval_ms()};
+
     return stats;
 }
 

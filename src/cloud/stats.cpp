@@ -81,6 +81,7 @@ void WorkerStats::reset() {
     timePerAction.clear();
     intervalStart = now();
     intervalsPerAction.clear();
+    intervalStart = now();
 }
 
 void WorkerStats::merge(const WorkerStats& other) {
