@@ -74,6 +74,8 @@ class LambdaMaster {
             : worker(worker), treelet(treelet) {}
     };
 
+    void logWorkerInfo(const Worker &worker) const;
+
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleWorkerRequests();
     Poller::Action::Result::Type handleWriteOutput();

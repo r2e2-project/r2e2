@@ -1,5 +1,6 @@
 #include "utils.h"
 
+#include <chrono>
 #include <memory>
 #include <stdexcept>
 
@@ -31,6 +32,7 @@
 #include "cloud/manager.h"
 
 using namespace std;
+using namespace std::chrono;
 
 namespace pbrt {
 
@@ -323,12 +325,19 @@ protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
     proto.set_finished_paths(stats._finishedPaths);
     (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
     (*proto.mutable_queue_stats()) = to_protobuf(stats.queueStats);
+
     for (const auto& kv : stats.objectStats) {
         protobuf::WorkerStats::ObjectRayStats* ray_stats =
             proto.add_object_stats();
         (*ray_stats->mutable_id()) = to_protobuf(kv.first);
         (*ray_stats->mutable_stats()) = to_protobuf(kv.second);
     }
+
+    proto.set_bytes_sent(stats.bytesSent);
+    proto.set_bytes_received(stats.bytesReceived);
+    proto.set_interval_ms(
+        duration_cast<milliseconds>(now() - stats.intervalStart).count());
+
     return proto;
 }
 
@@ -901,6 +910,10 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
     for (const auto& kv : proto.time_per_action()) {
         stats.timePerAction[kv.first] = kv.second;
     }
+
+    stats.bytesSent = proto.bytes_sent();
+    stats.bytesReceived = proto.bytes_received();
+    stats.interval = milliseconds{proto.interval_ms()};
 
     return stats;
 }

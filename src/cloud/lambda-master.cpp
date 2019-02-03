@@ -361,6 +361,20 @@ bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
     return true;
 }
 
+void LambdaMaster::logWorkerInfo(const Worker &worker) const {
+    const uint64_t outBitrate =
+        (worker.stats.bytesSent / (worker.stats.interval.count() / 1000.0));
+
+    const uint64_t inBitrate =
+        (worker.stats.bytesReceived / (worker.stats.interval.count() / 1000.0));
+
+    LOG(INFO)
+        << "[worker:" << worker.id << "]"
+        << " time="
+        << chrono::duration_cast<milliseconds>(now().time_since_epoch()).count()
+        << " out=" << outBitrate << " in=" << inBitrate;
+}
+
 bool LambdaMaster::processMessage(const uint64_t workerId,
                                   const meow::Message &message) {
     /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
@@ -419,6 +433,8 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         sort(treeletLoads.begin(), treeletLoads.end(),
              greater<tuple<uint64_t, uint64_t>>());
         treeletPriority = treeletLoads;
+
+        logWorkerInfo(workers.at(workerId));
         break;
     }
 
@@ -644,7 +660,6 @@ int main(int argc, char const *argv[]) {
 
     signal(SIGINT, sigint_handler);
 
-    FLAGS_logtostderr = 1;
     google::InitGoogleLogging(argv[0]);
 
     const string scene{argv[1]};

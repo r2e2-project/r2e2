@@ -1,10 +1,8 @@
 #ifndef PBRT_CLOUD_STATS_H
 #define PBRT_CLOUD_STATS_H
 
-#include <cstdint>
 #include <chrono>
-#include <ctime>
-#include <cstdio>
+#include <cstdint>
 
 #include "cloud/manager.h"
 
@@ -12,9 +10,7 @@ namespace pbrt {
 
 /* timing utility functions */
 using timepoint_t = std::chrono::time_point<std::chrono::system_clock>;
-inline timepoint_t now() {
-  return std::chrono::system_clock::now();
-};
+inline timepoint_t now() { return std::chrono::system_clock::now(); };
 
 #define PER_RAY_STATS
 
@@ -55,6 +51,12 @@ struct WorkerStats {
     std::map<SceneManager::ObjectKey, RayStats> objectStats;
 
     std::map<std::string, double> timePerAction;
+
+    uint64_t bytesSent{0};
+    uint64_t bytesReceived{0};
+    std::chrono::milliseconds interval;
+
+    timepoint_t intervalStart{now()};
 
     uint64_t finishedPaths() const { return _finishedPaths; }
     uint64_t sentRays() const { return aggregateStats.sentRays; }

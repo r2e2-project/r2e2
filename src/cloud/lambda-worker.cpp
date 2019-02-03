@@ -152,6 +152,16 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                 });
             qStats.connected = peers.size() - qStats.connecting;
 
+            global::workerStats.bytesSent =
+                (this->coordinatorConnection->bytes_sent +
+                 this->udpConnection->bytes_sent) -
+                global::workerStats.bytesSent;
+
+            global::workerStats.bytesReceived =
+                (this->coordinatorConnection->bytes_received +
+                 this->udpConnection->bytes_received) -
+                global::workerStats.bytesReceived;
+
             auto proto = to_protobuf(global::workerStats);
             Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
             coordinatorConnection->enqueue_write(message.str());

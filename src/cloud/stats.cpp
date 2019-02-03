@@ -13,6 +13,7 @@ void RayStats::reset() {
     for (double& d : traceDurationPercentiles) {
         d = 0;
     }
+
 #ifdef PER_RAY_STATS
     rayDurations.clear();
 #endif  // PER_RAY_STATS
@@ -62,6 +63,7 @@ void WorkerStats::reset() {
     aggregateStats.reset();
     objectStats.clear();
     timePerAction.clear();
+    intervalStart = now();
 }
 
 void WorkerStats::merge(const WorkerStats& other) {
@@ -74,6 +76,10 @@ void WorkerStats::merge(const WorkerStats& other) {
     for (const auto& kv : other.timePerAction) {
         timePerAction[kv.first] += kv.second;
     }
+
+    bytesSent = other.bytesSent;
+    bytesReceived = other.bytesReceived;
+    interval = other.interval;
 }
 
 WorkerStats::Recorder::~Recorder() {
