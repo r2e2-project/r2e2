@@ -2,7 +2,7 @@
 
 import os
 import sys
-from zipfile import ZipFile
+import zipfile
 import shutil
 import argparse
 import hashlib
@@ -15,7 +15,7 @@ def create_function_package(output, pbrt_lambda_worker):
         "main.py": "lambda-function/main.py",
     }
 
-    with ZipFile(output, 'a') as funczip:
+    with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as funczip:
         for fn, fp in PACKAGE_FILES.items():
             funczip.write(fp, fn)
 
