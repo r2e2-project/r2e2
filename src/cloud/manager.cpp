@@ -1,6 +1,7 @@
 #include "manager.h"
 
 #include <fcntl.h>
+#include <fstream>
 
 #include "messages/utils.h"
 #include "util/exception.h"
@@ -11,7 +12,7 @@ namespace pbrt {
 
 static const string TYPE_PREFIXES[] = {
     "T",   "TM",   "LIGHTS", "SAMPLER",  "CAMERA", "SCENE",
-    "MAT", "FTEX", "STEX",   "MANIFEST", "TEX"};
+    "MAT", "FTEX", "STEX",   "MANIFEST", "TEX",    "TINFO"};
 
 static_assert(
     sizeof(TYPE_PREFIXES) / sizeof(string) == to_underlying(ObjectType::COUNT),
@@ -66,6 +67,7 @@ string SceneManager::getFileName(const ObjectType type, const uint32_t id) {
     case ObjectType::Lights:
     case ObjectType::Scene:
     case ObjectType::Manifest:
+    case ObjectType::TreeletInfo:
         return TYPE_PREFIXES[to_underlying(type)];
 
     case ObjectType::TriangleMesh:
@@ -178,6 +180,27 @@ void SceneManager::loadManifest() {
     dependencies[ObjectKey{ObjectType::Camera, 0}];
     dependencies[ObjectKey{ObjectType::Lights, 0}];
     dependencies[ObjectKey{ObjectType::Sampler, 0}];
+}
+
+vector<double> SceneManager::getTreeletProbs() const {
+    vector<double> result;
+
+    ifstream fin{getScenePath() + "/" + getFileName(ObjectType::TreeletInfo, 0)};
+
+    if (!fin.good()) {
+        return {};
+    }
+
+    size_t count = 0;
+    fin >> count;
+
+    for (size_t i = 0; i < count; i++) {
+        float f;
+        fin >> f;
+        result.push_back(f);
+    }
+
+    return result;
 }
 
 namespace global {

@@ -155,6 +155,11 @@ class LambdaMaster {
     WorkerStats workerStats;
     size_t initializedWorkers{0};
     size_t diagnosticsReceived{0};
+
+    /* Static Assignments */
+    void loadStaticAssignment(const uint32_t numWorkers);
+    bool staticAssignment{false};
+    std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
 };
 
 class Schedule {

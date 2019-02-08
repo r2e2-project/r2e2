@@ -56,6 +56,71 @@ shared_ptr<Sampler> loadSampler() {
     return sampler::from_protobuf(proto_sampler);
 }
 
+void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
+    vector<double> tempProbs = global::manager.getTreeletProbs();
+
+    if (tempProbs.size() == 0) {
+        staticAssignment = false;
+        return;
+    }
+
+    vector<pair<TreeletId, double>> probs;
+    for (size_t i = 1; i < tempProbs.size(); i++) {
+        probs.emplace_back(i, tempProbs[i]);
+    }
+
+    sort(probs.begin(), probs.end(),
+         [](const auto &a, const auto &b) { return a.second < a.second; });
+
+    struct WorkerData {
+        uint64_t freeSpace = 200 * 1024 * 1024; /* 200 MB */
+        double p = 0.f;
+    };
+
+    vector<WorkerData> workerData(numWorkers);
+
+    for (const auto &prob : probs) {
+        bool assigned = false;
+
+        const auto treelet = prob.first;
+        const auto p = prob.second;
+        int n = max(1.0, ceil(numWorkers * p));
+        const auto size = treeletTotalSizes[treelet];
+
+        for (size_t i = 0; i < numWorkers; i++) {
+            auto &worker = workerData[i];
+
+            if (worker.freeSpace >= size &&
+                worker.p < 0.03) {
+                staticAssignments[i].push_back(treelet);
+                worker.freeSpace -= size;
+                worker.p += p;
+                n--;
+                assigned = true;
+
+                if (n == 0) break;
+            }
+        }
+
+        if (!assigned) {
+            cout << treelet << " " << size << " " << p << " " << n << endl;
+            throw runtime_error("treelet not assigned: " + to_string(treelet));
+        }
+    }
+
+    // for (size_t i = 0; i < numWorkers; i++) {
+    //     cout << i << ": ";
+    //     for (const auto x : staticAssignments[i]) {
+    //         cout << x << " ";
+    //     }
+    //     cout << endl;
+    // }
+    //
+    // abort();
+
+    staticAssignment = true;
+}
+
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                            const uint32_t numberOfLambdas,
                            const string &publicAddress,
@@ -104,6 +169,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             treeletSize += sceneObjects.at(obj).size;
         }
     }
+
+    loadStaticAssignment(numberOfLambdas);
 
     udpConnection = loop.make_udp_connection(
         [&](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
@@ -265,11 +332,31 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             /* assign root treelet to worker since it is generating rays for
              * a crop window */
             // this->assignRootTreelet(workerIt->second);
-            this->assignAllTreelets(workerIt->second);
+            if (staticAssignment) {
+                assignTreelet(workerIt->second,
+                              SceneManager::ObjectKey{ObjectType::Treelet, 0});
+                for (const auto t : staticAssignments[workerIt->second.id]) {
+                    assignTreelet(
+                        workerIt->second,
+                        SceneManager::ObjectKey{ObjectType::Treelet, t});
+                }
+            } else {
+                this->assignAllTreelets(workerIt->second);
+            }
         }
         /* assign treelet to worker based on most in-demand treelets */
         else {
-            this->assignTreelets(workerIt->second);
+            if (staticAssignment) {
+                assignTreelet(workerIt->second,
+                              SceneManager::ObjectKey{ObjectType::Treelet, 0});
+                for (const auto t : staticAssignments[workerIt->second.id]) {
+                    assignTreelet(
+                        workerIt->second,
+                        SceneManager::ObjectKey{ObjectType::Treelet, t});
+                }
+            } else {
+                this->assignTreelets(workerIt->second);
+            }
             // this->assignAllTreelets(workerIt->second);
         }
 

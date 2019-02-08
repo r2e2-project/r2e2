@@ -23,6 +23,7 @@ enum class ObjectType {
     SpectrumTexture,
     Manifest,
     Texture,
+    TreeletInfo,
     COUNT
 };
 
@@ -74,7 +75,9 @@ class SceneManager {
     std::map<ObjectKey, std::set<ObjectKey>> listObjectDependencies();
 
     static std::string getFileName(const ObjectType type, const uint32_t id);
-    const std::string& getScenePath() { return scenePath; }
+    const std::string& getScenePath() const { return scenePath; }
+
+    std::vector<double> getTreeletProbs() const;
 
   private:
     void loadManifest();
