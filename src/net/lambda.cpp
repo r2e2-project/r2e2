@@ -2,6 +2,8 @@
 
 #include "lambda.h"
 
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <stdexcept>
 #include <stdlib.h>
@@ -13,17 +15,32 @@ using InvocationType = LambdaInvocationRequest::InvocationType;
 using LogType = LambdaInvocationRequest::LogType;
 
 namespace {
-  // Returns true iff the string contains only characters that are unreserved
-  // per RFC 3986.
-  bool has_only_unreserved_charsd( const string & unencoded )
+  // Encodes the given string using the percent-encoding mechanism described in RFC 3986.
+  // Used for canonicalizing the path for an HTTP requests to AWS.
+  //
+  // The RFC doesn't specify exactly which characters are safe, and which must
+  // be escaped, but by looking at [the implementation of the AWS
+  // CLI](https://github.com/boto/botocore/blob/c2f3e14d4436271181c1ab831d20a3de002ea0d6/botocore/auth.py#L315)
+  // one can see that for AWS the safe characters are the alphanumeric ones,
+  // along with those in the string "-_.~/".
+  string uri_encode( const string & unencoded )
   {
+    ostringstream encoded;
+    encoded.fill('0');
+    encoded << hex;
     for (const char c : unencoded) {
-      if ( !isalpha(c) && c != '-' && c != '_' && c != '.' && c != '~' )
+      if ( !isalnum(c) && c != '-' && c != '_' && c != '.' && c != '~' && c != '/' )
       {
-        return false;
+        // Encode it
+        encoded << '%' << uppercase << setw(2) << int((unsigned char)c)
+                << nouppercase;
+      }
+      else
+      {
+        encoded << c;
       }
     }
-    return true;
+    return encoded.str();
   }
 }
 
@@ -62,13 +79,8 @@ LambdaInvocationRequest::LambdaInvocationRequest( const AWSCredentials & credent
                                                   const string & context )
   : AWSRequest( credentials, region, {}, payload )
 {
-  if (!has_only_unreserved_charsd(function_name))
-  {
-    throw runtime_error("The AWS Lambda name `" + function_name + "` contains\n"
-        "unpermitted characters\n"
-        "Please restrict yourself to to alphanumerics, '-', '_', '.', and '~'");
-  }
   const string path = "/2015-03-31/functions/" + function_name + "/invocations";
+  const string encoded_path = uri_encode(path);
   first_line_ = "POST " + path + " HTTP/1.1";
 
   headers_[ "host" ] = endpoint( region );
@@ -77,7 +89,7 @@ LambdaInvocationRequest::LambdaInvocationRequest( const AWSCredentials & credent
   headers_[ "x-amz-log-type" ] = to_string( log_type );
   headers_[ "x-amz-client-context" ] = context;
 
-  AWSv4Sig::sign_request( "POST\n" + path,
+  AWSv4Sig::sign_request( "POST\n" + encoded_path,
                           credentials_.secret_key(), credentials_.access_key(),
                           region_, "lambda", request_date_, payload, headers_ );
 }
