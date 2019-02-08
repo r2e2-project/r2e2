@@ -4,12 +4,28 @@
 
 #include <string>
 #include <stdexcept>
+#include <stdlib.h>
 
 #include "awsv4_sig.h"
 
 using namespace std;
 using InvocationType = LambdaInvocationRequest::InvocationType;
 using LogType = LambdaInvocationRequest::LogType;
+
+namespace {
+  // Returns true iff the string contains only characters that are unreserved
+  // per RFC 3986.
+  bool has_only_unreserved_charsd( const string & unencoded )
+  {
+    for (const char c : unencoded) {
+      if ( !isalpha(c) && c != '-' && c != '_' && c != '.' && c != '~' )
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+}
 
 string to_string( const InvocationType & invocation_type )
 {
@@ -46,6 +62,12 @@ LambdaInvocationRequest::LambdaInvocationRequest( const AWSCredentials & credent
                                                   const string & context )
   : AWSRequest( credentials, region, {}, payload )
 {
+  if (!has_only_unreserved_charsd(function_name))
+  {
+    throw runtime_error("The AWS Lambda name `" + function_name + "` contains\n"
+        "unpermitted characters\n"
+        "Please restrict yourself to to alphanumerics, '-', '_', '.', and '~'");
+  }
   const string path = "/2015-03-31/functions/" + function_name + "/invocations";
   first_line_ = "POST " + path + " HTTP/1.1";
 
