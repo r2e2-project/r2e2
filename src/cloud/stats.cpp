@@ -89,8 +89,8 @@ WorkerStats::Recorder::~Recorder() {
             (end - start)).count();
 }
 
-WorkerStats::Recorder::Recorder(WorkerStats& stats_, const std::string& name_)
-    : stats(stats), name(name_) {
+WorkerStats::Recorder::Recorder(WorkerStats& stats, const std::string& name)
+    : stats(stats), name(name) {
     start = now();
 }
 
