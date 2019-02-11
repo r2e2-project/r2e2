@@ -99,7 +99,7 @@ class LambdaWorker {
     std::shared_ptr<Sampler> sampler{};
     std::unique_ptr<Scene> fakeScene{};
     std::vector<std::shared_ptr<Light>> lights{};
-    std::shared_ptr<CloudBVH> treelet{};
+    std::shared_ptr<CloudBVH> bvh{};
     std::set<uint32_t> treeletIds{};
     MemoryArena arena;
 

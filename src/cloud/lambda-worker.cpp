@@ -74,7 +74,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     PbrtOptions.nThreads = 1;
     global::manager.init(".");
 
-    treelet = make_shared<CloudBVH>();
+    bvh = make_shared<CloudBVH>();
 
     srand(time(nullptr));
     do {
@@ -219,7 +219,7 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayState ray = popRayQueue();
         if (!ray.toVisit.empty()) {
-            auto newRay = CloudIntegrator::Trace(move(ray), treelet);
+            auto newRay = CloudIntegrator::Trace(move(ray), bvh);
             const bool hit = newRay.hit.initialized();
             const bool emptyVisit = newRay.toVisit.empty();
 
@@ -240,7 +240,7 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
                 global::workerStats.recordFinishedPath();
             }
         } else if (ray.hit.initialized()) {
-            auto newRays = CloudIntegrator::Shade(move(ray), treelet, lights,
+            auto newRays = CloudIntegrator::Shade(move(ray), bvh, lights,
                                                   sampler, arena);
             for (auto& newRay : newRays) {
                 processedRays.push_back(move(newRay));
