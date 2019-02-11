@@ -111,10 +111,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("out queue failed"); }));
 
     /* send finished rays */
-    loop.poller().add_action(Poller::Action(
+    /* loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
         [this]() { return !finishedQueue.empty(); },
-        []() { throw runtime_error("finished queue failed"); }));
+        []() { throw runtime_error("finished queue failed"); })); */
 
     /* handle peers */
     loop.poller().add_action(Poller::Action(
@@ -214,7 +214,7 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
 Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
     deque<RayState> processedRays;
 
-    constexpr size_t MAX_RAYS = 10'000;
+    constexpr size_t MAX_RAYS = 100'000;
 
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayState ray = popRayQueue();
