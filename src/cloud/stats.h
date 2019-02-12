@@ -94,6 +94,42 @@ struct WorkerStats {
     }
 };
 
+/**
+ * This class handles a stream of incoming (value, time) pairs, where the time
+ * values are monotonically increasing, but not uniformly distributed, and
+ * maintains an estimate of the average value over the last `period`.
+ *
+ * An implementation of the (linearly interpolated) exponential moving average
+ * as described in S4.3 of this paper:
+ *   http://www.eckner.com/papers/Algorithms%20for%20Unevenly%20Spaced%20Time%20Series.pdf
+ * That paper cites a high-frequency trading book written by Muller.
+ */
+class ExponentialMovingAverage {
+ public:
+  ExponentialMovingAverage(std::chrono::high_resolution_clock::duration period);
+
+  // Feed this (value, time) pair into the stream.
+  double update(double value, std::chrono::high_resolution_clock::time_point time);
+  // Feed this value into the stream with the current time.
+  double updateNow(double value);
+
+ private:
+  // The period over which the moving average is computed.
+  // (e.g. the average of the last `period`)
+  const std::chrono::high_resolution_clock::duration period;
+
+  // Whether the stream has seen no data yet.
+  bool empty;
+  // The last value fed into the stream
+  double lastValue;
+  // The time that the last value was fed into the stream
+  std::chrono::high_resolution_clock::time_point lastTime;
+
+  // The current estimate of the moving average
+  double average;
+};
+
+
 namespace global {
 extern WorkerStats workerStats;
 }

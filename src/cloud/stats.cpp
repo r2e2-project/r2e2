@@ -1,5 +1,10 @@
 #include "stats.h"
 
+#include <math.h>
+
+
+using namespace::std::chrono;
+
 namespace pbrt {
 namespace global {
 WorkerStats workerStats;
@@ -84,14 +89,38 @@ void WorkerStats::merge(const WorkerStats& other) {
 
 WorkerStats::Recorder::~Recorder() {
     auto end = now();
-    stats.timePerAction[name] +=
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            (end - start)).count();
+    stats.timePerAction[name] += duration_cast<nanoseconds>((end - start)).count();
 }
 
 WorkerStats::Recorder::Recorder(WorkerStats& stats, const std::string& name)
     : stats(stats), name(name) {
     start = now();
+}
+
+ExponentialMovingAverage::ExponentialMovingAverage(
+    high_resolution_clock::duration period)
+    : period(period), empty(true) {
+    // lastValue, lastTime, and average will all be ignored since `empty` is
+    // true.
+}
+
+double ExponentialMovingAverage::updateNow( double value ) {
+  return update( value, high_resolution_clock::now() );
+}
+
+double ExponentialMovingAverage::update( double value, high_resolution_clock::time_point time ) {
+  if ( empty ) {
+    empty = false;
+    average = value;
+  } else {
+    high_resolution_clock::duration deltaT = time - lastTime;
+    double w1 = exp( - deltaT / period );
+    double w2 = ( 1.0 - w1 ) * period / deltaT;
+    average = w1 * average + ( 1.0 - w2 ) * value + ( w2 - w1 ) * lastValue;
+  }
+  lastTime = time;
+  lastValue = value;
+  return average;
 }
 
 }  // namespace pbrt
