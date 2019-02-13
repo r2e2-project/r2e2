@@ -283,6 +283,7 @@ message QueueStats {
     uint64 out = 4;
     uint64 connecting = 5;
     uint64 connected = 6;
+    uint64 outstanding_udp = 7;
 }
 
 message WorkerStats {

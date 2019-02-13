@@ -322,6 +322,7 @@ protobuf::QueueStats to_protobuf(const QueueStats& stats) {
     proto.set_out(stats.out);
     proto.set_connecting(stats.connecting);
     proto.set_connected(stats.connected);
+    proto.set_outstanding_udp(stats.outstandingUdp);
     return proto;
 }
 
@@ -930,6 +931,7 @@ QueueStats from_protobuf(const protobuf::QueueStats& proto) {
     stats.out = proto.out();
     stats.connecting = proto.connecting();
     stats.connected = proto.connected();
+    stats.outstandingUdp = proto.outstanding_udp();
     return stats;
 }
 

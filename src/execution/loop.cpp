@@ -272,11 +272,10 @@ ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection
       connection->socket_, Direction::Out,
       [connection] ()
       {
-        auto datagram = move(connection->queue_front());
+        const auto & datagram = connection->queue_front();
+        connection->bytes_sent += get<1>(datagram).length();
+        connection->socket_.sendto(get<0>(datagram), get<1>(datagram));
         connection->queue_pop();
-
-        connection->bytes_sent += datagram.second.length();
-        connection->socket_.sendto(datagram.first, datagram.second);
         return ResultType::Continue;
       },
       [connection] { return not connection->queue_empty(); },

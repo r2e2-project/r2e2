@@ -163,6 +163,18 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                 });
             qStats.connected = peers.size() - qStats.connecting;
 
+            global::workerStats.bytesSent =
+                (this->coordinatorConnection->bytes_sent +
+                 this->udpConnection->bytes_sent) -
+                global::workerStats.bytesSent;
+
+            global::workerStats.bytesReceived =
+                (this->coordinatorConnection->bytes_received +
+                 this->udpConnection->bytes_received) -
+                global::workerStats.bytesReceived;
+
+            qStats.outstandingUdp = this->udpConnection->queue_size();
+
             auto proto = to_protobuf(global::workerStats);
             Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
             coordinatorConnection->enqueue_write(message.str());
@@ -285,8 +297,8 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
                 global::workerStats.recordFinishedPath();
             }
         } else if (ray.hit.initialized()) {
-            auto newRays = CloudIntegrator::Shade(move(ray), bvh, lights,
-                                                  sampler, arena);
+            auto newRays =
+                CloudIntegrator::Shade(move(ray), bvh, lights, sampler, arena);
             for (auto& newRay : newRays) {
                 processedRays.push_back(move(newRay));
             }
@@ -401,7 +413,8 @@ Poller::Action::Result::Type LambdaWorker::handlePeers() {
         switch (peer.state) {
         case Worker::State::Connecting: {
             auto message = createConnectionRequest(peer);
-            udpConnection->enqueue_datagram(peer.address, message.str());
+            udpConnection->enqueue_datagram(peer.address, message.str(),
+                                            PacketPriority::High);
             peer.tries++;
             break;
         }
@@ -541,7 +554,8 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         /* send connection request */
         Message connRequest = createConnectionRequest(peers.at(0));
-        udpConnection->enqueue_datagram(coordinatorAddr, connRequest.str());
+        udpConnection->enqueue_datagram(coordinatorAddr, connRequest.str(),
+                                        PacketPriority::High);
 
         break;
     }
@@ -593,7 +607,8 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         auto& peer = peers.at(otherWorkerId);
         auto message = createConnectionResponse(peer);
-        udpConnection->enqueue_datagram(peer.address, message.str());
+        udpConnection->enqueue_datagram(peer.address, message.str(),
+                                        PacketPriority::High);
         break;
     }
 
