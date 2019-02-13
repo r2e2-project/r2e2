@@ -2,6 +2,7 @@
 
 #include <glog/logging.h>
 #include <algorithm>
+#include <cmath>
 #include <deque>
 #include <iomanip>
 #include <iostream>
@@ -38,7 +39,7 @@ using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 using ObjectKey = SceneManager::ObjectKey;
 
-constexpr milliseconds WORKER_REQUEST_INTERVAL{500};
+constexpr milliseconds WORKER_REQUEST_INTERVAL{250};
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
@@ -70,7 +71,7 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
     }
 
     sort(probs.begin(), probs.end(),
-         [](const auto &a, const auto &b) { return a.second < a.second; });
+         [](const auto &a, const auto &b) { return a.second < b.second; });
 
     struct WorkerData {
         uint64_t freeSpace = 200 * 1024 * 1024; /* 200 MB */
@@ -90,8 +91,7 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
         for (size_t i = 0; i < numWorkers; i++) {
             auto &worker = workerData[i];
 
-            if (worker.freeSpace >= size &&
-                worker.p < 0.03) {
+            if (worker.freeSpace >= size && worker.p < 1.0 / (numWorkers / 2)) {
                 staticAssignments[i].push_back(treelet);
                 worker.freeSpace -= size;
                 worker.p += p;
@@ -103,20 +103,11 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
         }
 
         if (!assigned) {
-            cout << treelet << " " << size << " " << p << " " << n << endl;
             throw runtime_error("treelet not assigned: " + to_string(treelet));
         }
     }
 
-    // for (size_t i = 0; i < numWorkers; i++) {
-    //     cout << i << ": ";
-    //     for (const auto x : staticAssignments[i]) {
-    //         cout << x << " ";
-    //     }
-    //     cout << endl;
-    // }
-    //
-    // abort();
+    /* XXX count empty workers */
 
     staticAssignment = true;
 }
@@ -322,6 +313,13 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
          */
         this->assignBaseSceneObjects(workerIt->second);
 
+        auto doStaticAssign = [this](Worker &worker) {
+            assignTreelet(worker, 0);
+            for (const auto t : staticAssignments[worker.id - 1]) {
+                assignTreelet(worker, t);
+            }
+        };
+
         /* assign a tile to the worker, if we need to */
         if (currentWorkerID <= nTiles.x * nTiles.y) {
             /* compute the crop window */
@@ -337,13 +335,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
              * a crop window */
             // this->assignRootTreelet(workerIt->second);
             if (staticAssignment) {
-                assignTreelet(workerIt->second,
-                              SceneManager::ObjectKey{ObjectType::Treelet, 0});
-                for (const auto t : staticAssignments[workerIt->second.id]) {
-                    assignTreelet(
-                        workerIt->second,
-                        SceneManager::ObjectKey{ObjectType::Treelet, t});
-                }
+                doStaticAssign(workerIt->second);
             } else {
                 this->assignAllTreelets(workerIt->second);
             }
@@ -351,13 +343,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         /* assign treelet to worker based on most in-demand treelets */
         else {
             if (staticAssignment) {
-                assignTreelet(workerIt->second,
-                              SceneManager::ObjectKey{ObjectType::Treelet, 0});
-                for (const auto t : staticAssignments[workerIt->second.id]) {
-                    assignTreelet(
-                        workerIt->second,
-                        SceneManager::ObjectKey{ObjectType::Treelet, t});
-                }
+                doStaticAssign(workerIt->second);
             } else {
                 this->assignTreelets(workerIt->second);
             }
@@ -771,14 +757,10 @@ void LambdaMaster::assignObject(Worker &worker, const ObjectKey &object) {
     }
 }
 
-void LambdaMaster::assignTreelet(Worker &worker, const ObjectKey &treelet) {
-    if (treelet.type != ObjectType::Treelet) {
-        throw runtime_error("assignTreelet: object is not a treelet");
-    }
+void LambdaMaster::assignTreelet(Worker &worker, const TreeletId treeletId) {
+    assignObject(worker, {ObjectType::Treelet, treeletId});
 
-    assignObject(worker, treelet);
-
-    for (const auto &obj : treeletFlattenDependencies[treelet.id]) {
+    for (const auto &obj : treeletFlattenDependencies[treeletId]) {
         assignObject(worker, obj);
     }
 }
@@ -793,7 +775,7 @@ void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
 void LambdaMaster::assignAllTreelets(Worker &worker) {
     for (const auto &treeletId : treeletIds) {
         if (treeletId.id == 0 || (treeletId.id % 4 == worker.id % 4))
-            assignTreelet(worker, treeletId);
+            assignTreelet(worker, treeletId.id);
     }
 }
 
@@ -818,7 +800,7 @@ void LambdaMaster::assignTreelets(Worker &worker) {
         ObjectKey id = unassignedTreelets.top();
         size_t size = treeletTotalSizes.at(id.id);
         if (size < freeSpace) {
-            assignTreelet(worker, id);
+            assignTreelet(worker, id.id);
             unassignedTreelets.pop();
             return;
         }
@@ -847,7 +829,7 @@ void LambdaMaster::assignTreelets(Worker &worker) {
         highestID = *random::sample(treeletIds.begin(), treeletIds.end());
     }
 
-    assignTreelet(worker, highestID);
+    assignTreelet(worker, highestID.id);
 }
 
 void LambdaMaster::updateObjectUsage(const Worker &worker) {}
