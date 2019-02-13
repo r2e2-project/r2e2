@@ -243,16 +243,19 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
             aggregateQueueStats();
 
-            const auto elapsedTime =
-                duration_cast<seconds>(steady_clock::now() - startTime).count();
+            const auto elapsedTime = steady_clock::now() - startTime;
+            const auto elapsedSeconds =
+                duration_cast<seconds>(elapsedTime).count();
 
-            cerr << "ray: " << workerStats.queueStats.ray
+            cerr << setfill('0') << setw(6)
+                 << duration_cast<milliseconds>(elapsedTime).count()
+                 << " ray: " << workerStats.queueStats.ray
                  << " / finished: " << workerStats.queueStats.finished
                  << " / pending: " << workerStats.queueStats.pending
                  << " / out: " << workerStats.queueStats.out
                  << " / connecting: " << workerStats.queueStats.connecting
                  << " / connected: " << workerStats.queueStats.connected
-                 << " / outstandingUdp: " << workerStats.queueStats.outstandingUdp
+                 << " / outstanding: " << workerStats.queueStats.outstandingUdp
                  << endl;
 
             ostringstream oss;
@@ -272,8 +275,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                         : (100.0 * workerStats.receivedRays() /
                            workerStats.sentRays()))
                 << "%)"
-                << " | time: " << setfill('0') << setw(2) << (elapsedTime / 60)
-                << ":" << setw(2) << (elapsedTime % 60);
+                << " | time: " << setfill('0') << setw(2)
+                << (elapsedSeconds / 60) << ":" << setw(2)
+                << (elapsedSeconds % 60);
 
             StatusBar::set_text(oss.str());
             return ResultType::Continue;
