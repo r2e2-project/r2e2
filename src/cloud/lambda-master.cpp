@@ -107,6 +107,17 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
         }
     }
 
+    /* log the static assignments */
+    LOG(INFO) << "static assignment for " << numberOfLambdas << " workers";
+
+    for (size_t i = 0; i < numWorkers; i++) {
+        LOG(INFO) << "worker=" << i;
+        LOG(INFO) << "\t0";
+        for (const auto t : staticAssignments[i]) {
+            LOG(INFO) << '\t' << t;
+        }
+    }
+
     /* XXX count empty workers */
 
     staticAssignment = true;
