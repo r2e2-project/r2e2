@@ -388,6 +388,10 @@ ResultType LambdaMaster::handleMessages() {
 ResultType LambdaMaster::handleWorkerRequests() {
     workerRequestTimer.reset();
 
+    if (initializedWorkers < numberOfLambdas * 0.90) {
+        return ResultType::Continue;
+    }
+
     deque<WorkerRequest> unprocessedRequests;
 
     while (!pendingWorkerRequests.empty()) {
@@ -427,7 +431,6 @@ bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
     const SceneObjectInfo &info = sceneObjects.at(
         SceneManager::ObjectKey{ObjectType::Treelet, treeletId});
     if (info.workers.size() == 0) {
-        /* cerr << "No worker found for treelet " << treeletId << endl; */
         return false;
     }
 
@@ -437,7 +440,6 @@ bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
     const auto &selectedWorker = workers.at(selectedWorkerId);
 
     if (!selectedWorker.udpAddress.initialized()) {
-        /* LOG(WARNING) << "No UDP address for " << selectedWorkerId << endl; */
         return false;
     }
 
@@ -874,7 +876,8 @@ void LambdaMaster::aggregateQueueStats() {
         workerStats.queueStats.out += worker.stats.queueStats.out;
         workerStats.queueStats.connecting += worker.stats.queueStats.connecting;
         workerStats.queueStats.connected += worker.stats.queueStats.connected;
-        workerStats.queueStats.outstandingUdp += worker.stats.queueStats.outstandingUdp;
+        workerStats.queueStats.outstandingUdp +=
+            worker.stats.queueStats.outstandingUdp;
     }
 }
 
