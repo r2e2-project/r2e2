@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 #include <sys/timerfd.h>
 #include <cstdlib>
+#include <getopt.h>
 #include <iterator>
 #include <limits>
 #include <sstream>
@@ -324,6 +325,8 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
         processedRays.pop_front();
 
         const TreeletId nextTreelet = ray.currentTreelet();
+        global::workerStats.recordDemandedRay(
+            SceneManager::ObjectKey{ObjectType::Treelet, nextTreelet});
 
         if (treeletIds.count(nextTreelet)) {
             pushRayQueue(move(ray));
@@ -777,26 +780,89 @@ void LambdaWorker::uploadLog() const {
     storageBackend->put(putLogRequest);
 }
 
-void usage(const char* argv0) {
-    cerr << "Usage: " << argv0 << " DESTINATION PORT STORAGE-BACKEND" << endl;
+void usage(const char* argv0, int exitCode) {
+    cerr << "Usage: " << argv0 << " [OPTIONS]" << endl << endl
+         << "Options:" << endl
+         << "  -i --ip IPSTRING        ip of coordinator" << endl
+         << "  -p --port PORT          port of coordinator" << endl
+         << "  -r --aws-region REGION  S3 region to read from" << endl
+         << "  -b --scene-bucket NAME  bucket with scene dump" << endl
+         << "  -h --help               show help information" << endl;
+    exit(exitCode);
 }
 
-int main(int argc, char const* argv[]) {
+int main(int argc, char * argv[]) {
     int exit_status = EXIT_SUCCESS;
+
+    uint16_t listenPort = 50000;
+    string publicIp;
+    string bucketName;
+    string region{"us-west-2"};
+
+    struct option long_options[] = {
+        { "port"     ,          required_argument, nullptr, 'p' },
+        { "ip",                 required_argument, nullptr, 'i' },
+        { "aws-region",         required_argument, nullptr, 'r' },
+        { "scene-bucket",       required_argument, nullptr, 'b' },
+        { "help",               no_argument,       nullptr, 'h' },
+        { nullptr,              0,                 nullptr,  0  },
+    };
+
+    while ( true ) {
+        const int opt = getopt_long( argc, argv, "p:i:r:b:h", long_options, nullptr );
+
+        if ( opt == -1 ) {
+            break;
+        }
+
+        switch ( opt ) {
+          case 'p':
+            {
+              listenPort = stoi( optarg );
+              break;
+            }
+          case 'i':
+            {
+              publicIp = optarg;
+              break;
+            }
+          case 'r':
+            {
+              region = optarg;
+              break;
+            }
+          case 'b':
+            {
+              bucketName = optarg;
+              break;
+            }
+          case 'h':
+            {
+              usage(argv[0], 0);
+              break;
+            }
+          default:
+            {
+              usage(argv[0], 2);
+              break;
+            }
+        }
+    }
+
+    if (listenPort == 0 ||
+        publicIp.empty() ||
+        bucketName.empty() ||
+        region.empty()) {
+      usage(argv[0], 2);
+    }
+
+    ostringstream bucketUri;
+    bucketUri << "s3://" << bucketName << "/?region=" << region;
+
     unique_ptr<LambdaWorker> worker;
 
     try {
-        if (argc <= 0) {
-            abort();
-        }
-
-        if (argc != 4) {
-            usage(argv[0]);
-            return EXIT_FAILURE;
-        }
-
-        const uint16_t coordinatorPort = stoi(argv[2]);
-        worker = make_unique<LambdaWorker>(argv[1], coordinatorPort, argv[3]);
+        worker = make_unique<LambdaWorker>(publicIp, listenPort, bucketUri.str());
         worker->run();
     } catch (const exception& e) {
         LOG(INFO) << argv[0] << ": " << e.what();

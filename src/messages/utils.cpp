@@ -8,9 +8,9 @@
 #include "cameras/orthographic.h"
 #include "cameras/perspective.h"
 #include "cameras/realistic.h"
+#include "cloud/manager.h"
 #include "core/api.h"
 #include "core/api_makefns.h"
-#include "core/api.h"
 #include "filters/box.h"
 #include "filters/gaussian.h"
 #include "filters/mitchell.h"
@@ -29,7 +29,6 @@
 #include "samplers/stratified.h"
 #include "samplers/zerotwosequence.h"
 #include "shapes/fake.h"
-#include "cloud/manager.h"
 
 using namespace std;
 using namespace std::chrono;
@@ -272,22 +271,22 @@ protobuf::Scene to_protobuf(const Scene& scene) {
 }
 
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params) {
-  protobuf::TextureParams params;
-  *params.mutable_geom_params() = to_protobuf(texture_params.GetGeomParams());
-  *params.mutable_material_params() = to_protobuf(texture_params.GetMaterialParams());
-  for (auto& kv : texture_params.GetFloatTextures()) {
-    int id = global::manager.getId(kv.second.get());
-    (*params.mutable_float_textures())[kv.first] = id;
-  }
-  for (auto& kv : texture_params.GetSpectrumTextures()) {
-    int id = global::manager.getId(kv.second.get());
-    (*params.mutable_spectrum_textures())[kv.first] = id;
-  }
-  return params;
+    protobuf::TextureParams params;
+    *params.mutable_geom_params() = to_protobuf(texture_params.GetGeomParams());
+    *params.mutable_material_params() =
+        to_protobuf(texture_params.GetMaterialParams());
+    for (auto& kv : texture_params.GetFloatTextures()) {
+        int id = global::manager.getId(kv.second.get());
+        (*params.mutable_float_textures())[kv.first] = id;
+    }
+    for (auto& kv : texture_params.GetSpectrumTextures()) {
+        int id = global::manager.getId(kv.second.get());
+        (*params.mutable_spectrum_textures())[kv.first] = id;
+    }
+    return params;
 }
 
-protobuf::ObjectKey to_protobuf(
-    const SceneManager::ObjectKey& ObjectKey) {
+protobuf::ObjectKey to_protobuf(const SceneManager::ObjectKey& ObjectKey) {
     protobuf::ObjectKey proto;
     proto.set_type(to_underlying(ObjectKey.type));
     proto.set_id(ObjectKey.id);
@@ -295,23 +294,24 @@ protobuf::ObjectKey to_protobuf(
 }
 
 protobuf::RayStats to_protobuf(const RayStats& stats) {
-  protobuf::RayStats proto;
-  proto.set_sent_rays(stats.sentRays);
-  proto.set_received_rays(stats.receivedRays);
-  proto.set_waiting_rays(stats.waitingRays);
-  proto.set_processed_rays(stats.processedRays);
-  return proto;
+    protobuf::RayStats proto;
+    proto.set_sent_rays(stats.sentRays);
+    proto.set_received_rays(stats.receivedRays);
+    proto.set_waiting_rays(stats.waitingRays);
+    proto.set_processed_rays(stats.processedRays);
+    proto.set_demanded_rays(stats.demandedRays);
+    return proto;
 }
 
 protobuf::RayStats to_protobuf_diagnostics(const RayStats& stats) {
-  protobuf::RayStats proto = to_protobuf(stats);
-  for (double d : stats.traceDurationPercentiles) {
-    proto.add_trace_duration_percentiles(d);
-  }
-  for (double d : stats.rayDurations) {
-    proto.add_ray_durations(d);
-  }
-  return proto;
+    protobuf::RayStats proto = to_protobuf(stats);
+    for (double d : stats.traceDurationPercentiles) {
+        proto.add_trace_duration_percentiles(d);
+    }
+    for (double d : stats.rayDurations) {
+        proto.add_ray_durations(d);
+    }
+    return proto;
 }
 
 protobuf::QueueStats to_protobuf(const QueueStats& stats) {
@@ -353,7 +353,7 @@ protobuf::WorkerStats to_protobuf_diagnostics(const WorkerStats& stats) {
         (*ray_stats->mutable_stats()) = to_protobuf_diagnostics(kv.second);
     }
     for (const auto& kv : stats.timePerAction) {
-      (*proto.mutable_time_per_action())[kv.first] = kv.second;
+        (*proto.mutable_time_per_action())[kv.first] = kv.second;
     }
     for (const auto& kv : stats.intervalsPerAction) {
         protobuf::WorkerStats::ActionIntervals* action_intervals =
@@ -367,8 +367,7 @@ protobuf::WorkerStats to_protobuf_diagnostics(const WorkerStats& stats) {
         }
     }
     for (const auto& kv : stats.metricsOverTime) {
-        protobuf::WorkerStats::Metrics* metrics =
-            proto.add_metrics_over_time();
+        protobuf::WorkerStats::Metrics* metrics = proto.add_metrics_over_time();
         metrics->set_name(kv.first);
         for (std::tuple<uint64_t, double> point : kv.second) {
             protobuf::WorkerStats::MetricPoint* metric_point =
@@ -632,18 +631,17 @@ TextureParams from_protobuf(
     ParamSet& material_params,
     std::map<std::string, std::shared_ptr<Texture<Float>>>& fTex,
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex) {
-
     for (auto& kv : texture_params.float_textures()) {
-        auto texture_reader = global::manager.GetReader(
-            ObjectType::FloatTexture, kv.second);
+        auto texture_reader =
+            global::manager.GetReader(ObjectType::FloatTexture, kv.second);
         protobuf::FloatTexture texture;
         texture_reader->read(&texture);
         fTex[kv.first] = float_texture::from_protobuf(texture);
     }
     for (auto& kv : texture_params.spectrum_textures()) {
         // Load the texture
-        auto texture_reader = global::manager.GetReader(
-            ObjectType::SpectrumTexture, kv.second);
+        auto texture_reader =
+            global::manager.GetReader(ObjectType::SpectrumTexture, kv.second);
         protobuf::SpectrumTexture texture;
         texture_reader->read(&texture);
         sTex[kv.first] = spectrum_texture::from_protobuf(texture);
@@ -653,11 +651,9 @@ TextureParams from_protobuf(
     return TextureParams(geom_params, material_params, fTex, sTex);
 }
 
-SceneManager::ObjectKey from_protobuf(
-    const protobuf::ObjectKey& ObjectKey) {
-    return SceneManager::ObjectKey{
-        static_cast<ObjectType>(ObjectKey.type()),
-        ObjectKey.id()};
+SceneManager::ObjectKey from_protobuf(const protobuf::ObjectKey& ObjectKey) {
+    return SceneManager::ObjectKey{static_cast<ObjectType>(ObjectKey.type()),
+                                   ObjectKey.id()};
 }
 
 protobuf::Light light::to_protobuf(const string& name, const ParamSet& params,
@@ -841,18 +837,17 @@ std::shared_ptr<Material> material::from_protobuf(
     ParamSet material_params;
     std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
-    TextureParams tp =
-        pbrt::from_protobuf(material.texture_params(), geom_params,
-                            material_params, fTex, sTex);
+    TextureParams tp = pbrt::from_protobuf(
+        material.texture_params(), geom_params, material_params, fTex, sTex);
     return pbrt::MakeMaterial(material.name(), tp);
 }
 
 protobuf::Material material::to_protobuf(const std::string& name,
                                          const TextureParams& tp) {
-  protobuf::Material material;
-  material.set_name(name);
-  material.mutable_texture_params()->CopyFrom(pbrt::to_protobuf(tp));
-  return material;
+    protobuf::Material material;
+    material.set_name(name);
+    material.mutable_texture_params()->CopyFrom(pbrt::to_protobuf(tp));
+    return material;
 }
 
 std::shared_ptr<Texture<Float>> float_texture::from_protobuf(
@@ -861,9 +856,8 @@ std::shared_ptr<Texture<Float>> float_texture::from_protobuf(
     ParamSet material_params;
     std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
-    TextureParams tp =
-        pbrt::from_protobuf(texture.texture_params(), geom_params,
-                            material_params, fTex, sTex);
+    TextureParams tp = pbrt::from_protobuf(
+        texture.texture_params(), geom_params, material_params, fTex, sTex);
 
     return MakeFloatTexture(texture.name(),
                             Transform(pbrt::from_protobuf(texture.tex2world())),
@@ -875,7 +869,8 @@ protobuf::FloatTexture float_texture::to_protobuf(const std::string& name,
                                                   const TextureParams& tp) {
     protobuf::FloatTexture texture;
     texture.set_name(name);
-    texture.mutable_tex2world()->CopyFrom(pbrt::to_protobuf(tex2world.GetMatrix()));
+    texture.mutable_tex2world()->CopyFrom(
+        pbrt::to_protobuf(tex2world.GetMatrix()));
     texture.mutable_texture_params()->CopyFrom(pbrt::to_protobuf(tp));
     return texture;
 }
@@ -886,9 +881,8 @@ std::shared_ptr<Texture<Spectrum>> spectrum_texture::from_protobuf(
     ParamSet material_params;
     std::map<std::string, std::shared_ptr<Texture<Float>>> fTex;
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>> sTex;
-    TextureParams tp =
-        pbrt::from_protobuf(texture.texture_params(), geom_params,
-                            material_params, fTex, sTex);
+    TextureParams tp = pbrt::from_protobuf(
+        texture.texture_params(), geom_params, material_params, fTex, sTex);
 
     return MakeSpectrumTexture(
         texture.name(), Transform(pbrt::from_protobuf(texture.tex2world())),
@@ -900,7 +894,8 @@ protobuf::SpectrumTexture spectrum_texture::to_protobuf(
     const TextureParams& tp) {
     protobuf::SpectrumTexture texture;
     texture.set_name(name);
-    texture.mutable_tex2world()->CopyFrom(pbrt::to_protobuf(tex2world.GetMatrix()));
+    texture.mutable_tex2world()->CopyFrom(
+        pbrt::to_protobuf(tex2world.GetMatrix()));
     texture.mutable_texture_params()->CopyFrom(pbrt::to_protobuf(tp));
     return texture;
 }
@@ -911,14 +906,15 @@ RayStats from_protobuf(const protobuf::RayStats& proto) {
     stats.receivedRays = proto.received_rays();
     stats.waitingRays = proto.waiting_rays();
     stats.processedRays = proto.processed_rays();
+    stats.demandedRays = proto.demanded_rays();
 
     for (int i = 0; i < proto.trace_duration_percentiles_size(); ++i) {
-      double d = proto.trace_duration_percentiles(i);
-      stats.traceDurationPercentiles[i] = d;
+        double d = proto.trace_duration_percentiles(i);
+        stats.traceDurationPercentiles[i] = d;
     }
     stats.rayDurations.reserve(proto.ray_durations_size());
     for (double d : proto.ray_durations()) {
-      stats.rayDurations.push_back(d);
+        stats.rayDurations.push_back(d);
     }
     return stats;
 }
@@ -951,11 +947,11 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
         stats.timePerAction[kv.first] = kv.second;
     }
     for (const auto& action_interval : proto.intervals_per_action()) {
-      const std::string& name = action_interval.name();
-      for (const auto& interval : action_interval.intervals()) {
-          stats.intervalsPerAction[name].push_back(
-              std::make_tuple(interval.start(), interval.end()));
-      }
+        const std::string& name = action_interval.name();
+        for (const auto& interval : action_interval.intervals()) {
+            stats.intervalsPerAction[name].push_back(
+                std::make_tuple(interval.start(), interval.end()));
+        }
     }
     for (const auto& metrics : proto.metrics_over_time()) {
         const std::string& name = metrics.name();

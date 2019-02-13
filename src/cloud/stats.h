@@ -28,6 +28,8 @@ struct RayStats {
     uint64_t waitingRays{0};
     /* rays processed for this scene object */
     uint64_t processedRays{0};
+    /* rays that require (or required) this scence object to render */
+    uint64_t demandedRays{0};
 
     double traceDurationPercentiles[NUM_PERCENTILES] = {0.0, 0.0, 0.0, 0.0,
                                                         0.0};
@@ -80,6 +82,7 @@ struct WorkerStats {
     void recordProcessedRay(const SceneManager::ObjectKey& type);
     void recordRayInterval(const SceneManager::ObjectKey& type,
                            timepoint_t start, timepoint_t end);
+    void recordDemandedRay(const SceneManager::ObjectKey& type);
 
     void reset();
     void resetDiagnostics();
@@ -108,40 +111,61 @@ struct WorkerStats {
     void recordMetric(const std::string& name, timepoint_t time, double metric);
 };
 
-/**
- * This class handles a stream of incoming (value, time) pairs, where the time
- * values are monotonically increasing, but not uniformly distributed, and
- * maintains an estimate of the average value over the last `period`.
- *
- * An implementation of the (linearly interpolated) exponential moving average
- * as described in S4.3 of this paper:
- *   http://www.eckner.com/papers/Algorithms%20for%20Unevenly%20Spaced%20Time%20Series.pdf
- * That paper cites a high-frequency trading book written by Muller.
- */
-class ExponentialMovingAverage {
- public:
-  ExponentialMovingAverage(std::chrono::high_resolution_clock::duration period);
+// Ray statistics, but with doubles for numerical stability
+struct RayStatsD {
+    /* rays sent to this scene object */
+    double sentRays{0};
+    /* rays received for this scene object */
+    double receivedRays{0};
+    /* rays waiting to be processed for this scene object */
+    double waitingRays{0};
+    /* rays processed for this scene object */
+    double processedRays{0};
+    /* rays that require (or required) this scence object to render */
+    double demandedRays{0};
 
-  // Feed this (value, time) pair into the stream.
-  double update(double value, std::chrono::high_resolution_clock::time_point time);
-  // Feed this value into the stream with the current time.
-  double updateNow(double value);
+    void reset();
 
- private:
-  // The period over which the moving average is computed.
-  // (e.g. the average of the last `period`)
-  const std::chrono::high_resolution_clock::duration period;
+    RayStatsD()
+        : sentRays(0),
+          receivedRays(0),
+          waitingRays(0),
+          processedRays(0),
+          demandedRays(0) {}
 
-  // Whether the stream has seen no data yet.
-  bool empty;
-  // The last value fed into the stream
-  double lastValue;
-  // The time that the last value was fed into the stream
-  std::chrono::high_resolution_clock::time_point lastTime;
-
-  // The current estimate of the moving average
-  double average;
+    RayStatsD(double sentRays, double receivedRays, double waitingRays,
+              double processedRays, double demandedRays)
+        : sentRays(sentRays),
+          receivedRays(receivedRays),
+          waitingRays(waitingRays),
+          processedRays(processedRays),
+          demandedRays(demandedRays) {}
+    RayStatsD(const RayStats& other)
+        : sentRays(other.sentRays),
+          receivedRays(other.receivedRays),
+          waitingRays(other.waitingRays),
+          processedRays(other.processedRays),
+          demandedRays(other.demandedRays) {}
 };
+
+RayStatsD operator+(const RayStatsD& a, const RayStatsD& b);
+
+RayStatsD operator*(const RayStatsD& a, double scalar);
+
+RayStatsD operator*(double scalar, const RayStatsD& a);
+
+struct RayStatsPerObjectD {
+    std::map<SceneManager::ObjectKey, RayStatsD> stats;
+    RayStatsPerObjectD();
+    RayStatsPerObjectD(const WorkerStats& full);
+};
+
+RayStatsPerObjectD operator+(const RayStatsPerObjectD& a,
+                             const RayStatsPerObjectD& b);
+
+RayStatsPerObjectD operator*(const RayStatsPerObjectD& a, double scalar);
+
+RayStatsPerObjectD operator*(double scalar, const RayStatsPerObjectD& a);
 
 namespace global {
 extern WorkerStats workerStats;

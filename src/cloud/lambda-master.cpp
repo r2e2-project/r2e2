@@ -1,12 +1,13 @@
 #include "lambda-master.h"
 
+#include <getopt.h>
 #include <glog/logging.h>
 #include <algorithm>
 #include <cmath>
 #include <deque>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <fstream>
 #include <memory>
 #include <numeric>
 #include <random>
@@ -127,7 +128,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                            const uint32_t numberOfLambdas,
                            const string &publicAddress,
                            const string &storageBackend,
-                           const string &awsRegion)
+                           const string &awsRegion,
+                           const MasterConfiguration &config)
     : scenePath(scenePath),
       numberOfLambdas(numberOfLambdas),
       publicAddress(publicAddress),
@@ -136,7 +138,10 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
       workerRequestTimer(WORKER_REQUEST_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL),
-      writeOutputTimer(WRITE_OUTPUT_INTERVAL) {
+      writeOutputTimer(WRITE_OUTPUT_INTERVAL),
+      rateMeter(),
+      rateMeters(),
+      config(config) {
     global::manager.init(scenePath);
     loadCamera();
 
@@ -343,6 +348,21 @@ ResultType LambdaMaster::updateStatusMessage() {
               << " / connected: " << workerStats.queueStats.connected
               << " / outstanding: " << workerStats.queueStats.outstandingUdp;
 
+    if (this->config.treeletStats) {
+        const RayStatsD &rate = rateMeter.getRate();
+        cerr << rate.demandedRays << endl;
+        cerr << "               Treelet: ";
+        for (const auto &s : rateMeters.getRate().stats) {
+            cerr << setw(8) << s.first.to_string();
+        }
+        cerr << endl;
+        cerr << "log10(demanded rays/s): ";
+        for (const auto &s : rateMeters.getRate().stats) {
+            cerr << setw(8) << setprecision(3) << log10(s.second.demandedRays);
+        }
+        cerr << endl;
+    }
+
     ostringstream oss;
     oss << "\033[0m"
         << "\033[48;5;022m"
@@ -492,12 +512,18 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
     }
 
     case OpCode::WorkerStats: {
+        high_resolution_clock::time_point now = high_resolution_clock::now();
         protobuf::WorkerStats proto;
         protoutil::from_string(message.payload(), proto);
         auto stats = from_protobuf(proto);
+
         if (stats.timePerAction.size() > 0) {
-          diagnosticsReceived += 1;
+            diagnosticsReceived += 1;
         }
+
+        rateMeter.update(RayStatsD{stats.aggregateStats});
+        rateMeters.update(RayStatsPerObjectD{stats});
+
         /* merge into global worker stats */
         workerStats.merge(stats);
         /* merge into local worker stats */
@@ -565,7 +591,7 @@ void LambdaMaster::run() {
     cerr << "Waiting to receive diagnostics from workers.." << endl;
     /* Ask workers to send back diagnostic stats */
     size_t numWorkers = workers.size();
-    for (auto& kv : workers) {
+    for (auto &kv : workers) {
         auto worker = kv.second;
         Message message{OpCode::RequestDiagnostics, ""};
         worker.connection->enqueue_write(message.str());
@@ -573,9 +599,8 @@ void LambdaMaster::run() {
 
     diagnosticsReceived = 0;
     while (diagnosticsReceived < numWorkers) {
-      auto res = loop.loop_once().result;
-      if (res != PollerResult::Success && res != PollerResult::Timeout)
-        break;
+        auto res = loop.loop_once().result;
+        if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 }
 
@@ -657,12 +682,12 @@ string LambdaMaster::getSummary() {
                 maxWorkerID = worker.id;
                 maxActionsLength = actionsSum;
             }
-            }
-            if (maxActionsLength > 0) {
-                oss << "Most busy worker intervals:" << endl;
-                printActionTimes(workers.at(maxWorkerID).stats);
-            }
         }
+        if (maxActionsLength > 0) {
+            oss << "Most busy worker intervals:" << endl;
+            printActionTimes(workers.at(maxWorkerID).stats);
+        }
+    }
 
     /* Print ray duration percentiles */
     vector<double> sortedRayDurations = workerStats.aggregateStats.rayDurations;
@@ -711,15 +736,15 @@ string LambdaMaster::getSummary() {
             const Worker &worker = kv.second;
             const auto &metrics = worker.stats.metricsOverTime;
             workerIntervals << "worker " << worker.id << " " << metrics.size()
-                          << " ";
+                            << " ";
             for (auto &kv : metrics) {
                 const std::string &metricName = kv.first;
                 const auto &metricPoints = kv.second;
                 workerIntervals << metricName << " ";
                 workerIntervals << metricPoints.size() << " ";
                 for (tuple<uint64_t, double> tup : metricPoints) {
-                    workerIntervals << std::get<0>(tup) << "," << std::get<1>(tup)
-                                  << " ";
+                    workerIntervals << std::get<0>(tup) << ","
+                                    << std::get<1>(tup) << " ";
                 }
             }
             workerIntervals << endl;
@@ -728,9 +753,9 @@ string LambdaMaster::getSummary() {
     ofstream sceneStats("scene_stats.txt");
     /* write out information about the scene */
     size_t totalSize = 0;
-    for (auto& kv : treeletTotalSizes) {
-      size_t size = kv.second;
-      totalSize += size;
+    for (auto &kv : treeletTotalSizes) {
+        size_t size = kv.second;
+        totalSize += size;
     }
     sceneStats << totalSize << " " << treeletTotalSizes.size() << " ";
     /* write out information about how many rays were sent */
@@ -873,37 +898,117 @@ void LambdaMaster::aggregateQueueStats() {
     }
 }
 
-void usage(const char *argv0) {
-    cerr << argv0 << " SCENE-DATA PORT NUM-LAMBDA PUBLIC-ADDR STORAGE REGION"
-         << endl;
+void usage(const char *argv0, int exitCode) {
+    cerr << "Usage: " << argv0 << " [OPTIONS]" << endl
+         << endl
+         << "Options:" << endl
+         << "  -s --scene-path PATH    path to scene dump" << endl
+         << "  -p --port PORT          port to use" << endl
+         << "  -i --ip IPSTRING        public ip of this machine" << endl
+         << "  -r --aws-region REGION  region to run lambdas in" << endl
+         << "  -b --scene-bucket NAME  bucket with scene dump" << endl
+         << "  -l --lambdas N          how many lambdas to run" << endl
+         << "  -t --treelet-stats      show treelet use stats" << endl
+         << "  -h --help               show help information" << endl;
+    exit(exitCode);
 }
 
-int main(int argc, char const *argv[]) {
+int main(int argc, char *argv[]) {
     if (argc <= 0) {
         abort();
-    }
-
-    if (argc != 7) {
-        usage(argv[0]);
-        return EXIT_FAILURE;
     }
 
     signal(SIGINT, sigint_handler);
 
     google::InitGoogleLogging(argv[0]);
 
-    const string scene{argv[1]};
-    const uint16_t listenPort = stoi(argv[2]);
-    const uint32_t numLambdas = stoul(argv[3]);
-    const string publicAddress = argv[4];
-    const string storage = argv[5];
-    const string region = argv[6];
+    string scene;
+    uint16_t listenPort = 50000;
+    int32_t numLambdas = -1;
+    string publicIp;
+    string bucketName;
+    string region{"us-west-2"};
+    bool treeletStats = false;
+
+    struct option long_options[] = {
+        {"scene-path", required_argument, nullptr, 's'},
+        {"port", required_argument, nullptr, 'p'},
+        {"ip", required_argument, nullptr, 'i'},
+        {"aws-region", required_argument, nullptr, 'r'},
+        {"scene-bucket", required_argument, nullptr, 'b'},
+        {"lambdas", required_argument, nullptr, 'l'},
+        {"treelet-stats", no_argument, nullptr, 't'},
+        {"help", no_argument, nullptr, 'h'},
+        {nullptr, 0, nullptr, 0},
+    };
+
+    while (true) {
+        const int opt =
+            getopt_long(argc, argv, "s:p:i:r:b:l:th", long_options, nullptr);
+
+        if (opt == -1) {
+            break;
+        }
+
+        switch (opt) {
+        case 's': {
+            scene = optarg;
+            break;
+        }
+        case 'p': {
+            listenPort = stoi(optarg);
+            break;
+        }
+        case 'i': {
+            publicIp = optarg;
+            break;
+        }
+        case 'r': {
+            region = optarg;
+            break;
+        }
+        case 'b': {
+            bucketName = optarg;
+            break;
+        }
+        case 'l': {
+            numLambdas = stoul(optarg);
+            break;
+        }
+        case 't': {
+            treeletStats = true;
+            break;
+        }
+        case 'h': {
+            usage(argv[0], 0);
+            break;
+        }
+        default: {
+            usage(argv[0], 2);
+            break;
+        }
+        }
+    }
+
+    if (scene.empty() || listenPort == 0 || numLambdas < 0 ||
+        publicIp.empty() || bucketName.empty() || region.empty()) {
+        usage(argv[0], 2);
+    }
+
+    ostringstream publicAddress;
+    publicAddress << publicIp << ":" << listenPort;
+
+    ostringstream bucketUri;
+    bucketUri << "s3://" << bucketName << "/?region=" << region;
 
     unique_ptr<LambdaMaster> master;
 
+    MasterConfiguration config = {treeletStats};
+
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,
-                                           publicAddress, storage, region);
+                                           publicAddress.str(), bucketUri.str(),
+                                           region, config);
         master->run();
         if (master) cout << master->getSummary() << endl;
     } catch (const exception &e) {
