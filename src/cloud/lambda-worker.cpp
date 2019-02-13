@@ -126,6 +126,15 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return !finishedQueue.empty(); },
         []() { throw runtime_error("finished queue failed"); })); */
 
+    loop.poller().add_action(
+        Poller::Action(dummyFD, Direction::Out,
+                       [this]() {
+                           finishedQueue.clear();
+                           return ResultType::Continue;
+                       },
+                       [this]() { return finishedQueue.size() > 10000; },
+                       []() { throw runtime_error("finished queue failed"); }));
+
     /* handle peers */
     loop.poller().add_action(Poller::Action(
         peerTimer.fd, Direction::In, bind(&LambdaWorker::handlePeers, this),
