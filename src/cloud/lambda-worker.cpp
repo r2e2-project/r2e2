@@ -70,10 +70,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       statusPrintTimer(STATUS_PRINT_INTERVAL),
       recordMetricsTimer(RECORD_METRICS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
-    roost::chdir(workingDirectory.name());
-    FLAGS_log_dir = ".";
-    google::InitGoogleLogging(logBase.c_str());
-    global::workerStats.start = now();
+
     roost::chdir(workingDirectory.name());
     FLAGS_log_dir = ".";
     google::InitGoogleLogging(logBase.c_str());
@@ -526,7 +523,6 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
         requests.emplace_back(filePath, filePath);
     }
     storageBackend->get(requests);
-    sleep(10);
 }
 
 void LambdaWorker::pushRayQueue(RayState&& state) {
