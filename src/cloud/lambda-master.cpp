@@ -210,13 +210,15 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
     udpConnection->socket().bind({"0.0.0.0", listenPort});
 
-    Vector2i sampleExtent = sampleBounds.Diagonal();
-    Point2i nTiles((sampleExtent.x + TILE_SIZE - 1) / TILE_SIZE,
-                   (sampleExtent.y + TILE_SIZE - 1) / TILE_SIZE);
+    const Vector2i sampleExtent = sampleBounds.Diagonal();
+    tileSize = ceil(sqrt(sampleExtent.x * sampleExtent.y / numberOfLambdas));
+    const Point2i nTiles((sampleExtent.x + tileSize - 1) / tileSize,
+                         (sampleExtent.y + tileSize - 1) / tileSize);
     tiles.resize(nTiles.x * nTiles.y);
     iota(tiles.begin(), tiles.end(), 0);
     shuffle(tiles.begin(), tiles.end(), mt19937{random_device{}()});
 
+    LOG(INFO) << "Tile size: " << tileSize;
     LOG(INFO) << "Total tiles: " << nTiles.x * nTiles.y;
 
     totalPaths =
@@ -293,10 +295,10 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             /* compute the crop window */
             const int tileX = (tiles[currentWorkerID - 1]) % nTiles.x;
             const int tileY = (tiles[currentWorkerID - 1]) / nTiles.x;
-            const int x0 = this->sampleBounds.pMin.x + tileX * TILE_SIZE;
-            const int x1 = min(x0 + TILE_SIZE, this->sampleBounds.pMax.x);
-            const int y0 = this->sampleBounds.pMin.y + tileY * TILE_SIZE;
-            const int y1 = min(y0 + TILE_SIZE, this->sampleBounds.pMax.y);
+            const int x0 = this->sampleBounds.pMin.x + tileX * tileSize;
+            const int x1 = min(x0 + tileSize, this->sampleBounds.pMax.x);
+            const int y0 = this->sampleBounds.pMin.y + tileY * tileSize;
+            const int y1 = min(y0 + tileSize, this->sampleBounds.pMax.y);
             workerIt->second.tile.reset(Point2i{x0, y0}, Point2i{x1, y1});
 
             /* assign root treelet to worker since it is generating rays for
