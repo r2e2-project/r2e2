@@ -67,8 +67,6 @@ struct WorkerStats {
 
     timepoint_t intervalStart{now()};
 
-    timepoint_t intervalStart{now()};
-
     uint64_t finishedPaths() const { return _finishedPaths; }
     uint64_t sentRays() const { return aggregateStats.sentRays; }
     uint64_t receivedRays() const { return aggregateStats.receivedRays; }

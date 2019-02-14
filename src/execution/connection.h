@@ -66,9 +66,9 @@ class UDPConnection {
                         UDPPacketCompare>
         outgoing_datagrams_{};
 
-    static constexpr std::chrono::microseconds pace_{2'000};
+    static constexpr std::chrono::microseconds pace_{5'000};
     bool pacing_{false};
-    int packet_per_pace_{5};
+    int packet_per_pace_{30};
     int sent_packets_{0};
     std::chrono::steady_clock::time_point when_next_;
 
