@@ -331,15 +331,15 @@ ResultType LambdaMaster::updateStatusMessage() {
     const auto elapsedTime = steady_clock::now() - startTime;
     const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
 
-    cerr << setfill('0') << setw(6)
-         << duration_cast<milliseconds>(elapsedTime).count()
-         << " ray: " << workerStats.queueStats.ray
-         << " / finished: " << workerStats.queueStats.finished
-         << " / pending: " << workerStats.queueStats.pending
-         << " / out: " << workerStats.queueStats.out
-         << " / connecting: " << workerStats.queueStats.connecting
-         << " / connected: " << workerStats.queueStats.connected
-         << " / outstanding: " << workerStats.queueStats.outstandingUdp << endl;
+    LOG(INFO) << "QUEUES " << setfill('0') << setw(6)
+              << duration_cast<milliseconds>(elapsedTime).count()
+              << " ray: " << workerStats.queueStats.ray
+              << " / finished: " << workerStats.queueStats.finished
+              << " / pending: " << workerStats.queueStats.pending
+              << " / out: " << workerStats.queueStats.out
+              << " / connecting: " << workerStats.queueStats.connecting
+              << " / connected: " << workerStats.queueStats.connected
+              << " / outstanding: " << workerStats.queueStats.outstandingUdp;
 
     ostringstream oss;
     oss << "\033[0m"

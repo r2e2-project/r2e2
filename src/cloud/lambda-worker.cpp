@@ -132,7 +132,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            finishedQueue.clear();
                            return ResultType::Continue;
                        },
-                       [this]() { return finishedQueue.size() > 10000; },
+                       [this]() { return finishedQueue.size() > 1000; },
                        []() { throw runtime_error("finished queue failed"); }));
 
     /* handle peers */
