@@ -74,8 +74,7 @@ Poller::Result Poller::poll( const int timeout_ms )
   it_pollfd = pollfds_.begin();
 
   set<int> fds_to_remove;
-  static int X = 0;
-  X++;
+
   for ( ; it_action != actions_.end() and it_pollfd != pollfds_.end()
         ; it_action++, it_pollfd++ ) {
     if ( it_pollfd->revents & (POLLERR | POLLHUP | POLLNVAL) ) {
