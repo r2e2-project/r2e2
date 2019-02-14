@@ -102,7 +102,13 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     udpConnection = loop.make_udp_connection(
         [this](shared_ptr<UDPConnection>, Address&& addr, string&& data) {
             auto recorder = global::workerStats.recordInterval("parseUDP");
-            this->messageParser.parse(data);
+            this->udpMessageParser.parse(data);
+
+            while (!this->udpMessageParser.empty()) {
+                this->messageParser.push(move(this->udpMessageParser.front()));
+                this->udpMessageParser.pop();
+            }
+
             return true;
         },
         []() { LOG(INFO) << "UDP connection to coordinator failed."; },

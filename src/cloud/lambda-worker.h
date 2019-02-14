@@ -85,6 +85,7 @@ class LambdaWorker {
     std::shared_ptr<TCPConnection> coordinatorConnection;
     std::shared_ptr<UDPConnection> udpConnection;
     meow::MessageParser messageParser{};
+    meow::MessageParser udpMessageParser{};
     Optional<WorkerId> workerId;
     std::map<WorkerId, Worker> peers;
     int32_t mySeed;
