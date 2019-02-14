@@ -1,14 +1,14 @@
 #include "lambda-worker.h"
 
+#include <getopt.h>
 #include <glog/logging.h>
+#include <stdlib.h>
 #include <sys/timerfd.h>
 #include <cstdlib>
-#include <getopt.h>
 #include <iterator>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
-#include <stdlib.h>
 
 #include "cloud/bvh.h"
 #include "cloud/integrator.h"
@@ -215,41 +215,39 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                        []() { throw runtime_error("status print failed"); }));
 
     /* record metrics */
-    loop.poller().add_action(
-        Poller::Action(recordMetricsTimer.fd, Direction::In,
-                       [this]() {
-                           auto time = now();
+    loop.poller().add_action(Poller::Action(
+        recordMetricsTimer.fd, Direction::In,
+        [this]() {
+            auto time = now();
 
-                           /* record CPU usage */
+            /* record CPU usage */
 
-                           /* record bandwidth usage */
-                           /* NOTE(apoms): we could record the bytes
-                            * sent/received at a finer granularity if we moved
-                            * this to a new poller action */
-                           size_t bytesSent =
-                               (this->coordinatorConnection->bytes_sent +
+            /* record bandwidth usage */
+            /* NOTE(apoms): we could record the bytes
+             * sent/received at a finer granularity if we moved
+             * this to a new poller action */
+            size_t bytesSent = (this->coordinatorConnection->bytes_sent +
                                 this->udpConnection->bytes_sent) -
                                prevBytesSent;
-                           metrics["bytesSent"] = bytesSent;
-                           prevBytesSent += bytesSent;
+            metrics["bytesSent"] = bytesSent;
+            prevBytesSent += bytesSent;
 
-                           size_t bytesReceived =
-                               (this->coordinatorConnection->bytes_received +
-                                this->udpConnection->bytes_received) -
-                               prevBytesReceived;
-                           metrics["bytesReceived"] = bytesReceived;
-                           prevBytesReceived += bytesReceived;
+            size_t bytesReceived =
+                (this->coordinatorConnection->bytes_received +
+                 this->udpConnection->bytes_received) -
+                prevBytesReceived;
+            metrics["bytesReceived"] = bytesReceived;
+            prevBytesReceived += bytesReceived;
 
-                           for (auto& kv : metrics) {
-                               global::workerStats.recordMetric(kv.first, time,
-                                                                kv.second);
-                           }
-                           metrics.clear();
-                           recordMetricsTimer.reset();
-                           return ResultType::Continue;
-                       },
-                       [this]() { return true; },
-                       []() { throw runtime_error("status print failed"); }));
+            for (auto& kv : metrics) {
+                global::workerStats.recordMetric(kv.first, time, kv.second);
+            }
+            metrics.clear();
+            recordMetricsTimer.reset();
+            return ResultType::Continue;
+        },
+        [this]() { return true; },
+        []() { throw runtime_error("status print failed"); }));
 
     Message message{OpCode::Hey, ""};
     coordinatorConnection->enqueue_write(message.str());
@@ -781,88 +779,70 @@ void LambdaWorker::uploadLog() const {
 }
 
 void usage(const char* argv0, int exitCode) {
-    cerr << "Usage: " << argv0 << " [OPTIONS]" << endl << endl
+    cerr << "Usage: " << argv0 << " [OPTIONS]" << endl
+         << endl
          << "Options:" << endl
-         << "  -i --ip IPSTRING        ip of coordinator" << endl
-         << "  -p --port PORT          port of coordinator" << endl
-         << "  -r --aws-region REGION  S3 region to read from" << endl
-         << "  -b --scene-bucket NAME  bucket with scene dump" << endl
-         << "  -h --help               show help information" << endl;
+         << "  -i --ip IPSTRING           ip of coordinator" << endl
+         << "  -p --port PORT             port of coordinator" << endl
+         << "  -s --storage-backend NAME  storage backend URI" << endl
+         << "  -h --help                  show help information" << endl;
     exit(exitCode);
 }
 
-int main(int argc, char * argv[]) {
+int main(int argc, char* argv[]) {
     int exit_status = EXIT_SUCCESS;
 
     uint16_t listenPort = 50000;
     string publicIp;
-    string bucketName;
-    string region{"us-west-2"};
+    string storageBackendUri;
 
     struct option long_options[] = {
-        { "port"     ,          required_argument, nullptr, 'p' },
-        { "ip",                 required_argument, nullptr, 'i' },
-        { "aws-region",         required_argument, nullptr, 'r' },
-        { "scene-bucket",       required_argument, nullptr, 'b' },
-        { "help",               no_argument,       nullptr, 'h' },
-        { nullptr,              0,                 nullptr,  0  },
+        {"port", required_argument, nullptr, 'p'},
+        {"ip", required_argument, nullptr, 'i'},
+        {"storage-backend", required_argument, nullptr, 's'},
+        {"help", no_argument, nullptr, 'h'},
+        {nullptr, 0, nullptr, 0},
     };
 
-    while ( true ) {
-        const int opt = getopt_long( argc, argv, "p:i:r:b:h", long_options, nullptr );
+    while (true) {
+        const int opt =
+            getopt_long(argc, argv, "p:i:s:h", long_options, nullptr);
 
-        if ( opt == -1 ) {
+        if (opt == -1) {
             break;
         }
 
-        switch ( opt ) {
-          case 'p':
-            {
-              listenPort = stoi( optarg );
-              break;
-            }
-          case 'i':
-            {
-              publicIp = optarg;
-              break;
-            }
-          case 'r':
-            {
-              region = optarg;
-              break;
-            }
-          case 'b':
-            {
-              bucketName = optarg;
-              break;
-            }
-          case 'h':
-            {
-              usage(argv[0], 0);
-              break;
-            }
-          default:
-            {
-              usage(argv[0], 2);
-              break;
-            }
+        switch (opt) {
+        case 'p':
+            listenPort = stoi(optarg);
+            break;
+
+        case 'i':
+            publicIp = optarg;
+            break;
+
+        case 's':
+            storageBackendUri = optarg;
+            break;
+
+        case 'h':
+            usage(argv[0], 0);
+            break;
+
+        default:
+            usage(argv[0], 2);
         }
     }
 
-    if (listenPort == 0 ||
-        publicIp.empty() ||
-        bucketName.empty() ||
-        region.empty()) {
-      usage(argv[0], 2);
+    if (listenPort == 0 || publicIp.empty() || storageBackendUri.empty()) {
+        usage(argv[0], 2);
     }
-
-    ostringstream bucketUri;
-    bucketUri << "s3://" << bucketName << "/?region=" << region;
 
     unique_ptr<LambdaWorker> worker;
 
     try {
-        worker = make_unique<LambdaWorker>(publicIp, listenPort, bucketUri.str());
+        worker =
+            make_unique<LambdaWorker>(publicIp, listenPort, storageBackendUri);
         worker->run();
     } catch (const exception& e) {
         LOG(INFO) << argv[0] << ": " << e.what();

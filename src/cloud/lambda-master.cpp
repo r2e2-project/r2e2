@@ -356,9 +356,9 @@ ResultType LambdaMaster::updateStatusMessage() {
             cerr << setw(8) << s.first.to_string();
         }
         cerr << endl;
-        cerr << "log10(demanded rays/s): ";
+        cerr << "demanded rays/s: ";
         for (const auto &s : rateMeters.getRate().stats) {
-            cerr << setw(8) << setprecision(3) << log10(s.second.demandedRays);
+            cerr << setw(8) << setprecision(8) << s.second.demandedRays;
         }
         cerr << endl;
     }
@@ -902,14 +902,14 @@ void usage(const char *argv0, int exitCode) {
     cerr << "Usage: " << argv0 << " [OPTIONS]" << endl
          << endl
          << "Options:" << endl
-         << "  -s --scene-path PATH    path to scene dump" << endl
-         << "  -p --port PORT          port to use" << endl
-         << "  -i --ip IPSTRING        public ip of this machine" << endl
-         << "  -r --aws-region REGION  region to run lambdas in" << endl
-         << "  -b --scene-bucket NAME  bucket with scene dump" << endl
-         << "  -l --lambdas N          how many lambdas to run" << endl
-         << "  -t --treelet-stats      show treelet use stats" << endl
-         << "  -h --help               show help information" << endl;
+         << "  -s --scene-path PATH       path to scene dump" << endl
+         << "  -p --port PORT             port to use" << endl
+         << "  -i --ip IPSTRING           public ip of this machine" << endl
+         << "  -r --aws-region REGION     region to run lambdas in" << endl
+         << "  -b --storage-backend NAME  storage backend URI" << endl
+         << "  -l --lambdas N             how many lambdas to run" << endl
+         << "  -t --treelet-stats         show treelet use stats" << endl
+         << "  -h --help                  show help information" << endl;
     exit(exitCode);
 }
 
@@ -926,7 +926,7 @@ int main(int argc, char *argv[]) {
     uint16_t listenPort = 50000;
     int32_t numLambdas = -1;
     string publicIp;
-    string bucketName;
+    string storageBackendUri;
     string region{"us-west-2"};
     bool treeletStats = false;
 
@@ -935,7 +935,7 @@ int main(int argc, char *argv[]) {
         {"port", required_argument, nullptr, 'p'},
         {"ip", required_argument, nullptr, 'i'},
         {"aws-region", required_argument, nullptr, 'r'},
-        {"scene-bucket", required_argument, nullptr, 'b'},
+        {"storage-backend", required_argument, nullptr, 'b'},
         {"lambdas", required_argument, nullptr, 'l'},
         {"treelet-stats", no_argument, nullptr, 't'},
         {"help", no_argument, nullptr, 'h'},
@@ -968,7 +968,7 @@ int main(int argc, char *argv[]) {
             break;
         }
         case 'b': {
-            bucketName = optarg;
+            storageBackendUri = optarg;
             break;
         }
         case 'l': {
@@ -991,15 +991,12 @@ int main(int argc, char *argv[]) {
     }
 
     if (scene.empty() || listenPort == 0 || numLambdas < 0 ||
-        publicIp.empty() || bucketName.empty() || region.empty()) {
+        publicIp.empty() || storageBackendUri.empty() || region.empty()) {
         usage(argv[0], 2);
     }
 
     ostringstream publicAddress;
     publicAddress << publicIp << ":" << listenPort;
-
-    ostringstream bucketUri;
-    bucketUri << "s3://" << bucketName << "/?region=" << region;
 
     unique_ptr<LambdaMaster> master;
 
@@ -1007,8 +1004,8 @@ int main(int argc, char *argv[]) {
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,
-                                           publicAddress.str(), bucketUri.str(),
-                                           region, config);
+                                           publicAddress.str(),
+                                           storageBackendUri, region, config);
         master->run();
         if (master) cout << master->getSummary() << endl;
     } catch (const exception &e) {

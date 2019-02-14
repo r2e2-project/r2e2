@@ -26,9 +26,9 @@ def handler(event, context):
     os.system("rm -rf /tmp/pbrt-lambda-*")
 
     retcode, output = run_command(["pbrt-lambda-worker",
-                                   coordinator_host,
-                                   coordinator_port,
-                                   storage_backend])
+                                   "--ip", coordinator_host,
+                                   "--port", coordinator_port,
+                                   "--storage-backend", storage_backend])
 
     print(output)
     print(retcode)
