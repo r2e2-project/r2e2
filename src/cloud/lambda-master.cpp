@@ -362,20 +362,6 @@ bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
     return true;
 }
 
-void LambdaMaster::logWorkerInfo(const Worker &worker) const {
-    const uint64_t outBitrate =
-        (worker.stats.bytesSent / (worker.stats.interval.count() / 1000.0));
-
-    const uint64_t inBitrate =
-        (worker.stats.bytesReceived / (worker.stats.interval.count() / 1000.0));
-
-    LOG(INFO)
-        << "[worker:" << worker.id << "]"
-        << " time="
-        << chrono::duration_cast<milliseconds>(now().time_since_epoch()).count()
-        << " out=" << outBitrate << " in=" << inBitrate;
-}
-
 bool LambdaMaster::processMessage(const uint64_t workerId,
                                   const meow::Message &message) {
     /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
@@ -419,6 +405,9 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         protobuf::WorkerStats proto;
         protoutil::from_string(message.payload(), proto);
         auto stats = from_protobuf(proto);
+        if (stats.timePerAction.size() > 0) {
+          diagnosticsReceived += 1;
+        }
         /* merge into global worker stats */
         workerStats.merge(stats);
         /* merge into local worker stats */
@@ -435,7 +424,6 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
              greater<tuple<uint64_t, uint64_t>>());
         treeletPriority = treeletLoads;
 
-        logWorkerInfo(workers.at(workerId));
         break;
     }
 
@@ -475,9 +463,29 @@ void LambdaMaster::run() {
             });
     }
 
-    while (true) {
-        auto res = loop.loop_once().result;
-        if (res != PollerResult::Success && res != PollerResult::Timeout) break;
+    try {
+        while (true) {
+            auto res = loop.loop_once().result;
+            if (res != PollerResult::Success && res != PollerResult::Timeout)
+                break;
+        }
+    } catch (const interrupt_error &e) {
+    }
+
+    cerr << "Waiting to receive diagnostics from workers.." << endl;
+    /* Ask workers to send back diagnostic stats */
+    size_t numWorkers = workers.size();
+    for (auto& kv : workers) {
+        auto worker = kv.second;
+        Message message{OpCode::RequestDiagnostics, ""};
+        worker.connection->enqueue_write(message.str());
+    }
+
+    diagnosticsReceived = 0;
+    while (diagnosticsReceived < numWorkers) {
+      auto res = loop.loop_once().result;
+      if (res != PollerResult::Success && res != PollerResult::Timeout)
+        break;
     }
 }
 
@@ -507,16 +515,39 @@ string LambdaMaster::getSummary() {
 
     /* Print worker intervals */
     {
-        double totalTime = durations[durations.size() - 1] / 1000.0;
+        uint64_t minTime = std::numeric_limits<uint64_t>::max();
+        uint64_t maxTime = 0;
+        for (auto &kv : (*workers.begin()).second.stats.intervalsPerAction) {
+            for (tuple<uint64_t, uint64_t> tup : kv.second) {
+                uint64_t start, end;
+                std::tie(start, end) = tup;
+                if (start < minTime) {
+                    minTime = start;
+                }
+                if (end > maxTime) {
+                    maxTime = end;
+                }
+            }
+        }
+        printf("min time %lu, max time %lu\n", minTime, maxTime);
+        double totalTime = (maxTime - minTime) / 1e9;
 
-        auto printActionTimes = [&](const WorkerStats &stats, double normalizer = 1.0) {
+        auto printActionTimes = [&](const WorkerStats &stats,
+                                    double normalizer = 1.0) {
+            double sum = 0;
             for (auto &kv : stats.timePerAction) {
                 auto actionTime = kv.second / 1e9 / normalizer;
+                sum += actionTime;
                 oss << setfill(' ') << setw(20) << kv.first << ": " << setw(6)
                     << setprecision(2) << actionTime / totalTime * 100.0 << ", "
                     << setw(8) << setprecision(5) << actionTime << " seconds"
                     << endl;
             }
+            oss << setfill(' ') << setw(20) << "other: " << setw(6)
+                << setprecision(2) << (totalTime - sum) / totalTime * 100.0
+                << ", " << setw(8) << setprecision(5) << (totalTime - sum)
+                << " seconds" << endl;
+
             oss << endl;
         };
         oss << "Average actions:" << endl;
@@ -528,19 +559,20 @@ string LambdaMaster::getSummary() {
             Worker &worker = kv.second;
             double actionsSum = 0;
             for (auto &kv : worker.stats.timePerAction) {
+                if (kv.first == "idle") continue;
                 auto actionTime = kv.second / 1e9;
                 actionsSum += actionTime;
             }
             if (actionsSum > maxActionsLength) {
-              maxWorkerID = worker.id;
-              maxActionsLength = actionsSum;
+                maxWorkerID = worker.id;
+                maxActionsLength = actionsSum;
+            }
+            }
+            if (maxActionsLength > 0) {
+                oss << "Most busy worker intervals:" << endl;
+                printActionTimes(workers.at(maxWorkerID).stats);
             }
         }
-        if (maxActionsLength > 0) {
-            oss << "Most busy worker intervals:" << endl;
-            printActionTimes(workers.at(maxWorkerID).stats);
-        }
-    }
 
     /* Print ray duration percentiles */
     vector<double> sortedRayDurations = workerStats.aggregateStats.rayDurations;
@@ -561,22 +593,59 @@ string LambdaMaster::getSummary() {
     }
     oss << endl;
 
+    ofstream workerIntervals("worker_stats.txt");
     /* write out worker intervals */
-    ofstream workerIntervals("worker_intervals.txt");
-    for (auto &worker_kv : workers) {
-        const auto &worker = worker_kv.second;
-        const auto &intervals = worker.stats.intervalsPerAction;
-        workerIntervals << "worker " << worker.id << " " << intervals.size() << " ";
-        for (auto &kv : intervals) {
-            workerIntervals << kv.first << " ";
-            workerIntervals << kv.second.size() << " ";
-            for (tuple<uint64_t, uint64_t> tup : kv.second) {
-                workerIntervals << std::get<0>(tup) << "," << std::get<1>(tup)
-                                << " ";
+    workerIntervals << workers.size() << endl;
+    {
+        workerIntervals << "intervals" << endl;
+        for (auto &worker_kv : workers) {
+            const auto &worker = worker_kv.second;
+            const auto &intervals = worker.stats.intervalsPerAction;
+            workerIntervals << "worker " << worker.id << " " << intervals.size()
+                            << " ";
+            for (auto &kv : intervals) {
+                workerIntervals << kv.first << " ";
+                workerIntervals << kv.second.size() << " ";
+                for (tuple<uint64_t, uint64_t> tup : kv.second) {
+                    workerIntervals << std::get<0>(tup) << ","
+                                    << std::get<1>(tup) << " ";
+                }
             }
+            workerIntervals << endl;
         }
-        workerIntervals << endl;
     }
+    /* write out metrics */
+    {
+        workerIntervals << "metrics" << endl;
+        for (auto &kv : workers) {
+            const Worker &worker = kv.second;
+            const auto &metrics = worker.stats.metricsOverTime;
+            workerIntervals << "worker " << worker.id << " " << metrics.size()
+                          << " ";
+            for (auto &kv : metrics) {
+                const std::string &metricName = kv.first;
+                const auto &metricPoints = kv.second;
+                workerIntervals << metricName << " ";
+                workerIntervals << metricPoints.size() << " ";
+                for (tuple<uint64_t, double> tup : metricPoints) {
+                    workerIntervals << std::get<0>(tup) << "," << std::get<1>(tup)
+                                  << " ";
+                }
+            }
+            workerIntervals << endl;
+        }
+    }
+    ofstream sceneStats("scene_stats.txt");
+    /* write out information about the scene */
+    size_t totalSize = 0;
+    for (auto& kv : treeletTotalSizes) {
+      size_t size = kv.second;
+      totalSize += size;
+    }
+    sceneStats << totalSize << " " << treeletTotalSizes.size() << " ";
+    /* write out information about how many rays were sent */
+    sceneStats << workerStats.aggregateStats.sentRays;
+
     return oss.str();
 }
 
@@ -629,7 +698,7 @@ void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
 
 void LambdaMaster::assignAllTreelets(Worker &worker) {
     for (const auto &treeletId : treeletIds) {
-        if (treeletId.id == 0 || (treeletId.id % 100 == worker.id % 100))
+        if (treeletId.id == 0 || (treeletId.id % 4 == worker.id % 4))
             assignTreelet(worker, treeletId);
     }
 }
@@ -748,9 +817,7 @@ int main(int argc, char const *argv[]) {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,
                                            publicAddress, storage, region);
         master->run();
-    } catch (const interrupt_error &e) {
         if (master) cout << master->getSummary() << endl;
-        return EXIT_FAILURE;
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;

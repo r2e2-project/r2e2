@@ -301,12 +301,23 @@ message WorkerStats {
     repeated Interval intervals = 2;
   }
 
+  message MetricPoint {
+    uint64 time = 1;
+    float value = 2;
+  }
+
+  message Metrics {
+    string name = 1;
+    repeated MetricPoint points = 2;
+  }
+
   uint64 finished_paths = 1;
   RayStats aggregate_stats = 2;
   QueueStats queue_stats = 3;
   repeated ObjectRayStats object_stats = 4;
   map<string, float> time_per_action = 5;
   repeated ActionIntervals intervals_per_action = 6;
+  repeated Metrics metrics_over_time = 7;
 }
 
 // Materials & Textures

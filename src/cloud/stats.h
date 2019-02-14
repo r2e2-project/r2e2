@@ -14,6 +14,7 @@ inline timepoint_t now() { return std::chrono::system_clock::now(); };
 
 #define PER_RAY_STATS
 #define PER_INTERVAL_STATS
+#define RECORD_METRICS
 
 const double RAY_PERCENTILES[] = {0.5, 0.9, 0.99, 0.999, 0.9999};
 constexpr size_t NUM_PERCENTILES = sizeof(RAY_PERCENTILES) / sizeof(double);
@@ -46,15 +47,18 @@ struct QueueStats {
 };
 
 struct WorkerStats {
+    /* required stats */
     uint64_t _finishedPaths{0};
-
     RayStats aggregateStats;
     QueueStats queueStats;
     std::map<SceneManager::ObjectKey, RayStats> objectStats;
 
+    /* diagnostic stats */
     std::map<std::string, double> timePerAction;
     std::map<std::string, std::vector<std::tuple<uint64_t, uint64_t>>>
         intervalsPerAction;
+    std::map<std::string, std::vector<std::tuple<uint64_t, double>>>
+        metricsOverTime;
 
     uint64_t bytesSent{0};
     uint64_t bytesReceived{0};
@@ -79,6 +83,7 @@ struct WorkerStats {
                            timepoint_t start, timepoint_t end);
 
     void reset();
+    void resetDiagnostics();
 
     void merge(const WorkerStats& other);
 
@@ -100,6 +105,8 @@ struct WorkerStats {
     Recorder recordInterval(const std::string& name) {
         return Recorder(*this, name);
     }
+
+    void recordMetric(const std::string& name, timepoint_t time, double metric);
 };
 
 /**
@@ -136,7 +143,6 @@ class ExponentialMovingAverage {
   // The current estimate of the moving average
   double average;
 };
-
 
 namespace global {
 extern WorkerStats workerStats;

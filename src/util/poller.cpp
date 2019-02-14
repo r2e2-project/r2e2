@@ -7,6 +7,8 @@
 #include "poller.h"
 #include "exception.h"
 
+#include "cloud/stats.h"
+
 using namespace std;
 using namespace PollerShortNames;
 
@@ -60,9 +62,12 @@ Poller::Result Poller::poll( const int timeout_ms )
                        [] ( bool acc, pollfd x ) { return acc or x.events; } ) ) {
     return Result::Type::Exit;
   }
-
-  if ( 0 == CheckSystemCall( "poll", ::poll( &pollfds_[ 0 ], pollfds_.size(), timeout_ms ) ) ) {
-    return Result::Type::Timeout;
+  {
+      auto recorder = pbrt::global::workerStats.recordInterval("idle");
+      if (0 == CheckSystemCall(
+                   "poll", ::poll(&pollfds_[0], pollfds_.size(), timeout_ms))) {
+          return Result::Type::Timeout;
+      }
   }
 
   it_action = actions_.begin();

@@ -7,6 +7,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <stdlib.h>
 
 #include "cloud/bvh.h"
 #include "cloud/integrator.h"
@@ -45,6 +46,7 @@ class ProgramFinished : public exception {};
 constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{10'000};
 constexpr chrono::milliseconds WORKER_STATS_INTERVAL{2'000};
+constexpr chrono::milliseconds RECORD_METRICS_INTERVAL{1'000};
 
 protobuf::FinishedRay createFinishedRay(const size_t sampleId,
                                         const Point2f& pFilm,
@@ -65,7 +67,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
       peerTimer(PEER_CHECK_INTERVAL),
       workerStatsTimer(WORKER_STATS_INTERVAL),
-      statusPrintTimer(STATUS_PRINT_INTERVAL) {
+      statusPrintTimer(STATUS_PRINT_INTERVAL),
+      recordMetricsTimer(RECORD_METRICS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
     roost::chdir(workingDirectory.name());
     FLAGS_log_dir = ".";
@@ -74,7 +77,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     roost::chdir(workingDirectory.name());
     FLAGS_log_dir = ".";
     google::InitGoogleLogging(logBase.c_str());
-    global::workerStats.start = now();
+    global::workerStats.intervalStart = now();
 
     PbrtOptions.nThreads = 1;
     global::manager.init(".");
@@ -146,7 +149,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     loop.poller().add_action(Poller::Action(
         workerStatsTimer.fd, Direction::In,
         [this]() {
-          auto recorder = global::workerStats.recordInterval("sendStats");
+            auto recorder = global::workerStats.recordInterval("sendStats");
             workerStatsTimer.reset();
 
             auto& qStats = global::workerStats.queueStats;
@@ -159,16 +162,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                     return peer.second.state == Worker::State::Connecting;
                 });
             qStats.connected = peers.size() - qStats.connecting;
-
-            global::workerStats.bytesSent =
-                (this->coordinatorConnection->bytes_sent +
-                 this->udpConnection->bytes_sent) -
-                global::workerStats.bytesSent;
-
-            global::workerStats.bytesReceived =
-                (this->coordinatorConnection->bytes_received +
-                 this->udpConnection->bytes_received) -
-                global::workerStats.bytesReceived;
 
             auto proto = to_protobuf(global::workerStats);
             Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
@@ -191,6 +184,43 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                                      << " / out: " << outQueueSize
                                      << " / peers: " << peers.size();
 
+                           return ResultType::Continue;
+                       },
+                       [this]() { return true; },
+                       []() { throw runtime_error("status print failed"); }));
+
+    /* record metrics */
+    loop.poller().add_action(
+        Poller::Action(recordMetricsTimer.fd, Direction::In,
+                       [this]() {
+                           auto time = now();
+
+                           /* record CPU usage */
+
+                           /* record bandwidth usage */
+                           /* NOTE(apoms): we could record the bytes
+                            * sent/received at a finer granularity if we moved
+                            * this to a new poller action */
+                           size_t bytesSent =
+                               (this->coordinatorConnection->bytes_sent +
+                                this->udpConnection->bytes_sent) -
+                               prevBytesSent;
+                           metrics["bytesSent"] = bytesSent;
+                           prevBytesSent += bytesSent;
+
+                           size_t bytesReceived =
+                               (this->coordinatorConnection->bytes_received +
+                                this->udpConnection->bytes_received) -
+                               prevBytesReceived;
+                           metrics["bytesReceived"] = bytesReceived;
+                           prevBytesReceived += bytesReceived;
+
+                           for (auto& kv : metrics) {
+                               global::workerStats.recordMetric(kv.first, time,
+                                                                kv.second);
+                           }
+                           metrics.clear();
+                           recordMetricsTimer.reset();
                            return ResultType::Continue;
                        },
                        [this]() { return true; },
@@ -386,7 +416,6 @@ Poller::Action::Result::Type LambdaWorker::handlePeers() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleMessages() {
-    auto recorder = global::workerStats.recordInterval("handleMessages");
     MessageParser unprocessedMessages;
     while (!messageParser.empty()) {
         Message message = move(messageParser.front());
@@ -469,6 +498,7 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
         requests.emplace_back(filePath, filePath);
     }
     storageBackend->get(requests);
+    sleep(10);
 }
 
 void LambdaWorker::pushRayQueue(RayState&& state) {
@@ -625,6 +655,15 @@ bool LambdaWorker::processMessage(const Message& message) {
             }
         }
 
+        break;
+    }
+
+    case OpCode::RequestDiagnostics: {
+        LOG(INFO) << "Diagnosstics requested, sending...";
+        auto proto = to_protobuf_diagnostics(global::workerStats);
+        Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
+        coordinatorConnection->enqueue_write(message.str());
+        LOG(INFO) << "Diagnostics sent.";
         break;
     }
 
