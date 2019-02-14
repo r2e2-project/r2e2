@@ -238,54 +238,11 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         bind(&LambdaMaster::handleWriteOutput, this), [this]() { return true; },
         []() { throw runtime_error("worker requests failed"); }));
 
-    loop.poller().add_action(Poller::Action(
-        statusPrintTimer.fd, Direction::In,
-        [this]() {
-            statusPrintTimer.reset();
-
-            aggregateQueueStats();
-
-            const auto elapsedTime = steady_clock::now() - startTime;
-            const auto elapsedSeconds =
-                duration_cast<seconds>(elapsedTime).count();
-
-            cerr << setfill('0') << setw(6)
-                 << duration_cast<milliseconds>(elapsedTime).count()
-                 << " ray: " << workerStats.queueStats.ray
-                 << " / finished: " << workerStats.queueStats.finished
-                 << " / pending: " << workerStats.queueStats.pending
-                 << " / out: " << workerStats.queueStats.out
-                 << " / connecting: " << workerStats.queueStats.connecting
-                 << " / connected: " << workerStats.queueStats.connected
-                 << " / outstanding: " << workerStats.queueStats.outstandingUdp
-                 << endl;
-
-            ostringstream oss;
-            oss << "\033[0m"
-                << "\033[48;5;022m"
-                << " done paths: " << workerStats.finishedPaths() << " ("
-                << fixed << setprecision(1)
-                << (100.0 * workerStats.finishedPaths() / totalPaths) << "%)"
-                << " | workers: " << workers.size() << " ("
-                << initializedWorkers << ")"
-                << " | requests: " << pendingWorkerRequests.size()
-                << " | \u2191 " << workerStats.sentRays() << " | \u2193 "
-                << workerStats.receivedRays() << " (" << fixed
-                << setprecision(1)
-                << (workerStats.sentRays() == 0
-                        ? 0
-                        : (100.0 * workerStats.receivedRays() /
-                           workerStats.sentRays()))
-                << "%)"
-                << " | time: " << setfill('0') << setw(2)
-                << (elapsedSeconds / 60) << ":" << setw(2)
-                << (elapsedSeconds % 60);
-
-            StatusBar::set_text(oss.str());
-            return ResultType::Continue;
-        },
-        [this]() { return true; },
-        []() { throw runtime_error("status print failed"); }));
+    loop.poller().add_action(
+        Poller::Action(statusPrintTimer.fd, Direction::In,
+                       bind(&LambdaMaster::updateStatusMessage, this),
+                       [this]() { return true; },
+                       []() { throw runtime_error("status print failed"); }));
 
     loop.make_listener({"0.0.0.0", listenPort}, [this, nTiles](
                                                     ExecutionLoop &loop,
@@ -364,6 +321,46 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         currentWorkerID++;
         return true;
     });
+}
+
+ResultType LambdaMaster::updateStatusMessage() {
+    statusPrintTimer.reset();
+
+    aggregateQueueStats();
+
+    const auto elapsedTime = steady_clock::now() - startTime;
+    const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
+
+    cerr << setfill('0') << setw(6)
+         << duration_cast<milliseconds>(elapsedTime).count()
+         << " ray: " << workerStats.queueStats.ray
+         << " / finished: " << workerStats.queueStats.finished
+         << " / pending: " << workerStats.queueStats.pending
+         << " / out: " << workerStats.queueStats.out
+         << " / connecting: " << workerStats.queueStats.connecting
+         << " / connected: " << workerStats.queueStats.connected
+         << " / outstanding: " << workerStats.queueStats.outstandingUdp << endl;
+
+    ostringstream oss;
+    oss << "\033[0m"
+        << "\033[48;5;022m"
+        << " done paths: " << workerStats.finishedPaths() << " (" << fixed
+        << setprecision(1) << (100.0 * workerStats.finishedPaths() / totalPaths)
+        << "%)"
+        << " | workers: " << workers.size() << " (" << initializedWorkers << ")"
+        << " | requests: " << pendingWorkerRequests.size() << " | \u2191 "
+        << workerStats.sentRays() << " | \u2193 " << workerStats.receivedRays()
+        << " (" << fixed << setprecision(1)
+        << (workerStats.sentRays() == 0
+                ? 0
+                : (100.0 * workerStats.receivedRays() / workerStats.sentRays()))
+        << "%)"
+        << " | time: " << setfill('0') << setw(2) << (elapsedSeconds / 60)
+        << ":" << setw(2) << (elapsedSeconds % 60);
+
+    StatusBar::set_text(oss.str());
+
+    return ResultType::Continue;
 }
 
 ResultType LambdaMaster::handleMessages() {
