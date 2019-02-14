@@ -74,8 +74,6 @@ class LambdaMaster {
             : worker(worker), treelet(treelet) {}
     };
 
-    void logWorkerInfo(const Worker &worker) const;
-
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleWorkerRequests();
     Poller::Action::Result::Type handleWriteOutput();
@@ -156,6 +154,7 @@ class LambdaMaster {
     /* Worker stats */
     WorkerStats workerStats;
     size_t initializedWorkers{0};
+    size_t diagnosticsReceived{0};
 };
 
 class Schedule {

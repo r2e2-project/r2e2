@@ -122,6 +122,12 @@ class LambdaWorker {
     TimerFD peerTimer;
     TimerFD statusPrintTimer;
     TimerFD workerStatsTimer;
+    TimerFD recordMetricsTimer;
+
+    /* Metrics accumulator */
+    std::map<std::string, double> metrics;
+    size_t prevBytesSent{0};
+    size_t prevBytesReceived{0};
 
     bool terminated{false};
 };

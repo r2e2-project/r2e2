@@ -7,6 +7,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <stdlib.h>
 
 #include "cloud/bvh.h"
 #include "cloud/integrator.h"
@@ -45,6 +46,7 @@ class ProgramFinished : public exception {};
 constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{10'000};
 constexpr chrono::milliseconds WORKER_STATS_INTERVAL{2'000};
+constexpr chrono::milliseconds RECORD_METRICS_INTERVAL{1'000};
 
 protobuf::FinishedRay createFinishedRay(const size_t sampleId,
                                         const Point2f& pFilm,
@@ -65,11 +67,17 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
       peerTimer(PEER_CHECK_INTERVAL),
       workerStatsTimer(WORKER_STATS_INTERVAL),
-      statusPrintTimer(STATUS_PRINT_INTERVAL) {
+      statusPrintTimer(STATUS_PRINT_INTERVAL),
+      recordMetricsTimer(RECORD_METRICS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
     roost::chdir(workingDirectory.name());
     FLAGS_log_dir = ".";
     google::InitGoogleLogging(logBase.c_str());
+    global::workerStats.start = now();
+    roost::chdir(workingDirectory.name());
+    FLAGS_log_dir = ".";
+    google::InitGoogleLogging(logBase.c_str());
+    global::workerStats.intervalStart = now();
 
     PbrtOptions.nThreads = 1;
     global::manager.init(".");
@@ -84,6 +92,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     coordinatorConnection = loop.make_connection<TCPConnection>(
         coordinatorAddr,
         [this](shared_ptr<TCPConnection>, string&& data) {
+            auto recorder = global::workerStats.recordInterval("parseTCP");
             this->messageParser.parse(data);
             return true;
         },
@@ -92,6 +101,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     udpConnection = loop.make_udp_connection(
         [this](shared_ptr<UDPConnection>, Address&& addr, string&& data) {
+            auto recorder = global::workerStats.recordInterval("parseUDP");
             this->messageParser.parse(data);
             return true;
         },
@@ -139,6 +149,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     loop.poller().add_action(Poller::Action(
         workerStatsTimer.fd, Direction::In,
         [this]() {
+            auto recorder = global::workerStats.recordInterval("sendStats");
             workerStatsTimer.reset();
 
             auto& qStats = global::workerStats.queueStats;
@@ -151,16 +162,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                     return peer.second.state == Worker::State::Connecting;
                 });
             qStats.connected = peers.size() - qStats.connecting;
-
-            global::workerStats.bytesSent =
-                (this->coordinatorConnection->bytes_sent +
-                 this->udpConnection->bytes_sent) -
-                global::workerStats.bytesSent;
-
-            global::workerStats.bytesReceived =
-                (this->coordinatorConnection->bytes_received +
-                 this->udpConnection->bytes_received) -
-                global::workerStats.bytesReceived;
 
             auto proto = to_protobuf(global::workerStats);
             Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
@@ -183,6 +184,43 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                                      << " / out: " << outQueueSize
                                      << " / peers: " << peers.size();
 
+                           return ResultType::Continue;
+                       },
+                       [this]() { return true; },
+                       []() { throw runtime_error("status print failed"); }));
+
+    /* record metrics */
+    loop.poller().add_action(
+        Poller::Action(recordMetricsTimer.fd, Direction::In,
+                       [this]() {
+                           auto time = now();
+
+                           /* record CPU usage */
+
+                           /* record bandwidth usage */
+                           /* NOTE(apoms): we could record the bytes
+                            * sent/received at a finer granularity if we moved
+                            * this to a new poller action */
+                           size_t bytesSent =
+                               (this->coordinatorConnection->bytes_sent +
+                                this->udpConnection->bytes_sent) -
+                               prevBytesSent;
+                           metrics["bytesSent"] = bytesSent;
+                           prevBytesSent += bytesSent;
+
+                           size_t bytesReceived =
+                               (this->coordinatorConnection->bytes_received +
+                                this->udpConnection->bytes_received) -
+                               prevBytesReceived;
+                           metrics["bytesReceived"] = bytesReceived;
+                           prevBytesReceived += bytesReceived;
+
+                           for (auto& kv : metrics) {
+                               global::workerStats.recordMetric(kv.first, time,
+                                                                kv.second);
+                           }
+                           metrics.clear();
+                           recordMetricsTimer.reset();
                            return ResultType::Continue;
                        },
                        [this]() { return true; },
@@ -212,6 +250,7 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
+    auto recorder = global::workerStats.recordInterval("handleRayQueue");
     deque<RayState> processedRays;
 
     constexpr size_t MAX_RAYS = 100'000;
@@ -219,7 +258,13 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayState ray = popRayQueue();
         if (!ray.toVisit.empty()) {
+            auto rayTraceStart = now();
+            const uint32_t rayTreelet = ray.toVisit.back().treelet;
             auto newRay = CloudIntegrator::Trace(move(ray), bvh);
+            global::workerStats.recordRayInterval(
+                SceneManager::ObjectKey{ObjectType::Treelet, rayTreelet},
+                rayTraceStart, now());
+
             const bool hit = newRay.hit.initialized();
             const bool emptyVisit = newRay.toVisit.empty();
 
@@ -274,6 +319,7 @@ Poller::Action::Result::Type LambdaWorker::handleRayQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
+    auto recorder = global::workerStats.recordInterval("handleOutQueue");
     for (auto& q : outQueue) {
         if (q.second.size() == 0) continue;
 
@@ -315,6 +361,7 @@ Poller::Action::Result::Type LambdaWorker::handleOutQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
+    auto recorder = global::workerStats.recordInterval("handleFinishedQueue");
     ostringstream oss;
 
     {
@@ -344,6 +391,7 @@ Poller::Action::Result::Type LambdaWorker::handleFinishedQueue() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handlePeers() {
+    auto recorder = global::workerStats.recordInterval("handlePeers");
     peerTimer.reset();
 
     for (auto& kv : peers) {
@@ -384,6 +432,7 @@ Poller::Action::Result::Type LambdaWorker::handleMessages() {
 }
 
 Poller::Action::Result::Type LambdaWorker::handleNeededTreelets() {
+    auto recorder = global::workerStats.recordInterval("handleNeededTreelets");
     for (const auto& treeletId : neededTreelets) {
         if (requestedTreelets.count(treeletId)) {
             continue;
@@ -401,6 +450,7 @@ Poller::Action::Result::Type LambdaWorker::handleNeededTreelets() {
 }
 
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
+    auto recorder = global::workerStats.recordInterval("generateRays");
     const Bounds2i sampleBounds = camera->film->GetSampleBounds();
     const Vector2i sampleExtent = sampleBounds.Diagonal();
     const uint8_t maxDepth = 5;
@@ -433,6 +483,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 }
 
 void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
+    auto recorder = global::workerStats.recordInterval("getObjects");
     vector<storage::GetRequest> requests;
     for (const protobuf::ObjectKey& ObjectKey : objects.object_ids()) {
         SceneManager::ObjectKey id = from_protobuf(ObjectKey);
@@ -447,6 +498,7 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
         requests.emplace_back(filePath, filePath);
     }
     storageBackend->get(requests);
+    sleep(10);
 }
 
 void LambdaWorker::pushRayQueue(RayState&& state) {
@@ -603,6 +655,15 @@ bool LambdaWorker::processMessage(const Message& message) {
             }
         }
 
+        break;
+    }
+
+    case OpCode::RequestDiagnostics: {
+        LOG(INFO) << "Diagnosstics requested, sending...";
+        auto proto = to_protobuf_diagnostics(global::workerStats);
+        Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
+        coordinatorConnection->enqueue_write(message.str());
+        LOG(INFO) << "Diagnostics sent.";
         break;
     }
 

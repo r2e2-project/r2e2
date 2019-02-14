@@ -28,6 +28,7 @@ namespace meow {
       WorkerStats,
       SendRays,
       FinishedRays,
+      RequestDiagnostics,
       Bye,
 
       COUNT
@@ -47,6 +48,7 @@ namespace meow {
         "WorkerStats",
         "SendRays",
         "FinishedRays",
+        "RequestDiagnostics",
         "Bye"};
 
   private:

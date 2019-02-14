@@ -65,6 +65,7 @@ protobuf::AnimatedTransform to_protobuf(const AnimatedTransform& transform);
 protobuf::TriangleMesh to_protobuf(const TriangleMesh& triangleMesh);
 protobuf::VisitNode to_protobuf(const RayState::TreeletNode& node);
 protobuf::RayState to_protobuf(const RayState& state);
+protobuf::RayState to_protobuf_diagnostics(const RayState& state);
 protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample);
 protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 protobuf::Scene to_protobuf(const Scene& scene);
@@ -73,6 +74,7 @@ protobuf::ObjectKey to_protobuf(
     const SceneManager::ObjectKey& ObjectKey);
 protobuf::RayStats to_protobuf(const RayStats& state);
 protobuf::WorkerStats to_protobuf(const WorkerStats& state);
+protobuf::WorkerStats to_protobuf_diagnostics(const WorkerStats& state);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);

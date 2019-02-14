@@ -300,6 +300,11 @@ protobuf::RayStats to_protobuf(const RayStats& stats) {
   proto.set_received_rays(stats.receivedRays);
   proto.set_waiting_rays(stats.waitingRays);
   proto.set_processed_rays(stats.processedRays);
+  return proto;
+}
+
+protobuf::RayStats to_protobuf_diagnostics(const RayStats& stats) {
+  protobuf::RayStats proto = to_protobuf(stats);
   for (double d : stats.traceDurationPercentiles) {
     proto.add_trace_duration_percentiles(d);
   }
@@ -332,12 +337,45 @@ protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
         (*ray_stats->mutable_id()) = to_protobuf(kv.first);
         (*ray_stats->mutable_stats()) = to_protobuf(kv.second);
     }
+    return proto;
+}
 
-    proto.set_bytes_sent(stats.bytesSent);
-    proto.set_bytes_received(stats.bytesReceived);
-    proto.set_interval_ms(
-        duration_cast<milliseconds>(now() - stats.intervalStart).count());
-
+protobuf::WorkerStats to_protobuf_diagnostics(const WorkerStats& stats) {
+    protobuf::WorkerStats proto;
+    proto.set_finished_paths(stats._finishedPaths);
+    (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
+    (*proto.mutable_queue_stats()) = to_protobuf(stats.queueStats);
+    for (const auto& kv : stats.objectStats) {
+        protobuf::WorkerStats::ObjectRayStats* ray_stats =
+            proto.add_object_stats();
+        (*ray_stats->mutable_id()) = to_protobuf(kv.first);
+        (*ray_stats->mutable_stats()) = to_protobuf_diagnostics(kv.second);
+    }
+    for (const auto& kv : stats.timePerAction) {
+      (*proto.mutable_time_per_action())[kv.first] = kv.second;
+    }
+    for (const auto& kv : stats.intervalsPerAction) {
+        protobuf::WorkerStats::ActionIntervals* action_intervals =
+            proto.add_intervals_per_action();
+        action_intervals->set_name(kv.first);
+        for (std::tuple<uint64_t, uint64_t> interval : kv.second) {
+            protobuf::WorkerStats::Interval* proto_interval =
+                action_intervals->add_intervals();
+            proto_interval->set_start(std::get<0>(interval));
+            proto_interval->set_end(std::get<1>(interval));
+        }
+    }
+    for (const auto& kv : stats.metricsOverTime) {
+        protobuf::WorkerStats::Metrics* metrics =
+            proto.add_metrics_over_time();
+        metrics->set_name(kv.first);
+        for (std::tuple<uint64_t, double> point : kv.second) {
+            protobuf::WorkerStats::MetricPoint* metric_point =
+                metrics->add_points();
+            metric_point->set_time(std::get<0>(point));
+            metric_point->set_value(std::get<1>(point));
+        }
+    }
     return proto;
 }
 
@@ -873,7 +911,7 @@ RayStats from_protobuf(const protobuf::RayStats& proto) {
     stats.waitingRays = proto.waiting_rays();
     stats.processedRays = proto.processed_rays();
 
-    for (int i = 0; i < NUM_PERCENTILES; ++i) {
+    for (int i = 0; i < proto.trace_duration_percentiles_size(); ++i) {
       double d = proto.trace_duration_percentiles(i);
       stats.traceDurationPercentiles[i] = d;
     }
@@ -910,10 +948,20 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
     for (const auto& kv : proto.time_per_action()) {
         stats.timePerAction[kv.first] = kv.second;
     }
-
-    stats.bytesSent = proto.bytes_sent();
-    stats.bytesReceived = proto.bytes_received();
-    stats.interval = milliseconds{proto.interval_ms()};
+    for (const auto& action_interval : proto.intervals_per_action()) {
+      const std::string& name = action_interval.name();
+      for (const auto& interval : action_interval.intervals()) {
+          stats.intervalsPerAction[name].push_back(
+              std::make_tuple(interval.start(), interval.end()));
+      }
+    }
+    for (const auto& metrics : proto.metrics_over_time()) {
+        const std::string& name = metrics.name();
+        for (const auto& metric_point : metrics.points()) {
+            stats.metricsOverTime[name].push_back(
+                std::make_tuple(metric_point.time(), metric_point.value()));
+        }
+    }
 
     return stats;
 }

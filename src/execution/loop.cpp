@@ -129,7 +129,7 @@ ExecutionLoop::add_connection( TCPSocket && socket,
        close_callback { move( real_close_callback ) }] ()
       {
         string data { move( connection->socket_.read() ) };
-        connection->bytes_received = data.length();
+        connection->bytes_received += data.length();
 
         if ( data.empty() or not data_callback( connection, move( data ) ) ) {
           close_callback();

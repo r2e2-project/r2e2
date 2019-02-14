@@ -63,12 +63,31 @@ void WorkerStats::recordProcessedRay(const SceneManager::ObjectKey& type) {
 
 #undef INCREMENT_FIELD
 
+void WorkerStats::recordRayInterval(const SceneManager::ObjectKey& type,
+                                    timepoint_t start, timepoint_t end) {
+    auto total_time =
+        std::chrono::duration_cast<std::chrono::nanoseconds>((end - start))
+            .count();
+    aggregateStats.rayDurations.push_back(total_time);
+#ifdef PER_RAY_STATS
+    objectStats[type].rayDurations.push_back(total_time);
+#endif
+}
+
 void WorkerStats::reset() {
     _finishedPaths = 0;
     aggregateStats.reset();
     objectStats.clear();
+}
+
+void WorkerStats::resetDiagnostics() {
+    reset();
     timePerAction.clear();
     intervalStart = now();
+    intervalsPerAction.clear();
+    intervalStart = now();
+    intervalsPerAction.clear();
+    metricsOverTime.clear();
 }
 
 void WorkerStats::merge(const WorkerStats& other) {
@@ -81,20 +100,42 @@ void WorkerStats::merge(const WorkerStats& other) {
     for (const auto& kv : other.timePerAction) {
         timePerAction[kv.first] += kv.second;
     }
-
-    bytesSent = other.bytesSent;
-    bytesReceived = other.bytesReceived;
-    interval = other.interval;
+    for (const auto& kv : other.intervalsPerAction) {
+        intervalsPerAction[kv.first].insert(intervalsPerAction[kv.first].end(),
+                                            kv.second.begin(), kv.second.end());
+    }
+    for (const auto& kv : other.metricsOverTime) {
+        metricsOverTime[kv.first].insert(metricsOverTime[kv.first].end(),
+                                         kv.second.begin(), kv.second.end());
+    }
 }
 
 WorkerStats::Recorder::~Recorder() {
     auto end = now();
-    stats.timePerAction[name] += duration_cast<nanoseconds>((end - start)).count();
+    stats.timePerAction[name] +=
+        std::chrono::duration_cast<std::chrono::nanoseconds>((end - start))
+            .count();
+#ifdef PER_INTERVAL_STATS
+    stats.intervalsPerAction[name].push_back(std::make_tuple(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            (start - stats.intervalStart)).count(),
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            (end - stats.intervalStart)).count()));
+#endif
 }
 
-WorkerStats::Recorder::Recorder(WorkerStats& stats, const std::string& name)
-    : stats(stats), name(name) {
+WorkerStats::Recorder::Recorder(WorkerStats& stats_, const std::string& name_)
+    : stats(stats_), name(name_) {
     start = now();
+}
+
+void WorkerStats::recordMetric(const std::string& name, timepoint_t time,
+                               double metric) {
+    metricsOverTime[name].push_back(std::make_tuple(
+        (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(time -
+                                                                       intervalStart)
+            .count(),
+        metric));
 }
 
 ExponentialMovingAverage::ExponentialMovingAverage(
@@ -122,5 +163,4 @@ double ExponentialMovingAverage::update( double value, high_resolution_clock::ti
   lastValue = value;
   return average;
 }
-
 }  // namespace pbrt
