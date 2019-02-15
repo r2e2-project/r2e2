@@ -27,9 +27,16 @@
 
 namespace pbrt {
 
+enum Assignment {
+    Static,
+    Uniform,
+};
+
 struct MasterConfiguration {
   bool treeletStats;
   bool workerStats;
+  Assignment assignment;
+  bool collectDiagnostics;
 };
 
 class LambdaMaster {
@@ -94,7 +101,11 @@ class LambdaMaster {
     void assignTreelet(Worker &worker, const TreeletId treeletId);
 
     void assignBaseSceneObjects(Worker &worker);
-    void assignAllTreelets(Worker &worker);
+    // Assigns this worker a single treelet per a uniform assignment of
+    // treelets over workers. Assumes that treelet ids are in [0, t], where 0
+    // is the root treelet and is assigned to everyone.  Assumes that worker
+    // ids are in [0, w];
+    void assignTreeletsUniformly(Worker &worker);
     void assignTreelets(Worker &worker);
 
     void updateObjectUsage(const Worker &worker);
@@ -166,7 +177,6 @@ class LambdaMaster {
 
     /* Static Assignments */
     void loadStaticAssignment(const uint32_t numWorkers);
-    bool staticAssignment{false};
     std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
 
     const MasterConfiguration config;
