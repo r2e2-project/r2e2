@@ -57,6 +57,7 @@ struct WorkerStats {
     RayStats aggregateStats;
     QueueStats queueStats;
     std::map<SceneManager::ObjectKey, RayStats> objectStats;
+    std::chrono::milliseconds cpuTime{0};
 
     /* diagnostic stats */
     std::map<std::string, double> timePerAction;

@@ -329,6 +329,7 @@ protobuf::QueueStats to_protobuf(const QueueStats& stats) {
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
     protobuf::WorkerStats proto;
     proto.set_finished_paths(stats._finishedPaths);
+    proto.set_cpu_millis(stats.cpuTime.count());
     (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
     (*proto.mutable_queue_stats()) = to_protobuf(stats.queueStats);
 
@@ -344,6 +345,7 @@ protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
 protobuf::WorkerStats to_protobuf_diagnostics(const WorkerStats& stats) {
     protobuf::WorkerStats proto;
     proto.set_finished_paths(stats._finishedPaths);
+    proto.set_cpu_millis(stats.cpuTime.count());
     (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
     (*proto.mutable_queue_stats()) = to_protobuf(stats.queueStats);
     for (const auto& kv : stats.objectStats) {
@@ -942,6 +944,7 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
         auto id = from_protobuf(object_stats.id());
         stats.objectStats[id] = from_protobuf(object_stats.stats());
     }
+    stats.cpuTime = std::chrono::milliseconds(proto.cpu_millis());
 
     for (const auto& kv : proto.time_per_action()) {
         stats.timePerAction[kv.first] = kv.second;

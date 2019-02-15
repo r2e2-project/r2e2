@@ -347,7 +347,7 @@ ResultType LambdaMaster::updateStatusMessage() {
               << " / connected: " << workerStats.queueStats.connected
               << " / outstanding: " << workerStats.queueStats.outstandingUdp;
 
-    if (this->config.treeletStats) {
+    if (config.treeletStats) {
         cerr << "Net demand (rays/s): " << demandTracker.netDemand() << endl;
         cerr << "            Treelet: ";
         for (const ObjectKey &tid : treeletIds) {
@@ -358,6 +358,26 @@ ResultType LambdaMaster::updateStatusMessage() {
         for (const ObjectKey &tid : treeletIds) {
             cerr << setw(8) << setprecision(4)
                  << log10(demandTracker.treeletDemand(tid.id));
+        }
+        cerr << endl;
+    }
+
+    if (config.workerStats) {
+        cerr << "                 Worker: ";
+        for (const auto &kv : workers) {
+            cerr << setw(8) << kv.first;
+        }
+        cerr << endl;
+        cerr << "        CPU time (ms/s): ";
+        for (const auto &kv : workers) {
+            cerr << setw(8)
+                 << int(cpuTimeMillisTrackers[kv.first].getRate());
+        }
+        cerr << endl;
+        cerr << "Rays processed (log /s): ";
+        for (const auto &kv : workers) {
+            cerr << setw(8) << setprecision(4)
+                 << log10(processedRayTrackers[kv.first].getRate());
         }
         cerr << endl;
     }
@@ -521,6 +541,10 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         }
 
         demandTracker.submit(workerId, stats);
+        processedRayTrackers[workerId].update(
+            double(stats.aggregateStats.processedRays));
+        cpuTimeMillisTrackers[workerId].update(double(
+            (stats.cpuTime - workers.at(workerId).stats.cpuTime).count()));
 
         /* merge into global worker stats */
         workerStats.merge(stats);
@@ -927,6 +951,7 @@ int main(int argc, char *argv[]) {
     string storageBackendUri;
     string region{"us-west-2"};
     bool treeletStats = false;
+    bool workerStats = false;
 
     struct option long_options[] = {
         {"scene-path", required_argument, nullptr, 's'},
@@ -936,13 +961,14 @@ int main(int argc, char *argv[]) {
         {"storage-backend", required_argument, nullptr, 'b'},
         {"lambdas", required_argument, nullptr, 'l'},
         {"treelet-stats", no_argument, nullptr, 't'},
+        {"worker-stats", no_argument, nullptr, 'w'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "s:p:i:r:b:l:th", long_options, nullptr);
+            getopt_long(argc, argv, "s:p:i:r:b:l:twh", long_options, nullptr);
 
         if (opt == -1) {
             break;
@@ -977,6 +1003,10 @@ int main(int argc, char *argv[]) {
             treeletStats = true;
             break;
         }
+        case 'w': {
+            workerStats = true;
+            break;
+        }
         case 'h': {
             usage(argv[0], 0);
             break;
@@ -998,7 +1028,7 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {treeletStats};
+    MasterConfiguration config = {treeletStats, workerStats};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,

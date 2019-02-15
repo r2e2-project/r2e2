@@ -84,6 +84,7 @@ void WorkerStats::reset() {
     _finishedPaths = 0;
     aggregateStats.reset();
     objectStats.clear();
+    cpuTime = std::chrono::milliseconds(0);
 }
 
 void WorkerStats::resetDiagnostics() {
@@ -103,6 +104,7 @@ void WorkerStats::merge(const WorkerStats& other) {
     for (const auto& kv : other.objectStats) {
         objectStats[kv.first].merge(kv.second);
     }
+    cpuTime = other.cpuTime;
     for (const auto& kv : other.timePerAction) {
         timePerAction[kv.first] += kv.second;
     }

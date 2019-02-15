@@ -3,6 +3,7 @@
 #include <getopt.h>
 #include <glog/logging.h>
 #include <stdlib.h>
+#include <sys/resource.h>
 #include <sys/timerfd.h>
 #include <cstdlib>
 #include <iterator>
@@ -185,6 +186,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                 (this->coordinatorConnection->bytes_received +
                  this->udpConnection->bytes_received) -
                 global::workerStats.bytesReceived;
+
+            rusage usage;
+            CheckSystemCall("getrusage", ::getrusage(RUSAGE_SELF, &usage));
+            global::workerStats.cpuTime = std::chrono::milliseconds(
+                1000 * (usage.ru_stime.tv_sec + usage.ru_utime.tv_sec) +
+                (usage.ru_stime.tv_usec + usage.ru_utime.tv_usec) / 1000);
 
             qStats.outstandingUdp = this->udpConnection->queue_size();
 

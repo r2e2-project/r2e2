@@ -29,6 +29,7 @@ namespace pbrt {
 
 struct MasterConfiguration {
   bool treeletStats;
+  bool workerStats;
 };
 
 class LambdaMaster {
@@ -169,6 +170,10 @@ class LambdaMaster {
     std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
 
     const MasterConfiguration config;
+    // For estimating the cpu time (in millis) per second wall-clock
+    std::map<WorkerId, RateEstimator<double>> cpuTimeMillisTrackers;
+    // For estimating the rays traced per second
+    std::map<WorkerId, RateEstimator<double>> processedRayTrackers;
 };
 
 class Schedule {
