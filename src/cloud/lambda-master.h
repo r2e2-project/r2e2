@@ -170,8 +170,9 @@ class LambdaMaster {
     std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
 
     const MasterConfiguration config;
-    // For estimating the cpu time (in millis) per second wall-clock
-    std::map<WorkerId, RateEstimator<double>> cpuTimeMillisTrackers;
+    // For estimating the cpu utilization of workers. A number that is likely
+    // between 0 and 1.
+    std::map<WorkerId, RateEstimator<double>> cpuUtilizationTracker;
     // For estimating the rays traced per second
     std::map<WorkerId, RateEstimator<double>> processedRayTrackers;
 };

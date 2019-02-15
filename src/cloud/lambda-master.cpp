@@ -17,6 +17,7 @@
 
 #include "cloud/manager.h"
 #include "cloud/raystate.h"
+#include "cloud/estimators.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/transform.h"
@@ -368,10 +369,13 @@ ResultType LambdaMaster::updateStatusMessage() {
             cerr << setw(8) << kv.first;
         }
         cerr << endl;
-        cerr << "        CPU time (ms/s): ";
+        cerr << "           CPU time (%): ";
+        vector<double> cpuPercents;
         for (const auto &kv : workers) {
-            cerr << setw(8)
-                 << int(cpuTimeMillisTrackers[kv.first].getRate());
+            double cpuPercent =
+                cpuUtilizationTracker[kv.first].getRate() * 100.0;
+            cpuPercents.push_back(cpuPercent);
+            cerr << setw(8) << int(cpuPercent + 0.5);
         }
         cerr << endl;
         cerr << "Rays processed (log /s): ";
@@ -380,6 +384,10 @@ ResultType LambdaMaster::updateStatusMessage() {
                  << log10(processedRayTrackers[kv.first].getRate());
         }
         cerr << endl;
+
+        const auto mAndS = meanAndStandardDev(cpuPercents);
+        cerr << "CPU utilization mean: " << mAndS.first << endl;
+        cerr << "CPU utilization SD  : " << mAndS.second << endl;
     }
 
     ostringstream oss;
@@ -543,8 +551,8 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         demandTracker.submit(workerId, stats);
         processedRayTrackers[workerId].update(
             double(stats.aggregateStats.processedRays));
-        cpuTimeMillisTrackers[workerId].update(double(
-            (stats.cpuTime - workers.at(workerId).stats.cpuTime).count()));
+        cpuUtilizationTracker[workerId].update(double(
+            (stats.cpuTime - workers.at(workerId).stats.cpuTime).count()) / 1000.0);
 
         /* merge into global worker stats */
         workerStats.merge(stats);

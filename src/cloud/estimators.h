@@ -3,6 +3,8 @@
 
 #include <math.h>
 #include <chrono>
+#include <vector>
+#include <utility>
 
 /**
  * This class maintains a moving sum of stream of values.
@@ -91,5 +93,8 @@ template <typename T>
 const T& RateEstimator<T>::getRate() const {
     return sum.getSum();
 }
+
+// Computes the mean and standard deviation
+std::pair<double, double> meanAndStandardDev(const std::vector<double> & xs);
 
 #endif  // PBRT_CLOUD_ESTIMATORS_H
