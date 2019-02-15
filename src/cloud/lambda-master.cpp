@@ -139,8 +139,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
       workerRequestTimer(WORKER_REQUEST_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL),
       writeOutputTimer(WRITE_OUTPUT_INTERVAL),
-      rateMeter(),
-      rateMeters(),
+      demandTracker(),
       config(config) {
     global::manager.init(scenePath);
     loadCamera();
@@ -177,7 +176,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         }
     }
 
-    loadStaticAssignment(numberOfLambdas);
+    // loadStaticAssignment(numberOfLambdas);
 
     udpConnection = loop.make_udp_connection(
         [&](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
@@ -349,16 +348,16 @@ ResultType LambdaMaster::updateStatusMessage() {
               << " / outstanding: " << workerStats.queueStats.outstandingUdp;
 
     if (this->config.treeletStats) {
-        const RayStatsD &rate = rateMeter.getRate();
-        cerr << rate.demandedRays << endl;
-        cerr << "               Treelet: ";
-        for (const auto &s : rateMeters.getRate().stats) {
-            cerr << setw(8) << s.first.to_string();
+        cerr << "Net demand (rays/s): " << demandTracker.netDemand() << endl;
+        cerr << "            Treelet: ";
+        for (const ObjectKey &tid : treeletIds) {
+            cerr << setw(8) << tid.to_string();
         }
         cerr << endl;
-        cerr << "demanded rays/s: ";
-        for (const auto &s : rateMeters.getRate().stats) {
-            cerr << setw(8) << setprecision(8) << s.second.demandedRays;
+        cerr << "    demand (rays/s): ";
+        for (const ObjectKey &tid : treeletIds) {
+            cerr << setw(8) << setprecision(4)
+                 << log10(demandTracker.treeletDemand(tid.id));
         }
         cerr << endl;
     }
@@ -521,8 +520,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
             diagnosticsReceived += 1;
         }
 
-        rateMeter.update(RayStatsD{stats.aggregateStats});
-        rateMeters.update(RayStatsPerObjectD{stats});
+        demandTracker.submit(workerId, stats);
 
         /* merge into global worker stats */
         workerStats.merge(stats);
@@ -809,7 +807,7 @@ void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
 
 void LambdaMaster::assignAllTreelets(Worker &worker) {
     for (const auto &treeletId : treeletIds) {
-        if (treeletId.id == 0 || (treeletId.id % 4 == worker.id % 4))
+        if (treeletId.id == 0 || (treeletId.id % 100 == worker.id % 100))
             assignTreelet(worker, treeletId.id);
     }
 }

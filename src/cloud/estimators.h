@@ -1,116 +1,95 @@
-#include <chrono>
+#ifndef PBRT_CLOUD_ESTIMATORS_H
+#define PBRT_CLOUD_ESTIMATORS_H
+
 #include <math.h>
+#include <chrono>
 
 /**
- * This class handles a stream of incoming (value, time) pairs, where the time
- * values are monotonically increasing, but not uniformly distributed, and
- * maintains an estimate of the average value over the last `period`.
+ * This class maintains a moving sum of stream of values.
  *
- * An implementation of the (linearly interpolated) exponential moving average
- * as described in S4.3 of this paper:
- *   http://www.eckner.com/papers/Algorithms%20for%20Unevenly%20Spaced%20Time%20Series.pdf
- * That paper cites a high-frequency trading book written by Muller.
+ * This sum is exponentially smoothed.
  *
  * T must support addition and multiplication by doubles
  */
 template <typename T>
-class ExponentialMovingAverage {
- public:
-  ExponentialMovingAverage(std::chrono::high_resolution_clock::duration period);
+class ExponentialMovingSum {
+  public:
+    ExponentialMovingSum(std::chrono::high_resolution_clock::duration period);
 
-  // Feed this (value, time) pair into the stream.
-  void update(const T& value, std::chrono::high_resolution_clock::time_point time);
-  // Feed this value into the stream with the current time.
-  void updateNow(const T& value);
+    // Add this value, now.
+    void add(const T& value);
 
-  // Get the current average estimate
-  const T& getAverage() const { return average; }
+    // Get the current sum estimate
+    const T& getSum() const { return sum; }
 
- private:
-  // The period over which the moving average is computed.
-  // (e.g. the average of the last `period`)
-  const std::chrono::high_resolution_clock::duration period;
+  private:
+    // The period over which the moving sum is computed.
+    // (e.g. the sum of the last `period`, exponentially smoothed)
+    const std::chrono::high_resolution_clock::duration period;
 
-  // Whether the stream has seen no data yet.
-  bool empty;
-  // The last value fed into the stream
-  T lastValue;
-  // The time that the last value was fed into the stream
-  std::chrono::high_resolution_clock::time_point lastTime;
-  // The last value of W2, used when multiple points have the same time.
-  double lastW2;
+    // The time that the last value was fed into the stream
+    std::chrono::high_resolution_clock::time_point lastTime;
 
-  // The current estimate of the moving average
-  T average;
+    // The current estimate of the moving sum
+    T sum;
 };
 
 template <typename T>
-ExponentialMovingAverage<T>::ExponentialMovingAverage(
+ExponentialMovingSum<T>::ExponentialMovingSum(
     std::chrono::high_resolution_clock::duration period)
-    : period(period), empty(true) {
-    // lastValue, lastTime, and average will all be ignored since `empty` is
-    // true.
+    : period{period},
+      lastTime{std::chrono::high_resolution_clock::now()},
+      sum{} {
+    // No other members
 }
 
 template <typename T>
-void ExponentialMovingAverage<T>::updateNow( const T& value ) {
-  update( value, std::chrono::high_resolution_clock::now() );
-}
-
-template <typename T>
-void ExponentialMovingAverage<T>::update( const T& value, std::chrono::high_resolution_clock::time_point time ) {
-  if ( empty ) {
-    empty = false;
-    average = value;
-    lastW2 = 1.0;
-    lastValue = value;
-  } else {
-    std::chrono::high_resolution_clock::duration deltaT = time - lastTime;
-    if ( deltaT <= std::chrono::nanoseconds{0} ) {
-      average = average + (1.0 - lastW2) * value;
-      lastValue = lastValue + value;
-    } else {
-        double w1 = exp(-double(deltaT.count()) / double(period.count()));
-        double w2 =
-            (1.0 - w1) * double(period.count()) / double(deltaT.count());
-        average = w1 * average + (1.0 - w2) * value + (w2 - w1) * lastValue;
-        lastW2 = w2;
-        lastValue = value;
-    }
-  }
-  lastTime = time;
+void ExponentialMovingSum<T>::add(const T& value) {
+    const auto now = std::chrono::high_resolution_clock::now();
+    const auto deltaT = now - lastTime;
+    const double x = double(deltaT.count()) / double(period.count());
+    sum = exp(-x) * sum + value;
+    lastTime = now;
 }
 
 template <typename T>
 class RateEstimator {
- public:
-  RateEstimator();
-  void update(const T& value);
-  const T& getRate();
- private:
-  bool empty;
-  std::chrono::high_resolution_clock::time_point lastTime;
-  ExponentialMovingAverage<T> averager;
+  public:
+    // Construct a rate estimator. Initially the rate is 0.
+    RateEstimator();
+    // Submit a new delta to this rate estimator! Modifies the estimate.
+    // The value of the `delta` should be how much stuff happened since the
+    // last update.
+    void update(const T& delta);
+    // Gets the current estimate of the rate (/s).
+    const T& getRate() const;
+
+  private:
+    std::chrono::high_resolution_clock::duration period;
+    double secondsPerPeriod;
+    ExponentialMovingSum<T> sum;
 };
 
 template <typename T>
-RateEstimator<T>::RateEstimator() : empty(true), averager(std::chrono::seconds(1)) {}
+RateEstimator<T>::RateEstimator()
+    : period{std::chrono::duration_cast<
+          std::chrono::high_resolution_clock::duration>(
+          std::chrono::seconds(3))},
+      secondsPerPeriod{
+          1.0 / double(std::chrono::duration_cast<std::chrono::seconds>(period)
+                           .count())},
+      sum{period} {
+    // No other members
+}
 
 template <typename T>
 void RateEstimator<T>::update(const T& value) {
-  std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
-  if ( empty ) {
-    empty = false;
-  } else {
-    std::chrono::duration<double> period = now - lastTime;
-    T thisRate = value * (1.0 / period.count());
-    averager.update(thisRate, now);
-  }
-  lastTime = now;
+    sum.add(secondsPerPeriod * value);
 }
 
 template <typename T>
-const T& RateEstimator<T>::getRate() {
-  return averager.getAverage();
+const T& RateEstimator<T>::getRate() const {
+    return sum.getSum();
 }
 
+#endif  // PBRT_CLOUD_ESTIMATORS_H

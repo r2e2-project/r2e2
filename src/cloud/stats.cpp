@@ -2,7 +2,6 @@
 
 #include <math.h>
 #include <iomanip>
-#include <iostream>
 
 using namespace std::chrono;
 using namespace std;
@@ -147,57 +146,48 @@ void WorkerStats::recordMetric(const std::string& name, timepoint_t time,
         metric));
 }
 
-RayStatsD operator+(const RayStatsD& a, const RayStatsD& b) {
-    return RayStatsD{
-        a.sentRays + b.sentRays,         a.receivedRays + b.receivedRays,
-        a.waitingRays + b.waitingRays,   a.processedRays + b.processedRays,
-        a.demandedRays + b.demandedRays,
-    };
-}
+DemandTracker::DemandTracker()
+    : estimators(), byWorker(), byTreelet(), total(0.0) {}
+void DemandTracker::submit(WorkerId wid, const WorkerStats& stats) {
+    for (const auto& kv : stats.objectStats) {
+        if (kv.first.type == ObjectType::Treelet) {
+            TreeletId tid = kv.first.id;
+            double oldRate = workerTreeletDemand(wid, tid);
+            RateEstimator<double>& estimator = estimators[make_pair(wid, tid)];
 
-RayStatsD operator*(const RayStatsD& a, double scalar) {
-    return RayStatsD{
-        a.sentRays * scalar,     a.receivedRays * scalar,
-        a.waitingRays * scalar,  a.processedRays * scalar,
-        a.demandedRays * scalar,
-    };
-}
-
-RayStatsD operator*(double scalar, const RayStatsD& a) { return a * scalar; }
-
-void RayStatsD::reset() {
-    sentRays = 0.0;
-    receivedRays = 0.0;
-    waitingRays = 0.0;
-    processedRays = 0.0;
-    demandedRays = 0.0;
-}
-
-RayStatsPerObjectD::RayStatsPerObjectD() {}
-RayStatsPerObjectD::RayStatsPerObjectD(const WorkerStats& full) {
-    for (const auto& kv : full.objectStats) {
-        stats.insert(make_pair(kv.first, RayStatsD{kv.second}));
+            estimator.update(double(kv.second.demandedRays));
+            double rateChange = workerTreeletDemand(wid, tid) - oldRate;
+            total += rateChange;
+            byWorker[wid] += rateChange;
+            byTreelet[tid] += rateChange;
+        }
     }
 }
 
-RayStatsPerObjectD operator+(const RayStatsPerObjectD& a,
-                             const RayStatsPerObjectD& b) {
-    RayStatsPerObjectD n{a};
-    for (const auto& kv : b.stats) {
-        n.stats[kv.first] = n.stats[kv.first] + kv.second;
+double DemandTracker::workerDemand(WorkerId wid) const {
+    if (byWorker.count(wid)) {
+        return byWorker.at(wid);
+    } else {
+        return 0.0;
     }
-    return n;
 }
 
-RayStatsPerObjectD operator*(const RayStatsPerObjectD& a, double scalar) {
-    RayStatsPerObjectD n{a};
-    for (auto& kv : n.stats) {
-        kv.second = kv.second * scalar;
+double DemandTracker::treeletDemand(TreeletId tid) const {
+    if (byTreelet.count(tid)) {
+        return byTreelet.at(tid);
+    } else {
+        return 0.0;
     }
-    return n;
 }
 
-RayStatsPerObjectD operator*(double scalar, const RayStatsPerObjectD& a) {
-    return a * scalar;
+double DemandTracker::workerTreeletDemand(WorkerId wid, TreeletId tid) const {
+    const auto key = make_pair(wid, tid);
+    if (estimators.count(key)) {
+        return estimators.at(key).getRate();
+    } else {
+        return 0.0;
+    }
 }
+
+double DemandTracker::netDemand() const { return total; }
 }  // namespace pbrt

@@ -159,8 +159,7 @@ class LambdaMaster {
 
     /* Worker stats */
     WorkerStats workerStats;
-    RateEstimator<RayStatsD> rateMeter;
-    RateEstimator<RayStatsPerObjectD> rateMeters;
+    DemandTracker demandTracker;
     size_t initializedWorkers{0};
     size_t diagnosticsReceived{0};
 

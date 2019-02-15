@@ -46,7 +46,7 @@ class ProgramFinished : public exception {};
 
 constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{10'000};
-constexpr chrono::milliseconds WORKER_STATS_INTERVAL{2'000};
+constexpr chrono::milliseconds WORKER_STATS_INTERVAL{500};
 constexpr chrono::milliseconds RECORD_METRICS_INTERVAL{1'000};
 
 protobuf::FinishedRay createFinishedRay(const size_t sampleId,

@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cstdint>
 
+#include "cloud/estimators.h"
+#include "cloud/lambda.h"
 #include "cloud/manager.h"
 
 namespace pbrt {
@@ -111,61 +113,21 @@ struct WorkerStats {
     void recordMetric(const std::string& name, timepoint_t time, double metric);
 };
 
-// Ray statistics, but with doubles for numerical stability
-struct RayStatsD {
-    /* rays sent to this scene object */
-    double sentRays{0};
-    /* rays received for this scene object */
-    double receivedRays{0};
-    /* rays waiting to be processed for this scene object */
-    double waitingRays{0};
-    /* rays processed for this scene object */
-    double processedRays{0};
-    /* rays that require (or required) this scence object to render */
-    double demandedRays{0};
+class DemandTracker {
+  public:
+    DemandTracker();
+    void submit(WorkerId wid, const WorkerStats& stats);
+    double workerDemand(WorkerId wid) const;
+    double treeletDemand(TreeletId tid) const;
+    double workerTreeletDemand(WorkerId wid, TreeletId tid) const;
+    double netDemand() const;
 
-    void reset();
-
-    RayStatsD()
-        : sentRays(0),
-          receivedRays(0),
-          waitingRays(0),
-          processedRays(0),
-          demandedRays(0) {}
-
-    RayStatsD(double sentRays, double receivedRays, double waitingRays,
-              double processedRays, double demandedRays)
-        : sentRays(sentRays),
-          receivedRays(receivedRays),
-          waitingRays(waitingRays),
-          processedRays(processedRays),
-          demandedRays(demandedRays) {}
-    RayStatsD(const RayStats& other)
-        : sentRays(other.sentRays),
-          receivedRays(other.receivedRays),
-          waitingRays(other.waitingRays),
-          processedRays(other.processedRays),
-          demandedRays(other.demandedRays) {}
+  private:
+    std::map<std::pair<WorkerId, TreeletId>, RateEstimator<double>> estimators;
+    std::map<WorkerId, double> byWorker;
+    std::map<TreeletId, double> byTreelet;
+    double total;
 };
-
-RayStatsD operator+(const RayStatsD& a, const RayStatsD& b);
-
-RayStatsD operator*(const RayStatsD& a, double scalar);
-
-RayStatsD operator*(double scalar, const RayStatsD& a);
-
-struct RayStatsPerObjectD {
-    std::map<SceneManager::ObjectKey, RayStatsD> stats;
-    RayStatsPerObjectD();
-    RayStatsPerObjectD(const WorkerStats& full);
-};
-
-RayStatsPerObjectD operator+(const RayStatsPerObjectD& a,
-                             const RayStatsPerObjectD& b);
-
-RayStatsPerObjectD operator*(const RayStatsPerObjectD& a, double scalar);
-
-RayStatsPerObjectD operator*(double scalar, const RayStatsPerObjectD& a);
 
 namespace global {
 extern WorkerStats workerStats;
