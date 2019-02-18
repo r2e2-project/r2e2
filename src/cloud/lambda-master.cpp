@@ -379,10 +379,73 @@ ResultType LambdaMaster::updateStatusMessage() {
         }
         cerr << endl;
 
-        cerr << "Rays processed (log /s): ";
+        cerr << "Rays processed     (/s): ";
         for (const auto &kv : workers) {
-            cerr << setw(8) << setprecision(4)
-                 << log10(processedRayTrackers[kv.first].getRate());
+            cerr << setw(8)
+                 << int(processedRayTrackers[kv.first].getRate());
+        }
+        cerr << endl;
+
+        cerr << "Rays received      (/s): ";
+        for (const auto &kv : workers) {
+            cerr << setw(8)
+                 << int(receivedRaysByWorker[kv.first].getRate());
+        }
+        cerr << endl;
+
+        cerr << "Ray Q                  : ";
+        for (const auto &kv : workers) {
+            cerr << setw(8)
+                 << workers.at(kv.first).stats.queueStats.ray;
+        }
+        cerr << endl;
+
+        cerr << "Pending Q              : ";
+        for (const auto &kv : workers) {
+            cerr << setw(8)
+                 << workers.at(kv.first).stats.queueStats.pending;
+        }
+        cerr << endl;
+
+        cerr << "Out Q                  : ";
+        for (const auto &kv : workers) {
+            cerr << setw(8)
+                 << workers.at(kv.first).stats.queueStats.out;
+        }
+        cerr << endl;
+
+        cerr << "Outstanding UDP        : ";
+        for (const auto &kv : workers) {
+            cerr << setw(8)
+                 << workers.at(kv.first).stats.queueStats.outstandingUdp;
+        }
+        cerr << endl;
+
+        cerr << "Connecting Count       : ";
+        for (const auto &kv : workers) {
+            cerr << setw(8)
+                 << workers.at(kv.first).stats.queueStats.connecting;
+        }
+        cerr << endl;
+
+        cerr << "Connected  Count       : ";
+        for (const auto &kv : workers) {
+            cerr << setw(8)
+                 << workers.at(kv.first).stats.queueStats.connected;
+        }
+        cerr << endl;
+
+        cerr << "          Ingress (b/s): ";
+        for (const auto &kv : workers) {
+            cerr << setw(8) << setprecision(2)
+                 << 8 * receivedBytesByWorker[kv.first].getRate();
+        }
+        cerr << endl;
+
+        cerr << "         Outgress (b/s): ";
+        for (const auto &kv : workers) {
+            cerr << setw(8) << setprecision(2)
+                 << 8 * sentBytesByWorker[kv.first].getRate();
         }
         cerr << endl;
 
@@ -401,6 +464,23 @@ ResultType LambdaMaster::updateStatusMessage() {
         const auto mAndS = meanAndStandardDev(cpuPercents);
         cerr << "CPU utilization mean: " << mAndS.first << endl;
         cerr << "CPU utilization SD  : " << mAndS.second << endl;
+        cerr << "Net   Bytes Sent    : " << setw(15) << workerStats.bytesSent
+             << endl;
+        cerr << "Net   Bytes Received: " << setw(15)
+             << workerStats.bytesReceived << endl;
+        cerr << "Net             Loss: " << setprecision(3)
+             << (double(workerStats.bytesSent) -
+                 double(workerStats.bytesReceived)) /
+                    double(workerStats.bytesSent)
+             << endl;
+        cerr << "   Send Rate: " << setprecision(5)
+             << 8 * bytesSentRate.getRate() << endl;
+        cerr << "Receive Rate: " << setprecision(5)
+             << 8 * bytesReceivedRate.getRate() << endl;
+        cerr << "Current Loss: " << setprecision(3)
+             << (bytesSentRate.getRate() - bytesReceivedRate.getRate()) /
+                    bytesSentRate.getRate()
+             << endl;
     }
 
     ostringstream oss;
@@ -563,9 +643,14 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 
         demandTracker.submit(workerId, stats);
         processedRayTrackers[workerId].update(
-            double(stats.aggregateStats.processedRays));
-        cpuUtilizationTracker[workerId].update(double(
-            (stats.cpuTime - workers.at(workerId).stats.cpuTime).count()) / 1000.0);
+            stats.aggregateStats.processedRays);
+        cpuUtilizationTracker[workerId].update(double(stats.cpuTime.count()) /
+                                               1000.0);
+        receivedRaysByWorker[workerId].update(stats.aggregateStats.waitingRays);
+        receivedBytesByWorker[workerId].update(stats.bytesReceived);
+        sentBytesByWorker[workerId].update(stats.bytesSent);
+        bytesReceivedRate.update(stats.bytesReceived);
+        bytesSentRate.update(stats.bytesSent);
 
         /* merge into global worker stats */
         workerStats.merge(stats);

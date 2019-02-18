@@ -85,6 +85,8 @@ void WorkerStats::reset() {
     aggregateStats.reset();
     objectStats.clear();
     cpuTime = std::chrono::milliseconds(0);
+    bytesReceived = 0;
+    bytesSent = 0;
 }
 
 void WorkerStats::resetDiagnostics() {
@@ -104,7 +106,10 @@ void WorkerStats::merge(const WorkerStats& other) {
     for (const auto& kv : other.objectStats) {
         objectStats[kv.first].merge(kv.second);
     }
-    cpuTime = other.cpuTime;
+    cpuTime += other.cpuTime;
+    bytesReceived += other.bytesReceived;
+    bytesSent += other.bytesSent;
+
     for (const auto& kv : other.timePerAction) {
         timePerAction[kv.first] += kv.second;
     }

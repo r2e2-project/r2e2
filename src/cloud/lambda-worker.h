@@ -9,6 +9,7 @@
 #include "cloud/bvh.h"
 #include "cloud/lambda.h"
 #include "cloud/raystate.h"
+#include "cloud/stats.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/light.h"
@@ -33,6 +34,7 @@ class LambdaWorker {
     void writeImage();
     void terminate() { terminated = true; }
     void uploadLog() const;
+    Optional<WorkerId> getId() const { return workerId; }
 
   private:
     struct Worker {
@@ -129,6 +131,7 @@ class LambdaWorker {
     std::map<std::string, double> metrics;
     size_t prevBytesSent{0};
     size_t prevBytesReceived{0};
+    WorkerStats netStats{};
 
     bool terminated{false};
 };

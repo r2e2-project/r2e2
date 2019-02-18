@@ -77,6 +77,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     FLAGS_log_dir = ".";
     google::InitGoogleLogging(logBase.c_str());
     global::workerStats.intervalStart = now();
+    netStats.reset();
 
     PbrtOptions.nThreads = 1;
     global::manager.init(".");
@@ -178,22 +179,20 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             qStats.connected = peers.size() - qStats.connecting;
 
             global::workerStats.bytesSent =
-                (this->coordinatorConnection->bytes_sent +
-                 this->udpConnection->bytes_sent) -
-                global::workerStats.bytesSent;
+                this->udpConnection->bytes_sent - netStats.bytesSent;
 
             global::workerStats.bytesReceived =
-                (this->coordinatorConnection->bytes_received +
-                 this->udpConnection->bytes_received) -
-                global::workerStats.bytesReceived;
+                this->udpConnection->bytes_received - netStats.bytesReceived;
 
             rusage usage;
             CheckSystemCall("getrusage", ::getrusage(RUSAGE_SELF, &usage));
-            global::workerStats.cpuTime = std::chrono::milliseconds(
+            std::chrono::milliseconds netCpuTime = std::chrono::milliseconds(
                 1000 * (usage.ru_stime.tv_sec + usage.ru_utime.tv_sec) +
                 (usage.ru_stime.tv_usec + usage.ru_utime.tv_usec) / 1000);
+            global::workerStats.cpuTime = netCpuTime - netStats.cpuTime;
 
             qStats.outstandingUdp = this->udpConnection->queue_size();
+            netStats.merge(global::workerStats);
 
             auto proto = to_protobuf(global::workerStats);
             Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
@@ -857,7 +856,11 @@ int main(int argc, char* argv[]) {
     }
 
     if (worker) {
+        Optional<WorkerId> id = worker->getId();
+        cerr << "Uploading logs for worker " << id.get_or(0) << endl;
         worker->uploadLog();
+    } else {
+        cerr << "No worker, so logs cannot be uploaded" << endl;
     }
 
     return exit_status;

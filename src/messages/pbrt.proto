@@ -318,9 +318,11 @@ message WorkerStats {
   QueueStats queue_stats = 3;
   repeated ObjectRayStats object_stats = 4;
   uint64 cpu_millis = 5;
-  map<string, float> time_per_action = 6;
-  repeated ActionIntervals intervals_per_action = 7;
-  repeated Metrics metrics_over_time = 8;
+  uint64 bytes_sent = 6;
+  uint64 bytes_received = 7;
+  map<string, float> time_per_action = 8;
+  repeated ActionIntervals intervals_per_action = 9;
+  repeated Metrics metrics_over_time = 10;
 }
 
 // Materials & Textures

@@ -185,6 +185,11 @@ class LambdaMaster {
     std::map<WorkerId, RateEstimator<double>> cpuUtilizationTracker;
     // For estimating the rays traced per second
     std::map<WorkerId, RateEstimator<double>> processedRayTrackers;
+    std::map<WorkerId, RateEstimator<double>> receivedBytesByWorker;
+    std::map<WorkerId, RateEstimator<double>> sentBytesByWorker;
+    std::map<WorkerId, RateEstimator<double>> receivedRaysByWorker;
+    RateEstimator<double> bytesSentRate;
+    RateEstimator<double> bytesReceivedRate;
 };
 
 class Schedule {

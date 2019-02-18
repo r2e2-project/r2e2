@@ -76,7 +76,7 @@ template <typename T>
 RateEstimator<T>::RateEstimator()
     : period{std::chrono::duration_cast<
           std::chrono::high_resolution_clock::duration>(
-          std::chrono::seconds(3))},
+          std::chrono::seconds(1))},
       secondsPerPeriod{
           1.0 / double(std::chrono::duration_cast<std::chrono::seconds>(period)
                            .count())},
