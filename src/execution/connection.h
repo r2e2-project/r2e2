@@ -66,11 +66,13 @@ class UDPConnection {
                         UDPPacketCompare>
         outgoing_datagrams_{};
 
-    static constexpr std::chrono::microseconds pace_{5'000};
     bool pacing_{false};
-    int packet_per_pace_{30};
-    int sent_packets_{0};
-    std::chrono::steady_clock::time_point when_next_;
+
+    uint64_t rate_Mb_per_s_{100};
+    uint64_t bits_since_reference_{0};
+    std::chrono::steady_clock::time_point rate_reference_pt_{std::chrono::steady_clock::now()};
+    std::chrono::microseconds reference_reset_time_{1'000'000};
+
 
   public:
     UDPConnection() {}
@@ -86,21 +88,8 @@ class UDPConnection {
         outgoing_datagrams_.push(make_tuple(addr, move(datagram), p));
     }
 
-    int ms_until_next() {
-        if (!pacing_ or outgoing_datagrams_.size() == 0) {
-            return -1;
-        }
-
-        auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(
-                          when_next_ - std::chrono::steady_clock::now())
-                          .count();
-
-        return (millis < 0) ? 0 : millis;
-    }
-
     bool queue_empty() {
-        return outgoing_datagrams_.empty() or
-               (pacing_ and ms_until_next() != 0);
+        return outgoing_datagrams_.empty() or (not within_pace());
     }
 
     const UDPPacketData& queue_front() const {
@@ -108,13 +97,14 @@ class UDPConnection {
     }
 
     void queue_pop() {
-        outgoing_datagrams_.pop();
-        if (!pacing_) return;
-        sent_packets_++;
-        if (sent_packets_ >= packet_per_pace_) {
-            when_next_ = std::chrono::steady_clock::now() + pace_;
-            sent_packets_ = 0;
+        if (pacing_) {
+            const UDPPacketData& sent = outgoing_datagrams_.top();
+            bits_since_reference_ += std::get<1>(sent).length() * 8;
+            if (std::chrono::steady_clock::now() >= rate_reference_pt_ + reference_reset_time_) {
+                reset_reference();
+            }
         }
+        outgoing_datagrams_.pop();
     }
 
     size_t queue_size() { return outgoing_datagrams_.size(); }
@@ -123,6 +113,23 @@ class UDPConnection {
 
     size_t bytes_sent{0};
     size_t bytes_received{0};
+
+  private:
+    bool within_pace() {
+        if (!pacing_) return true;
+        auto now = std::chrono::steady_clock::now();
+        uint64_t elapsed_micros =
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                now - rate_reference_pt_)
+                .count();
+        return bits_since_reference_ <=
+               rate_Mb_per_s_ * elapsed_micros;
+    }
+    void reset_reference() {
+        if (!pacing_) return;
+        rate_reference_pt_ = std::chrono::steady_clock::now();
+        bits_since_reference_ = 0;
+    }
 };
 
 using TCPConnection = Connection<TCPSocket>;

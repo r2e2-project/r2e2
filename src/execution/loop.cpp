@@ -11,8 +11,6 @@
 using namespace std;
 using namespace PollerShortNames;
 
-constexpr std::chrono::microseconds UDPConnection::pace_;
-
 ExecutionLoop::ExecutionLoop()
   : signals_( { SIGCHLD, SIGCONT, SIGHUP, SIGTERM, SIGQUIT } ),
     signal_fd_( signals_ )
@@ -32,16 +30,7 @@ ExecutionLoop::ExecutionLoop()
 
 Poller::Result ExecutionLoop::loop_once( const int timeout_ms )
 {
-  int real_timeout_ms = timeout_ms;
-  for ( const auto & udp_connection : udp_connections_ ) {
-      const int conn_timeout = udp_connection->ms_until_next();
-      real_timeout_ms =
-          ( conn_timeout == -1 or conn_timeout == 0 )
-              ? -1
-              : ( real_timeout_ms == -1 ? conn_timeout
-                                       : min(conn_timeout, real_timeout_ms ) );
-  }
-  return poller_.poll( real_timeout_ms );
+  return poller_.poll( timeout_ms );
 }
 
 template<>
