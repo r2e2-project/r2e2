@@ -68,7 +68,7 @@ class UDPConnection {
 
     bool pacing_{false};
 
-    uint64_t rate_Mb_per_s_{100};
+    uint64_t rate_Mb_per_s_{10};
     uint64_t bits_since_reference_{0};
     std::chrono::steady_clock::time_point rate_reference_pt_{std::chrono::steady_clock::now()};
     std::chrono::microseconds reference_reset_time_{1'000'000};
