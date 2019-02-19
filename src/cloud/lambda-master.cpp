@@ -352,7 +352,44 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     });
 }
 
+void LambdaMaster::updateStatsTrace() {
+    protobuf::TreeletStatsTrace* treeletsStats = new protobuf::TreeletStatsTrace;
+    for (const ObjectKey& tid : treeletIds) {
+        protobuf::SingleTreeletStatsTrace treeletStats;
+        treeletStats.set_demand(demandTracker.treeletDemand(tid.id));
+        treeletStats.set_allocations(sceneObjects[tid].workers.size());
+        (*treeletsStats->mutable_map())[tid.id] = treeletStats;
+    }
+    protobuf::StatsTrace trace;
+    trace.set_allocated_treelet_stats(treeletsStats);
+    LOG(INFO) << "json" << protoutil::to_json(trace, false);
+
+    protobuf::WorkerStatsTrace* workersStats = new protobuf::WorkerStatsTrace;
+    for (const auto &kv : workers) {
+        WorkerId id = kv.first;
+        protobuf::SingleWorkerStatsTrace workerStats;
+        protobuf::QueueStats* q = new protobuf::QueueStats;
+        *q = to_protobuf(workers.at(id).stats.queueStats);
+        workerStats.set_allocated_queue_stats(q);
+        workerStats.set_ingress(receivedBytesByWorker[id].getRate());
+        workerStats.set_outgress(sentBytesByWorker[id].getRate());
+        workerStats.set_treelet_id(
+                find_if(kv.second.objects.begin(), kv.second.objects.end(),
+                     [](const ObjectKey &o) {
+                         return o.type == ObjectType::Treelet && o.id != 0;
+                     })->id);
+        workerStats.set_cpu_fraction(cpuUtilizationTracker[id].getRate());
+        workerStats.set_rays_processed(processedRayTrackers[id].getRate());
+        workerStats.set_rays_received(receivedRaysByWorker[id].getRate());
+        (*workersStats->mutable_map())[id] = workerStats;
+    }
+    protobuf::StatsTrace trace2;
+    trace2.set_allocated_worker_stats(workersStats);
+    LOG(INFO) << "json" << protoutil::to_json(trace2, false);
+}
+
 ResultType LambdaMaster::updateStatusMessage() {
+    updateStatsTrace();
     statusPrintTimer.reset();
 
     aggregateQueueStats();

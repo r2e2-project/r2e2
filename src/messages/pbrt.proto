@@ -325,6 +325,42 @@ message WorkerStats {
   repeated Metrics metrics_over_time = 10;
 }
 
+// For stat output to logs.
+message TreeletStatsTrace {
+  map<uint32, SingleTreeletStatsTrace> map = 1;
+}
+
+message SingleTreeletStatsTrace {
+  double demand = 1;
+  uint32 allocations = 2;
+}
+
+message WorkerStatsTrace {
+  map<uint32, SingleWorkerStatsTrace> map = 1;
+}
+
+message SingleWorkerStatsTrace {
+  // in [0,1]
+  double cpu_fraction = 1;
+  // rays/s
+  double rays_processed = 2;
+  // rays/s
+  double rays_received = 3;
+  QueueStats queue_stats = 4;
+  // b/s
+  double ingress = 5;
+  // b/s
+  double outgress = 6;
+  uint32 treelet_id = 7;
+}
+
+message StatsTrace {
+  oneof data {
+    WorkerStatsTrace worker_stats = 2;
+    TreeletStatsTrace treelet_stats = 3;
+  }
+}
+
 // Materials & Textures
 message TextureParams {
   ParamSet geom_params = 1;

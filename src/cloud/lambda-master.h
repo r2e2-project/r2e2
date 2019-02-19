@@ -89,6 +89,7 @@ class LambdaMaster {
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleWorkerRequests();
     Poller::Action::Result::Type handleWriteOutput();
+    void updateStatsTrace();
     Poller::Action::Result::Type updateStatusMessage();
 
     bool processMessage(const WorkerId workerId, const meow::Message &message);

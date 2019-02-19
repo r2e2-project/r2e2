@@ -73,6 +73,7 @@ protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
 protobuf::ObjectKey to_protobuf(
     const SceneManager::ObjectKey& ObjectKey);
 protobuf::RayStats to_protobuf(const RayStats& state);
+protobuf::QueueStats to_protobuf(const QueueStats& stats);
 protobuf::WorkerStats to_protobuf(const WorkerStats& state);
 protobuf::WorkerStats to_protobuf_diagnostics(const WorkerStats& state);
 
