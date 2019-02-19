@@ -184,9 +184,9 @@ Distributed pbrt has two programs, a master and a worker. The master can be invo
 
 ```
 pbrt-lambda-master --scene-path <path-to-pdrt-scene-dump> \
+                   --ip <public-ip-of-machine> \
                    --port <port> \
                    --lambdas <number-of-workers> \
-                   --ip <public-ip>:<public-port> \
                    --storage-backend s3://<s3-bucket-name>?region=<aws-region> \
                    --aws-region <aws-region>
 ```
