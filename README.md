@@ -183,18 +183,35 @@ s3://<s3-bucket-name>`
 Distributed pbrt has two programs, a master and a worker. The master can be invoked as
 
 ```
-pbrt-lambda-master <path-to-pdrt-dump> <public-port> <n-lambdas> <public-ip>:<public-port> s3://<s3-bucket-name>?region=<aws-region> <aws-region>
+pbrt-lambda-master --scene-path <path-to-pdrt-scene-dump> \
+                   --port <port> \
+                   --lambdas <number-of-workers> \
+                   --ip <public-ip>:<public-port> \
+                   --storage-backend s3://<s3-bucket-name>?region=<aws-region> \
+                   --aws-region <aws-region>
 ```
 
 And the worker as
 
 ```
-pbrt-lambda-worker <public-ip> <public-port> s3://<s3-bucket-name>?region=<aws-region>
+pbrt-lambda-worker --ip <master-ip> \
+                   --port <master-port> \
+                   --storage-backend s3://<s3-bucket-name>?region=<aws-region>
 ```
 
-You may actually run all of these locally! However, by setting <n-lambdas> to
-be greater than 0, the master will fire up lambda instances running the worker
-program.
+You may actually run all of these locally! However, by setting
+<number-of-workers> to be greater than 0, the master will fire up lambda
+instances running the worker program.
+
+The master also support a few important options:
+```
+  -t --treelet-stats         show treelet use stats
+  -w --worker-stats          show worker use stats
+  -d --diagnostics           collect & display diagnostics
+  -a --assignment TYPE       indicate assignment type:
+                             * static
+                             * uniform (default)
+```
 
 ### Changing the worker binary
 
