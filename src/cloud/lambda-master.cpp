@@ -147,7 +147,7 @@ Bounds2i getTile(uint32_t tileIndex, uint32_t tileCount, Bounds2i bounds,
             secondSplit = Bounds2i{Point2i{bounds.pMin.x, yMid}, bounds.pMax};
         } else {
             auto xMid = (bounds.pMax.x + bounds.pMin.x) / 2;
-            if (xMid == bounds.pMin.y || xMid == bounds.pMax.y) {
+            if (xMid == bounds.pMin.x || xMid == bounds.pMax.x) {
                 throw runtime_error(
                     "Tried to split a rectangle across an axis of length 1");
             }
