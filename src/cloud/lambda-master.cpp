@@ -362,7 +362,7 @@ void LambdaMaster::updateStatsTrace() {
     }
     protobuf::StatsTrace trace;
     trace.set_allocated_treelet_stats(treeletsStats);
-    LOG(INFO) << "json" << protoutil::to_json(trace, false);
+    LOG(INFO) << "json " << protoutil::to_json(trace, false);
 
     protobuf::WorkerStatsTrace* workersStats = new protobuf::WorkerStatsTrace;
     for (const auto &kv : workers) {
@@ -385,7 +385,7 @@ void LambdaMaster::updateStatsTrace() {
     }
     protobuf::StatsTrace trace2;
     trace2.set_allocated_worker_stats(workersStats);
-    LOG(INFO) << "json" << protoutil::to_json(trace2, false);
+    LOG(INFO) << "json " << protoutil::to_json(trace2, false);
 }
 
 ResultType LambdaMaster::updateStatusMessage() {
