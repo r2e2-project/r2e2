@@ -28,9 +28,31 @@ ExecutionLoop::ExecutionLoop()
   );
 }
 
+// Minimum, where negative numbers are regarded as infinitely positive.
+int min_neg_infinity(int a, int b) {
+    if (a < 0) { return b; }
+    if (b < 0) { return a; }
+    return min(a, b);
+}
+
 Poller::Result ExecutionLoop::loop_once( const int timeout_ms )
 {
-  return poller_.poll( timeout_ms );
+  // timeouts treat -1 as positive infinity
+  int min_timeout_ms = timeout_ms;
+  for ( const auto & udp_connection : udp_connections_ ) {
+
+    // If this connection is not within pace, it requests a timeout when it
+    // would be, so that we can re-poll and schedule it.
+    const int64_t millis_ahead_of_pace =
+        udp_connection->micros_ahead_of_pace() / 1000;
+    const int this_conn_timeout_ms =
+        millis_ahead_of_pace <= 0
+            ? -1
+            : millis_ahead_of_pace;
+
+    min_timeout_ms = min_neg_infinity( min_timeout_ms, this_conn_timeout_ms );
+  }
+  return poller_.poll( min_timeout_ms );
 }
 
 template<>
@@ -267,7 +289,9 @@ ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection
         connection->queue_pop();
         return ResultType::Continue;
       },
-      [connection] { return not connection->queue_empty(); },
+      [connection] {
+        return (not connection->queue_empty()) and connection->within_pace();
+      },
       fderror_callback
     )
   );

@@ -88,8 +88,25 @@ class UDPConnection {
         outgoing_datagrams_.push(make_tuple(addr, move(datagram), p));
     }
 
+    // How many microseconds are we ahead of our pace?
+    int64_t micros_ahead_of_pace() const {
+        if (!pacing_) return -1;
+        auto now = std::chrono::steady_clock::now();
+        int64_t elapsed_micros =
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                now - rate_reference_pt_)
+                .count();
+        int64_t elapsed_micros_if_at_pace =
+            bits_since_reference_ / rate_Mb_per_s_;
+        return elapsed_micros_if_at_pace - elapsed_micros;
+    }
+
+    bool within_pace() {
+        return micros_ahead_of_pace() <= 0;
+    }
+
     bool queue_empty() {
-        return outgoing_datagrams_.empty() or (not within_pace());
+        return outgoing_datagrams_.empty();
     }
 
     const UDPPacketData& queue_front() const {
@@ -115,16 +132,6 @@ class UDPConnection {
     size_t bytes_received{0};
 
   private:
-    bool within_pace() {
-        if (!pacing_) return true;
-        auto now = std::chrono::steady_clock::now();
-        uint64_t elapsed_micros =
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                now - rate_reference_pt_)
-                .count();
-        return bits_since_reference_ <=
-               rate_Mb_per_s_ * elapsed_micros;
-    }
     void reset_reference() {
         if (!pacing_) return;
         rate_reference_pt_ = std::chrono::steady_clock::now();

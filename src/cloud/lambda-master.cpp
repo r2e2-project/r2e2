@@ -336,9 +336,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         };
 
         /* assign a tile to the worker */
-        WorkerId id = workerIt->first;  // indexed starting at 1
-        uint32_t tileIndex = id - 1;    // indexed starting at 0
-        uint32_t tileCount = numberOfLambdas;
+        const WorkerId id = workerIt->first;  // indexed starting at 1
+        const uint32_t tileIndex = id - 1;    // indexed starting at 0
+        const uint32_t tileCount = numberOfLambdas <= 0 ? 4 : numberOfLambdas;
 
         Bounds2i tile = getTile(tileIndex, tileCount, this->sampleBounds);
         LOG(INFO) << "Worker " << id << "/" << numberOfLambdas
