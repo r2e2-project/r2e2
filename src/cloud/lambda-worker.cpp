@@ -574,6 +574,8 @@ bool LambdaWorker::processMessage(const Message& message) {
         workerId.reset(stoull(message.payload()));
         outputName = to_string(*workerId) + ".rays";
 
+        cerr << "worker-id=" << *workerId << endl;
+
         Address addrCopy{coordinatorAddr};
         peers.emplace(0, Worker{0, move(addrCopy)});
 
