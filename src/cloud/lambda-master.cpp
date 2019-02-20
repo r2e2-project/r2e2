@@ -92,7 +92,6 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
         staticAssignments[wid].push_back(tid);
     }
 
-
     if (allocator.anyUnassignedTreelets()) {
         throw runtime_error("Unassigned treelets!");
     }
@@ -116,11 +115,11 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
     }
 
     /* XXX count empty workers */
-
 }
 
 /**
- * Computes the bounds for `tileIndex` when `bounds` is split into `tileCount` tiles.
+ * Computes the bounds for `tileIndex` when `bounds` is split into `tileCount`
+ * tiles.
  *
  * Does this recursively, by splitting `bounds` in half (vertically first, iff
  * `splitVertical` is `true`), putting the even indexed tiles in one half, and
@@ -128,9 +127,11 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
  *
  * The split direction will alternate between vertical and horizontal.
  *
- * If the splitting results in trying to split a 1-pixel line in half, throws an exception.
+ * If the splitting results in trying to split a 1-pixel line in half, throws an
+ * exception.
  */
-Bounds2i getTile(uint32_t tileIndex, uint32_t tileCount, Bounds2i bounds, bool splitVertical = true) {
+Bounds2i getTile(uint32_t tileIndex, uint32_t tileCount, Bounds2i bounds,
+                 bool splitVertical = true) {
     if (tileCount == 1) {
         return bounds;
     } else {
@@ -139,24 +140,28 @@ Bounds2i getTile(uint32_t tileIndex, uint32_t tileCount, Bounds2i bounds, bool s
         if (splitVertical) {
             auto yMid = (bounds.pMax.y + bounds.pMin.y) / 2;
             if (yMid == bounds.pMin.y || yMid == bounds.pMax.y) {
-                throw runtime_error("Tried to split a rectangle across an axis of length 1");
+                throw runtime_error(
+                    "Tried to split a rectangle across an axis of length 1");
             }
-            firstSplit = Bounds2i{bounds.pMin,Point2i{bounds.pMax.x,yMid}};
-            secondSplit = Bounds2i{Point2i{bounds.pMin.x,yMid},bounds.pMax};
+            firstSplit = Bounds2i{bounds.pMin, Point2i{bounds.pMax.x, yMid}};
+            secondSplit = Bounds2i{Point2i{bounds.pMin.x, yMid}, bounds.pMax};
         } else {
             auto xMid = (bounds.pMax.x + bounds.pMin.x) / 2;
             if (xMid == bounds.pMin.y || xMid == bounds.pMax.y) {
-                throw runtime_error("Tried to split a rectangle across an axis of length 1");
+                throw runtime_error(
+                    "Tried to split a rectangle across an axis of length 1");
             }
-            firstSplit = Bounds2i{bounds.pMin,Point2i{xMid,bounds.pMax.y}};
-            secondSplit = Bounds2i{Point2i{xMid,bounds.pMin.y},bounds.pMax};
+            firstSplit = Bounds2i{bounds.pMin, Point2i{xMid, bounds.pMax.y}};
+            secondSplit = Bounds2i{Point2i{xMid, bounds.pMin.y}, bounds.pMax};
         }
         if (tileIndex % 2 == 0) {
             uint32_t evenTiles = tileCount - tileCount / 2;
-            return getTile(tileIndex / 2, evenTiles, firstSplit, !splitVertical);
+            return getTile(tileIndex / 2, evenTiles, firstSplit,
+                           !splitVertical);
         } else {
             uint32_t oddTiles = tileCount / 2;
-            return getTile(tileIndex / 2, oddTiles, secondSplit, !splitVertical);
+            return getTile(tileIndex / 2, oddTiles, secondSplit,
+                           !splitVertical);
         }
     }
 }
@@ -253,8 +258,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
     udpConnection->socket().bind({"0.0.0.0", listenPort});
 
-    totalPaths =
-        this->sampleBounds.Area() * loadSampler()->samplesPerPixel;
+    totalPaths = this->sampleBounds.Area() * loadSampler()->samplesPerPixel;
 
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaMaster::handleMessages, this),
@@ -353,8 +357,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 }
 
 void LambdaMaster::updateStatsTrace() {
-    protobuf::TreeletStatsTrace* treeletsStats = new protobuf::TreeletStatsTrace;
-    for (const ObjectKey& tid : treeletIds) {
+    protobuf::TreeletStatsTrace *treeletsStats =
+        new protobuf::TreeletStatsTrace;
+    for (const ObjectKey &tid : treeletIds) {
         protobuf::SingleTreeletStatsTrace treeletStats;
         treeletStats.set_demand(demandTracker.treeletDemand(tid.id));
         treeletStats.set_allocations(sceneObjects[tid].workers.size());
@@ -364,20 +369,21 @@ void LambdaMaster::updateStatsTrace() {
     trace.set_allocated_treelet_stats(treeletsStats);
     LOG(INFO) << "json " << protoutil::to_json(trace, false);
 
-    protobuf::WorkerStatsTrace* workersStats = new protobuf::WorkerStatsTrace;
+    protobuf::WorkerStatsTrace *workersStats = new protobuf::WorkerStatsTrace;
     for (const auto &kv : workers) {
         WorkerId id = kv.first;
         protobuf::SingleWorkerStatsTrace workerStats;
-        protobuf::QueueStats* q = new protobuf::QueueStats;
+        protobuf::QueueStats *q = new protobuf::QueueStats;
         *q = to_protobuf(workers.at(id).stats.queueStats);
         workerStats.set_allocated_queue_stats(q);
         workerStats.set_ingress(receivedBytesByWorker[id].getRate());
         workerStats.set_outgress(sentBytesByWorker[id].getRate());
         workerStats.set_treelet_id(
-                find_if(kv.second.objects.begin(), kv.second.objects.end(),
-                     [](const ObjectKey &o) {
-                         return o.type == ObjectType::Treelet && o.id != 0;
-                     })->id);
+            find_if(kv.second.objects.begin(), kv.second.objects.end(),
+                    [](const ObjectKey &o) {
+                        return o.type == ObjectType::Treelet && o.id != 0;
+                    })
+                ->id);
         workerStats.set_cpu_fraction(cpuUtilizationTracker[id].getRate());
         workerStats.set_rays_processed(processedRayTrackers[id].getRate());
         workerStats.set_rays_received(receivedRaysByWorker[id].getRate());
@@ -448,36 +454,31 @@ ResultType LambdaMaster::updateStatusMessage() {
 
         cerr << "Rays processed     (/s): ";
         for (const auto &kv : workers) {
-            cerr << setw(8)
-                 << int(processedRayTrackers[kv.first].getRate());
+            cerr << setw(8) << int(processedRayTrackers[kv.first].getRate());
         }
         cerr << endl;
 
         cerr << "Rays received      (/s): ";
         for (const auto &kv : workers) {
-            cerr << setw(8)
-                 << int(receivedRaysByWorker[kv.first].getRate());
+            cerr << setw(8) << int(receivedRaysByWorker[kv.first].getRate());
         }
         cerr << endl;
 
         cerr << "Ray Q                  : ";
         for (const auto &kv : workers) {
-            cerr << setw(8)
-                 << workers.at(kv.first).stats.queueStats.ray;
+            cerr << setw(8) << workers.at(kv.first).stats.queueStats.ray;
         }
         cerr << endl;
 
         cerr << "Pending Q              : ";
         for (const auto &kv : workers) {
-            cerr << setw(8)
-                 << workers.at(kv.first).stats.queueStats.pending;
+            cerr << setw(8) << workers.at(kv.first).stats.queueStats.pending;
         }
         cerr << endl;
 
         cerr << "Out Q                  : ";
         for (const auto &kv : workers) {
-            cerr << setw(8)
-                 << workers.at(kv.first).stats.queueStats.out;
+            cerr << setw(8) << workers.at(kv.first).stats.queueStats.out;
         }
         cerr << endl;
 
@@ -490,15 +491,13 @@ ResultType LambdaMaster::updateStatusMessage() {
 
         cerr << "Connecting Count       : ";
         for (const auto &kv : workers) {
-            cerr << setw(8)
-                 << workers.at(kv.first).stats.queueStats.connecting;
+            cerr << setw(8) << workers.at(kv.first).stats.queueStats.connecting;
         }
         cerr << endl;
 
         cerr << "Connected  Count       : ";
         for (const auto &kv : workers) {
-            cerr << setw(8)
-                 << workers.at(kv.first).stats.queueStats.connected;
+            cerr << setw(8) << workers.at(kv.first).stats.queueStats.connected;
         }
         cerr << endl;
 
@@ -520,9 +519,9 @@ ResultType LambdaMaster::updateStatusMessage() {
         for (const auto &kv : workers) {
             const auto &i =
                 find_if(kv.second.objects.begin(), kv.second.objects.end(),
-                     [](const ObjectKey &o) {
-                         return o.type == ObjectType::Treelet && o.id != 0;
-                     });
+                        [](const ObjectKey &o) {
+                            return o.type == ObjectType::Treelet && o.id != 0;
+                        });
 
             cerr << setw(8) << i->to_string();
         }
@@ -796,7 +795,8 @@ void LambdaMaster::run() {
         diagnosticsReceived = 0;
         while (diagnosticsReceived < numWorkers) {
             auto res = loop.loop_once().result;
-            if (res != PollerResult::Success && res != PollerResult::Timeout) break;
+            if (res != PollerResult::Success && res != PollerResult::Timeout)
+                break;
         }
     }
 }
@@ -1151,8 +1151,8 @@ int main(int argc, char *argv[]) {
     };
 
     while (true) {
-        const int opt =
-            getopt_long(argc, argv, "s:p:i:r:b:l:twhda:", long_options, nullptr);
+        const int opt = getopt_long(
+            argc, argv, "s:p:i:r:b:l:twhda:", long_options, nullptr);
 
         if (opt == -1) {
             break;
