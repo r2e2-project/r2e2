@@ -801,7 +801,6 @@ void usage(const char* argv0, int exitCode) {
          << "  -p --port PORT             port of coordinator" << endl
          << "  -s --storage-backend NAME  storage backend URI" << endl
          << "  -h --help                  show help information" << endl;
-    exit(exitCode);
 }
 
 int main(int argc, char* argv[]) {
@@ -823,34 +822,21 @@ int main(int argc, char* argv[]) {
         const int opt =
             getopt_long(argc, argv, "p:i:s:h", long_options, nullptr);
 
-        if (opt == -1) {
-            break;
-        }
+        if (opt == -1) break;
 
+        // clang-format off
         switch (opt) {
-        case 'p':
-            listenPort = stoi(optarg);
-            break;
-
-        case 'i':
-            publicIp = optarg;
-            break;
-
-        case 's':
-            storageBackendUri = optarg;
-            break;
-
-        case 'h':
-            usage(argv[0], 0);
-            break;
-
-        default:
-            usage(argv[0], 2);
+        case 'p': listenPort = stoi(optarg); break;
+        case 'i': publicIp = optarg; break;
+        case 's': storageBackendUri = optarg; break;
+        case 'h': usage(argv[0], EXIT_SUCCESS); break;
+        default: usage(argv[0], EXIT_FAILURE);
         }
+        // clang-format on
     }
 
     if (listenPort == 0 || publicIp.empty() || storageBackendUri.empty()) {
-        usage(argv[0], 2);
+        usage(argv[0], EXIT_FAILURE);
     }
 
     unique_ptr<LambdaWorker> worker;
