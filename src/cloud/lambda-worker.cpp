@@ -262,7 +262,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return true; },
         []() { throw runtime_error("status print failed"); }));
 
-    Message message{OpCode::Hey, ""};
+    Message message{OpCode::Hey,
+                    safe_getenv_or("AWS_LAMBDA_LOG_STREAM_NAME", "")};
     coordinatorConnection->enqueue_write(message.str());
 }
 

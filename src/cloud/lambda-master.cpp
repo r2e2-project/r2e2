@@ -304,8 +304,17 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                 return true;
             },
             []() { throw runtime_error("error occured"); },
-            [ID = currentWorkerID]() {
-                throw runtime_error("worker died: " + to_string(ID));
+            [this, ID = currentWorkerID]() {
+                const auto &worker = workers.at(ID);
+
+                ostringstream errorMessage;
+                errorMessage << "worker died: " << ID;
+
+                if (!worker.aws.logStream.empty()) {
+                    errorMessage << " (" << worker.aws.logStream << ")";
+                }
+
+                throw runtime_error(errorMessage.str());
             });
 
         auto workerIt =
@@ -667,6 +676,8 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 
     switch (message.opcode()) {
     case OpCode::Hey: {
+        worker.aws.logStream = message.payload();
+
         Message heyBackMessage{OpCode::Hey, to_string(workerId)};
         worker.connection->enqueue_write(heyBackMessage.str());
 

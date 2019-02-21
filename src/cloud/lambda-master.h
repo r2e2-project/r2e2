@@ -33,10 +33,10 @@ enum Assignment {
 };
 
 struct MasterConfiguration {
-  bool treeletStats;
-  bool workerStats;
-  Assignment assignment;
-  bool collectDiagnostics;
+    bool treeletStats;
+    bool workerStats;
+    Assignment assignment;
+    bool collectDiagnostics;
 };
 
 class LambdaMaster {
@@ -73,6 +73,10 @@ class LambdaMaster {
         size_t freeSpace{2 * 1000 * 1000 *
                          1000}; /* in bytes (assuming 2 GBs free to start) */
         WorkerStats stats;
+
+        struct {
+            std::string logStream;
+        } aws;
 
         Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}
