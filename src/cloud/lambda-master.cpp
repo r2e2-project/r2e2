@@ -1017,7 +1017,7 @@ void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
 
 void LambdaMaster::assignTreeletsUniformly(Worker &worker) {
     uint32_t nNonRootTreelets = treeletIds.size() - 1;
-    uint32_t wid = worker.id;
+    uint32_t wid = worker.id - 1;
     assignTreelet(worker, 0);
     assignTreelet(worker, 1 + wid % nNonRootTreelets);
 }
