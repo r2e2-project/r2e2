@@ -131,6 +131,7 @@ class LambdaWorker {
     std::map<std::string, double> metrics;
     size_t prevBytesSent{0};
     size_t prevBytesReceived{0};
+    std::chrono::milliseconds prevCPUTime{0};
     WorkerStats netStats{};
 
     bool terminated{false};

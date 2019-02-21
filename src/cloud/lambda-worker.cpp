@@ -48,7 +48,7 @@ class ProgramFinished : public exception {};
 constexpr chrono::milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr chrono::milliseconds STATUS_PRINT_INTERVAL{10'000};
 constexpr chrono::milliseconds WORKER_STATS_INTERVAL{500};
-constexpr chrono::milliseconds RECORD_METRICS_INTERVAL{1'000};
+constexpr chrono::milliseconds RECORD_METRICS_INTERVAL{500};
 
 protobuf::FinishedRay createFinishedRay(const size_t sampleId,
                                         const Point2f& pFilm,
@@ -232,18 +232,25 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             /* NOTE(apoms): we could record the bytes
              * sent/received at a finer granularity if we moved
              * this to a new poller action */
-            size_t bytesSent = (this->coordinatorConnection->bytes_sent +
-                                this->udpConnection->bytes_sent) -
-                               prevBytesSent;
-            metrics["bytesSent"] = bytesSent;
+            size_t bytesSent = this->udpConnection->bytes_sent - prevBytesSent;
+            metrics["udpBytesSent"] = bytesSent;
             prevBytesSent += bytesSent;
 
             size_t bytesReceived =
-                (this->coordinatorConnection->bytes_received +
-                 this->udpConnection->bytes_received) -
-                prevBytesReceived;
-            metrics["bytesReceived"] = bytesReceived;
+                this->udpConnection->bytes_received - prevBytesReceived;
+            metrics["udpBytesReceived"] = bytesReceived;
             prevBytesReceived += bytesReceived;
+
+            rusage usage;
+            CheckSystemCall("getrusage", ::getrusage(RUSAGE_SELF, &usage));
+            std::chrono::milliseconds netCpuTime = std::chrono::milliseconds(
+                1000 * (usage.ru_stime.tv_sec + usage.ru_utime.tv_sec) +
+                (usage.ru_stime.tv_usec + usage.ru_utime.tv_usec) / 1000);
+            metrics["cpuTime"] =
+                double((netCpuTime - prevCPUTime).count()) / 1000.0;
+            prevCPUTime = prevCPUTime + netCpuTime;
+
+            metrics["udpOutstanding"] = this->udpConnection->queue_size();
 
             for (auto& kv : metrics) {
                 global::workerStats.recordMetric(kv.first, time, kv.second);

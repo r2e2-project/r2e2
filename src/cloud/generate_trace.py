@@ -1,12 +1,10 @@
 import sys
 import struct
 import json
-from concurrent.futures import ThreadPoolExecutor
 import random
 import tarfile
 import os
 import argparse
-from collections import defaultdict
 import pint
 import math
 
@@ -17,9 +15,13 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 plt.rcParams['image.interpolation'] = 'nearest'
 import seaborn as sns
-from PIL import Image
 import numpy as np
 import pandas as pd
+
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from matplotlib.colors import LogNorm
+from PIL import Image
 
 sns.set_style("ticks", {'axes.grid': True})
 
@@ -66,7 +68,6 @@ class WorkerStats(object):
                     time, value = tokens[offset + n].split(',')
                     metrics.append((int(time), float(value)))
                 offset += num_points
-                print(metrics)
                 worker_metrics[worker_id][metric_name] = metrics
             if len(worker_metrics) == num_workers:
                 break
@@ -231,9 +232,7 @@ def write_trace(stats, path: str):
     worker_metrics = stats.metrics
 
     def make_counter_from_metric(name, metric, proc, tid):
-        print(metric)
         time, value = metric
-        print(name)
         cat = ''
         trace = {
             'name': name,
@@ -257,7 +256,6 @@ def write_trace(stats, path: str):
         tag = None
         proc = worker_id
 
-        print(metrics)
         print('Generating metrics for worker {:d}...'.format(tid))
 
         for name, points in metrics.items():
@@ -284,14 +282,201 @@ def write_trace(stats, path: str):
         raise Exception("Invalid trace extension '{}'. Must be .trace or .tar.gz." \
                         .format(''.join(['.' + e for e in exts])))
 
+def quantize_sequence(sequence, quantization):
+    quantized_sequence = []
 
-def plot_metrics(stats):
+    if len(sequence) == 0:
+        return []
+
+    current_time = sequence[0][0]
+    offset = 1
+    summed_value = 0
+    while offset < len(sequence):
+        timePrev, valuePrev = sequence[offset - 1]
+        time, value = sequence[offset]
+    
+        interval = float(time - timePrev)
+        contribution = value / interval
+        #print(metric_name, value, time, timePrev, interval)
+        if time >= current_time:
+            # Add % contribution from prior interval
+            alpha = 1.0 - (time - current_time) / interval
+            beta = 1.0 - alpha
+            #print(time, current_time, alpha)
+            summed_value += contribution * alpha
+            quantized_sequence.append((current_time, summed_value))
+
+            current_time += quantization
+            summed_value = 0
+    
+            summed_value += contribution * beta
+        else:
+            summed_value += contribution
+        offset += 1
+    return quantized_sequence
+
+
+def heatmap(data, row_labels, col_labels, ax=None,
+            cbar_kw={}, cbarlabel="", **kwargs):
+    """
+    Create a heatmap from a numpy array and two lists of labels.
+
+    Arguments:
+        data       : A 2D numpy array of shape (N,M)
+        row_labels : A list or array of length N with the labels
+                     for the rows
+        col_labels : A list or array of length M with the labels
+                     for the columns
+    Optional arguments:
+        ax         : A matplotlib.axes.Axes instance to which the heatmap
+                     is plotted. If not provided, use current axes or
+                     create a new one.
+        cbar_kw    : A dictionary with arguments to
+                     :meth:`matplotlib.Figure.colorbar`.
+        cbarlabel  : The label for the colorbar
+    All other arguments are directly passed on to the imshow call.
+    """
+
+    if not ax:
+        ax = plt.gca()
+
+    # Plot the heatmap
+    im = ax.imshow(data + 1.0, **kwargs)
+
+    # Create colorbar
+    cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+    cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+
+    # We want to show all ticks...
+    #ax.set_xticks(np.arange(data.shape[1]))
+    #ax.set_yticks(np.arange(data.shape[0]))
+    # ... and label them with the respective list entries.
+    ax.set_xlim([min(col_labels), max(col_labels)])
+    #ax.set_xticks(np.arange(data.shape[1]))
+    #ax.set_xticklabels(col_labels)
+    #ax.set_yticklabels(row_labels)
+
+    # Let the horizontal axes labeling appear on top.
+    #ax.tick_params(top=True, bottom=False,
+    #               labeltop=True, labelbottom=False)
+
+    # Rotate the tick labels and set their alignment.
+    #plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",
+    #         rotation_mode="anchor")
+
+    # Turn spines off and create white grid.
+    for edge, spine in ax.spines.items():
+        spine.set_visible(False)
+
+    ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
+    ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
+    ax.grid(which="minor", color="w", linestyle='-', linewidth=0.1)
+    ax.grid(which="major", color="w", linestyle='-', linewidth=0)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    return im, cbar
+
+
+def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
+                     textcolors=["black", "white"],
+                     threshold=None, **textkw):
+    """
+    A function to annotate a heatmap.
+
+    Arguments:
+        im         : The AxesImage to be labeled.
+    Optional arguments:
+        data       : Data used to annotate. If None, the image's data is used.
+        valfmt     : The format of the annotations inside the heatmap.
+                     This should either use the string format method, e.g.
+                     "$ {x:.2f}", or be a :class:`matplotlib.ticker.Formatter`.
+        textcolors : A list or array of two color specifications. The first is
+                     used for values below a threshold, the second for those
+                     above.
+        threshold  : Value in data units according to which the colors from
+                     textcolors are applied. If None (the default) uses the
+                     middle of the colormap as separation.
+
+    Further arguments are passed on to the created text labels.
+    """
+
+    if not isinstance(data, (list, np.ndarray)):
+        data = im.get_array()
+
+    # Normalize the threshold to the images color range.
+    if threshold is not None:
+        threshold = im.norm(threshold)
+    else:
+        threshold = im.norm(data.max())/2.
+
+    # Set default alignment to center, but allow it to be
+    # overwritten by textkw.
+    kw = dict(horizontalalignment="center",
+              verticalalignment="center")
+    kw.update(textkw)
+
+    # Get the formatter in case a string is supplied
+    if isinstance(valfmt, str):
+        valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+
+    # Loop over the data and create a `Text` for each "pixel".
+    # Change the text's color depending on the data.
+    texts = []
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            kw.update(color=textcolors[im.norm(data[i, j]) > threshold])
+            text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
+            texts.append(text)
+
+    return texts
+
+
+def plot_time_heatmap(stats, metric_label):
+    quantization = 1000 * 1e6 # ms to nanoseconds
+
+    # Deteremine number of rows
+    num_timepoints = 0
+    for worker_id, metrics in stats.metrics.items():
+        points = metrics[metric_label]
+        for time, _ in points:
+            quantized_time = time // quantization 
+            if quantized_time > num_timepoints:
+                num_timepoints = quantized_time
+    num_timepoints = int(num_timepoints) + 1
+
+    # Deteremine number of columns
+    num_workers = len(stats.metrics)
+    
+    data = np.zeros((num_workers, num_timepoints))
+    row_labels = []
+    for worker_idx, (worker_id, metrics) in enumerate(stats.metrics.items()):
+        row_labels.append(worker_id)
+        points = metrics[metric_label]
+        quantized_points = quantize_sequence(points, quantization)
+        for i, (time, value) in enumerate(quantized_points):
+            data[worker_idx, i] = value * 1e9
+    col_labels = [int(x[0] * 1e-9) for x in quantized_points]
+    fig = plt.figure(dpi=300)
+    ax = plt.subplot()
+    im, cbar = heatmap(data, row_labels, col_labels, ax=ax,
+                       norm=LogNorm())
+    return fig
+
+
+def plot_metrics(stats, path):
+    quantization = 1000 * 1e6 # nanoseconds
+
+    plt.clf()
+    metric_labels = ['udpBytesSent', 'udpBytesReceived', 'cpuTime', 'udpOutstanding']
+    # Plot heatmaps for each worker over time
+    for metric_name in metric_labels:
+        fig = plot_time_heatmap(stats, metric_name)
+        plt.savefig(os.path.join(path, 'heatmap_{:s}.png'.format(metric_name)))
+        plt.close(fig)
+        plt.clf()
+
     # Plot a chart over time showing min/median/max worker stats
-    quantization = 2000 * 1e6 # nanoseconds
-
-    metrics = ['bytesSent', 'bytesReceived']
-
-    for metric_name in metrics:
+    for metric_name in metric_labels:
         for worker_id, metrics in stats.metrics.items():
             data = {
                 'ids': [],
@@ -329,11 +514,11 @@ def plot_metrics(stats):
             for i in range(len(data['time']) - 1):
                 if data['time'][i + 1] < data['time'][i]:
                     print(data['time'][i], data['time'][i + 1])
-            if metric_name == 'bytesReceived':
+            if False and metric_name == 'bytesReceived':
                 print(data['time'], data['value'])
                 print(points)
             plt.semilogy(data['time'], data['value'])
-        plt.savefig('metric_{:s}.png'.format(metric_name))
+        plt.savefig(os.path.join(path, 'metric_{:s}.png'.format(metric_name)))
         plt.clf()
 
 
@@ -437,17 +622,23 @@ def main():
                         help=(
                             'Path to the worker_intervals.txt generated by '
                             'pbrt-lambda-master after finished a run.'))
-    parser.add_argument('--output-path', default='pbrt.tar.gz',
+    parser.add_argument('--trace-path', default='pbrt.tar.gz',
                         help='Path to write the compressed trace file to.')
+    parser.add_argument('--graph-path', default='graphs/',
+                        help='Directory to write the generated graphs to.')
     args = parser.parse_args()
 
     #compare_model()
     print('Reading worker stats from {:s}...'.format(args.worker_stats_path))
     stats = WorkerStats(args.worker_stats_path)
     print('Done reading worker stats.')
-    path = write_trace(stats, args.output_path)
-    print('Wrote trace to {:s}.'.format(path))
-    plot_metrics(stats)
+    if False:
+        path = write_trace(stats, args.trace_path)
+        print('Wrote trace to {:s}.'.format(path))
+    if True:
+        path = args.graph_path
+        plot_metrics(stats, path)
+        print('Wrote graphs to {:s}.'.format(path))
 
 
 if __name__ == "__main__":
