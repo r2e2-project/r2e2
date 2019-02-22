@@ -52,10 +52,10 @@ constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const uint16_t coordinatorPort,
-                           const string& storageBackendUri)
+                           const string& storageUri)
     : coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
-      storageBackend(StorageBackend::create_backend(storageBackendUri)),
+      storageBackend(StorageBackend::create_backend(storageUri)),
       peerTimer(PEER_CHECK_INTERVAL),
       workerStatsTimer(WORKER_STATS_INTERVAL),
       recordMetricsTimer(RECORD_METRICS_INTERVAL) {
@@ -758,7 +758,7 @@ int main(int argc, char* argv[]) {
 
     uint16_t listenPort = 50000;
     string publicIp;
-    string storageBackendUri;
+    string storageUri;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
@@ -778,22 +778,21 @@ int main(int argc, char* argv[]) {
         switch (opt) {
         case 'p': listenPort = stoi(optarg); break;
         case 'i': publicIp = optarg; break;
-        case 's': storageBackendUri = optarg; break;
+        case 's': storageUri = optarg; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
         default: usage(argv[0], EXIT_FAILURE);
         }
         // clang-format on
     }
 
-    if (listenPort == 0 || publicIp.empty() || storageBackendUri.empty()) {
+    if (listenPort == 0 || publicIp.empty() || storageUri.empty()) {
         usage(argv[0], EXIT_FAILURE);
     }
 
     unique_ptr<LambdaWorker> worker;
 
     try {
-        worker =
-            make_unique<LambdaWorker>(publicIp, listenPort, storageBackendUri);
+        worker = make_unique<LambdaWorker>(publicIp, listenPort, storageUri);
         worker->run();
     } catch (const exception& e) {
         LOG(INFO) << argv[0] << ": " << e.what();
