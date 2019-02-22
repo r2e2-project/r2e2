@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <thread>
+#include <future>
 #include <fcntl.h>
 #include <sys/types.h>
 
@@ -123,10 +124,11 @@ void S3Client::upload_files( const string & bucket,
   const size_t thread_count = config_.max_threads;
   const size_t batch_size = config_.max_batch_size;
 
+  vector<future<void>> waitables;
   vector<thread> threads;
   for ( size_t thread_index = 0; thread_index < thread_count; thread_index++ ) {
     if ( thread_index < upload_requests.size() ) {
-      threads.emplace_back(
+      waitables.emplace_back( async( launch::async,
         [&] ( const size_t index )
         {
           for ( size_t first_file_idx = index;
@@ -179,13 +181,13 @@ void S3Client::upload_files( const string & bucket,
               }
             }
           }
-        }, thread_index
+        }, thread_index )
       );
     }
   }
 
-  for ( auto & thread : threads ) {
-    thread.join();
+  for ( auto & waitable : waitables ) {
+    waitable.get();
   }
 }
 
@@ -200,10 +202,10 @@ void S3Client::download_files( const std::string & bucket,
   const size_t thread_count = config_.max_threads;
   const size_t batch_size = config_.max_batch_size;
 
-  vector<thread> threads;
+  vector<future<void>> waitables;
   for ( size_t thread_index = 0; thread_index < thread_count; thread_index++ ) {
     if ( thread_index < download_requests.size() ) {
-      threads.emplace_back(
+      waitables.emplace_back( async( launch::async,
         [&] ( const size_t index )
         {
           for ( size_t first_file_idx = index;
@@ -259,12 +261,12 @@ void S3Client::download_files( const std::string & bucket,
               }
             }
           }
-        }, thread_index
+        }, thread_index )
       );
     }
   }
 
-  for ( auto & thread : threads ) {
-    thread.join();
+  for ( auto & waitable : waitables ) {
+    waitable.get();
   }
 }
