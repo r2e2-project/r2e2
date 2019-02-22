@@ -65,7 +65,6 @@ class LambdaWorker {
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleNeededTreelets();
 
-    Poller::Action::Result::Type handleStatusPrint();
     Poller::Action::Result::Type handleWorkerStats();
     Poller::Action::Result::Type handleMetrics();
 
@@ -125,7 +124,6 @@ class LambdaWorker {
 
     /* Timers */
     TimerFD peerTimer;
-    TimerFD statusPrintTimer;
     TimerFD workerStatsTimer;
     TimerFD recordMetricsTimer;
 

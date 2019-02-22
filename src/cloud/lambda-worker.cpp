@@ -46,7 +46,6 @@ using PollerResult = Poller::Result::Type;
 
 constexpr size_t UDP_MTU_BYTES{1'400};
 constexpr milliseconds PEER_CHECK_INTERVAL{1'000};
-constexpr milliseconds STATUS_PRINT_INTERVAL{10'000};
 constexpr milliseconds WORKER_STATS_INTERVAL{500};
 constexpr milliseconds RECORD_METRICS_INTERVAL{500};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
@@ -59,7 +58,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
       peerTimer(PEER_CHECK_INTERVAL),
       workerStatsTimer(WORKER_STATS_INTERVAL),
-      statusPrintTimer(STATUS_PRINT_INTERVAL),
       recordMetricsTimer(RECORD_METRICS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
 
@@ -147,12 +145,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         workerStatsTimer.fd, Direction::In,
         bind(&LambdaWorker::handleWorkerStats, this), [this]() { return true; },
         []() { throw runtime_error("worker stats failed"); }));
-
-    /* print stats */
-    loop.poller().add_action(Poller::Action(
-        statusPrintTimer.fd, Direction::In,
-        bind(&LambdaWorker::handleStatusPrint, this), [this]() { return true; },
-        []() { throw runtime_error("status print failed"); }));
 
     /* record metrics */
     loop.poller().add_action(Poller::Action(
@@ -372,17 +364,6 @@ ResultType LambdaWorker::handleNeededTreelets() {
     }
 
     neededTreelets.clear();
-    return ResultType::Continue;
-}
-
-ResultType LambdaWorker::handleStatusPrint() {
-    statusPrintTimer.reset();
-
-    LOG(INFO) << "ray: " << rayQueue.size()
-              << " / finished: " << finishedQueue.size()
-              << " / pending: " << pendingQueueSize
-              << " / out: " << outQueueSize << " / peers: " << peers.size();
-
     return ResultType::Continue;
 }
 
