@@ -31,10 +31,8 @@ class LambdaWorker {
                  const std::string& storageBackendUri);
 
     void run();
-    void writeImage();
     void terminate() { terminated = true; }
     void uploadLog() const;
-    Optional<WorkerId> getId() const { return workerId; }
 
   private:
     struct Worker {
@@ -67,6 +65,10 @@ class LambdaWorker {
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleNeededTreelets();
 
+    Poller::Action::Result::Type handleStatusPrint();
+    Poller::Action::Result::Type handleWorkerStats();
+    Poller::Action::Result::Type handleMetrics();
+
     meow::Message createConnectionRequest(const Worker& peer);
     meow::Message createConnectionResponse(const Worker& peer);
 
@@ -87,7 +89,7 @@ class LambdaWorker {
     std::shared_ptr<TCPConnection> coordinatorConnection;
     std::shared_ptr<UDPConnection> udpConnection;
     meow::MessageParser messageParser{};
-    meow::MessageParser udpMessageParser{};
+    meow::MessageParser tcpMessageParser{};
     Optional<WorkerId> workerId;
     std::map<WorkerId, Worker> peers;
     int32_t mySeed;

@@ -51,7 +51,7 @@ public:
 
     template<class ProtobufType>
     bool read(ProtobufType * record);
-  
+
     bool read(std::string* string);
 
     bool read(uint32_t* integer);

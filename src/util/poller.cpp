@@ -62,8 +62,9 @@ Poller::Result Poller::poll( const int timeout_ms )
                        [] ( bool acc, pollfd x ) { return acc or x.events; } ) ) {
     return Result::Type::Exit;
   }
+
   {
-      auto recorder = pbrt::global::workerStats.recordInterval("idle");
+      RECORD_INTERVAL("idle");
       if (0 == CheckSystemCall(
                    "poll", ::poll(&pollfds_[0], pollfds_.size(), timeout_ms))) {
           return Result::Type::Timeout;

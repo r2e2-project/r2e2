@@ -134,6 +134,9 @@ namespace global {
 extern WorkerStats workerStats;
 }
 
+#define RECORD_INTERVAL(x) \
+    auto __REC__ = pbrt::global::workerStats.recordInterval(x)
+
 }  // namespace pbrt
 
 #endif /* PBRT_CLOUD_STATS_H */
