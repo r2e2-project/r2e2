@@ -44,7 +44,7 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
-constexpr size_t UDP_MTU_BYTES{1'200};
+constexpr size_t UDP_MTU_BYTES{1'400};
 constexpr milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr milliseconds STATUS_PRINT_INTERVAL{10'000};
 constexpr milliseconds WORKER_STATS_INTERVAL{500};
@@ -264,25 +264,37 @@ ResultType LambdaWorker::handleOutQueue() {
         auto& peer = peers.at(
             *random::sample(workerCandidates.begin(), workerCandidates.end()));
 
-        while (!q.second.empty()) {
+        string unpackedRay;
+
+        while (!q.second.empty() || !unpackedRay.empty()) {
             ostringstream oss;
             size_t packetLen = 5;
 
             {
                 protobuf::RecordWriter writer{&oss};
 
+                if (!unpackedRay.empty()) {
+                    writer.write(unpackedRay);
+                    unpackedRay.clear();
+                }
+
                 while (packetLen < UDP_MTU_BYTES && !q.second.empty()) {
                     RayState ray = move(q.second.front());
                     q.second.pop_front();
 
-                    const string rayStr =
-                        protoutil::to_string(to_protobuf(ray));
+                    string rayStr = protoutil::to_string(to_protobuf(ray));
 
                     outQueueSize--;
                     global::workerStats.recordSentRay(
                         SceneManager::ObjectKey{ObjectType::Treelet, q.first});
 
-                    packetLen += rayStr.length() + 4;
+                    const size_t len = rayStr.length() + 4;
+                    if (len + packetLen > UDP_MTU_BYTES) {
+                        unpackedRay.swap(rayStr);
+                        break;
+                    }
+
+                    packetLen += len;
                     writer.write(rayStr);
                 }
             }
