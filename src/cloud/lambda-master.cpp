@@ -780,7 +780,7 @@ void LambdaMaster::run() {
             "start-worker", awsAddress, generateRequest(),
             [](const uint64_t, const string &, const HTTPResponse &) {},
             [](const uint64_t, const string &) {
-                LOG(ERROR) << "invocation request failed" << endl;
+                LOG(ERROR) << "invocation request failed";
             });
     }
 

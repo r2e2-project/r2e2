@@ -60,7 +60,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       workerStatsTimer(WORKER_STATS_INTERVAL),
       recordMetricsTimer(RECORD_METRICS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
-
     roost::chdir(workingDirectory.name());
     FLAGS_log_dir = ".";
     google::InitGoogleLogging(logBase.c_str());

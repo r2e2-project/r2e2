@@ -38,7 +38,7 @@ using namespace std;
 
 // This function produces a stack backtrace with demangled function & method
 // names.
-string sacktrace(int skip = 1) {
+string stacktrace(int skip) {
     void *callstack[128];
     const int nMaxFrames = sizeof(callstack) / sizeof(callstack[0]);
     char buf[1024];

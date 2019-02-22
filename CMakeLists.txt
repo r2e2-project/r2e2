@@ -599,13 +599,13 @@ ADD_SANITIZERS ( pbrt_lambda_master )
 
 SET_TARGET_PROPERTIES ( pbrt_lambda_master PROPERTIES OUTPUT_NAME "pbrt-lambda-master" )
 TARGET_COMPILE_FEATURES ( pbrt_lambda_master PRIVATE ${PBRT_CXX11_FEATURES} )
-TARGET_LINK_LIBRARIES ( pbrt_lambda_master ${ALL_PBRT_LIBS} )
+TARGET_LINK_LIBRARIES ( pbrt_lambda_master ${ALL_PBRT_LIBS} -ldl )
 
 # pbrt-lambda-worker
 ADD_EXECUTABLE ( pbrt_lambda_worker src/cloud/lambda-worker.cpp )
 SET_TARGET_PROPERTIES ( pbrt_lambda_worker PROPERTIES OUTPUT_NAME "pbrt-lambda-worker" )
 TARGET_COMPILE_FEATURES ( pbrt_lambda_worker PRIVATE ${PBRT_CXX11_FEATURES} )
-set(STRIP_SYMBOLS "")
+set(STRIP_SYMBOLS "-export-dynamic")
 IF(CMAKE_BUILD_TYPE MATCHES RELEASE)
   set(STRIP_SYMBOLS "-s")
 ENDIF()
