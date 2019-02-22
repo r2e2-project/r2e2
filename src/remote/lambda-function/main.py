@@ -8,11 +8,8 @@ sys.path.append(curdir)
 os.environ['PATH'] = "{}:{}".format(curdir, os.environ.get('PATH', ''))
 
 def run_command(command):
-    try:
-        output = sub.check_output(command, stderr=sub.STDOUT)
-        return 0, output.decode('utf-8')
-    except sub.CalledProcessError as exc:
-        return exc.returncode, exc.output.decode('utf-8')
+    completed = sub.run(command)
+    return completed.returncode
 
 def handler(event, context):
     storage_backend = event['storageBackend']
@@ -25,12 +22,11 @@ def handler(event, context):
     # remove old log files
     os.system("rm -rf /tmp/pbrt-lambda-*")
 
-    retcode, output = run_command(["pbrt-lambda-worker",
-                                   "--ip", coordinator_host,
-                                   "--port", coordinator_port,
-                                   "--storage-backend", storage_backend])
+    retcode = run_command(["pbrt-lambda-worker",
+                           "--ip", coordinator_host,
+                           "--port", coordinator_port,
+                           "--storage-backend", storage_backend])
 
-    print(output)
-    print(retcode)
+    print("retcode={}".format(retcode))
 
-    return {'returnCode': retcode, 'stdout': output}
+    return {'stdout': retcode}
