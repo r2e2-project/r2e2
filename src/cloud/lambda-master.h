@@ -59,20 +59,20 @@ class LambdaMaster {
     struct SceneObjectInfo {
         SceneManager::ObjectID id;
         size_t size;
-        std::set<uint64_t>
-            workers; /* the set of workers which have this scene object */
+
+        /* the set of workers which have this scene object */
+        std::set<uint64_t> workers;
     };
 
     struct Worker {
-        enum class State { Idle, Busy };
         WorkerId id;
-        State state{State::Idle};
+
         std::shared_ptr<TCPConnection> connection;
         Optional<Address> udpAddress{};
         Optional<Bounds2i> tile;
         std::set<ObjectKey> objects;
-        size_t freeSpace{2 * 1000 * 1000 *
-                         1000}; /* in bytes (assuming 2 GBs free to start) */
+
+        size_t freeSpace{2 * 1000 * 1000 * 1000};
         WorkerStats stats;
 
         struct {
@@ -107,6 +107,7 @@ class LambdaMaster {
     void assignTreelet(Worker &worker, const TreeletId treeletId);
 
     void assignBaseSceneObjects(Worker &worker);
+
     // Assigns this worker a single treelet per a uniform assignment of
     // treelets over workers. Assumes that treelet ids are in [0, t], where 0
     // is the root treelet and is assigned to everyone.  Assumes that worker
@@ -186,9 +187,11 @@ class LambdaMaster {
     std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
 
     const MasterConfiguration config;
+
     // For estimating the cpu utilization of workers. A number that is likely
     // between 0 and 1.
     std::map<WorkerId, RateEstimator<double>> cpuUtilizationTracker;
+
     // For estimating the rays traced per second
     std::map<WorkerId, RateEstimator<double>> processedRayTrackers;
     std::map<WorkerId, RateEstimator<double>> receivedBytesByWorker;
