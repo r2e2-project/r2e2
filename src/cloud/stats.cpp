@@ -3,8 +3,8 @@
 #include <math.h>
 #include <iomanip>
 
-using namespace std::chrono;
 using namespace std;
+using namespace chrono;
 
 namespace pbrt {
 namespace global {
@@ -50,30 +50,31 @@ void RayStats::merge(const RayStats& other) {
 
 void WorkerStats::recordFinishedPath() { _finishedPaths += 1; }
 
-void WorkerStats::recordSentRay(const SceneManager::ObjectKey& type) {
+void WorkerStats::recordSentRay(const ObjectKey& type) {
     INCREMENT_FIELD(sentRays);
 }
 
-void WorkerStats::recordReceivedRay(const SceneManager::ObjectKey& type) {
+void WorkerStats::recordReceivedRay(const ObjectKey& type) {
     INCREMENT_FIELD(receivedRays);
 }
-void WorkerStats::recordWaitingRay(const SceneManager::ObjectKey& type) {
+
+void WorkerStats::recordWaitingRay(const ObjectKey& type) {
     INCREMENT_FIELD(waitingRays);
 }
-void WorkerStats::recordProcessedRay(const SceneManager::ObjectKey& type) {
+
+void WorkerStats::recordProcessedRay(const ObjectKey& type) {
     INCREMENT_FIELD(processedRays);
 }
-void WorkerStats::recordDemandedRay(const SceneManager::ObjectKey& type) {
+
+void WorkerStats::recordDemandedRay(const ObjectKey& type) {
     INCREMENT_FIELD(demandedRays);
 }
 
 #undef INCREMENT_FIELD
 
-void WorkerStats::recordRayInterval(const SceneManager::ObjectKey& type,
-                                    timepoint_t start, timepoint_t end) {
-    auto total_time =
-        std::chrono::duration_cast<std::chrono::nanoseconds>((end - start))
-            .count();
+void WorkerStats::recordRayInterval(const ObjectKey& type, timepoint_t start,
+                                    timepoint_t end) {
+    auto total_time = duration_cast<nanoseconds>((end - start)).count();
     aggregateStats.rayDurations.push_back(total_time);
 #ifdef PER_RAY_STATS
     objectStats[type].rayDurations.push_back(total_time);
@@ -84,7 +85,7 @@ void WorkerStats::reset() {
     _finishedPaths = 0;
     aggregateStats.reset();
     objectStats.clear();
-    cpuTime = std::chrono::milliseconds(0);
+    cpuTime = milliseconds(0);
     bytesReceived = 0;
     bytesSent = 0;
 }
@@ -92,8 +93,6 @@ void WorkerStats::reset() {
 void WorkerStats::resetDiagnostics() {
     reset();
     timePerAction.clear();
-    intervalStart = now();
-    intervalsPerAction.clear();
     intervalStart = now();
     intervalsPerAction.clear();
     metricsOverTime.clear();
@@ -113,10 +112,12 @@ void WorkerStats::merge(const WorkerStats& other) {
     for (const auto& kv : other.timePerAction) {
         timePerAction[kv.first] += kv.second;
     }
+
     for (const auto& kv : other.intervalsPerAction) {
         intervalsPerAction[kv.first].insert(intervalsPerAction[kv.first].end(),
                                             kv.second.begin(), kv.second.end());
     }
+
     for (const auto& kv : other.metricsOverTime) {
         metricsOverTime[kv.first].insert(metricsOverTime[kv.first].end(),
                                          kv.second.begin(), kv.second.end());
@@ -126,30 +127,24 @@ void WorkerStats::merge(const WorkerStats& other) {
 WorkerStats::Recorder::~Recorder() {
     auto end = now();
     stats.timePerAction[name] +=
-        std::chrono::duration_cast<std::chrono::nanoseconds>((end - start))
-            .count();
+        duration_cast<nanoseconds>((end - start)).count();
+
 #ifdef PER_INTERVAL_STATS
-    stats.intervalsPerAction[name].push_back(
-        std::make_tuple(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            (start - stats.intervalStart))
-                            .count(),
-                        std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            (end - stats.intervalStart))
-                            .count()));
+    stats.intervalsPerAction[name].push_back(make_tuple(
+        duration_cast<nanoseconds>((start - stats.intervalStart)).count(),
+        duration_cast<nanoseconds>((end - stats.intervalStart)).count()));
 #endif
 }
 
-WorkerStats::Recorder::Recorder(WorkerStats& stats_, const std::string& name_)
+WorkerStats::Recorder::Recorder(WorkerStats& stats_, const string& name_)
     : stats(stats_), name(name_) {
     start = now();
 }
 
-void WorkerStats::recordMetric(const std::string& name, timepoint_t time,
+void WorkerStats::recordMetric(const string& name, timepoint_t time,
                                double metric) {
-    metricsOverTime[name].push_back(std::make_tuple(
-        (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(
-            time - intervalStart)
-            .count(),
+    metricsOverTime[name].push_back(make_tuple(
+        (uint64_t)duration_cast<nanoseconds>(time - intervalStart).count(),
         metric));
 }
 

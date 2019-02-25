@@ -383,6 +383,7 @@ ResultType LambdaWorker::handleWorkerStats() {
             return peer.second.state == Worker::State::Connecting;
         });
     qStats.connected = peers.size() - qStats.connecting;
+    qStats.outstandingUdp = this->udpConnection->queue_size();
 
     global::workerStats.bytesSent =
         this->udpConnection->bytes_sent - netStats.bytesSent;
@@ -397,7 +398,6 @@ ResultType LambdaWorker::handleWorkerStats() {
                      (usage.ru_stime.tv_usec + usage.ru_utime.tv_usec) / 1000);
     global::workerStats.cpuTime = netCpuTime - netStats.cpuTime;
 
-    qStats.outstandingUdp = this->udpConnection->queue_size();
     netStats.merge(global::workerStats);
 
     auto proto = to_protobuf(global::workerStats);

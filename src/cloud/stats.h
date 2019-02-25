@@ -18,7 +18,7 @@ inline timepoint_t now() { return std::chrono::system_clock::now(); };
 // #define PER_INTERVAL_STATS
 #define RECORD_METRICS
 
-const double RAY_PERCENTILES[] = {0.5, 0.9, 0.99, 0.999, 0.9999};
+constexpr double RAY_PERCENTILES[] = {0.5, 0.9, 0.99, 0.999, 0.9999};
 constexpr size_t NUM_PERCENTILES = sizeof(RAY_PERCENTILES) / sizeof(double);
 
 struct RayStats {
@@ -52,11 +52,13 @@ struct QueueStats {
 };
 
 struct WorkerStats {
+    using ObjectKey = SceneManager::ObjectKey;
+
     /* required stats */
     uint64_t _finishedPaths{0};
     RayStats aggregateStats;
     QueueStats queueStats;
-    std::map<SceneManager::ObjectKey, RayStats> objectStats;
+    std::map<ObjectKey, RayStats> objectStats;
     std::chrono::milliseconds cpuTime{0};
 
     /* diagnostic stats */
@@ -68,7 +70,6 @@ struct WorkerStats {
 
     uint64_t bytesSent{0};
     uint64_t bytesReceived{0};
-    std::chrono::milliseconds interval;
 
     timepoint_t intervalStart{now()};
 
@@ -79,13 +80,13 @@ struct WorkerStats {
     uint64_t processedRays() const { return aggregateStats.processedRays; }
 
     void recordFinishedPath();
-    void recordSentRay(const SceneManager::ObjectKey& type);
-    void recordReceivedRay(const SceneManager::ObjectKey& type);
-    void recordWaitingRay(const SceneManager::ObjectKey& type);
-    void recordProcessedRay(const SceneManager::ObjectKey& type);
-    void recordRayInterval(const SceneManager::ObjectKey& type,
+    void recordSentRay(const ObjectKey& type);
+    void recordReceivedRay(const ObjectKey& type);
+    void recordWaitingRay(const ObjectKey& type);
+    void recordProcessedRay(const ObjectKey& type);
+    void recordRayInterval(const ObjectKey& type,
                            timepoint_t start, timepoint_t end);
-    void recordDemandedRay(const SceneManager::ObjectKey& type);
+    void recordDemandedRay(const ObjectKey& type);
 
     void reset();
     void resetDiagnostics();

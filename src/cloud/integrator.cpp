@@ -185,6 +185,7 @@ void CloudIntegrator::Render(const Scene &scene) {
             } else {
                 newRay.Ld = 0.f;
                 finishedRays.push_back(move(newRay));
+                global::workerStats.recordFinishedPath();
             }
         } else if (state.hit.initialized()) {
             auto newRays =
@@ -192,6 +193,8 @@ void CloudIntegrator::Render(const Scene &scene) {
             for (auto &newRay : newRays) {
                 rayQueue.push_back(move(newRay));
             }
+        } else {
+            throw runtime_error("unexpected ray state");
         }
     }
 
