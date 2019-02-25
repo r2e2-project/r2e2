@@ -715,10 +715,6 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         protoutil::from_string(message.payload(), proto);
         auto stats = from_protobuf(proto);
 
-        if (stats.timePerAction.size() > 0) {
-            diagnosticsReceived += 1;
-        }
-
         demandTracker.submit(workerId, stats);
         processedRayTrackers[workerId].update(
             stats.aggregateStats.processedRays);
@@ -841,7 +837,8 @@ string LambdaMaster::getSummary() {
     {
         uint64_t minTime = std::numeric_limits<uint64_t>::max();
         uint64_t maxTime = 0;
-        for (auto &kv : (*workers.begin()).second.stats.intervalsPerAction) {
+        for (auto &kv :
+             (*workers.begin()).second.diagnostics.intervalsPerAction) {
             for (tuple<uint64_t, uint64_t> tup : kv.second) {
                 uint64_t start, end;
                 std::tie(start, end) = tup;
@@ -856,10 +853,10 @@ string LambdaMaster::getSummary() {
         printf("min time %lu, max time %lu\n", minTime, maxTime);
         double totalTime = (maxTime - minTime) / 1e9;
 
-        auto printActionTimes = [&](const WorkerStats &stats,
+        auto printActionTimes = [&](const WorkerDiagnostics &diagnostics,
                                     double normalizer = 1.0) {
             double sum = 0;
-            for (auto &kv : stats.timePerAction) {
+            for (auto &kv : diagnostics.timePerAction) {
                 auto actionTime = kv.second / 1e9 / normalizer;
                 sum += actionTime;
                 oss << setfill(' ') << setw(20) << kv.first << ": " << setw(6)
@@ -875,14 +872,14 @@ string LambdaMaster::getSummary() {
             oss << endl;
         };
         oss << "Average actions:" << endl;
-        printActionTimes(workerStats, workers.size());
+        printActionTimes(workerDiagnostics, workers.size());
 
         uint64_t maxWorkerID = 0;
         double maxActionsLength = -1;
         for (auto &kv : workers) {
             Worker &worker = kv.second;
             double actionsSum = 0;
-            for (auto &kv : worker.stats.timePerAction) {
+            for (auto &kv : worker.diagnostics.timePerAction) {
                 if (kv.first == "idle") continue;
                 auto actionTime = kv.second / 1e9;
                 actionsSum += actionTime;
@@ -894,7 +891,7 @@ string LambdaMaster::getSummary() {
         }
         if (maxActionsLength > 0) {
             oss << "Most busy worker intervals:" << endl;
-            printActionTimes(workers.at(maxWorkerID).stats);
+            printActionTimes(workers.at(maxWorkerID).diagnostics);
         }
     }
 
@@ -924,7 +921,7 @@ string LambdaMaster::getSummary() {
         workerIntervals << "intervals" << endl;
         for (auto &worker_kv : workers) {
             const auto &worker = worker_kv.second;
-            const auto &intervals = worker.stats.intervalsPerAction;
+            const auto &intervals = worker.diagnostics.intervalsPerAction;
             workerIntervals << "worker " << worker.id << " " << intervals.size()
                             << " ";
             for (auto &kv : intervals) {
@@ -943,7 +940,7 @@ string LambdaMaster::getSummary() {
         workerIntervals << "metrics" << endl;
         for (auto &kv : workers) {
             const Worker &worker = kv.second;
-            const auto &metrics = worker.stats.metricsOverTime;
+            const auto &metrics = worker.diagnostics.metricsOverTime;
             workerIntervals << "worker " << worker.id << " " << metrics.size()
                             << " ";
             for (auto &kv : metrics) {

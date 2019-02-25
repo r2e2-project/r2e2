@@ -64,7 +64,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     roost::chdir(workingDirectory.name());
     FLAGS_log_dir = ".";
     google::InitGoogleLogging(logBase.c_str());
-    global::workerStats.intervalStart = now();
+    global::workerDiagnostics.intervalStart = now();
     netStats.reset();
 
     PbrtOptions.nThreads = 1;
@@ -436,7 +436,7 @@ ResultType LambdaWorker::handleMetrics() {
     metrics["udpOutstanding"] = this->udpConnection->queue_size();
 
     for (auto& kv : metrics) {
-        global::workerStats.recordMetric(kv.first, time, kv.second);
+        global::workerDiagnostics.recordMetric(kv.first, time, kv.second);
     }
 
     metrics.clear();

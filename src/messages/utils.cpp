@@ -336,52 +336,61 @@ protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
     (*proto.mutable_queue_stats()) = to_protobuf(stats.queueStats);
 
     for (const auto& kv : stats.objectStats) {
-        protobuf::WorkerStats::ObjectRayStats* ray_stats =
-            proto.add_object_stats();
+        protobuf::ObjectRayStats* ray_stats = proto.add_object_stats();
         (*ray_stats->mutable_id()) = to_protobuf(kv.first);
         (*ray_stats->mutable_stats()) = to_protobuf(kv.second);
     }
     return proto;
 }
 
+protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics) {
+    protobuf::WorkerDiagnostics proto;
+
+    for (const auto& kv : diagnostics.timePerAction) {
+        (*proto.mutable_time_per_action())[kv.first] = kv.second;
+    }
+
+    for (const auto& kv : diagnostics.intervalsPerAction) {
+        protobuf::ActionIntervals* action_intervals =
+            proto.add_intervals_per_action();
+        action_intervals->set_name(kv.first);
+        for (std::tuple<uint64_t, uint64_t> interval : kv.second) {
+            protobuf::Interval* proto_interval =
+                action_intervals->add_intervals();
+            proto_interval->set_start(std::get<0>(interval));
+            proto_interval->set_end(std::get<1>(interval));
+        }
+    }
+
+    for (const auto& kv : diagnostics.metricsOverTime) {
+        protobuf::Metrics* metrics = proto.add_metrics_over_time();
+        metrics->set_name(kv.first);
+        for (std::tuple<uint64_t, double> point : kv.second) {
+            protobuf::MetricPoint* metric_point = metrics->add_points();
+            metric_point->set_time(std::get<0>(point));
+            metric_point->set_value(std::get<1>(point));
+        }
+    }
+
+    return proto;
+}
+
 protobuf::WorkerStats to_protobuf_diagnostics(const WorkerStats& stats) {
     protobuf::WorkerStats proto;
+
     proto.set_finished_paths(stats._finishedPaths);
     proto.set_cpu_millis(stats.cpuTime.count());
     proto.set_bytes_sent(stats.bytesSent);
     proto.set_bytes_received(stats.bytesReceived);
     (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
     (*proto.mutable_queue_stats()) = to_protobuf(stats.queueStats);
+
     for (const auto& kv : stats.objectStats) {
-        protobuf::WorkerStats::ObjectRayStats* ray_stats =
-            proto.add_object_stats();
+        protobuf::ObjectRayStats* ray_stats = proto.add_object_stats();
         (*ray_stats->mutable_id()) = to_protobuf(kv.first);
         (*ray_stats->mutable_stats()) = to_protobuf_diagnostics(kv.second);
     }
-    for (const auto& kv : stats.timePerAction) {
-        (*proto.mutable_time_per_action())[kv.first] = kv.second;
-    }
-    for (const auto& kv : stats.intervalsPerAction) {
-        protobuf::WorkerStats::ActionIntervals* action_intervals =
-            proto.add_intervals_per_action();
-        action_intervals->set_name(kv.first);
-        for (std::tuple<uint64_t, uint64_t> interval : kv.second) {
-            protobuf::WorkerStats::Interval* proto_interval =
-                action_intervals->add_intervals();
-            proto_interval->set_start(std::get<0>(interval));
-            proto_interval->set_end(std::get<1>(interval));
-        }
-    }
-    for (const auto& kv : stats.metricsOverTime) {
-        protobuf::WorkerStats::Metrics* metrics = proto.add_metrics_over_time();
-        metrics->set_name(kv.first);
-        for (std::tuple<uint64_t, double> point : kv.second) {
-            protobuf::WorkerStats::MetricPoint* metric_point =
-                metrics->add_points();
-            metric_point->set_time(std::get<0>(point));
-            metric_point->set_value(std::get<1>(point));
-        }
-    }
+
     return proto;
 }
 
@@ -943,8 +952,7 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
     stats.aggregateStats = from_protobuf(proto.aggregate_stats());
     stats.queueStats = from_protobuf(proto.queue_stats());
 
-    for (const protobuf::WorkerStats::ObjectRayStats& object_stats :
-         proto.object_stats()) {
+    for (const protobuf::ObjectRayStats& object_stats : proto.object_stats()) {
         auto id = from_protobuf(object_stats.id());
         stats.objectStats[id] = from_protobuf(object_stats.stats());
     }
@@ -952,25 +960,31 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
     stats.bytesSent = proto.bytes_sent();
     stats.bytesReceived = proto.bytes_received();
 
+    return stats;
+}
+
+WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& proto) {
+    WorkerDiagnostics diagnostics;
+
     for (const auto& kv : proto.time_per_action()) {
-        stats.timePerAction[kv.first] = kv.second;
+        diagnostics.timePerAction[kv.first] = kv.second;
     }
     for (const auto& action_interval : proto.intervals_per_action()) {
         const std::string& name = action_interval.name();
         for (const auto& interval : action_interval.intervals()) {
-            stats.intervalsPerAction[name].push_back(
+            diagnostics.intervalsPerAction[name].push_back(
                 std::make_tuple(interval.start(), interval.end()));
         }
     }
     for (const auto& metrics : proto.metrics_over_time()) {
         const std::string& name = metrics.name();
         for (const auto& metric_point : metrics.points()) {
-            stats.metricsOverTime[name].push_back(
+            diagnostics.metricsOverTime[name].push_back(
                 std::make_tuple(metric_point.time(), metric_point.value()));
         }
     }
 
-    return stats;
+    return diagnostics;
 }
 
 }  // namespace pbrt

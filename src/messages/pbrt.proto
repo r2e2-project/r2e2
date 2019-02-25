@@ -288,115 +288,118 @@ message QueueStats {
     uint64 outstanding_udp = 7;
 }
 
-message WorkerStats {
-  message ObjectRayStats {
+message ObjectRayStats {
     ObjectKey id = 1;
     RayStats stats = 2;
-  }
+}
 
-  message Interval {
+message Interval {
     uint64 start = 1;
     uint64 end = 2;
-  }
+}
 
-  message ActionIntervals {
+message ActionIntervals {
     string name = 1;
     repeated Interval intervals = 2;
-  }
+}
 
-  message MetricPoint {
+message MetricPoint {
     uint64 time = 1;
     float value = 2;
-  }
+}
 
-  message Metrics {
+message Metrics {
     string name = 1;
     repeated MetricPoint points = 2;
-  }
+}
 
-  uint64 finished_paths = 1;
-  RayStats aggregate_stats = 2;
-  QueueStats queue_stats = 3;
-  repeated ObjectRayStats object_stats = 4;
-  uint64 cpu_millis = 5;
-  uint64 bytes_sent = 6;
-  uint64 bytes_received = 7;
-  map<string, float> time_per_action = 8;
-  repeated ActionIntervals intervals_per_action = 9;
-  repeated Metrics metrics_over_time = 10;
+message WorkerStats {
+    uint64 finished_paths = 1;
+    RayStats aggregate_stats = 2;
+    QueueStats queue_stats = 3;
+    repeated ObjectRayStats object_stats = 4;
+    uint64 cpu_millis = 5;
+    uint64 bytes_sent = 6;
+    uint64 bytes_received = 7;
+}
+
+message WorkerDiagnostics {
+    map<string, float> time_per_action = 8;
+    repeated ActionIntervals intervals_per_action = 9;
+    repeated Metrics metrics_over_time = 10;
 }
 
 // For stat output to logs.
 message TreeletStatsTrace {
-  map<uint32, SingleTreeletStatsTrace> map = 1;
+    map<uint32, SingleTreeletStatsTrace> map = 1;
 }
 
 message SingleTreeletStatsTrace {
-  double demand = 1;
-  uint32 allocations = 2;
+    double demand = 1;
+    uint32 allocations = 2;
 }
 
 message WorkerStatsTrace {
-  map<uint32, SingleWorkerStatsTrace> map = 1;
+    map<uint32, SingleWorkerStatsTrace> map = 1;
 }
 
 message SingleWorkerStatsTrace {
-  // in [0,1]
-  double cpu_fraction = 1;
-  // rays/s
-  double rays_processed = 2;
-  // rays/s
-  double rays_received = 3;
-  QueueStats queue_stats = 4;
-  // b/s
-  double ingress = 5;
-  // b/s
-  double outgress = 6;
-  uint32 treelet_id = 7;
+    // in [0,1]
+    double cpu_fraction = 1;
+    // rays/s
+    double rays_processed = 2;
+    // rays/s
+    double rays_received = 3;
+    QueueStats queue_stats = 4;
+    // b/s
+    double ingress = 5;
+    // b/s
+    double outgress = 6;
+    uint32 treelet_id = 7;
 }
 
 message StatsTrace {
-  oneof data {
-    WorkerStatsTrace worker_stats = 2;
-    TreeletStatsTrace treelet_stats = 3;
-  }
+    oneof data {
+        WorkerStatsTrace worker_stats = 2;
+        TreeletStatsTrace treelet_stats = 3;
+    }
 }
 
 // Materials & Textures
 message TextureParams {
-  ParamSet geom_params = 1;
-  ParamSet material_params = 2;
-  map<string, int32> float_textures = 3;
-  map<string, int32> spectrum_textures = 4;
+    ParamSet geom_params = 1;
+    ParamSet material_params = 2;
+    map<string, int32> float_textures = 3;
+    map<string, int32> spectrum_textures = 4;
 }
 
 // Materials
 
 message Material {
-  string name = 1;
-  TextureParams texture_params = 2;
+    string name = 1;
+    TextureParams texture_params = 2;
 }
 
 // Textures
 
 message FloatTexture {
-  string name = 1;
-  Matrix tex2world = 2;
-  TextureParams texture_params = 3;
+    string name = 1;
+    Matrix tex2world = 2;
+    TextureParams texture_params = 3;
 }
 
 message SpectrumTexture {
-  string name = 1;
-  Matrix tex2world = 2;
-  TextureParams texture_params = 3;
+    string name = 1;
+    Matrix tex2world = 2;
+    TextureParams texture_params = 3;
 }
 
 // Manifest
 
 message Manifest {
-  message Object {
-    ObjectKey id = 1;
-    repeated ObjectKey dependencies = 2;
-  };
-  repeated Object objects = 1;
+    message Object {
+        ObjectKey id = 1;
+        repeated ObjectKey dependencies = 2;
+    };
+    repeated Object objects = 1;
 }

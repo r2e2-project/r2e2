@@ -9,7 +9,8 @@ using namespace chrono;
 namespace pbrt {
 namespace global {
 WorkerStats workerStats;
-}
+WorkerDiagnostics workerDiagnostics;
+}  // namespace global
 
 void RayStats::reset() {
     sentRays = 0;
@@ -90,14 +91,6 @@ void WorkerStats::reset() {
     bytesSent = 0;
 }
 
-void WorkerStats::resetDiagnostics() {
-    reset();
-    timePerAction.clear();
-    intervalStart = now();
-    intervalsPerAction.clear();
-    metricsOverTime.clear();
-}
-
 void WorkerStats::merge(const WorkerStats& other) {
     _finishedPaths += other._finishedPaths;
     aggregateStats.merge(other.aggregateStats);
@@ -108,23 +101,17 @@ void WorkerStats::merge(const WorkerStats& other) {
     cpuTime += other.cpuTime;
     bytesReceived += other.bytesReceived;
     bytesSent += other.bytesSent;
-
-    for (const auto& kv : other.timePerAction) {
-        timePerAction[kv.first] += kv.second;
-    }
-
-    for (const auto& kv : other.intervalsPerAction) {
-        intervalsPerAction[kv.first].insert(intervalsPerAction[kv.first].end(),
-                                            kv.second.begin(), kv.second.end());
-    }
-
-    for (const auto& kv : other.metricsOverTime) {
-        metricsOverTime[kv.first].insert(metricsOverTime[kv.first].end(),
-                                         kv.second.begin(), kv.second.end());
-    }
 }
 
-WorkerStats::Recorder::~Recorder() {
+/* WorkerDiagnostics */
+
+WorkerDiagnostics::Recorder::Recorder(WorkerDiagnostics& stats_,
+                                      const string& name_)
+    : stats(stats_), name(name_) {
+    start = now();
+}
+
+WorkerDiagnostics::Recorder::~Recorder() {
     auto end = now();
     stats.timePerAction[name] +=
         duration_cast<nanoseconds>((end - start)).count();
@@ -136,13 +123,15 @@ WorkerStats::Recorder::~Recorder() {
 #endif
 }
 
-WorkerStats::Recorder::Recorder(WorkerStats& stats_, const string& name_)
-    : stats(stats_), name(name_) {
-    start = now();
+void WorkerDiagnostics::reset() {
+    timePerAction.clear();
+    intervalStart = now();
+    intervalsPerAction.clear();
+    metricsOverTime.clear();
 }
 
-void WorkerStats::recordMetric(const string& name, timepoint_t time,
-                               double metric) {
+void WorkerDiagnostics::recordMetric(const string& name, timepoint_t time,
+                                     double metric) {
     metricsOverTime[name].push_back(make_tuple(
         (uint64_t)duration_cast<nanoseconds>(time - intervalStart).count(),
         metric));

@@ -11,8 +11,8 @@
 namespace pbrt {
 
 /* timing utility functions */
-using timepoint_t = std::chrono::time_point<std::chrono::system_clock>;
-inline timepoint_t now() { return std::chrono::system_clock::now(); };
+using timepoint_t = std::chrono::time_point<std::chrono::steady_clock>;
+inline timepoint_t now() { return std::chrono::steady_clock::now(); };
 
 #define PER_RAY_STATS
 // #define PER_INTERVAL_STATS
@@ -61,17 +61,8 @@ struct WorkerStats {
     std::map<ObjectKey, RayStats> objectStats;
     std::chrono::milliseconds cpuTime{0};
 
-    /* diagnostic stats */
-    std::map<std::string, double> timePerAction;
-    std::map<std::string, std::vector<std::tuple<uint64_t, uint64_t>>>
-        intervalsPerAction;
-    std::map<std::string, std::vector<std::tuple<uint64_t, double>>>
-        metricsOverTime;
-
     uint64_t bytesSent{0};
     uint64_t bytesReceived{0};
-
-    timepoint_t intervalStart{now()};
 
     uint64_t finishedPaths() const { return _finishedPaths; }
     uint64_t sentRays() const { return aggregateStats.sentRays; }
@@ -84,35 +75,48 @@ struct WorkerStats {
     void recordReceivedRay(const ObjectKey& type);
     void recordWaitingRay(const ObjectKey& type);
     void recordProcessedRay(const ObjectKey& type);
-    void recordRayInterval(const ObjectKey& type,
-                           timepoint_t start, timepoint_t end);
+    void recordRayInterval(const ObjectKey& type, timepoint_t start,
+                           timepoint_t end);
     void recordDemandedRay(const ObjectKey& type);
 
     void reset();
-    void resetDiagnostics();
 
     void merge(const WorkerStats& other);
+};
+
+struct WorkerDiagnostics {
+    const timepoint_t startTime{now()};
+    timepoint_t intervalStart{now()};
+
+    /* diagnostic stats */
+    std::map<std::string, double> timePerAction;
+    std::map<std::string, std::vector<std::tuple<uint64_t, uint64_t>>>
+        intervalsPerAction;
+    std::map<std::string, std::vector<std::tuple<uint64_t, double>>>
+        metricsOverTime;
 
     /* for recording action intervals */
-    struct Recorder {
+    class Recorder {
+      public:
         ~Recorder();
 
       private:
-        friend WorkerStats;
+        friend WorkerDiagnostics;
 
-        Recorder(WorkerStats& stats_, const std::string& name_);
+        Recorder(WorkerDiagnostics& stats_, const std::string& name_);
 
-        WorkerStats& stats;
+        WorkerDiagnostics& stats;
         std::string name;
         timepoint_t start;
     };
 
-    friend Recorder;
     Recorder recordInterval(const std::string& name) {
         return Recorder(*this, name);
     }
 
     void recordMetric(const std::string& name, timepoint_t time, double metric);
+
+    void reset();
 };
 
 class DemandTracker {
@@ -133,10 +137,11 @@ class DemandTracker {
 
 namespace global {
 extern WorkerStats workerStats;
-}
+extern WorkerDiagnostics workerDiagnostics;
+}  // namespace global
 
 #define RECORD_INTERVAL(x) \
-    auto __REC__ = pbrt::global::workerStats.recordInterval(x)
+    auto __REC__ = pbrt::global::workerDiagnostics.recordInterval(x)
 
 }  // namespace pbrt
 

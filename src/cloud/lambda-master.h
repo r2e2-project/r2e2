@@ -71,9 +71,10 @@ class LambdaMaster {
         Optional<Address> udpAddress{};
         Optional<Bounds2i> tile;
         std::set<ObjectKey> objects;
-
         size_t freeSpace{2 * 1000 * 1000 * 1000};
+
         WorkerStats stats;
+        WorkerDiagnostics diagnostics;
 
         struct {
             std::string logStream;
@@ -178,6 +179,7 @@ class LambdaMaster {
 
     /* Worker stats */
     WorkerStats workerStats;
+    WorkerDiagnostics workerDiagnostics;
     DemandTracker demandTracker;
     size_t initializedWorkers{0};
     size_t diagnosticsReceived{0};
