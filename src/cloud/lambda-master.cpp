@@ -366,46 +366,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     });
 }
 
-void LambdaMaster::updateStatsTrace() {
-    protobuf::TreeletStatsTrace *treeletsStats =
-        new protobuf::TreeletStatsTrace;
-    for (const ObjectKey &tid : treeletIds) {
-        protobuf::SingleTreeletStatsTrace treeletStats;
-        treeletStats.set_demand(demandTracker.treeletDemand(tid.id));
-        treeletStats.set_allocations(sceneObjects[tid].workers.size());
-        (*treeletsStats->mutable_map())[tid.id] = treeletStats;
-    }
-    protobuf::StatsTrace trace;
-    trace.set_allocated_treelet_stats(treeletsStats);
-    LOG(INFO) << "json " << protoutil::to_json(trace, false);
-
-    protobuf::WorkerStatsTrace *workersStats = new protobuf::WorkerStatsTrace;
-    for (const auto &kv : workers) {
-        WorkerId id = kv.first;
-        protobuf::SingleWorkerStatsTrace workerStats;
-        protobuf::QueueStats *q = new protobuf::QueueStats;
-        *q = to_protobuf(workers.at(id).stats.queueStats);
-        workerStats.set_allocated_queue_stats(q);
-        workerStats.set_ingress(receivedBytesByWorker[id].getRate());
-        workerStats.set_outgress(sentBytesByWorker[id].getRate());
-        workerStats.set_treelet_id(
-            find_if(kv.second.objects.begin(), kv.second.objects.end(),
-                    [](const ObjectKey &o) {
-                        return o.type == ObjectType::Treelet && o.id != 0;
-                    })
-                ->id);
-        workerStats.set_cpu_fraction(cpuUtilizationTracker[id].getRate());
-        workerStats.set_rays_processed(processedRayTrackers[id].getRate());
-        workerStats.set_rays_received(receivedRaysByWorker[id].getRate());
-        (*workersStats->mutable_map())[id] = workerStats;
-    }
-    protobuf::StatsTrace trace2;
-    trace2.set_allocated_worker_stats(workersStats);
-    LOG(INFO) << "json " << protoutil::to_json(trace2, false);
-}
-
 ResultType LambdaMaster::updateStatusMessage() {
-    updateStatsTrace();
     statusPrintTimer.reset();
 
     aggregateQueueStats();
@@ -422,142 +383,6 @@ ResultType LambdaMaster::updateStatusMessage() {
               << " / connecting: " << workerStats.queueStats.connecting
               << " / connected: " << workerStats.queueStats.connected
               << " / outstanding: " << workerStats.queueStats.outstandingUdp;
-
-    if (config.treeletStats) {
-        cerr << "Net demand (rays/s): " << demandTracker.netDemand() << endl;
-        cerr << "            Treelet: ";
-        for (const ObjectKey &tid : treeletIds) {
-            cerr << setw(8) << tid.to_string();
-        }
-        cerr << endl;
-
-        cerr << "    demand (rays/s): ";
-        for (const ObjectKey &tid : treeletIds) {
-            cerr << setw(8) << setprecision(4)
-                 << log10(demandTracker.treeletDemand(tid.id));
-        }
-        cerr << endl;
-
-        cerr << "        allocations: ";
-        for (const ObjectKey &tid : treeletIds) {
-            cerr << setw(8) << sceneObjects[tid].workers.size();
-        }
-        cerr << endl;
-    }
-
-    if (config.workerStats) {
-        cerr << "                 Worker: ";
-        for (const auto &kv : workers) {
-            cerr << setw(8) << kv.first;
-        }
-        cerr << endl;
-
-        cerr << "           CPU time (%): ";
-        vector<double> cpuPercents;
-        for (const auto &kv : workers) {
-            double cpuPercent =
-                cpuUtilizationTracker[kv.first].getRate() * 100.0;
-            cpuPercents.push_back(cpuPercent);
-            cerr << setw(8) << int(cpuPercent + 0.5);
-        }
-        cerr << endl;
-
-        cerr << "Rays processed     (/s): ";
-        for (const auto &kv : workers) {
-            cerr << setw(8) << int(processedRayTrackers[kv.first].getRate());
-        }
-        cerr << endl;
-
-        cerr << "Rays received      (/s): ";
-        for (const auto &kv : workers) {
-            cerr << setw(8) << int(receivedRaysByWorker[kv.first].getRate());
-        }
-        cerr << endl;
-
-        cerr << "Ray Q                  : ";
-        for (const auto &kv : workers) {
-            cerr << setw(8) << workers.at(kv.first).stats.queueStats.ray;
-        }
-        cerr << endl;
-
-        cerr << "Pending Q              : ";
-        for (const auto &kv : workers) {
-            cerr << setw(8) << workers.at(kv.first).stats.queueStats.pending;
-        }
-        cerr << endl;
-
-        cerr << "Out Q                  : ";
-        for (const auto &kv : workers) {
-            cerr << setw(8) << workers.at(kv.first).stats.queueStats.out;
-        }
-        cerr << endl;
-
-        cerr << "Outstanding UDP        : ";
-        for (const auto &kv : workers) {
-            cerr << setw(8)
-                 << workers.at(kv.first).stats.queueStats.outstandingUdp;
-        }
-        cerr << endl;
-
-        cerr << "Connecting Count       : ";
-        for (const auto &kv : workers) {
-            cerr << setw(8) << workers.at(kv.first).stats.queueStats.connecting;
-        }
-        cerr << endl;
-
-        cerr << "Connected  Count       : ";
-        for (const auto &kv : workers) {
-            cerr << setw(8) << workers.at(kv.first).stats.queueStats.connected;
-        }
-        cerr << endl;
-
-        cerr << "          Ingress (b/s): ";
-        for (const auto &kv : workers) {
-            cerr << setw(8) << setprecision(2)
-                 << 8 * receivedBytesByWorker[kv.first].getRate();
-        }
-        cerr << endl;
-
-        cerr << "         Outgress (b/s): ";
-        for (const auto &kv : workers) {
-            cerr << setw(8) << setprecision(2)
-                 << 8 * sentBytesByWorker[kv.first].getRate();
-        }
-        cerr << endl;
-
-        cerr << "                Treelet: ";
-        for (const auto &kv : workers) {
-            const auto &i =
-                find_if(kv.second.objects.begin(), kv.second.objects.end(),
-                        [](const ObjectKey &o) {
-                            return o.type == ObjectType::Treelet && o.id != 0;
-                        });
-
-            cerr << setw(8) << i->to_string();
-        }
-        cerr << endl;
-
-        const auto mAndS = meanAndStandardDev(cpuPercents);
-        cerr << "CPU utilization mean: " << mAndS.first << endl;
-        cerr << "CPU utilization SD  : " << mAndS.second << endl;
-        cerr << "Net   Bytes Sent    : " << setw(15) << workerStats.bytesSent
-             << endl;
-        cerr << "Net   Bytes Received: " << setw(15)
-             << workerStats.bytesReceived << endl;
-        cerr << "Net             Loss: " << setprecision(3)
-             << (double(workerStats.bytesSent) -
-                 double(workerStats.bytesReceived)) /
-                    double(workerStats.bytesSent)
-             << endl;
-        cerr << "   Send Rate: " << setprecision(5)
-             << 8 * bytesSentRate.getRate() << endl;
-        cerr << "Receive Rate: " << setprecision(5)
-             << 8 * bytesReceivedRate.getRate() << endl;
-        cerr << "Current Loss: " << setprecision(3)
-             << (bytesSentRate.getRate() - bytesReceivedRate.getRate()) /
-                    bytesSentRate.getRate()
-             << endl;
-    }
 
     ostringstream oss;
     oss << "\033[0m"
@@ -716,15 +541,6 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         auto stats = from_protobuf(proto);
 
         demandTracker.submit(workerId, stats);
-        processedRayTrackers[workerId].update(
-            stats.aggregateStats.processedRays);
-        cpuUtilizationTracker[workerId].update(double(stats.cpuTime.count()) /
-                                               1000.0);
-        receivedRaysByWorker[workerId].update(stats.aggregateStats.waitingRays);
-        receivedBytesByWorker[workerId].update(stats.bytesReceived);
-        sentBytesByWorker[workerId].update(stats.bytesSent);
-        bytesReceivedRate.update(stats.bytesReceived);
-        bytesSentRate.update(stats.bytesSent);
 
         /* merge into global worker stats */
         workerStats.merge(stats);

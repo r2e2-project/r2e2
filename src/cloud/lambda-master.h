@@ -96,7 +96,6 @@ class LambdaMaster {
     Poller::Action::Result::Type handleWorkerRequests();
     Poller::Action::Result::Type handleWriteOutput();
     Poller::Action::Result::Type updateStatusMessage();
-    void updateStatsTrace();
 
     bool processMessage(const WorkerId workerId, const meow::Message &message);
     bool processWorkerRequest(const WorkerRequest &request);
@@ -189,18 +188,6 @@ class LambdaMaster {
     std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
 
     const MasterConfiguration config;
-
-    // For estimating the cpu utilization of workers. A number that is likely
-    // between 0 and 1.
-    std::map<WorkerId, RateEstimator<double>> cpuUtilizationTracker;
-
-    // For estimating the rays traced per second
-    std::map<WorkerId, RateEstimator<double>> processedRayTrackers;
-    std::map<WorkerId, RateEstimator<double>> receivedBytesByWorker;
-    std::map<WorkerId, RateEstimator<double>> sentBytesByWorker;
-    std::map<WorkerId, RateEstimator<double>> receivedRaysByWorker;
-    RateEstimator<double> bytesSentRate;
-    RateEstimator<double> bytesReceivedRate;
 };
 
 class Schedule {

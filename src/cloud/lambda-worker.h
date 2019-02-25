@@ -67,7 +67,7 @@ class LambdaWorker {
     Poller::Action::Result::Type handleNeededTreelets();
 
     Poller::Action::Result::Type handleWorkerStats();
-    Poller::Action::Result::Type handleMetrics();
+    Poller::Action::Result::Type handleDiagnostics();
 
     meow::Message createConnectionRequest(const Worker& peer);
     meow::Message createConnectionResponse(const Worker& peer);
@@ -127,14 +127,12 @@ class LambdaWorker {
     /* Timers */
     TimerFD peerTimer;
     TimerFD workerStatsTimer;
-    TimerFD recordMetricsTimer;
+    TimerFD workerDiagnosticsTimer;
 
     /* Metrics accumulator */
     std::map<std::string, double> metrics;
-    size_t prevBytesSent{0};
-    size_t prevBytesReceived{0};
-    std::chrono::milliseconds prevCPUTime{0};
-    WorkerStats netStats{};
+
+    WorkerDiagnostics prevDiagnostics{};
 
     bool terminated{false};
 };

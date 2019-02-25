@@ -47,7 +47,7 @@ using PollerResult = Poller::Result::Type;
 constexpr size_t UDP_MTU_BYTES{1'400};
 constexpr milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr milliseconds WORKER_STATS_INTERVAL{500};
-constexpr milliseconds RECORD_METRICS_INTERVAL{500};
+constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{5'000};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
@@ -59,13 +59,14 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       storageBackend(StorageBackend::create_backend(storageUri)),
       peerTimer(PEER_CHECK_INTERVAL),
       workerStatsTimer(WORKER_STATS_INTERVAL),
-      recordMetricsTimer(RECORD_METRICS_INTERVAL) {
+      workerDiagnosticsTimer(WORKER_DIAGNOSTICS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
+
     roost::chdir(workingDirectory.name());
+    global::workerDiagnostics.intervalStart = now();
+
     FLAGS_log_dir = ".";
     google::InitGoogleLogging(logBase.c_str());
-    global::workerDiagnostics.intervalStart = now();
-    netStats.reset();
 
     PbrtOptions.nThreads = 1;
     global::manager.init(".");
@@ -146,11 +147,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         bind(&LambdaWorker::handleWorkerStats, this), [this]() { return true; },
         []() { throw runtime_error("worker stats failed"); }));
 
-    /* record metrics */
+    /* record diagnostics */
     loop.poller().add_action(Poller::Action(
-        recordMetricsTimer.fd, Direction::In,
-        bind(&LambdaWorker::handleMetrics, this), [this]() { return true; },
-        []() { throw runtime_error("status print failed"); }));
+        workerDiagnosticsTimer.fd, Direction::In,
+        bind(&LambdaWorker::handleDiagnostics, this), [this]() { return true; },
+        []() { throw runtime_error("handle diagnostics failed"); }));
 
     coordinatorConnection->enqueue_write(
         Message(OpCode::Hey, safe_getenv_or(LOG_STREAM_ENVAR, "")).str());
@@ -385,21 +386,6 @@ ResultType LambdaWorker::handleWorkerStats() {
     qStats.connected = peers.size() - qStats.connecting;
     qStats.outstandingUdp = this->udpConnection->queue_size();
 
-    global::workerStats.bytesSent =
-        this->udpConnection->bytes_sent - netStats.bytesSent;
-
-    global::workerStats.bytesReceived =
-        this->udpConnection->bytes_received - netStats.bytesReceived;
-
-    rusage usage;
-    CheckSystemCall("getrusage", ::getrusage(RUSAGE_SELF, &usage));
-    milliseconds netCpuTime =
-        milliseconds(1000 * (usage.ru_stime.tv_sec + usage.ru_utime.tv_sec) +
-                     (usage.ru_stime.tv_usec + usage.ru_utime.tv_usec) / 1000);
-    global::workerStats.cpuTime = netCpuTime - netStats.cpuTime;
-
-    netStats.merge(global::workerStats);
-
     auto proto = to_protobuf(global::workerStats);
     Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
     coordinatorConnection->enqueue_write(message.str());
@@ -407,7 +393,9 @@ ResultType LambdaWorker::handleWorkerStats() {
     return ResultType::Continue;
 }
 
-ResultType LambdaWorker::handleMetrics() {
+ResultType LambdaWorker::handleDiagnostics() {
+    workerDiagnosticsTimer.reset();
+
     auto time = now();
 
     /* record CPU usage */
@@ -416,31 +404,11 @@ ResultType LambdaWorker::handleMetrics() {
     /* NOTE(apoms): we could record the bytes
      * sent/received at a finer granularity if we moved
      * this to a new poller action */
-    size_t bytesSent = this->udpConnection->bytes_sent - prevBytesSent;
-    metrics["udpBytesSent"] = bytesSent;
-    prevBytesSent += bytesSent;
-
-    size_t bytesReceived =
-        this->udpConnection->bytes_received - prevBytesReceived;
-    metrics["udpBytesReceived"] = bytesReceived;
-    prevBytesReceived += bytesReceived;
-
-    rusage usage;
-    CheckSystemCall("getrusage", ::getrusage(RUSAGE_SELF, &usage));
-    milliseconds netCpuTime =
-        milliseconds(1000 * (usage.ru_stime.tv_sec + usage.ru_utime.tv_sec) +
-                     (usage.ru_stime.tv_usec + usage.ru_utime.tv_usec) / 1000);
-    metrics["cpuTime"] = double((netCpuTime - prevCPUTime).count()) / 1000.0;
-    prevCPUTime = prevCPUTime + netCpuTime;
-
-    metrics["udpOutstanding"] = this->udpConnection->queue_size();
-
     for (auto& kv : metrics) {
         global::workerDiagnostics.recordMetric(kv.first, time, kv.second);
     }
 
     metrics.clear();
-    recordMetricsTimer.reset();
 
     return ResultType::Continue;
 }
@@ -659,7 +627,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 
     case OpCode::RequestDiagnostics: {
         LOG(INFO) << "Diagnosstics requested, sending...";
-        auto proto = to_protobuf_diagnostics(global::workerStats);
+        auto proto = to_protobuf(global::workerDiagnostics);
         Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
         coordinatorConnection->enqueue_write(message.str());
         LOG(INFO) << "Diagnostics sent.";

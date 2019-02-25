@@ -59,10 +59,6 @@ struct WorkerStats {
     RayStats aggregateStats;
     QueueStats queueStats;
     std::map<ObjectKey, RayStats> objectStats;
-    std::chrono::milliseconds cpuTime{0};
-
-    uint64_t bytesSent{0};
-    uint64_t bytesReceived{0};
 
     uint64_t finishedPaths() const { return _finishedPaths; }
     uint64_t sentRays() const { return aggregateStats.sentRays; }
@@ -80,7 +76,6 @@ struct WorkerStats {
     void recordDemandedRay(const ObjectKey& type);
 
     void reset();
-
     void merge(const WorkerStats& other);
 };
 
@@ -89,6 +84,10 @@ struct WorkerDiagnostics {
     timepoint_t intervalStart{now()};
 
     /* diagnostic stats */
+    std::chrono::milliseconds cpuTime{0};
+    uint64_t bytesSent{0};
+    uint64_t bytesReceived{0};
+
     std::map<std::string, double> timePerAction;
     std::map<std::string, std::vector<std::tuple<uint64_t, uint64_t>>>
         intervalsPerAction;
@@ -115,7 +114,6 @@ struct WorkerDiagnostics {
     }
 
     void recordMetric(const std::string& name, timepoint_t time, double metric);
-
     void reset();
 };
 

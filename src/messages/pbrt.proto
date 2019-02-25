@@ -318,15 +318,15 @@ message WorkerStats {
     RayStats aggregate_stats = 2;
     QueueStats queue_stats = 3;
     repeated ObjectRayStats object_stats = 4;
-    uint64 cpu_millis = 5;
-    uint64 bytes_sent = 6;
-    uint64 bytes_received = 7;
 }
 
 message WorkerDiagnostics {
-    map<string, float> time_per_action = 8;
-    repeated ActionIntervals intervals_per_action = 9;
-    repeated Metrics metrics_over_time = 10;
+    uint64 cpu_millis = 1;
+    uint64 bytes_sent = 2;
+    uint64 bytes_received = 3;
+    map<string, float> time_per_action = 4;
+    repeated ActionIntervals intervals_per_action = 5;
+    repeated Metrics metrics_over_time = 6;
 }
 
 // For stat output to logs.

@@ -303,17 +303,6 @@ protobuf::RayStats to_protobuf(const RayStats& stats) {
     return proto;
 }
 
-protobuf::RayStats to_protobuf_diagnostics(const RayStats& stats) {
-    protobuf::RayStats proto = to_protobuf(stats);
-    for (double d : stats.traceDurationPercentiles) {
-        proto.add_trace_duration_percentiles(d);
-    }
-    for (double d : stats.rayDurations) {
-        proto.add_ray_durations(d);
-    }
-    return proto;
-}
-
 protobuf::QueueStats to_protobuf(const QueueStats& stats) {
     protobuf::QueueStats proto;
     proto.set_ray(stats.ray);
@@ -329,9 +318,6 @@ protobuf::QueueStats to_protobuf(const QueueStats& stats) {
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
     protobuf::WorkerStats proto;
     proto.set_finished_paths(stats._finishedPaths);
-    proto.set_cpu_millis(stats.cpuTime.count());
-    proto.set_bytes_sent(stats.bytesSent);
-    proto.set_bytes_received(stats.bytesReceived);
     (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
     (*proto.mutable_queue_stats()) = to_protobuf(stats.queueStats);
 
@@ -345,6 +331,10 @@ protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
 
 protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics) {
     protobuf::WorkerDiagnostics proto;
+
+    proto.set_cpu_millis(diagnostics.cpuTime.count());
+    proto.set_bytes_sent(diagnostics.bytesSent);
+    proto.set_bytes_received(diagnostics.bytesReceived);
 
     for (const auto& kv : diagnostics.timePerAction) {
         (*proto.mutable_time_per_action())[kv.first] = kv.second;
@@ -370,25 +360,6 @@ protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics) {
             metric_point->set_time(std::get<0>(point));
             metric_point->set_value(std::get<1>(point));
         }
-    }
-
-    return proto;
-}
-
-protobuf::WorkerStats to_protobuf_diagnostics(const WorkerStats& stats) {
-    protobuf::WorkerStats proto;
-
-    proto.set_finished_paths(stats._finishedPaths);
-    proto.set_cpu_millis(stats.cpuTime.count());
-    proto.set_bytes_sent(stats.bytesSent);
-    proto.set_bytes_received(stats.bytesReceived);
-    (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
-    (*proto.mutable_queue_stats()) = to_protobuf(stats.queueStats);
-
-    for (const auto& kv : stats.objectStats) {
-        protobuf::ObjectRayStats* ray_stats = proto.add_object_stats();
-        (*ray_stats->mutable_id()) = to_protobuf(kv.first);
-        (*ray_stats->mutable_stats()) = to_protobuf_diagnostics(kv.second);
     }
 
     return proto;
@@ -956,15 +927,16 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
         auto id = from_protobuf(object_stats.id());
         stats.objectStats[id] = from_protobuf(object_stats.stats());
     }
-    stats.cpuTime = std::chrono::milliseconds(proto.cpu_millis());
-    stats.bytesSent = proto.bytes_sent();
-    stats.bytesReceived = proto.bytes_received();
 
     return stats;
 }
 
 WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& proto) {
     WorkerDiagnostics diagnostics;
+
+    diagnostics.cpuTime = std::chrono::milliseconds(proto.cpu_millis());
+    diagnostics.bytesSent = proto.bytes_sent();
+    diagnostics.bytesReceived = proto.bytes_received();
 
     for (const auto& kv : proto.time_per_action()) {
         diagnostics.timePerAction[kv.first] = kv.second;

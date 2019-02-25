@@ -86,9 +86,6 @@ void WorkerStats::reset() {
     _finishedPaths = 0;
     aggregateStats.reset();
     objectStats.clear();
-    cpuTime = milliseconds(0);
-    bytesReceived = 0;
-    bytesSent = 0;
 }
 
 void WorkerStats::merge(const WorkerStats& other) {
@@ -98,9 +95,6 @@ void WorkerStats::merge(const WorkerStats& other) {
     for (const auto& kv : other.objectStats) {
         objectStats[kv.first].merge(kv.second);
     }
-    cpuTime += other.cpuTime;
-    bytesReceived += other.bytesReceived;
-    bytesSent += other.bytesSent;
 }
 
 /* WorkerDiagnostics */
@@ -124,6 +118,10 @@ WorkerDiagnostics::Recorder::~Recorder() {
 }
 
 void WorkerDiagnostics::reset() {
+    cpuTime = milliseconds(0);
+    bytesReceived = 0;
+    bytesSent = 0;
+
     timePerAction.clear();
     intervalStart = now();
     intervalsPerAction.clear();
