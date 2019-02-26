@@ -15,7 +15,7 @@ using timepoint_t = std::chrono::time_point<std::chrono::system_clock>;
 inline timepoint_t now() { return std::chrono::system_clock::now(); };
 
 #define PER_RAY_STATS
-#define PER_INTERVAL_STATS
+// #define PER_INTERVAL_STATS
 #define RECORD_METRICS
 
 const double RAY_PERCENTILES[] = {0.5, 0.9, 0.99, 0.999, 0.9999};

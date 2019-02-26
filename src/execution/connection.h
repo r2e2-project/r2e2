@@ -6,6 +6,7 @@
 #include <chrono>
 #include <deque>
 #include <iostream>
+#include <map>
 #include <queue>
 #include <string>
 #include <tuple>
@@ -93,12 +94,10 @@ class UDPConnection {
         uint64_t, std::pair<PacketData, std::chrono::steady_clock::time_point>>
         outstanding_packets_{};
 
+    std::map<Address, std::vector<uint64_t>> to_be_acked_{};
+
   public:
-    enum class FirstByte : uint8_t {
-        Unreliable,
-        Reliable,
-        Ack
-    };
+    enum class FirstByte : uint8_t { Unreliable, Reliable, Ack };
 
     UDPConnection() {}
 

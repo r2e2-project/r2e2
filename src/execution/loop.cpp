@@ -318,12 +318,17 @@ ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection
                 break;
 
             case UDPConnection::FirstByte::Reliable: {
-                const uint64_t seqno = chunk(1).be64();
+                connection->to_be_acked_[datagram.first].push_back(chunk(1).be64());
                 data = data.substr(9);
                 break;
             }
 
             case UDPConnection::FirstByte::Ack:
+                while ( chunk.size() ) {
+                    connection->outstanding_packets_.erase(chunk.be64());
+                    chunk = chunk(8);
+                }
+
                 break;
 
             default:
