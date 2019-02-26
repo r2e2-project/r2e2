@@ -3,6 +3,7 @@
 
 #include <cstring>
 #include <deque>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -33,7 +34,7 @@ class LambdaWorker {
 
     void run();
     void terminate() { terminated = true; }
-    void uploadLog() const;
+    void uploadLogs();
 
   private:
     struct Worker {
@@ -77,10 +78,14 @@ class LambdaWorker {
     void pushRayQueue(RayState&& state);
     RayState popRayQueue();
 
-    /* Logging */
+    /* Logging & Diagnostics */
     const std::string logBase{"pbrt-worker"};
     const std::string infoLogName{logBase + ".INFO"};
+    const std::string diagnosticsName{logBase + ".DIAG"};
     const std::string logPrefix{"logs/"};
+    std::ofstream diagnosticsOstream{};
+
+    WorkerDiagnostics lastDiagnostics;
 
     const bool sendReliably;
     Address coordinatorAddr;
@@ -128,11 +133,6 @@ class LambdaWorker {
     TimerFD peerTimer;
     TimerFD workerStatsTimer;
     TimerFD workerDiagnosticsTimer;
-
-    /* Metrics accumulator */
-    std::map<std::string, double> metrics;
-
-    WorkerDiagnostics prevDiagnostics{};
 
     bool terminated{false};
 };

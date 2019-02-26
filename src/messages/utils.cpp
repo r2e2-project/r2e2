@@ -332,12 +332,13 @@ protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
 protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics) {
     protobuf::WorkerDiagnostics proto;
 
-    proto.set_cpu_millis(diagnostics.cpuTime.count());
     proto.set_bytes_sent(diagnostics.bytesSent);
     proto.set_bytes_received(diagnostics.bytesReceived);
 
     for (const auto& kv : diagnostics.timePerAction) {
-        (*proto.mutable_time_per_action())[kv.first] = kv.second;
+        protobuf::Action* action = proto.add_time_per_action();
+        action->set_name(kv.first);
+        action->set_time(kv.second);
     }
 
     for (const auto& kv : diagnostics.intervalsPerAction) {
@@ -934,12 +935,11 @@ WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
 WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& proto) {
     WorkerDiagnostics diagnostics;
 
-    diagnostics.cpuTime = std::chrono::milliseconds(proto.cpu_millis());
     diagnostics.bytesSent = proto.bytes_sent();
     diagnostics.bytesReceived = proto.bytes_received();
 
     for (const auto& kv : proto.time_per_action()) {
-        diagnostics.timePerAction[kv.first] = kv.second;
+        diagnostics.timePerAction[kv.name()] = kv.time();
     }
     for (const auto& action_interval : proto.intervals_per_action()) {
         const std::string& name = action_interval.name();

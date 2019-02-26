@@ -11,8 +11,8 @@
 namespace pbrt {
 
 /* timing utility functions */
-using timepoint_t = std::chrono::time_point<std::chrono::steady_clock>;
-inline timepoint_t now() { return std::chrono::steady_clock::now(); };
+using timepoint_t = std::chrono::time_point<std::chrono::system_clock>;
+inline timepoint_t now() { return std::chrono::system_clock::now(); };
 
 #define PER_RAY_STATS
 // #define PER_INTERVAL_STATS
@@ -81,10 +81,8 @@ struct WorkerStats {
 
 struct WorkerDiagnostics {
     const timepoint_t startTime{now()};
-    timepoint_t intervalStart{now()};
 
     /* diagnostic stats */
-    std::chrono::milliseconds cpuTime{0};
     uint64_t bytesSent{0};
     uint64_t bytesReceived{0};
 
@@ -102,11 +100,11 @@ struct WorkerDiagnostics {
       private:
         friend WorkerDiagnostics;
 
-        Recorder(WorkerDiagnostics& stats_, const std::string& name_);
+        Recorder(WorkerDiagnostics& diagnostics, const std::string& name);
 
-        WorkerDiagnostics& stats;
+        WorkerDiagnostics& diagnostics;
         std::string name;
-        timepoint_t start;
+        timepoint_t start{now()};
     };
 
     Recorder recordInterval(const std::string& name) {

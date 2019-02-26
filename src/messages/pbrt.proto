@@ -298,6 +298,11 @@ message Interval {
     uint64 end = 2;
 }
 
+message Action {
+    string name = 1;
+    uint64 time = 2;
+}
+
 message ActionIntervals {
     string name = 1;
     repeated Interval intervals = 2;
@@ -321,12 +326,11 @@ message WorkerStats {
 }
 
 message WorkerDiagnostics {
-    uint64 cpu_millis = 1;
-    uint64 bytes_sent = 2;
-    uint64 bytes_received = 3;
-    map<string, float> time_per_action = 4;
-    repeated ActionIntervals intervals_per_action = 5;
-    repeated Metrics metrics_over_time = 6;
+    uint64 bytes_sent = 1;
+    uint64 bytes_received = 2;
+    repeated Action time_per_action = 3;
+    repeated ActionIntervals intervals_per_action = 4;
+    repeated Metrics metrics_over_time = 5;
 }
 
 // For stat output to logs.

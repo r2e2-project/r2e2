@@ -75,7 +75,7 @@ void WorkerStats::recordDemandedRay(const ObjectKey& type) {
 
 void WorkerStats::recordRayInterval(const ObjectKey& type, timepoint_t start,
                                     timepoint_t end) {
-    auto total_time = duration_cast<nanoseconds>((end - start)).count();
+    auto total_time = duration_cast<microseconds>((end - start)).count();
     aggregateStats.rayDurations.push_back(total_time);
 #ifdef PER_RAY_STATS
     objectStats[type].rayDurations.push_back(total_time);
@@ -85,6 +85,7 @@ void WorkerStats::recordRayInterval(const ObjectKey& type, timepoint_t start,
 void WorkerStats::reset() {
     _finishedPaths = 0;
     aggregateStats.reset();
+    queueStats = {};
     objectStats.clear();
 }
 
@@ -99,31 +100,27 @@ void WorkerStats::merge(const WorkerStats& other) {
 
 /* WorkerDiagnostics */
 
-WorkerDiagnostics::Recorder::Recorder(WorkerDiagnostics& stats_,
-                                      const string& name_)
-    : stats(stats_), name(name_) {
-    start = now();
-}
+WorkerDiagnostics::Recorder::Recorder(WorkerDiagnostics& diagnostics,
+                                      const string& name)
+    : diagnostics(diagnostics), name(name) {}
 
 WorkerDiagnostics::Recorder::~Recorder() {
     auto end = now();
-    stats.timePerAction[name] +=
-        duration_cast<nanoseconds>((end - start)).count();
+    diagnostics.timePerAction[name] +=
+        duration_cast<microseconds>((end - start)).count();
 
 #ifdef PER_INTERVAL_STATS
-    stats.intervalsPerAction[name].push_back(make_tuple(
-        duration_cast<nanoseconds>((start - stats.intervalStart)).count(),
-        duration_cast<nanoseconds>((end - stats.intervalStart)).count()));
+    diagnostics.intervalsPerAction[name].push_back(make_tuple(
+        duration_cast<microseconds>((start - diagnostics.startTime)).count(),
+        duration_cast<microseconds>((end - diagnostics.startTime)).count()));
 #endif
 }
 
 void WorkerDiagnostics::reset() {
-    cpuTime = milliseconds(0);
     bytesReceived = 0;
     bytesSent = 0;
 
     timePerAction.clear();
-    intervalStart = now();
     intervalsPerAction.clear();
     metricsOverTime.clear();
 }
@@ -131,7 +128,7 @@ void WorkerDiagnostics::reset() {
 void WorkerDiagnostics::recordMetric(const string& name, timepoint_t time,
                                      double metric) {
     metricsOverTime[name].push_back(make_tuple(
-        (uint64_t)duration_cast<nanoseconds>(time - intervalStart).count(),
+        (uint64_t)duration_cast<microseconds>(time - startTime).count(),
         metric));
 }
 

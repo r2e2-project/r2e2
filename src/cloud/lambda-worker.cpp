@@ -39,6 +39,7 @@ using namespace std;
 using namespace chrono;
 using namespace meow;
 using namespace pbrt;
+using namespace pbrt::global;
 using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
@@ -47,7 +48,7 @@ using PollerResult = Poller::Result::Type;
 constexpr size_t UDP_MTU_BYTES{1'400};
 constexpr milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr milliseconds WORKER_STATS_INTERVAL{500};
-constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{5'000};
+constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
@@ -63,13 +64,19 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     cerr << "* starting worker in " << workingDirectory.name() << endl;
 
     roost::chdir(workingDirectory.name());
-    global::workerDiagnostics.intervalStart = now();
 
     FLAGS_log_dir = ".";
     google::InitGoogleLogging(logBase.c_str());
+    diagnosticsOstream.open(diagnosticsName, ios::out | ios::trunc);
+
+    diagnosticsOstream << "start "
+                       << duration_cast<microseconds>(
+                              workerDiagnostics.startTime.time_since_epoch())
+                              .count()
+                       << endl;
 
     PbrtOptions.nThreads = 1;
-    global::manager.init(".");
+    manager.init(".");
 
     bvh = make_shared<CloudBVH>();
 
@@ -188,7 +195,7 @@ ResultType LambdaWorker::handleRayQueue() {
             auto rayTraceStart = now();
             const uint32_t rayTreelet = ray.toVisit.back().treelet;
             auto newRay = CloudIntegrator::Trace(move(ray), bvh);
-            global::workerStats.recordRayInterval(
+            workerStats.recordRayInterval(
                 SceneManager::ObjectKey{ObjectType::Treelet, rayTreelet},
                 rayTraceStart, now());
 
@@ -209,7 +216,7 @@ ResultType LambdaWorker::handleRayQueue() {
             } else if (emptyVisit) {
                 newRay.Ld = 0.f;
                 finishedQueue.push_back(move(newRay));
-                global::workerStats.recordFinishedPath();
+                workerStats.recordFinishedPath();
             }
         } else if (ray.hit.initialized()) {
             auto newRays =
@@ -227,7 +234,7 @@ ResultType LambdaWorker::handleRayQueue() {
         processedRays.pop_front();
 
         const TreeletId nextTreelet = ray.currentTreelet();
-        global::workerStats.recordDemandedRay(
+        workerStats.recordDemandedRay(
             SceneManager::ObjectKey{ObjectType::Treelet, nextTreelet});
 
         if (treeletIds.count(nextTreelet)) {
@@ -278,7 +285,7 @@ ResultType LambdaWorker::handleOutQueue() {
                     string rayStr = protoutil::to_string(to_protobuf(ray));
 
                     outQueueSize--;
-                    global::workerStats.recordSentRay(
+                    workerStats.recordSentRay(
                         SceneManager::ObjectKey{ObjectType::Treelet, q.first});
 
                     const size_t len = rayStr.length() + 4;
@@ -374,7 +381,7 @@ ResultType LambdaWorker::handleWorkerStats() {
     RECORD_INTERVAL("sendStats");
     workerStatsTimer.reset();
 
-    auto& qStats = global::workerStats.queueStats;
+    auto& qStats = workerStats.queueStats;
     qStats.ray = rayQueue.size();
     qStats.finished = finishedQueue.size();
     qStats.pending = pendingQueueSize;
@@ -386,29 +393,34 @@ ResultType LambdaWorker::handleWorkerStats() {
     qStats.connected = peers.size() - qStats.connecting;
     qStats.outstandingUdp = this->udpConnection->queue_size();
 
-    auto proto = to_protobuf(global::workerStats);
+    auto proto = to_protobuf(workerStats);
     Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
     coordinatorConnection->enqueue_write(message.str());
-    global::workerStats.reset();
+    workerStats.reset();
     return ResultType::Continue;
 }
 
 ResultType LambdaWorker::handleDiagnostics() {
     workerDiagnosticsTimer.reset();
 
-    auto time = now();
+    workerDiagnostics.bytesSent =
+        this->udpConnection->bytes_sent - lastDiagnostics.bytesSent;
 
-    /* record CPU usage */
+    workerDiagnostics.bytesReceived =
+        this->udpConnection->bytes_received - lastDiagnostics.bytesReceived;
 
-    /* record bandwidth usage */
-    /* NOTE(apoms): we could record the bytes
-     * sent/received at a finer granularity if we moved
-     * this to a new poller action */
-    for (auto& kv : metrics) {
-        global::workerDiagnostics.recordMetric(kv.first, time, kv.second);
-    }
+    lastDiagnostics.bytesSent = this->udpConnection->bytes_sent;
+    lastDiagnostics.bytesReceived = this->udpConnection->bytes_received;
 
-    metrics.clear();
+    const auto timestamp =
+        duration_cast<microseconds>(now() - workerDiagnostics.startTime)
+            .count();
+
+    const string diagnosticsStr =
+        protoutil::to_json(to_protobuf(workerDiagnostics));
+
+    diagnosticsOstream << timestamp << " " << diagnosticsStr << endl;
+    workerDiagnostics.reset();
 
     return ResultType::Continue;
 }
@@ -471,7 +483,7 @@ void LambdaWorker::pushRayQueue(RayState&& state) {
     } else {
         treelet_id = state.hit.get().treelet;
     }
-    global::workerStats.recordWaitingRay(
+    workerStats.recordWaitingRay(
         SceneManager::ObjectKey{ObjectType::Treelet, treelet_id});
     rayQueue.push_back(move(state));
 }
@@ -485,7 +497,7 @@ RayState LambdaWorker::popRayQueue() {
     } else {
         treeletID = state.hit.get().treelet;
     }
-    global::workerStats.recordProcessedRay(
+    workerStats.recordProcessedRay(
         SceneManager::ObjectKey{ObjectType::Treelet, treeletID});
     return state;
 }
@@ -612,11 +624,11 @@ bool LambdaWorker::processMessage(const Message& message) {
                 if (proto.to_visit_size() > 0) {
                     SceneManager::ObjectKey treeletID{
                         ObjectType::Treelet, proto.to_visit(0).treelet()};
-                    global::workerStats.recordReceivedRay(treeletID);
+                    workerStats.recordReceivedRay(treeletID);
                 } else {
                     SceneManager::ObjectKey treeletID{ObjectType::Treelet,
                                                       proto.hit().treelet()};
-                    global::workerStats.recordReceivedRay(treeletID);
+                    workerStats.recordReceivedRay(treeletID);
                 }
                 pushRayQueue(move(from_protobuf(proto)));
             }
@@ -627,7 +639,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 
     case OpCode::RequestDiagnostics: {
         LOG(INFO) << "Diagnosstics requested, sending...";
-        auto proto = to_protobuf(global::workerDiagnostics);
+        auto proto = to_protobuf(workerDiagnostics);
         Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
         coordinatorConnection->enqueue_write(message.str());
         LOG(INFO) << "Diagnostics sent.";
@@ -653,7 +665,7 @@ void LambdaWorker::run() {
 }
 
 void LambdaWorker::loadCamera() {
-    auto reader = global::manager.GetReader(ObjectType::Camera);
+    auto reader = manager.GetReader(ObjectType::Camera);
     protobuf::Camera proto_camera;
     reader->read(&proto_camera);
     camera = camera::from_protobuf(proto_camera, transformCache);
@@ -661,7 +673,7 @@ void LambdaWorker::loadCamera() {
 }
 
 void LambdaWorker::loadSampler() {
-    auto reader = global::manager.GetReader(ObjectType::Sampler);
+    auto reader = manager.GetReader(ObjectType::Sampler);
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);
     sampler = sampler::from_protobuf(proto_sampler);
@@ -672,7 +684,7 @@ void LambdaWorker::loadSampler() {
 }
 
 void LambdaWorker::loadLights() {
-    auto reader = global::manager.GetReader(ObjectType::Lights);
+    auto reader = manager.GetReader(ObjectType::Lights);
     while (!reader->eof()) {
         protobuf::Light proto_light;
         reader->read(&proto_light);
@@ -681,7 +693,7 @@ void LambdaWorker::loadLights() {
 }
 
 void LambdaWorker::loadFakeScene() {
-    auto reader = global::manager.GetReader(ObjectType::Scene);
+    auto reader = manager.GetReader(ObjectType::Scene);
     protobuf::Scene proto_scene;
     reader->read(&proto_scene);
     fakeScene = make_unique<Scene>(from_protobuf(proto_scene));
@@ -702,15 +714,17 @@ void LambdaWorker::initializeScene() {
     initialized = true;
 }
 
-void LambdaWorker::uploadLog() const {
+void LambdaWorker::uploadLogs() {
     if (!workerId.initialized()) return;
 
     google::FlushLogFiles(google::INFO);
+    diagnosticsOstream.close();
 
-    vector<storage::PutRequest> putLogRequest = {
-        {infoLogName, logPrefix + to_string(*workerId)}};
+    vector<storage::PutRequest> putLogsRequest = {
+        {infoLogName, logPrefix + to_string(*workerId)},
+        {diagnosticsName, logPrefix + to_string(*workerId) + ".DIAG"}};
 
-    storageBackend->put(putLogRequest);
+    storageBackend->put(putLogsRequest);
 }
 
 void usage(const char* argv0, int exitCode) {
@@ -775,7 +789,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (worker) {
-        worker->uploadLog();
+        worker->uploadLogs();
     }
 
     return exit_status;

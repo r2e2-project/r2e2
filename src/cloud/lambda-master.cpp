@@ -218,7 +218,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         }
     }
 
-    if (config.assignment == Static) {
+    if (config.assignment == Assignment::Static) {
         loadStaticAssignment(numberOfLambdas);
     }
 
@@ -349,16 +349,16 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
         /* assign treelet to worker based on most in-demand treelets */
         switch (this->config.assignment) {
-        case Static:
+        case Assignment::Static:
             doStaticAssign(workerIt->second);
             break;
-        case Uniform:
+
+        case Assignment::Uniform:
             this->assignTreeletsUniformly(workerIt->second);
             break;
+
         default:
-            ostringstream msg;
-            msg << "Unrecognized assignment type: " << this->config.assignment;
-            throw runtime_error(msg.str());
+            throw runtime_error("unrecognized assignment type");
         }
 
         currentWorkerID++;
@@ -597,193 +597,10 @@ void LambdaMaster::run() {
             });
     }
 
-    try {
-        while (true) {
-            auto res = loop.loop_once().result;
-            if (res != PollerResult::Success && res != PollerResult::Timeout)
-                break;
-        }
-    } catch (const interrupt_error &e) {
+    while (true) {
+        auto res = loop.loop_once().result;
+        if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
-
-    if (config.collectDiagnostics) {
-        cerr << "Waiting to receive diagnostics from workers.." << endl;
-        /* Ask workers to send back diagnostic stats */
-        size_t numWorkers = workers.size();
-        for (auto &kv : workers) {
-            auto worker = kv.second;
-            Message message{OpCode::RequestDiagnostics, ""};
-            worker.connection->enqueue_write(message.str());
-        }
-
-        diagnosticsReceived = 0;
-        while (diagnosticsReceived < numWorkers) {
-            auto res = loop.loop_once().result;
-            if (res != PollerResult::Success && res != PollerResult::Timeout)
-                break;
-        }
-    }
-}
-
-string LambdaMaster::getSummary() {
-    ostringstream oss;
-
-    auto duration = chrono::duration_cast<chrono::seconds>(
-                        chrono::steady_clock::now() - startTime)
-                        .count();
-
-    oss << endl
-        << "Summary: "
-        << " finished paths: " << workerStats.finishedPaths() << " (" << fixed
-        << setprecision(1) << (100.0 * workerStats.finishedPaths() / totalPaths)
-        << "%)"
-        << " | workers: " << workers.size()
-        << " | requests: " << pendingWorkerRequests.size() << " | \u2191 "
-        << workerStats.sentRays() << " | \u2193 " << workerStats.receivedRays()
-        << " (" << fixed << setprecision(1)
-        << (workerStats.sentRays() == 0
-                ? 0
-                : (100.0 * workerStats.receivedRays() / workerStats.sentRays()))
-        << "%)"
-        << " | time: " << setfill('0') << setw(2) << (duration / 60) << ":"
-        << setw(2) << (duration % 60);
-    oss << endl << endl;
-
-    /* Print worker intervals */
-    {
-        uint64_t minTime = std::numeric_limits<uint64_t>::max();
-        uint64_t maxTime = 0;
-        for (auto &kv :
-             (*workers.begin()).second.diagnostics.intervalsPerAction) {
-            for (tuple<uint64_t, uint64_t> tup : kv.second) {
-                uint64_t start, end;
-                std::tie(start, end) = tup;
-                if (start < minTime) {
-                    minTime = start;
-                }
-                if (end > maxTime) {
-                    maxTime = end;
-                }
-            }
-        }
-        printf("min time %lu, max time %lu\n", minTime, maxTime);
-        double totalTime = (maxTime - minTime) / 1e9;
-
-        auto printActionTimes = [&](const WorkerDiagnostics &diagnostics,
-                                    double normalizer = 1.0) {
-            double sum = 0;
-            for (auto &kv : diagnostics.timePerAction) {
-                auto actionTime = kv.second / 1e9 / normalizer;
-                sum += actionTime;
-                oss << setfill(' ') << setw(20) << kv.first << ": " << setw(6)
-                    << setprecision(2) << actionTime / totalTime * 100.0 << ", "
-                    << setw(8) << setprecision(5) << actionTime << " seconds"
-                    << endl;
-            }
-            oss << setfill(' ') << setw(20) << "other: " << setw(6)
-                << setprecision(2) << (totalTime - sum) / totalTime * 100.0
-                << ", " << setw(8) << setprecision(5) << (totalTime - sum)
-                << " seconds" << endl;
-
-            oss << endl;
-        };
-        oss << "Average actions:" << endl;
-        printActionTimes(workerDiagnostics, workers.size());
-
-        uint64_t maxWorkerID = 0;
-        double maxActionsLength = -1;
-        for (auto &kv : workers) {
-            Worker &worker = kv.second;
-            double actionsSum = 0;
-            for (auto &kv : worker.diagnostics.timePerAction) {
-                if (kv.first == "idle") continue;
-                auto actionTime = kv.second / 1e9;
-                actionsSum += actionTime;
-            }
-            if (actionsSum > maxActionsLength) {
-                maxWorkerID = worker.id;
-                maxActionsLength = actionsSum;
-            }
-        }
-        if (maxActionsLength > 0) {
-            oss << "Most busy worker intervals:" << endl;
-            printActionTimes(workers.at(maxWorkerID).diagnostics);
-        }
-    }
-
-    /* Print ray duration percentiles */
-    vector<double> sortedRayDurations = workerStats.aggregateStats.rayDurations;
-    sort(sortedRayDurations.begin(), sortedRayDurations.end());
-    ofstream rayDurationsFile("ray_durations.txt");
-    oss << "Percentiles:" << endl;
-    if (sortedRayDurations.size() > 0) {
-        for (double d : sortedRayDurations) {
-            rayDurationsFile << d << " ";
-        }
-        for (size_t i = 0; i < NUM_PERCENTILES; ++i) {
-            oss << setprecision(5) << RAY_PERCENTILES[i] << " = "
-                << sortedRayDurations[sortedRayDurations.size() *
-                                      RAY_PERCENTILES[i]] /
-                       1e6
-                << " ms" << endl;
-        }
-    }
-    oss << endl;
-
-    ofstream workerIntervals("worker_stats.txt");
-    /* write out worker intervals */
-    workerIntervals << workers.size() << endl;
-    {
-        workerIntervals << "intervals" << endl;
-        for (auto &worker_kv : workers) {
-            const auto &worker = worker_kv.second;
-            const auto &intervals = worker.diagnostics.intervalsPerAction;
-            workerIntervals << "worker " << worker.id << " " << intervals.size()
-                            << " ";
-            for (auto &kv : intervals) {
-                workerIntervals << kv.first << " ";
-                workerIntervals << kv.second.size() << " ";
-                for (tuple<uint64_t, uint64_t> tup : kv.second) {
-                    workerIntervals << std::get<0>(tup) << ","
-                                    << std::get<1>(tup) << " ";
-                }
-            }
-            workerIntervals << endl;
-        }
-    }
-    /* write out metrics */
-    {
-        workerIntervals << "metrics" << endl;
-        for (auto &kv : workers) {
-            const Worker &worker = kv.second;
-            const auto &metrics = worker.diagnostics.metricsOverTime;
-            workerIntervals << "worker " << worker.id << " " << metrics.size()
-                            << " ";
-            for (auto &kv : metrics) {
-                const std::string &metricName = kv.first;
-                const auto &metricPoints = kv.second;
-                workerIntervals << metricName << " ";
-                workerIntervals << metricPoints.size() << " ";
-                for (tuple<uint64_t, double> tup : metricPoints) {
-                    workerIntervals << std::get<0>(tup) << ","
-                                    << std::get<1>(tup) << " ";
-                }
-            }
-            workerIntervals << endl;
-        }
-    }
-    ofstream sceneStats("scene_stats.txt");
-    /* write out information about the scene */
-    size_t totalSize = 0;
-    for (auto &kv : treeletTotalSizes) {
-        size_t size = kv.second;
-        totalSize += size;
-    }
-    sceneStats << totalSize << " " << treeletTotalSizes.size() << " ";
-    /* write out information about how many rays were sent */
-    sceneStats << workerStats.aggregateStats.sentRays;
-
-    return oss.str();
 }
 
 void LambdaMaster::loadCamera() {
@@ -961,7 +778,7 @@ int main(int argc, char *argv[]) {
     bool treeletStats = false;
     bool workerStats = false;
     bool collectDiagnostics = false;
-    Assignment assignment = Uniform;
+    Assignment assignment = Assignment::Uniform;
 
     struct option long_options[] = {
         {"scene-path", required_argument, nullptr, 's'},
@@ -987,66 +804,33 @@ int main(int argc, char *argv[]) {
             break;
         }
 
+        // clang-format off
         switch (opt) {
-        case 'R': {
-            sendReliably = true;
-            break;
-        }
-        case 's': {
-            scene = optarg;
-            break;
-        }
-        case 'p': {
-            listenPort = stoi(optarg);
-            break;
-        }
-        case 'i': {
-            publicIp = optarg;
-            break;
-        }
-        case 'r': {
-            region = optarg;
-            break;
-        }
-        case 'b': {
-            storageBackendUri = optarg;
-            break;
-        }
-        case 'l': {
-            numLambdas = stoul(optarg);
-            break;
-        }
-        case 't': {
-            treeletStats = true;
-            break;
-        }
-        case 'w': {
-            workerStats = true;
-            break;
-        }
-        case 'd': {
-            collectDiagnostics = true;
-            break;
-        }
+        case 'R': sendReliably = true; break;
+        case 's': scene = optarg; break;
+        case 'p': listenPort = stoi(optarg); break;
+        case 'i': publicIp = optarg; break;
+        case 'r': region = optarg; break;
+        case 'b': storageBackendUri = optarg; break;
+        case 'l': numLambdas = stoul(optarg); break;
+        case 't': treeletStats = true; break;
+        case 'w': workerStats = true; break;
+        case 'd': collectDiagnostics = true; break;
+        case 'h': usage(argv[0], 0); break;
         case 'a': {
             if (strcmp(optarg, "static") == 0) {
-                assignment = Static;
+                assignment = Assignment::Static;
             } else if (strcmp(optarg, "uniform") == 0) {
-                assignment = Uniform;
+                assignment = Assignment::Uniform;
             } else {
                 usage(argv[0], 2);
             }
             break;
         }
-        case 'h': {
-            usage(argv[0], 0);
-            break;
+
+        default: usage(argv[0], 2); break;
         }
-        default: {
-            usage(argv[0], 2);
-            break;
-        }
-        }
+        // clang-format on
     }
 
     if (scene.empty() || listenPort == 0 || numLambdas < 0 ||
@@ -1067,7 +851,6 @@ int main(int argc, char *argv[]) {
                                            publicAddress.str(),
                                            storageBackendUri, region, config);
         master->run();
-        if (master) cout << master->getSummary() << endl;
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;
