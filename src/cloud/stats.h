@@ -33,10 +33,6 @@ struct RayStats {
     /* rays that require (or required) this scence object to render */
     uint64_t demandedRays{0};
 
-    double traceDurationPercentiles[NUM_PERCENTILES] = {0.0, 0.0, 0.0, 0.0,
-                                                        0.0};
-    std::vector<double> rayDurations;
-
     void reset();
     void merge(const RayStats& other);
 };

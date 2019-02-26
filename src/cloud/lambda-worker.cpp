@@ -192,12 +192,8 @@ ResultType LambdaWorker::handleRayQueue() {
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayState ray = popRayQueue();
         if (!ray.toVisit.empty()) {
-            auto rayTraceStart = now();
             const uint32_t rayTreelet = ray.toVisit.back().treelet;
             auto newRay = CloudIntegrator::Trace(move(ray), bvh);
-            workerStats.recordRayInterval(
-                SceneManager::ObjectKey{ObjectType::Treelet, rayTreelet},
-                rayTraceStart, now());
 
             const bool hit = newRay.hit.initialized();
             const bool emptyVisit = newRay.toVisit.empty();

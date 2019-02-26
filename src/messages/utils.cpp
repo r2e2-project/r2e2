@@ -895,14 +895,6 @@ RayStats from_protobuf(const protobuf::RayStats& proto) {
     stats.processedRays = proto.processed_rays();
     stats.demandedRays = proto.demanded_rays();
 
-    for (int i = 0; i < proto.trace_duration_percentiles_size(); ++i) {
-        double d = proto.trace_duration_percentiles(i);
-        stats.traceDurationPercentiles[i] = d;
-    }
-    stats.rayDurations.reserve(proto.ray_durations_size());
-    for (double d : proto.ray_durations()) {
-        stats.rayDurations.push_back(d);
-    }
     return stats;
 }
 

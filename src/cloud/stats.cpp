@@ -18,13 +18,6 @@ void RayStats::reset() {
     waitingRays = 0;
     processedRays = 0;
     demandedRays = 0;
-    for (double& d : traceDurationPercentiles) {
-        d = 0;
-    }
-
-#ifdef PER_RAY_STATS
-    rayDurations.clear();
-#endif  // PER_RAY_STATS
 }
 
 void RayStats::merge(const RayStats& other) {
@@ -33,14 +26,6 @@ void RayStats::merge(const RayStats& other) {
     waitingRays += other.waitingRays;
     processedRays += other.processedRays;
     demandedRays += other.demandedRays;
-
-    for (int i = 0; i < NUM_PERCENTILES; ++i) {
-        traceDurationPercentiles[i] += other.traceDurationPercentiles[i];
-    }
-#ifdef PER_RAY_STATS
-    rayDurations.insert(rayDurations.end(), other.rayDurations.begin(),
-                        other.rayDurations.end());
-#endif  // PER_RAY_STATS
 }
 
 #define INCREMENT_FIELD(name__)        \
@@ -72,15 +57,6 @@ void WorkerStats::recordDemandedRay(const ObjectKey& type) {
 }
 
 #undef INCREMENT_FIELD
-
-void WorkerStats::recordRayInterval(const ObjectKey& type, timepoint_t start,
-                                    timepoint_t end) {
-    auto total_time = duration_cast<microseconds>((end - start)).count();
-    aggregateStats.rayDurations.push_back(total_time);
-#ifdef PER_RAY_STATS
-    objectStats[type].rayDurations.push_back(total_time);
-#endif
-}
 
 void WorkerStats::reset() {
     _finishedPaths = 0;
