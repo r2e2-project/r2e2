@@ -284,8 +284,8 @@ ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection
       [connection] ()
       {
         const auto & datagram = connection->queue_front();
-        connection->bytes_sent += get<1>(datagram).length();
-        connection->socket_.sendto(get<0>(datagram), get<1>(datagram));
+        connection->bytes_sent += datagram.data.length();
+        connection->socket_.sendto(datagram.destination, datagram.data);
         connection->queue_pop();
         return ResultType::Continue;
       },

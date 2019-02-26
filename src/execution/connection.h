@@ -49,11 +49,24 @@ class Connection {
 
 enum class PacketPriority { Low, Normal, High };
 
-using UDPPacketData = std::tuple<Address, std::string, PacketPriority>;
+struct PacketData {
+    Address destination;
+    std::string data;
+    PacketPriority priority{PacketPriority::Normal};
+    bool reliable{false};
 
-struct UDPPacketCompare {
-    bool operator()(const UDPPacketData& a, const UDPPacketData& b) {
-        return to_underlying(std::get<2>(a)) < to_underlying(std::get<2>(b));
+    PacketData(const Address& addr, std::string&& data,
+               const PacketPriority p = PacketPriority::Normal,
+               const bool reliable = false)
+        : destination(addr),
+          data(move(data)),
+          priority(p),
+          reliable(reliable) {}
+};
+
+struct PacketCompare {
+    bool operator()(const PacketData& a, const PacketData& b) {
+        return to_underlying(a.priority) < to_underlying(b.priority);
     }
 };
 
@@ -62,17 +75,19 @@ class UDPConnection {
 
   private:
     UDPSocket socket_{};
-    std::priority_queue<UDPPacketData, std::deque<UDPPacketData>,
-                        UDPPacketCompare>
+    std::priority_queue<PacketData, std::deque<PacketData>, PacketCompare>
         outgoing_datagrams_{};
 
     bool pacing_{false};
 
     uint64_t rate_Mb_per_s_{10};
     uint64_t bits_since_reference_{0};
-    std::chrono::steady_clock::time_point rate_reference_pt_{std::chrono::steady_clock::now()};
+    std::chrono::steady_clock::time_point rate_reference_pt_{
+        std::chrono::steady_clock::now()};
     std::chrono::microseconds reference_reset_time_{1'000'000};
 
+    /* reliable transport */
+    uint64_t sequence_number_{0};
 
   public:
     UDPConnection() {}
@@ -83,9 +98,10 @@ class UDPConnection {
     UDPConnection& operator=(const UDPConnection&) = delete;
     UDPConnection(const UDPConnection&) = delete;
 
-    void enqueue_datagram(const Address& addr, std::string&& datagram,
-                          const PacketPriority p = PacketPriority::Normal) {
-        outgoing_datagrams_.push(make_tuple(addr, move(datagram), p));
+    void enqueue_datagram(const Address& addr, std::string&& data,
+                          const PacketPriority p = PacketPriority::Normal,
+                          const bool reliable = false) {
+        outgoing_datagrams_.emplace(addr, move(data), p, reliable);
     }
 
     // How many microseconds are we ahead of our pace?
@@ -101,23 +117,18 @@ class UDPConnection {
         return elapsed_micros_if_at_pace - elapsed_micros;
     }
 
-    bool within_pace() {
-        return micros_ahead_of_pace() <= 0;
-    }
+    bool within_pace() { return micros_ahead_of_pace() <= 0; }
 
-    bool queue_empty() {
-        return outgoing_datagrams_.empty();
-    }
+    bool queue_empty() { return outgoing_datagrams_.empty(); }
 
-    const UDPPacketData& queue_front() const {
-        return outgoing_datagrams_.top();
-    }
+    const PacketData& queue_front() const { return outgoing_datagrams_.top(); }
 
     void queue_pop() {
         if (pacing_) {
-            const UDPPacketData& sent = outgoing_datagrams_.top();
-            bits_since_reference_ += std::get<1>(sent).length() * 8;
-            if (std::chrono::steady_clock::now() >= rate_reference_pt_ + reference_reset_time_) {
+            const PacketData& sent = outgoing_datagrams_.top();
+            bits_since_reference_ += sent.data.length() * 8;
+            if (std::chrono::steady_clock::now() >=
+                rate_reference_pt_ + reference_reset_time_) {
                 reset_reference();
             }
         }
