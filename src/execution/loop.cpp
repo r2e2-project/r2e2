@@ -329,7 +329,7 @@ ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection
                     chunk = chunk(8);
                 }
 
-                break;
+                return ResultType::Continue;
 
             default:
                 throw runtime_error("invalid packet");
