@@ -378,7 +378,7 @@ ResultType LambdaWorker::handleNeededTreelets() {
 }
 
 ResultType LambdaWorker::handleWorkerStats() {
-    RECORD_INTERVAL("sendStats");
+    RECORD_INTERVAL("handleWorkerStats");
     workerStatsTimer.reset();
 
     auto& qStats = workerStats.queueStats;
@@ -401,6 +401,7 @@ ResultType LambdaWorker::handleWorkerStats() {
 }
 
 ResultType LambdaWorker::handleDiagnostics() {
+    RECORD_INTERVAL("handleDiagnostics")
     workerDiagnosticsTimer.reset();
 
     workerDiagnostics.bytesSent =
@@ -634,15 +635,6 @@ bool LambdaWorker::processMessage(const Message& message) {
             }
         }
 
-        break;
-    }
-
-    case OpCode::RequestDiagnostics: {
-        LOG(INFO) << "Diagnosstics requested, sending...";
-        auto proto = to_protobuf(workerDiagnostics);
-        Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
-        coordinatorConnection->enqueue_write(message.str());
-        LOG(INFO) << "Diagnostics sent.";
         break;
     }
 
