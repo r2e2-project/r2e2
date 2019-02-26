@@ -9,6 +9,7 @@
 #include <queue>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 
 #include "net/address.h"
 #include "net/nb_secure_socket.h"
@@ -88,8 +89,17 @@ class UDPConnection {
 
     /* reliable transport */
     uint64_t sequence_number_{0};
+    std::unordered_map<
+        uint64_t, std::pair<PacketData, std::chrono::steady_clock::time_point>>
+        outstanding_packets_{};
 
   public:
+    enum class FirstByte : uint8_t {
+        Unreliable,
+        Reliable,
+        Ack
+    };
+
     UDPConnection() {}
 
     UDPConnection(UDPSocket&& sock, const bool pacing = false)
@@ -100,9 +110,7 @@ class UDPConnection {
 
     void enqueue_datagram(const Address& addr, std::string&& data,
                           const PacketPriority p = PacketPriority::Normal,
-                          const bool reliable = false) {
-        outgoing_datagrams_.emplace(addr, move(data), p, reliable);
-    }
+                          const bool reliable = false);
 
     // How many microseconds are we ahead of our pace?
     int64_t micros_ahead_of_pace() const {

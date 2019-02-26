@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "net/http_response_parser.h"
+#include "util/chunk.h"
 #include "util/exception.h"
 #include "util/optional.h"
 
@@ -304,9 +305,34 @@ ExecutionLoop::make_udp_connection( const function<bool(shared_ptr<UDPConnection
        close_callback { move( real_close_callback ) }] ()
       {
         auto datagram = connection->socket_.recvfrom();
-        connection->bytes_received += datagram.second.length();
+        auto &data = datagram.second;
+
+        connection->bytes_received += data.length();
+
+        if ( data.length() > 0 ) {
+            Chunk chunk(data);
+
+            switch ( static_cast<UDPConnection::FirstByte>(chunk.octet()) ) {
+            case UDPConnection::FirstByte::Unreliable:
+                data = data.substr(1);
+                break;
+
+            case UDPConnection::FirstByte::Reliable: {
+                const uint64_t seqno = chunk(1).be64();
+                data = data.substr(9);
+                break;
+            }
+
+            case UDPConnection::FirstByte::Ack:
+                break;
+
+            default:
+                throw runtime_error("invalid packet");
+            }
+        }
+
         if ( not data_callback( connection, move( datagram.first ),
-                                move( datagram.second ) ) ) {
+                                move( data ) ) ) {
           close_callback();
           return ResultType::CancelAll;
         }
