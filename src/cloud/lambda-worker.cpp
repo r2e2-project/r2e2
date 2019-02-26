@@ -344,6 +344,7 @@ ResultType LambdaWorker::handlePeers() {
 }
 
 ResultType LambdaWorker::handleMessages() {
+    RECORD_INTERVAL("handleMessages");
     MessageParser unprocessedMessages;
     while (!messageParser.empty()) {
         Message message = move(messageParser.front());
@@ -401,7 +402,7 @@ ResultType LambdaWorker::handleWorkerStats() {
 }
 
 ResultType LambdaWorker::handleDiagnostics() {
-    RECORD_INTERVAL("handleDiagnostics")
+    RECORD_INTERVAL("handleDiagnostics");
     workerDiagnosticsTimer.reset();
 
     workerDiagnostics.bytesSent =
@@ -427,7 +428,6 @@ ResultType LambdaWorker::handleDiagnostics() {
 }
 
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
-    RECORD_INTERVAL("generateRays");
     const Bounds2i sampleBounds = camera->film->GetSampleBounds();
     const Vector2i sampleExtent = sampleBounds.Diagonal();
     const uint8_t maxDepth = 5;
@@ -460,7 +460,6 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 }
 
 void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
-    RECORD_INTERVAL("getObjects");
     vector<storage::GetRequest> requests;
     for (const protobuf::ObjectKey& ObjectKey : objects.object_ids()) {
         SceneManager::ObjectKey id = from_protobuf(ObjectKey);

@@ -64,7 +64,7 @@ Poller::Result Poller::poll( const int timeout_ms )
   }
 
   {
-      RECORD_INTERVAL("idle");
+      RECORD_INTERVAL("poll");
       if (0 == CheckSystemCall(
                    "poll", ::poll(&pollfds_[0], pollfds_.size(), timeout_ms))) {
           return Result::Type::Timeout;
