@@ -334,6 +334,7 @@ protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics) {
 
     proto.set_bytes_sent(diagnostics.bytesSent);
     proto.set_bytes_received(diagnostics.bytesReceived);
+    proto.set_outstanding_udp(diagnostics.outstandingUdp);
 
     for (const auto& kv : diagnostics.timePerAction) {
         protobuf::Action* action = proto.add_time_per_action();
@@ -929,6 +930,7 @@ WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& proto) {
 
     diagnostics.bytesSent = proto.bytes_sent();
     diagnostics.bytesReceived = proto.bytes_received();
+    diagnostics.outstandingUdp = proto.outstanding_udp();
 
     for (const auto& kv : proto.time_per_action()) {
         diagnostics.timePerAction[kv.name()] = kv.time();

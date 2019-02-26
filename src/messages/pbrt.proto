@@ -328,9 +328,10 @@ message WorkerStats {
 message WorkerDiagnostics {
     uint64 bytes_sent = 1;
     uint64 bytes_received = 2;
-    repeated Action time_per_action = 3;
-    repeated ActionIntervals intervals_per_action = 4;
-    repeated Metrics metrics_over_time = 5;
+    uint64 outstanding_udp = 3;
+    repeated Action time_per_action = 4;
+    repeated ActionIntervals intervals_per_action = 5;
+    repeated Metrics metrics_over_time = 6;
 }
 
 // For stat output to logs.

@@ -407,6 +407,8 @@ ResultType LambdaWorker::handleDiagnostics() {
     workerDiagnostics.bytesReceived =
         this->udpConnection->bytes_received - lastDiagnostics.bytesReceived;
 
+    workerDiagnostics.outstandingUdp = this->udpConnection->queue_size();
+
     lastDiagnostics.bytesSent = this->udpConnection->bytes_sent;
     lastDiagnostics.bytesReceived = this->udpConnection->bytes_received;
 
