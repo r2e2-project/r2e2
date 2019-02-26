@@ -21,6 +21,7 @@
 #include "net/address.h"
 #include "net/aws.h"
 #include "net/http_request.h"
+#include "storage/backend.h"
 #include "util/optional.h"
 #include "util/timerfd.h"
 #include "util/util.h"
@@ -37,7 +38,7 @@ struct MasterConfiguration {
     bool treeletStats;
     bool workerStats;
     Assignment assignment;
-    bool collectDiagnostics;
+    std::string diagnosticsDir;
     bool sendReliably;
 };
 
@@ -129,7 +130,8 @@ class LambdaMaster {
     const std::string scenePath;
     const uint32_t numberOfLambdas;
     const std::string publicAddress;
-    const std::string storageBackend;
+    const std::string storageBackendUri;
+    const std::unique_ptr<StorageBackend> storageBackend;
     const Address awsAddress;
     const std::string awsRegion;
     const AWSCredentials awsCredentials{};
@@ -179,8 +181,7 @@ class LambdaMaster {
 
     /* Worker stats */
     WorkerStats workerStats;
-    WorkerDiagnostics workerDiagnostics;
-    DemandTracker demandTracker;
+    DemandTracker demandTracker{};
     size_t initializedWorkers{0};
     size_t diagnosticsReceived{0};
 

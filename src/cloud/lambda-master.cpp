@@ -13,6 +13,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "cloud/allocator.h"
@@ -26,6 +27,7 @@
 #include "execution/meow/message.h"
 #include "messages/utils.h"
 #include "net/lambda.h"
+#include "net/requests.h"
 #include "net/socket.h"
 #include "util/exception.h"
 #include "util/path.h"
@@ -175,13 +177,13 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     : scenePath(scenePath),
       numberOfLambdas(numberOfLambdas),
       publicAddress(publicAddress),
-      storageBackend(storageBackend),
+      storageBackendUri(storageBackend),
+      storageBackend(StorageBackend::create_backend(storageBackendUri)),
       awsRegion(awsRegion),
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
       workerRequestTimer(WORKER_REQUEST_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL),
       writeOutputTimer(WRITE_OUTPUT_INTERVAL),
-      demandTracker(),
       config(config) {
     global::manager.init(scenePath);
     loadCamera();
@@ -607,9 +609,28 @@ void LambdaMaster::run() {
             });
     }
 
-    while (true) {
-        auto res = loop.loop_once().result;
-        if (res != PollerResult::Success && res != PollerResult::Timeout) break;
+    try {
+        while (true) {
+            auto res = loop.loop_once().result;
+            if (res != PollerResult::Success && res != PollerResult::Timeout)
+                break;
+        }
+    } catch (const interrupt_error &) {
+        if (config.diagnosticsDir.length()) {
+            vector<storage::GetRequest> getRequests;
+            for (const auto &workerkv : workers) {
+                const auto &worker = workerkv.second;
+                getRequests.emplace_back(
+                    "logs/"s + to_string(worker.id) + ".DIAG",
+                    config.diagnosticsDir + "/" + to_string(worker.id));
+            }
+
+            cerr << "Downloading " << getRequests.size()
+                 << " diagnostic file(s)... ";
+            this_thread::sleep_for(5s);
+            storageBackend->get(getRequests);
+            cerr << "done." << endl;
+        }
     }
 }
 
@@ -720,7 +741,7 @@ void LambdaMaster::updateObjectUsage(const Worker &worker) {}
 
 HTTPRequest LambdaMaster::generateRequest() {
     protobuf::InvocationPayload proto;
-    proto.set_storage_backend(storageBackend);
+    proto.set_storage_backend(storageBackendUri);
     proto.set_coordinator(publicAddress);
     proto.set_send_reliably(config.sendReliably);
 
@@ -761,12 +782,13 @@ void usage(const char *argv0, int exitCode) {
          << "  -t --treelet-stats         show treelet use stats" << endl
          << "  -w --worker-stats          show worker use stats" << endl
          << "  -R --reliable-udp          send ray packets reliably" << endl
-         << "  -d --diagnostics           collect & display diagnostics" << endl
+         << "  -d --diagnostics DIR       collect worker diagnostics" << endl
          << "  -a --assignment TYPE       indicate assignment type:" << endl
          << "                             * uniform (default)" << endl
          << "                             * static" << endl
          << "                             * all" << endl
          << "  -h --help                  show help information" << endl;
+
     exit(exitCode);
 }
 
@@ -788,7 +810,7 @@ int main(int argc, char *argv[]) {
     bool sendReliably = false;
     bool treeletStats = false;
     bool workerStats = false;
-    bool collectDiagnostics = false;
+    string diagnosticsDir;
     Assignment assignment = Assignment::Uniform;
 
     struct option long_options[] = {
@@ -802,13 +824,13 @@ int main(int argc, char *argv[]) {
         {"reliable-udp", no_argument, nullptr, 'R'},
         {"treelet-stats", no_argument, nullptr, 't'},
         {"worker-stats", no_argument, nullptr, 'w'},
-        {"diagnostics", no_argument, nullptr, 'd'},
+        {"diagnostics", required_argument, nullptr, 'd'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:twhda:R",
+        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:twhd:a:R",
                                     long_options, nullptr);
 
         if (opt == -1) {
@@ -826,7 +848,7 @@ int main(int argc, char *argv[]) {
         case 'l': numLambdas = stoul(optarg); break;
         case 't': treeletStats = true; break;
         case 'w': workerStats = true; break;
-        case 'd': collectDiagnostics = true; break;
+        case 'd': diagnosticsDir = optarg; break;
         case 'h': usage(argv[0], 0); break;
         case 'a': {
             if (strcmp(optarg, "static") == 0) {
@@ -857,7 +879,7 @@ int main(int argc, char *argv[]) {
     unique_ptr<LambdaMaster> master;
 
     MasterConfiguration config = {treeletStats, workerStats, assignment,
-                                  collectDiagnostics, sendReliably};
+                                  diagnosticsDir, sendReliably};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,
