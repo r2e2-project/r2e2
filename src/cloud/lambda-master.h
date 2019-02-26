@@ -28,6 +28,7 @@
 namespace pbrt {
 
 enum class Assignment {
+    All,
     Static,
     Uniform,
 };

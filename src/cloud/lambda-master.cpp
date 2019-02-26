@@ -336,6 +336,12 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             }
         };
 
+        auto doAllAssign = [this](Worker &worker) {
+            for (const auto &t : treeletIds) {
+                assignTreelet(worker, t.id);
+            }
+        };
+
         /* assign a tile to the worker */
         const WorkerId id = workerIt->first;  // indexed starting at 1
         const uint32_t tileIndex = id - 1;    // indexed starting at 0
@@ -355,6 +361,10 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
         case Assignment::Uniform:
             this->assignTreeletsUniformly(workerIt->second);
+            break;
+
+        case Assignment::All:
+            doAllAssign(workerIt->second);
             break;
 
         default:
@@ -753,8 +763,9 @@ void usage(const char *argv0, int exitCode) {
          << "  -R --reliable-udp          send ray packets reliably" << endl
          << "  -d --diagnostics           collect & display diagnostics" << endl
          << "  -a --assignment TYPE       indicate assignment type:" << endl
-         << "                             * static" << endl
          << "                             * uniform (default)" << endl
+         << "                             * static" << endl
+         << "                             * all" << endl
          << "  -h --help                  show help information" << endl;
     exit(exitCode);
 }
@@ -822,6 +833,8 @@ int main(int argc, char *argv[]) {
                 assignment = Assignment::Static;
             } else if (strcmp(optarg, "uniform") == 0) {
                 assignment = Assignment::Uniform;
+            } else if (strcmp(optarg, "all") == 0 ) {
+                assignment = Assignment::All;
             } else {
                 usage(argv[0], 2);
             }
