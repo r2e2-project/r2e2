@@ -3,6 +3,7 @@
 #include <getopt.h>
 #include <glog/logging.h>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <deque>
 #include <fstream>
@@ -46,6 +47,7 @@ using ObjectKey = SceneManager::ObjectKey;
 
 constexpr milliseconds WORKER_REQUEST_INTERVAL{250};
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
+constexpr milliseconds WRITE_STATS_INTERVAL{5'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
 class interrupt_error : public runtime_error {
@@ -103,17 +105,6 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
             double(allocator.getLocations(kv.first).size()) / numWorkers;
         LOG(INFO) << "Treelet: " << kv.first << " " << allocatedWeight << " / "
                   << kv.second;
-    }
-
-    /* log the static assignments */
-    LOG(INFO) << "static assignment for " << numberOfLambdas << " workers";
-
-    for (size_t i = 0; i < numWorkers; i++) {
-        LOG(INFO) << "worker=" << i;
-        LOG(INFO) << "\t0";
-        for (const auto t : staticAssignments[i]) {
-            LOG(INFO) << '\t' << t;
-        }
     }
 
     /* XXX count empty workers */
@@ -184,6 +175,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
       workerRequestTimer(WORKER_REQUEST_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL),
       writeOutputTimer(WRITE_OUTPUT_INTERVAL),
+      writeWorkerStatsTimer(WRITE_STATS_INTERVAL),
       config(config) {
     global::manager.init(scenePath);
     loadCamera();
@@ -281,9 +273,17 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
     loop.poller().add_action(
         Poller::Action(statusPrintTimer.fd, Direction::In,
-                       bind(&LambdaMaster::updateStatusMessage, this),
+                       bind(&LambdaMaster::handleStatusMessage, this),
                        [this]() { return true; },
                        []() { throw runtime_error("status print failed"); }));
+
+    if (config.workerStatsDir.length()) {
+        loop.poller().add_action(Poller::Action(
+            writeWorkerStatsTimer.fd, Direction::In,
+            bind(&LambdaMaster::handleWriteWorkerStats, this),
+            [this]() { return true; },
+            []() { throw runtime_error("write worker stats failed"); }));
+    }
 
     loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfLambdas](
                                                     ExecutionLoop &loop,
@@ -325,6 +325,13 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                 .emplace(piecewise_construct, forward_as_tuple(currentWorkerID),
                          forward_as_tuple(currentWorkerID, move(connection)))
                 .first;
+
+        if (this->config.workerStatsDir.length()) {
+            workerIt->second.statsOstream.open(
+                this->config.workerStatsDir + "/" + to_string(workerIt->first) +
+                    ".STATS",
+                ios::out | ios::trunc);
+        }
 
         /* assigns the minimal necessary scene objects for working with a
          * scene
@@ -378,7 +385,21 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     });
 }
 
-ResultType LambdaMaster::updateStatusMessage() {
+ResultType LambdaMaster::handleWriteWorkerStats() {
+    const auto timestamp =
+        duration_cast<microseconds>(steady_clock::now() - startTime).count();
+
+    for (const auto &workerkv : workers) {
+        const auto &worker = workerkv.second;
+        worker.statsOstream << timestamp << " "
+                            << protoutil::to_json(to_protobuf(worker.stats))
+                            << endl;
+    }
+
+    return ResultType::Continue;
+}
+
+ResultType LambdaMaster::handleStatusMessage() {
     statusPrintTimer.reset();
 
     aggregateQueueStats();
@@ -622,7 +643,8 @@ void LambdaMaster::run() {
                 const auto &worker = workerkv.second;
                 getRequests.emplace_back(
                     "logs/"s + to_string(worker.id) + ".DIAG",
-                    config.diagnosticsDir + "/" + to_string(worker.id));
+                    config.diagnosticsDir + "/" + to_string(worker.id) +
+                        ".DIAG");
             }
 
             cerr << "Downloading " << getRequests.size()
@@ -780,8 +802,8 @@ void usage(const char *argv0, int exitCode) {
          << "  -b --storage-backend NAME  storage backend URI" << endl
          << "  -l --lambdas N             how many lambdas to run" << endl
          << "  -t --treelet-stats         show treelet use stats" << endl
-         << "  -w --worker-stats          show worker use stats" << endl
          << "  -R --reliable-udp          send ray packets reliably" << endl
+         << "  -w --worker-stats DIR      dump worker stats" << endl
          << "  -d --diagnostics DIR       collect worker diagnostics" << endl
          << "  -a --assignment TYPE       indicate assignment type:" << endl
          << "                             * uniform (default)" << endl
@@ -809,7 +831,7 @@ int main(int argc, char *argv[]) {
     string region{"us-west-2"};
     bool sendReliably = false;
     bool treeletStats = false;
-    bool workerStats = false;
+    string workerStatsDir;
     string diagnosticsDir;
     Assignment assignment = Assignment::Uniform;
 
@@ -823,7 +845,7 @@ int main(int argc, char *argv[]) {
         {"assignment", required_argument, nullptr, 'a'},
         {"reliable-udp", no_argument, nullptr, 'R'},
         {"treelet-stats", no_argument, nullptr, 't'},
-        {"worker-stats", no_argument, nullptr, 'w'},
+        {"worker-stats", required_argument, nullptr, 'w'},
         {"diagnostics", required_argument, nullptr, 'd'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
@@ -847,7 +869,7 @@ int main(int argc, char *argv[]) {
         case 'b': storageBackendUri = optarg; break;
         case 'l': numLambdas = stoul(optarg); break;
         case 't': treeletStats = true; break;
-        case 'w': workerStats = true; break;
+        case 'w': workerStatsDir = optarg; break;
         case 'd': diagnosticsDir = optarg; break;
         case 'h': usage(argv[0], 0); break;
         case 'a': {
@@ -878,8 +900,8 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {treeletStats, workerStats, assignment,
-                                  diagnosticsDir, sendReliably};
+    MasterConfiguration config = {treeletStats, assignment, diagnosticsDir,
+                                  workerStatsDir, sendReliably};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,

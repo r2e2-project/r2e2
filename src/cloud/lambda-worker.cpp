@@ -416,10 +416,10 @@ ResultType LambdaWorker::handleDiagnostics() {
         duration_cast<microseconds>(now() - workerDiagnostics.startTime)
             .count();
 
-    const string diagnosticsStr =
-        protoutil::to_json(to_protobuf(workerDiagnostics));
+    diagnosticsOstream << timestamp << " "
+                       << protoutil::to_json(to_protobuf(workerDiagnostics))
+                       << endl;
 
-    diagnosticsOstream << timestamp << " " << diagnosticsStr << endl;
     workerDiagnostics.reset();
 
     return ResultType::Continue;

@@ -1,6 +1,7 @@
 #ifndef PBRT_CLOUD_LAMBDA_MASTER_H
 #define PBRT_CLOUD_LAMBDA_MASTER_H
 
+#include <fstream>
 #include <map>
 #include <memory>
 #include <set>
@@ -36,9 +37,9 @@ enum class Assignment {
 
 struct MasterConfiguration {
     bool treeletStats;
-    bool workerStats;
     Assignment assignment;
     std::string diagnosticsDir;
+    std::string workerStatsDir;
     bool sendReliably;
 };
 
@@ -76,7 +77,7 @@ class LambdaMaster {
         size_t freeSpace{2 * 1000 * 1000 * 1000};
 
         WorkerStats stats;
-        WorkerDiagnostics diagnostics;
+        mutable std::ofstream statsOstream;
 
         struct {
             std::string logStream;
@@ -97,7 +98,8 @@ class LambdaMaster {
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleWorkerRequests();
     Poller::Action::Result::Type handleWriteOutput();
-    Poller::Action::Result::Type updateStatusMessage();
+    Poller::Action::Result::Type handleWriteWorkerStats();
+    Poller::Action::Result::Type handleStatusMessage();
 
     bool processMessage(const WorkerId workerId, const meow::Message &message);
     bool processWorkerRequest(const WorkerRequest &request);
@@ -175,6 +177,7 @@ class LambdaMaster {
     TimerFD workerRequestTimer;
     TimerFD statusPrintTimer;
     TimerFD writeOutputTimer;
+    TimerFD writeWorkerStatsTimer;
 
     const std::chrono::steady_clock::time_point startTime{
         std::chrono::steady_clock::now()};
