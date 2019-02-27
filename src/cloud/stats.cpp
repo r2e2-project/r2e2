@@ -90,6 +90,7 @@ WorkerDiagnostics::Recorder::~Recorder() {
         duration_cast<microseconds>((start - diagnostics.startTime)).count(),
         duration_cast<microseconds>((end - diagnostics.startTime)).count()));
 #endif
+    diagnostics.nameStack.pop_back();
 }
 
 void WorkerDiagnostics::reset() {
@@ -99,6 +100,16 @@ void WorkerDiagnostics::reset() {
     timePerAction.clear();
     intervalsPerAction.clear();
     metricsOverTime.clear();
+}
+
+WorkerDiagnostics::Recorder WorkerDiagnostics::recordInterval(const std::string& name) {
+    nameStack.push_back(name);
+    std::string recorderName = "";
+    for (const auto& n : nameStack) {
+        recorderName += n + ":";
+    }
+    recorderName.resize(recorderName.size() - 1);
+    return Recorder(*this, recorderName);
 }
 
 void WorkerDiagnostics::recordMetric(const string& name, timepoint_t time,

@@ -537,6 +537,7 @@ bool LambdaWorker::processMessage(const Message& message) {
     }
 
     case OpCode::GenerateRays: {
+        RECORD_INTERVAL("generateRays");
         protobuf::GenerateRays proto;
         protoutil::from_string(message.payload(), proto);
         generateRays(from_protobuf(proto.crop_window()));

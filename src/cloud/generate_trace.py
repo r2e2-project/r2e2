@@ -25,68 +25,89 @@ from PIL import Image
 
 sns.set_style("ticks", {'axes.grid': True})
 
-class WorkerStats(object):
-    def __init__(self, file_path : str):
-        stats = self._read_stats(file_path)
-        self.intervals = stats['intervals']
-        self.metrics = stats['metrics']
+def read_intervals(f, num_workers):
+    worker_intervals = {}
+    for line in f:
+        tokens = line.split(' ')
+        worker_id = int(tokens[1])
+        num_actions = int(tokens[2])
+        offset = 3
+        intervals = []
+        for _ in range(num_actions):
+            action_name = tokens[offset]
+            num_intervals = int(tokens[offset + 1])
+            offset += 2
+            for n in range(num_intervals):
+                start, end = tokens[offset + n].split(',')
+                intervals.append((action_name, int(start), int(end)))
+            offset += num_intervals
+        worker_intervals[worker_id] = intervals
+        if len(worker_intervals) == num_workers:
+            break
+    return worker_intervals
 
-    def _read_intervals(self, f, num_workers):
-        worker_intervals = {}
-        for line in f:
-            tokens = line.split(' ')
-            worker_id = int(tokens[1])
-            num_actions = int(tokens[2])
-            offset = 3
-            intervals = []
-            for _ in range(num_actions):
-                action_name = tokens[offset]
-                num_intervals = int(tokens[offset + 1])
-                offset += 2
-                for n in range(num_intervals):
-                    start, end = tokens[offset + n].split(',')
-                    intervals.append((action_name, int(start), int(end)))
-                offset += num_intervals
-            worker_intervals[worker_id] = intervals
-            if len(worker_intervals) == num_workers:
-                break
-        return worker_intervals
-    
-    def _read_metrics(self, f, num_workers):
-        worker_metrics = defaultdict(dict)
-        for line in f:
-            tokens = line.split(' ')
-            worker_id = int(tokens[1])
-            num_metrics = int(tokens[2])
-            offset = 3
-            for _ in range(num_metrics):
-                metrics = []
-                metric_name = tokens[offset]
-                num_points = int(tokens[offset + 1])
-                offset += 2
-                for n in range(num_points):
-                    time, value = tokens[offset + n].split(',')
-                    metrics.append((int(time), float(value)))
-                offset += num_points
-                worker_metrics[worker_id][metric_name] = metrics
-            if len(worker_metrics) == num_workers:
-                break
-        return worker_metrics
-    
-    def _read_stats(self, path: str):
-        stats = {}
-        with open(path, 'r') as f:
-            num_workers = int(next(f))
+class WorkerStats(object):
+    def __init__(self, idx, file_path : str):
+        self.idx = idx
+        self.path = file_path
+        self.metrics = defaultdict(list)
+        time_per_action = defaultdict(dict)
+        self.timestamps = []
+        self.top_level_actions = set()
+        with open(file_path, 'r') as f:
+            _, start_timestamp = f.readline().strip().split(' ')
+            self.start = int(start_timestamp)
+
             for line in f:
-                line = line.strip()
-                if line == 'intervals':
-                    stats['intervals'] = self._read_intervals(f, num_workers)
-                elif line == 'metrics':
-                    stats['metrics'] = self._read_metrics(f, num_workers)
+                timestamp, json_data = line.strip().split(' ')
+                timestamp = int(timestamp)
+                self.timestamps.append(timestamp)
+                data = json.loads(json_data)
+                if 'timePerAction' in data:
+                    for tup in data['timePerAction']:
+                        name = tup['name']
+                        time = int(tup['time'])
+                        if ':' not in name:
+                            self.top_level_actions.add(name)
+                        time_per_action[name][timestamp] = time
+                    del data['timePerAction']
+                if 'metricsOverTime' in data:
+                    del data['metricsOverTime']
+                if 'intervalsPerAction' in data:
+                    del data['intervalsPerAction']
+                for name, value in data.items():
+                    self.metrics[name].append(float(value))
+        self.time_per_action = defaultdict(list)
+        for t in self.timestamps:
+            for k, v in time_per_action.items():
+                if t in v:
+                    value = v[t]
                 else:
-                    print('Unrecognized stats header "{:s}"'.format(line))
-                    exit(-1)
-        return stats
+                    value = 0
+                self.time_per_action[k].append(value)
+
+    def percentage_action(self, action, idx=-1):
+        if len(self.timestamps) == 0:
+            return 0
+        if idx < 0:
+            total = sum(self.time_per_action[action])
+            return total / self.timestamps[len(self.timestamps) - 1]
+        else:
+            assert len(self.timestamps) > idx
+            start = self.timestamps[idx - 1] if idx > 0 else 0
+            end = self.timestamps[idx]
+            interval = end - start
+            return self.time_per_action[action][idx] / interval
+
+    def percentage_busy(self, idx=-1):
+        return 1.0 - self.percentage_action('poll', idx)
+
+
+
+class Stats(object):
+    def __init__(self, stats_directory : str):
+        worker_files = os.listdir(stats_directory)
+        self.worker_stats = [WorkerStats(int(path), os.path.join(stats_directory, path)) for path in worker_files]
 
 
 class Constants(object):
@@ -282,18 +303,20 @@ def write_trace(stats, path: str):
         raise Exception("Invalid trace extension '{}'. Must be .trace or .tar.gz." \
                         .format(''.join(['.' + e for e in exts])))
 
-def quantize_sequence(sequence, quantization):
+def quantize_sequence(timepoints, data, quantization):
     quantized_sequence = []
 
-    if len(sequence) == 0:
+    if len(data) == 0:
         return []
 
-    current_time = sequence[0][0]
+    current_time = timepoints[0]
     offset = 1
     summed_value = 0
-    while offset < len(sequence):
-        timePrev, valuePrev = sequence[offset - 1]
-        time, value = sequence[offset]
+    while offset < len(timepoints):
+        timePrev = timepoints[offset - 1]
+        valuePrev = data[offset - 1]
+        time = timepoints[offset]
+        value = data[offset]
     
         interval = float(time - timePrev)
         contribution = value / interval
@@ -341,7 +364,7 @@ def heatmap(data, row_labels, col_labels, ax=None,
         ax = plt.gca()
 
     # Plot the heatmap
-    im = ax.imshow(data + 1.0, **kwargs)
+    im = ax.imshow(data, **kwargs)
 
     # Create colorbar
     cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
@@ -349,12 +372,12 @@ def heatmap(data, row_labels, col_labels, ax=None,
 
     # We want to show all ticks...
     #ax.set_xticks(np.arange(data.shape[1]))
-    #ax.set_yticks(np.arange(data.shape[0]))
     # ... and label them with the respective list entries.
-    ax.set_xlim([min(col_labels), max(col_labels)])
-    #ax.set_xticks(np.arange(data.shape[1]))
-    #ax.set_xticklabels(col_labels)
-    #ax.set_yticklabels(row_labels)
+    xtick_spacing = data.shape[1] // 5
+    ax.set_xticks(np.arange(data.shape[1])[::xtick_spacing])
+    ax.set_xticklabels(col_labels[::xtick_spacing])
+    ax.set_yticks(np.arange(data.shape[0]))
+    ax.set_yticklabels(row_labels)
 
     # Let the horizontal axes labeling appear on top.
     #ax.tick_params(top=True, bottom=False,
@@ -373,6 +396,7 @@ def heatmap(data, row_labels, col_labels, ax=None,
     ax.grid(which="minor", color="w", linestyle='-', linewidth=0.1)
     ax.grid(which="major", color="w", linestyle='-', linewidth=0)
     ax.tick_params(which="minor", bottom=False, left=False)
+    plt.tight_layout()
 
     return im, cbar
 
@@ -431,7 +455,7 @@ def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
     return texts
 
 
-def plot_time_heatmap(stats, metric_label):
+def plot_metric_heatmap(stats, metric_label, sort=False):
     quantization = 1000 * 1e6 # ms to nanoseconds
 
     # Deteremine number of rows
@@ -463,21 +487,76 @@ def plot_time_heatmap(stats, metric_label):
     return fig
 
 
-def plot_metrics(stats, path):
+def plot_action_heatmap(worker_stats):
+    num_worker_timestamps = len(worker_stats.timestamps)
+
+    # Deteremine number of rows
+    num_timepoints = num_worker_timestamps
+
+    # Deteremine number of columns
+    num_actions = len(worker_stats.top_level_actions)
+    
+    data = np.zeros((num_actions, num_timepoints))
+    row_labels = []
+    for action_idx, action_name in enumerate(worker_stats.top_level_actions):
+        row_labels.append(action_name)
+        points = worker_stats.time_per_action[action_name]
+        for i in range(num_timepoints):
+            p = worker_stats.percentage_action(action_name, i)
+            data[action_idx, i] = p
+    col_labels = [int(x * 1e-6) for x in worker_stats.timestamps]
+    fig = plt.figure(dpi=300)
+    ax = plt.subplot()
+    im, cbar = heatmap(data, row_labels, col_labels, ax=ax, aspect='auto')
+    return fig
+
+
+def plot_metrics(diagnostics, path):
     quantization = 1000 * 1e6 # nanoseconds
 
     plt.clf()
-    metric_labels = ['udpBytesSent', 'udpBytesReceived', 'cpuTime', 'udpOutstanding']
+    metric_labels = ['bytesSent', 'bytesReceived', 'outstandingUdp']
     # Plot heatmaps for each worker over time
-    for metric_name in metric_labels:
-        fig = plot_time_heatmap(stats, metric_name)
-        plt.savefig(os.path.join(path, 'heatmap_{:s}.png'.format(metric_name)))
+    # for metric_name in metric_labels:
+    #     fig = plot_metric_heatmap(diagnostics, metric_name)
+    #     plt.savefig(os.path.join(path, 'heatmap_{:s}.png'.format(metric_name)))
+    #     plt.close(fig)
+    #     plt.clf()
+
+    # Plot heatmaps showing time spent in each action for least/most idle worker, and average worker
+    most_busy = 0.0
+    most_busy_worker = diagnostics.worker_stats[0]
+    least_busy = 1.0
+    least_busy_worker = diagnostics.worker_stats[0]
+    for worker in diagnostics.worker_stats:
+        if len(worker.timestamps) == 0:
+            continue
+        busy = worker.percentage_busy()
+        if busy > most_busy:
+            most_busy = busy
+            most_busy_worker = worker
+        if busy < least_busy:
+            least_busy = busy
+            least_busy_worker = worker
+
+    if len(most_busy_worker.timestamps) > 0:
+        fig = plot_action_heatmap(most_busy_worker)
+        plt.savefig(os.path.join(path, 'most_busy_worker_action_heatmap.png'))
         plt.close(fig)
         plt.clf()
+        print('Graphed most busy worker action heatmap.')
+    if len(least_busy_worker.timestamps) > 0:
+        fig = plot_action_heatmap(least_busy_worker)
+        plt.savefig(os.path.join(path, 'least_busy_worker_action_heatmap.png'))
+        plt.close(fig)
+        plt.clf()
+        print('Graphed least busy worker action heatmap.')
+
+    return
 
     # Plot a chart over time showing min/median/max worker stats
     for metric_name in metric_labels:
-        for worker_id, metrics in stats.metrics.items():
+        for worker_id, metrics in worker_stats.metrics.items():
             data = {
                 'ids': [],
                 'time': [],
@@ -618,9 +697,9 @@ def compare_model():
 def main():
     parser = argparse.ArgumentParser(description=(
         'Generate a trace file for viewing in chrome://tracing from cloud pbrt worker intervals.'))
-    parser.add_argument('--worker-stats-path', default='worker_stats.txt',
+    parser.add_argument('--diagnostics-directory', default='diag',
                         help=(
-                            'Path to the worker_intervals.txt generated by '
+                            'Path to the master_stats.txt generated by '
                             'pbrt-lambda-master after finished a run.'))
     parser.add_argument('--trace-path', default='pbrt.tar.gz',
                         help='Path to write the compressed trace file to.')
@@ -629,15 +708,15 @@ def main():
     args = parser.parse_args()
 
     #compare_model()
-    print('Reading worker stats from {:s}...'.format(args.worker_stats_path))
-    stats = WorkerStats(args.worker_stats_path)
-    print('Done reading worker stats.')
+    print('Reading diagnostics from {:s}...'.format(args.diagnostics_directory))
+    diagnostics = Stats(args.diagnostics_directory)
+    print('Done reading diagnostics.')
     if False:
         path = write_trace(stats, args.trace_path)
         print('Wrote trace to {:s}.'.format(path))
     if True:
         path = args.graph_path
-        plot_metrics(stats, path)
+        plot_metrics(diagnostics, path)
         print('Wrote graphs to {:s}.'.format(path))
 
 

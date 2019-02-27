@@ -89,6 +89,9 @@ struct WorkerDiagnostics {
     std::map<std::string, std::vector<std::tuple<uint64_t, double>>>
         metricsOverTime;
 
+    /* used for nesting interval names */
+    std::vector<std::string> nameStack;
+
     /* for recording action intervals */
     class Recorder {
       public:
@@ -104,9 +107,7 @@ struct WorkerDiagnostics {
         timepoint_t start{now()};
     };
 
-    Recorder recordInterval(const std::string& name) {
-        return Recorder(*this, name);
-    }
+    Recorder recordInterval(const std::string& name);
 
     void recordMetric(const std::string& name, timepoint_t time, double metric);
     void reset();
