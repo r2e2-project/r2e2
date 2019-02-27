@@ -18,6 +18,8 @@ void RayStats::reset() {
     waitingRays = 0;
     processedRays = 0;
     demandedRays = 0;
+    sendingRays = 0;
+    pendingRays = 0;
 }
 
 void RayStats::merge(const RayStats& other) {
@@ -26,6 +28,8 @@ void RayStats::merge(const RayStats& other) {
     waitingRays += other.waitingRays;
     processedRays += other.processedRays;
     demandedRays += other.demandedRays;
+    sendingRays += other.sendingRays;
+    pendingRays += other.pendingRays;
 }
 
 #define INCREMENT_FIELD(name__)        \
@@ -54,6 +58,14 @@ void WorkerStats::recordProcessedRay(const ObjectKey& type) {
 
 void WorkerStats::recordDemandedRay(const ObjectKey& type) {
     INCREMENT_FIELD(demandedRays);
+}
+
+void WorkerStats::recordSendingRay(const ObjectKey& type) {
+    INCREMENT_FIELD(sendingRays);
+}
+
+void WorkerStats::recordPendingRay(const ObjectKey& type) {
+    INCREMENT_FIELD(pendingRays);
 }
 
 #undef INCREMENT_FIELD
@@ -121,6 +133,7 @@ void WorkerDiagnostics::recordMetric(const string& name, timepoint_t time,
 
 DemandTracker::DemandTracker()
     : estimators(), byWorker(), byTreelet(), total(0.0) {}
+
 void DemandTracker::submit(WorkerId wid, const WorkerStats& stats) {
     for (const auto& kv : stats.objectStats) {
         if (kv.first.type == ObjectType::Treelet) {

@@ -273,9 +273,8 @@ message RayStats {
     uint64 waiting_rays = 3;
     uint64 processed_rays = 4;
     uint64 demanded_rays = 5;
-
-    repeated float trace_duration_percentiles = 6;
-    repeated float ray_durations = 7;
+    uint64 sending_rays = 6;
+    uint64 pending_rays = 7;
 }
 
 message QueueStats {

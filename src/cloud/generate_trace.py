@@ -22,8 +22,9 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from matplotlib.colors import LogNorm
 from PIL import Image
-
+from typing import List
 sns.set_style("ticks", {'axes.grid': True})
+TREELET_TYPE = 0
 
 def read_intervals(f, num_workers):
     worker_intervals = {}
@@ -46,7 +47,7 @@ def read_intervals(f, num_workers):
             break
     return worker_intervals
 
-class WorkerStats(object):
+class WorkerDiagnostics(object):
     def __init__(self, idx, file_path : str):
         self.idx = idx
         self.path = file_path
@@ -103,11 +104,66 @@ class WorkerStats(object):
         return 1.0 - self.percentage_action('poll', idx)
 
 
+class WorkerStats(object):
+    def __init__(self, idx, file_path : str):
+        self.idx = idx
+        self.path = file_path
+
+        self.aggregate_stats = defaultdict(list)
+        self.queue_stats = defaultdict(list)
+        treelet_stats = defaultdict(lambda: defaultdict(dict))
+        stat_keys = set()
+        self.timestamps = []
+        with open(file_path, 'r') as f:
+            for line in f:
+                split_line  = line.strip().split(' ')
+                if len(split_line) < 2:
+                    continue
+                timestamp, json_data = split_line
+                timestamp = int(timestamp)
+                self.timestamps.append(timestamp)
+                data = json.loads(json_data)
+                for k, v in data['aggregateStats'].items():
+                    self.aggregate_stats[k].append(v)
+                for k, v in data['queueStats'].items():
+                    self.queue_stats[k].append(v)
+                for ray_stats in data['objectStats']:
+                    object_key = ray_stats['id']
+                    typ = object_key['type']
+                    typ_id = int(object_key['id'])
+                    stats = ray_stats['stats']
+                    if typ != TREELET_TYPE:
+                        continue
+                    for k, v in stats.items():
+                        treelet_stats[typ_id][k][timestamp] = v
+                        stat_keys.add(k)
+
+        self.treelet_stats = {}
+        for treelet_id in treelet_stats.keys():
+            self.treelet_stats[treelet_id] = {}
+            for stat_key in stat_keys:
+                self.treelet_stats[treelet_id][stat_key] = []
+                ll = self.treelet_stats[treelet_id][stat_key]
+                tvs = treelet_stats[treelet_id][stat_key]
+                for t in self.timestamps:
+                    if t in tvs:
+                        v = tvs[t]
+                    else:
+                        v = 0
+                    ll.append(v)
+
 
 class Stats(object):
-    def __init__(self, stats_directory : str):
-        worker_files = os.listdir(stats_directory)
-        self.worker_stats = [WorkerStats(int(path), os.path.join(stats_directory, path)) for path in worker_files]
+    def __init__(self, diagnostics_directory : str):
+        worker_files = os.listdir(diagnostics_directory)
+        self.worker_diagnostics = [
+            WorkerDiagnostics(int(path[:path.find('.DIAG')]), os.path.join(diagnostics_directory, path))
+            for path in worker_files
+            if path.endswith('DIAG')]
+        self.worker_stats = [
+            WorkerStats(int(path[:path.find('.STATS')]), os.path.join(diagnostics_directory, path))
+            for path in worker_files
+            if path.endswith('STATS')]
 
 
 class Constants(object):
@@ -303,6 +359,24 @@ def write_trace(stats, path: str):
         raise Exception("Invalid trace extension '{}'. Must be .trace or .tar.gz." \
                         .format(''.join(['.' + e for e in exts])))
 
+
+def merge_sequences(timepoints : List[List[int]],
+                    data : List[List[float]]):
+    raise Exception()
+
+    merged_timepoints = []
+    merged_data = []
+
+    num_sequences = len(timepoints)
+    offsets = [0 for _ in range(num_sequences)]
+    while True:
+        for i in range(num_sequences):
+            pass
+            
+
+    return merged_timepoints, merged_data
+
+
 def quantize_sequence(timepoints, data, quantization):
     quantized_sequence = []
 
@@ -340,7 +414,10 @@ def quantize_sequence(timepoints, data, quantization):
 
 
 def heatmap(data, row_labels, col_labels, ax=None,
-            cbar_kw={}, cbarlabel="", **kwargs):
+            cbar_kw={}, cbarlabel="",
+            dense_xticks=False,
+            dense_yticks=False,
+            **kwargs):
     """
     Create a heatmap from a numpy array and two lists of labels.
 
@@ -373,11 +450,19 @@ def heatmap(data, row_labels, col_labels, ax=None,
     # We want to show all ticks...
     #ax.set_xticks(np.arange(data.shape[1]))
     # ... and label them with the respective list entries.
-    xtick_spacing = data.shape[1] // 5
+    if dense_xticks:
+        xtick_spacing = 1
+    else:
+        xtick_spacing = (data.shape[1] // 5) or 1
     ax.set_xticks(np.arange(data.shape[1])[::xtick_spacing])
     ax.set_xticklabels(col_labels[::xtick_spacing])
-    ax.set_yticks(np.arange(data.shape[0]))
-    ax.set_yticklabels(row_labels)
+
+    if dense_yticks:
+        ytick_spacing = 1
+    else:
+        ytick_spacing = (data.shape[0] //  5) or 1
+    ax.set_yticks(np.arange(data.shape[0])[::ytick_spacing])
+    ax.set_yticklabels(row_labels[::ytick_spacing])
 
     # Let the horizontal axes labeling appear on top.
     #ax.tick_params(top=True, bottom=False,
@@ -498,7 +583,7 @@ def plot_action_heatmap(worker_stats):
     
     data = np.zeros((num_actions, num_timepoints))
     row_labels = []
-    for action_idx, action_name in enumerate(worker_stats.top_level_actions):
+    for action_idx, action_name in enumerate(sorted(list(worker_stats.top_level_actions))):
         row_labels.append(action_name)
         points = worker_stats.time_per_action[action_name]
         for i in range(num_timepoints):
@@ -507,31 +592,91 @@ def plot_action_heatmap(worker_stats):
     col_labels = [int(x * 1e-6) for x in worker_stats.timestamps]
     fig = plt.figure(dpi=300)
     ax = plt.subplot()
+    im, cbar = heatmap(data, row_labels, col_labels, ax=ax, dense_yticks=True, aspect='auto')
+    return fig
+
+
+def aggregate_treelet_stats(all_worker_stats):
+    # Get the list of treelet ids and stat keys
+    treelet_ids = set()
+    stat_keys = set()
+    for worker in all_worker_stats:
+        for treelet_id, treelet_stats in worker.treelet_stats.items():
+            treelet_ids.add(treelet_id)
+            for k, _ in treelet_stats.items():
+                stat_keys.add(k)
+            
+    # Deteremine number of columns
+    timestamp_sets = [set(stats.timestamps) for stats in all_worker_stats]
+    timestamps = set()
+    for s in timestamp_sets:
+        timestamps = timestamps.union(s)
+    timestamps = sorted(list(timestamps))
+    num_timepoints = len(timestamps)
+
+    # Aggregate treelet stats across all workers
+    treelet_stats = {}
+    for tid in treelet_ids:
+        treelet_stats[tid] = {}
+        for key in stat_keys:
+            treelet_stats[tid][key] = [0 for _ in range(num_timepoints)]
+
+    for worker_stats in all_worker_stats:
+        for i, t in enumerate(timestamps):
+            if t in worker_stats.timestamps:
+                idx = worker_stats.timestamps.index(t)
+                for treelet_id, wtreelet_stats in worker_stats.treelet_stats.items():
+                    for key in stat_keys:
+                        treelet_stats[treelet_id][key][i] += int(wtreelet_stats[key][idx])
+
+    return treelet_stats, timestamps
+
+
+def plot_treelet_heatmap(treelet_stats, timestamps, metric):
+    # Number of rows
+    treelet_ids = sorted([int(x) for x in list(treelet_stats.keys())])
+    # Number of columns
+    num_timepoints = len(timestamps)
+
+    data = np.zeros((len(treelet_ids), num_timepoints))
+    row_labels = []
+    for idx, treelet_id in enumerate(treelet_ids):
+        row_labels.append(treelet_id)
+        points = treelet_stats[treelet_id][metric]
+        print(idx, end=' ')
+        for i, d in enumerate(points):
+            data[idx, i] = d
+            if d > 100000:
+                print(d, end=' ')
+        print()
+    col_labels = [int(x * 1e-6) for x in timestamps]
+    fig = plt.figure(dpi=300)
+    ax = plt.subplot()
     im, cbar = heatmap(data, row_labels, col_labels, ax=ax, aspect='auto')
     return fig
 
 
-def plot_metrics(diagnostics, path):
+def plot_metrics(stats, path):
     quantization = 1000 * 1e6 # nanoseconds
 
     plt.clf()
     metric_labels = ['bytesSent', 'bytesReceived', 'outstandingUdp']
     # Plot heatmaps for each worker over time
     # for metric_name in metric_labels:
-    #     fig = plot_metric_heatmap(diagnostics, metric_name)
+    #     fig = plot_metric_heatmap(stats, metric_name)
     #     plt.savefig(os.path.join(path, 'heatmap_{:s}.png'.format(metric_name)))
     #     plt.close(fig)
     #     plt.clf()
 
     # Plot heatmaps showing time spent in each action for least/most idle worker, and average worker
     most_busy = 0.0
-    most_busy_worker = diagnostics.worker_stats[0]
+    most_busy_worker = stats.worker_diagnostics[0]
     least_busy = 1.0
-    least_busy_worker = diagnostics.worker_stats[0]
-    for worker in diagnostics.worker_stats:
+    least_busy_worker = stats.worker_diagnostics[0]
+    for worker in stats.worker_diagnostics:
         if len(worker.timestamps) == 0:
             continue
-        busy = worker.percentage_busy()
+        busy = worker.percentage_busy() * len(worker.timestamps)
         if busy > most_busy:
             most_busy = busy
             most_busy_worker = worker
@@ -551,6 +696,15 @@ def plot_metrics(diagnostics, path):
         plt.close(fig)
         plt.clf()
         print('Graphed least busy worker action heatmap.')
+
+    print('Aggregating treelet stats...')
+    treelet_stats, timestamps = aggregate_treelet_stats(stats.worker_stats)
+    print('Done aggregating treelet stats.')
+    plot_treelet_heatmap(treelet_stats, timestamps, 'sendingRays')
+    plt.savefig(os.path.join(path, 'treelet_sendingRays_heatmap.png'))
+    plt.close(fig)
+    plt.clf()
+    print('Graphed treelet heatmap.')
 
     return
 

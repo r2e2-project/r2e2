@@ -32,6 +32,11 @@ struct RayStats {
     uint64_t processedRays{0};
     /* rays that require (or required) this scence object to render */
     uint64_t demandedRays{0};
+    /* rays that are waiting to be sent to another worker */
+    uint64_t sendingRays{0};
+    /* rays that are waiting to be sent to another worker, but we do not know
+       which worker to send them to */
+    uint64_t pendingRays{0};
 
     void reset();
     void merge(const RayStats& other);
@@ -61,6 +66,8 @@ struct WorkerStats {
     uint64_t receivedRays() const { return aggregateStats.receivedRays; }
     uint64_t waitingRays() const { return aggregateStats.waitingRays; }
     uint64_t processedRays() const { return aggregateStats.processedRays; }
+    uint64_t sendingRays() const { return aggregateStats.sendingRays; }
+    uint64_t pendingRays() const { return aggregateStats.pendingRays; }
 
     void recordFinishedPath();
     void recordSentRay(const ObjectKey& type);
@@ -70,6 +77,8 @@ struct WorkerStats {
     void recordRayInterval(const ObjectKey& type, timepoint_t start,
                            timepoint_t end);
     void recordDemandedRay(const ObjectKey& type);
+    void recordSendingRay(const ObjectKey& type);
+    void recordPendingRay(const ObjectKey& type);
 
     void reset();
     void merge(const WorkerStats& other);
