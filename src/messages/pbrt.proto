@@ -228,6 +228,7 @@ message Scene {
 message InvocationPayload {
     string storage_backend = 1;
     string coordinator = 2;
+    bool send_reliably = 3;
 }
 
 message ObjectKey {

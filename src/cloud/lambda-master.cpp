@@ -1082,6 +1082,7 @@ HTTPRequest LambdaMaster::generateRequest() {
     protobuf::InvocationPayload proto;
     proto.set_storage_backend(storageBackend);
     proto.set_coordinator(publicAddress);
+    proto.set_send_reliably(config.sendReliably);
 
     return LambdaInvocationRequest(
                awsCredentials, awsRegion, lambdaFunctionName,
@@ -1119,6 +1120,7 @@ void usage(const char *argv0, int exitCode) {
          << "  -l --lambdas N             how many lambdas to run" << endl
          << "  -t --treelet-stats         show treelet use stats" << endl
          << "  -w --worker-stats          show worker use stats" << endl
+         << "  -R --reliable-udp          send ray packets reliably" << endl
          << "  -d --diagnostics           collect & display diagnostics" << endl
          << "  -a --assignment TYPE       indicate assignment type:" << endl
          << "                             * static" << endl
@@ -1142,6 +1144,7 @@ int main(int argc, char *argv[]) {
     string publicIp;
     string storageBackendUri;
     string region{"us-west-2"};
+    bool sendReliably = false;
     bool treeletStats = false;
     bool workerStats = false;
     bool collectDiagnostics = false;
@@ -1155,6 +1158,7 @@ int main(int argc, char *argv[]) {
         {"storage-backend", required_argument, nullptr, 'b'},
         {"lambdas", required_argument, nullptr, 'l'},
         {"assignment", required_argument, nullptr, 'a'},
+        {"reliable-udp", no_argument, nullptr, 'R'},
         {"treelet-stats", no_argument, nullptr, 't'},
         {"worker-stats", no_argument, nullptr, 'w'},
         {"diagnostics", no_argument, nullptr, 'd'},
@@ -1163,14 +1167,18 @@ int main(int argc, char *argv[]) {
     };
 
     while (true) {
-        const int opt = getopt_long(
-            argc, argv, "s:p:i:r:b:l:twhda:", long_options, nullptr);
+        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:twhda:R",
+                                    long_options, nullptr);
 
         if (opt == -1) {
             break;
         }
 
         switch (opt) {
+        case 'R': {
+            sendReliably = true;
+            break;
+        }
         case 's': {
             scene = optarg;
             break;
@@ -1239,7 +1247,7 @@ int main(int argc, char *argv[]) {
     unique_ptr<LambdaMaster> master;
 
     MasterConfiguration config = {treeletStats, workerStats, assignment,
-                                  collectDiagnostics};
+                                  collectDiagnostics, sendReliably};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,

@@ -52,8 +52,9 @@ constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const uint16_t coordinatorPort,
-                           const string& storageUri)
-    : coordinatorAddr(coordinatorIP, coordinatorPort),
+                           const string& storageUri, const bool sendReliably)
+    : sendReliably(sendReliably),
+      coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
       storageBackend(StorageBackend::create_backend(storageUri)),
       peerTimer(PEER_CHECK_INTERVAL),
@@ -293,9 +294,9 @@ ResultType LambdaWorker::handleOutQueue() {
             oss.flush();
             Message message{OpCode::SendRays, oss.str()};
             auto messageStr = message.str();
-            udpConnection->enqueue_datagram(peer.address, move(messageStr),
-                                            PacketPriority::Normal,
-                                            PacketType::Reliable);
+            udpConnection->enqueue_datagram(
+                peer.address, move(messageStr), PacketPriority::Normal,
+                sendReliably ? PacketType::Reliable : PacketType::Unreliable);
         }
     }
 
@@ -751,6 +752,7 @@ void usage(const char* argv0, int exitCode) {
          << "  -i --ip IPSTRING           ip of coordinator" << endl
          << "  -p --port PORT             port of coordinator" << endl
          << "  -s --storage-backend NAME  storage backend URI" << endl
+         << "  -R --reliable-udp          send ray packets reliably" << endl
          << "  -h --help                  show help information" << endl;
 }
 
@@ -760,18 +762,20 @@ int main(int argc, char* argv[]) {
     uint16_t listenPort = 50000;
     string publicIp;
     string storageUri;
+    bool sendReliably = false;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
         {"ip", required_argument, nullptr, 'i'},
         {"storage-backend", required_argument, nullptr, 's'},
+        {"reliable-udp", no_argument, nullptr, 'R'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:s:h", long_options, nullptr);
+            getopt_long(argc, argv, "p:i:s:hR", long_options, nullptr);
 
         if (opt == -1) break;
 
@@ -780,6 +784,7 @@ int main(int argc, char* argv[]) {
         case 'p': listenPort = stoi(optarg); break;
         case 'i': publicIp = optarg; break;
         case 's': storageUri = optarg; break;
+        case 'R': sendReliably = true; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
         default: usage(argv[0], EXIT_FAILURE);
         }
@@ -793,7 +798,8 @@ int main(int argc, char* argv[]) {
     unique_ptr<LambdaWorker> worker;
 
     try {
-        worker = make_unique<LambdaWorker>(publicIp, listenPort, storageUri);
+        worker = make_unique<LambdaWorker>(publicIp, listenPort, storageUri,
+                                           sendReliably);
         worker->run();
     } catch (const exception& e) {
         LOG(INFO) << argv[0] << ": " << e.what();

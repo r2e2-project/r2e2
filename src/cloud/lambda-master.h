@@ -37,6 +37,7 @@ struct MasterConfiguration {
     bool workerStats;
     Assignment assignment;
     bool collectDiagnostics;
+    bool sendReliably;
 };
 
 class LambdaMaster {

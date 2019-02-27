@@ -22,11 +22,15 @@ def handler(event, context):
     # remove old log files
     os.system("rm -rf /tmp/pbrt-lambda-*")
 
-    retcode = run_command(["pbrt-lambda-worker",
-                           "--ip", coordinator_host,
-                           "--port", coordinator_port,
-                           "--storage-backend", storage_backend])
+    command = ["pbrt-lambda-worker",
+               "--ip", coordinator_host,
+               "--port", coordinator_port,
+               "--storage-backend", storage_backend]
 
+    if event['sendReliably']:
+        command += ['--reliable-udp']
+
+    retcode = run_command(command)
     print("retcode={}".format(retcode))
 
     return {'stdout': retcode}

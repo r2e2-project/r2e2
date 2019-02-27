@@ -28,7 +28,8 @@ class LambdaWorker {
   public:
     LambdaWorker(const std::string& coordinatorIP,
                  const uint16_t coordinatorPort,
-                 const std::string& storageBackendUri);
+                 const std::string& storageBackendUri,
+                 const bool sendReliably);
 
     void run();
     void terminate() { terminated = true; }
@@ -81,6 +82,7 @@ class LambdaWorker {
     const std::string infoLogName{logBase + ".INFO"};
     const std::string logPrefix{"logs/"};
 
+    const bool sendReliably;
     Address coordinatorAddr;
     ExecutionLoop loop{};
     UniqueDirectory workingDirectory;
