@@ -232,7 +232,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             const WorkerId workerId = req.worker_id();
 
             if (!workers.count(workerId)) {
-                throw runtime_error("unexpected worker id");
+                throw runtime_error("unexpected worker id: " +
+                                    to_string(workerId));
             }
 
             auto &worker = workers.at(workerId);

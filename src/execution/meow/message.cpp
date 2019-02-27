@@ -6,23 +6,13 @@
 #include <stdexcept>
 #include <endian.h>
 
+#include "net/util.h"
 #include "util/util.h"
 
 using namespace std;
 using namespace meow;
 
 constexpr char const* Message::OPCODE_NAMES[to_underlying(Message::OpCode::COUNT)];
-
-string put_field( const uint32_t n )
-{
-  const uint32_t network_order = htobe32( n );
-  return string( reinterpret_cast<const char *>( &network_order ),
-                 sizeof( network_order ) );
-}
-
-/* avoid implicit conversions */
-template<class T>
-string put_field( T n ) = delete;
 
 Message::Message( const Chunk & chunk )
 {

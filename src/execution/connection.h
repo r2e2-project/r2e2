@@ -8,6 +8,7 @@
 #include <iostream>
 #include <map>
 #include <queue>
+#include <set>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -15,6 +16,7 @@
 #include "net/address.h"
 #include "net/nb_secure_socket.h"
 #include "net/socket.h"
+#include "util/timerfd.h"
 #include "util/util.h"
 
 class ExecutionLoop;
@@ -51,19 +53,21 @@ class Connection {
 
 enum class PacketPriority { Low, Normal, High };
 
+enum class PacketType : uint8_t { Unreliable, Reliable, Ack };
+
 struct PacketData {
     Address destination;
     std::string data;
     PacketPriority priority{PacketPriority::Normal};
-    bool reliable{false};
+    uint64_t sequence_number{0};
 
     PacketData(const Address& addr, std::string&& data,
                const PacketPriority p = PacketPriority::Normal,
-               const bool reliable = false)
+               const uint64_t sequence_number = 0)
         : destination(addr),
           data(move(data)),
           priority(p),
-          reliable(reliable) {}
+          sequence_number(sequence_number) {}
 };
 
 struct PacketCompare {
@@ -90,15 +94,14 @@ class UDPConnection {
 
     /* reliable transport */
     uint64_t sequence_number_{0};
-    std::unordered_map<
-        uint64_t, std::pair<PacketData, std::chrono::steady_clock::time_point>>
+    TimerFD ackHandleTimer{std::chrono::seconds{2}};
+    std::deque<std::pair<std::chrono::steady_clock::time_point, PacketData>>
         outstanding_packets_{};
 
     std::map<Address, std::vector<uint64_t>> to_be_acked_{};
+    std::set<uint64_t> received_acks_{};
 
   public:
-    enum class FirstByte : uint8_t { Unreliable, Reliable, Ack };
-
     UDPConnection() {}
 
     UDPConnection(UDPSocket&& sock, const bool pacing = false)
@@ -109,7 +112,9 @@ class UDPConnection {
 
     void enqueue_datagram(const Address& addr, std::string&& data,
                           const PacketPriority p = PacketPriority::Normal,
-                          const bool reliable = false);
+                          const PacketType first_byte = PacketType::Unreliable);
+
+    void enqueue_datagram(PacketData&& packet);
 
     // How many microseconds are we ahead of our pace?
     int64_t micros_ahead_of_pace() const {

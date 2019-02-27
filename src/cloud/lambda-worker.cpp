@@ -293,7 +293,9 @@ ResultType LambdaWorker::handleOutQueue() {
             oss.flush();
             Message message{OpCode::SendRays, oss.str()};
             auto messageStr = message.str();
-            udpConnection->enqueue_datagram(peer.address, move(messageStr));
+            udpConnection->enqueue_datagram(peer.address, move(messageStr),
+                                            PacketPriority::Normal,
+                                            PacketType::Reliable);
         }
     }
 

@@ -1,23 +1,24 @@
 #include "connection.h"
 
-using namespace std;
+#include "net/util.h"
 
-string put_field(const uint64_t n) {
-    const uint64_t network_order = htobe64(n);
-    return string(reinterpret_cast<const char*>(&network_order),
-                  sizeof(network_order));
-}
+using namespace std;
 
 void UDPConnection::enqueue_datagram(const Address& addr, string&& data,
                                      const PacketPriority p,
-                                     const bool reliable) {
-    string header(1, to_underlying(FirstByte::Unreliable));
+                                     const PacketType first_byte) {
+    string header(1, to_underlying(first_byte));
+    uint64_t seqno = 0;
 
-    if (reliable) {
-        header[0] = to_underlying(FirstByte::Reliable);
-        header += put_field(sequence_number_++);
+    if (first_byte == PacketType::Reliable) {
+        seqno = sequence_number_++;
+        header += put_field(seqno);
     }
 
     data.insert(0, header);
-    outgoing_datagrams_.emplace(addr, move(data), p, reliable);
+    outgoing_datagrams_.emplace(addr, move(data), p, seqno);
+}
+
+void UDPConnection::enqueue_datagram(PacketData&& packet) {
+    outgoing_datagrams_.push(move(packet));
 }

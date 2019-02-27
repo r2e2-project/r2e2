@@ -8,6 +8,7 @@
 
 #include "util/exception.h"
 #include "util/file_descriptor.h"
+#include "util/util.h"
 
 struct TimerFD {
     FileDescriptor fd;
