@@ -6,6 +6,7 @@
 #include <chrono>
 #include <stdexcept>
 
+#include "cloud/stats.h"
 #include "net/http_response_parser.h"
 #include "net/util.h"
 #include "util/chunk.h"
@@ -324,6 +325,7 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
     poller_.add_action(Poller::Action(
         connection->ackHandleTimer.fd, Direction::In,
         [connection]() {
+            RECORD_INTERVAL("handleAcks");
             connection->ackHandleTimer.reset();
 
             // sending acknowledgements
