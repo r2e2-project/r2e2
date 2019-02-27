@@ -262,8 +262,6 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
                 Chunk chunk(data);
                 auto first_byte = static_cast<PacketType>(chunk.octet());
 
-                LOG(INFO) << "First byte: " << (int)to_underlying(first_byte);
-
                 chunk = chunk(1);
 
                 switch (first_byte) {
@@ -311,7 +309,8 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
             connection->bytes_sent += datagram.data.length();
             connection->socket_.sendto(datagram.destination, datagram.data);
 
-            if (datagram.data[0] == to_underlying(PacketType::Reliable)) {
+            if (!datagram.data.empty() and
+                datagram.data[0] == to_underlying(PacketType::Reliable)) {
                 connection->outstanding_packets_.emplace_back(
                     make_pair(steady_clock::now() + 10s, move(datagram)));
             }
@@ -335,15 +334,17 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
             for (auto &ackkv : connection->to_be_acked_) {
                 string ack;
 
-                for (const auto seqno : ackkv.second) {
-                    ack += put_field(seqno);
+                for (size_t i = 0; i < ackkv.second.size(); i++) {
+                    ack += put_field(ackkv.second[i]);
+
+                    if (ack.length() >= 1'400 or i == ackkv.second.size() - 1) {
+                        connection->enqueue_datagram(ackkv.first, move(ack),
+                                                     PacketPriority::High,
+                                                     PacketType::Ack);
+
+                        ack = {};
+                    }
                 }
-
-                if (ack.length() == 0) continue;
-
-                connection->enqueue_datagram(ackkv.first, move(ack),
-                                             PacketPriority::High,
-                                             PacketType::Ack);
             }
 
             connection->to_be_acked_.clear();
