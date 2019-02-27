@@ -642,22 +642,26 @@ void LambdaMaster::run() {
                 break;
         }
     } catch (const interrupt_error &) {
-        if (config.diagnosticsDir.length()) {
-            vector<storage::GetRequest> getRequests;
-            for (const auto &workerkv : workers) {
-                const auto &worker = workerkv.second;
-                getRequests.emplace_back(
-                    "logs/"s + to_string(worker.id) + ".DIAG",
-                    config.diagnosticsDir + "/" + to_string(worker.id) +
-                        ".DIAG");
-            }
+    }
 
-            cerr << "Downloading " << getRequests.size()
-                 << " diagnostic file(s)... ";
-            this_thread::sleep_for(5s);
-            storageBackend->get(getRequests);
-            cerr << "done." << endl;
+    if (config.diagnosticsDir.length()) {
+        vector<storage::GetRequest> getRequests;
+        for (const auto &workerkv : workers) {
+            const auto &worker = workerkv.second;
+            getRequests.emplace_back(
+                "logs/"s + to_string(worker.id) + ".DIAG",
+                config.diagnosticsDir + "/" + to_string(worker.id) + ".DIAG");
         }
+
+        cerr << "Downloading " << getRequests.size()
+             << " diagnostic file(s)... ";
+        this_thread::sleep_for(5s);
+        storageBackend->get(getRequests);
+        cerr << "done." << endl;
+    }
+
+    for (const auto &worker : workers) {
+        worker.second.statsOstream.close();
     }
 }
 

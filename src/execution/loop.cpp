@@ -272,9 +272,12 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
                     break;
 
                 case PacketType::Reliable: {
-                    connection->to_be_acked_[datagram.first].push_back(
-                        chunk.be64());
-                    data = data.substr(9);
+                    if (chunk.size() >= 8) {
+                        connection->to_be_acked_[datagram.first].push_back(
+                            chunk.be64());
+                        data = data.substr(9);
+                    }
+
                     break;
                 }
 
@@ -336,6 +339,8 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
                     ack += put_field(seqno);
                 }
 
+                if (ack.length() == 0) continue;
+
                 connection->enqueue_datagram(ackkv.first, move(ack),
                                              PacketPriority::High,
                                              PacketType::Ack);
@@ -345,7 +350,7 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
 
             // processing received acks
             if (connection->received_acks_.empty() or
-                connection->outstanding_packets_.size() == 0) {
+                connection->outstanding_packets_.empty()) {
                 return ResultType::Continue;
             }
 
