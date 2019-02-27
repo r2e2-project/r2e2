@@ -575,11 +575,6 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 
         demandTracker.submit(workerId, stats);
 
-        for (const ObjectKey &tid : treeletIds) {
-            workerStats.recordMetric("treelet" + std::to_string(tid.id) + ":demand", now,
-                                     demandTracker.treeletDemand(tid.id));
-        }
-
         /* merge into global worker stats */
         workerStats.merge(stats);
         /* merge into local worker stats */
