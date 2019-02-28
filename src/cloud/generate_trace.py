@@ -156,14 +156,18 @@ class WorkerStats(object):
 class Stats(object):
     def __init__(self, diagnostics_directory : str):
         worker_files = os.listdir(diagnostics_directory)
-        self.worker_diagnostics = [
-            WorkerDiagnostics(int(path[:path.find('.DIAG')]), os.path.join(diagnostics_directory, path))
-            for path in worker_files
-            if path.endswith('DIAG')]
-        self.worker_stats = [
-            WorkerStats(int(path[:path.find('.STATS')]), os.path.join(diagnostics_directory, path))
-            for path in worker_files
-            if path.endswith('STATS')]
+        self.worker_diagnostics = []
+        self.worker_stats = []
+        for path in worker_files:
+            if path.endswith('DIAG'):
+                self.worker_diagnostics.append(
+                    WorkerDiagnostics(int(path[:path.find('.DIAG')]),
+                                      os.path.join(diagnostics_directory, path)))
+            if path.endswith('STATS'):
+                self.worker_stats.append(
+                    WorkerStats(int(path[:path.find('.STATS')]),
+                                os.path.join(diagnostics_directory, path)))
+            print('.', end='', flush=True)
 
 
 class Constants(object):
@@ -596,6 +600,38 @@ def plot_action_heatmap(worker_stats):
     return fig
 
 
+def plot_worker_heatmap(all_worker_stats, metric):
+    '''Plot a treelet metric over time for all treelets'''
+    workers = {}
+    for w in all_worker_stats:
+        workers[int(w.idx)] = w
+    # Number of rows
+    worker_ids = list(sorted(workers.keys()))
+
+    # Determine number of columns
+    timestamp_sets = [set(stats.timestamps) for stats in all_worker_stats]
+    timestamps = set()
+    for s in timestamp_sets:
+        timestamps = timestamps.union(s)
+    timestamps = sorted(list(timestamps))
+    num_timepoints = len(timestamps)
+
+    data = np.zeros((len(worker_ids), num_timepoints))
+    row_labels = []
+    for i, idx in enumerate(worker_ids):
+        row_labels.append(idx)
+        points = workers[idx].aggregate_stats[metric]
+        ts = workers[idx].timestamps
+        for j, t in enumerate(timestamps):
+            if t in ts:
+                data[i, j] = points[ts.index(t)]
+    col_labels = [int(x * 1e-6) for x in timestamps]
+    fig = plt.figure(dpi=300)
+    ax = plt.subplot()
+    im, cbar = heatmap(data, row_labels, col_labels, ax=ax, aspect='auto')
+    return fig
+
+
 def aggregate_treelet_stats(all_worker_stats):
     # Get the list of treelet ids and stat keys
     treelet_ids = set()
@@ -606,7 +642,7 @@ def aggregate_treelet_stats(all_worker_stats):
             for k, _ in treelet_stats.items():
                 stat_keys.add(k)
             
-    # Deteremine number of columns
+    # Determine number of columns
     timestamp_sets = [set(stats.timestamps) for stats in all_worker_stats]
     timestamps = set()
     for s in timestamp_sets:
@@ -633,6 +669,7 @@ def aggregate_treelet_stats(all_worker_stats):
 
 
 def plot_treelet_heatmap(treelet_stats, timestamps, metric):
+    '''Plot a treelet metric over time for all treelets'''
     # Number of rows
     treelet_ids = sorted([int(x) for x in list(treelet_stats.keys())])
     # Number of columns
@@ -650,6 +687,72 @@ def plot_treelet_heatmap(treelet_stats, timestamps, metric):
                 print(d, end=' ')
         print()
     col_labels = [int(x * 1e-6) for x in timestamps]
+    fig = plt.figure(dpi=300)
+    ax = plt.subplot()
+    im, cbar = heatmap(data, row_labels, col_labels, ax=ax, aspect='auto')
+    return fig
+
+
+def plot_treelet_worker_rays(treelet_stats, worker_stats, metric, max_workers=15, normalized=False):
+    '''Plot distribution of treelet rays to workers'''
+    # Number of rows
+    treelet_ids = sorted([int(x) for x in list(treelet_stats.keys())])
+    # Number of columns
+    num_workers = min(len(worker_stats), max_workers)
+
+    data = np.zeros((len(treelet_ids), num_workers))
+    row_labels = []
+    for idx, treelet_id in enumerate(treelet_ids):
+        row_labels.append(treelet_id)
+        treelet_value = sum(treelet_stats[treelet_id][metric]) or 0.00001
+        values = []
+        for i in range(len(worker_stats)):
+            stats = worker_stats[i]
+            value = 0
+            if treelet_id in stats.treelet_stats:
+                value = sum([int(x) for x in stats.treelet_stats[treelet_id][metric]])
+            if normalized:
+                value = value / treelet_value
+            values.append(value)
+        values.sort()
+        values = list(reversed(values))
+        for i in range(num_workers):
+            data[idx, i] = values[i]
+
+    col_labels = range(num_workers)
+    fig = plt.figure(dpi=300)
+    ax = plt.subplot()
+    im, cbar = heatmap(data, row_labels, col_labels, ax=ax, aspect='auto')
+    return fig
+
+
+def plot_treelet_worker_rays(treelet_stats, worker_stats, metric, max_workers=15, normalized=False):
+    '''Plot distribution of treelet rays to workers'''
+    # Number of rows
+    treelet_ids = sorted([int(x) for x in list(treelet_stats.keys())])
+    # Number of columns
+    num_workers = min(len(worker_stats), max_workers)
+
+    data = np.zeros((len(treelet_ids), num_workers))
+    row_labels = []
+    for idx, treelet_id in enumerate(treelet_ids):
+        row_labels.append(treelet_id)
+        treelet_value = sum(treelet_stats[treelet_id][metric]) or 0.00001
+        values = []
+        for i in range(len(worker_stats)):
+            stats = worker_stats[i]
+            value = 0
+            if treelet_id in stats.treelet_stats:
+                value = sum([int(x) for x in stats.treelet_stats[treelet_id][metric]])
+            if normalized:
+                value = value / treelet_value
+            values.append(value)
+        values.sort()
+        values = list(reversed(values))
+        for i in range(num_workers):
+            data[idx, i] = values[i]
+
+    col_labels = range(num_workers)
     fig = plt.figure(dpi=300)
     ax = plt.subplot()
     im, cbar = heatmap(data, row_labels, col_labels, ax=ax, aspect='auto')
@@ -697,14 +800,33 @@ def plot_metrics(stats, path):
         plt.clf()
         print('Graphed least busy worker action heatmap.')
 
+    print('Graphing worker heatmaps...')
+    for metric in ['processedRays', 'receivedRays', 'sendingRays']:
+        plot_worker_heatmap(stats.worker_stats, metric)
+        plt.savefig(os.path.join(path, 'worker_heatmap_{:s}.png'.format(metric)))
+        plt.close(fig)
+        plt.clf()
+    print('Graphed worker heatmaps.')
+
     print('Aggregating treelet stats...')
     treelet_stats, timestamps = aggregate_treelet_stats(stats.worker_stats)
     print('Done aggregating treelet stats.')
-    plot_treelet_heatmap(treelet_stats, timestamps, 'sendingRays')
-    plt.savefig(os.path.join(path, 'treelet_sendingRays_heatmap.png'))
+    for metric in ['sendingRays', 'processedRays']:
+        plot_treelet_heatmap(treelet_stats, timestamps, metric)
+        plt.savefig(os.path.join(path, 'treelet_heatmap_{:s}.png'.format(metric)))
+        plt.close(fig)
+        plt.clf()
+    print('Graphed treelet heatmap.')
+
+    plot_treelet_worker_rays(treelet_stats, stats.worker_stats, 'processedRays', normalized=True)
+    plt.savefig(os.path.join(path, 'treelet_worker_processedRays_normalized.png'))
     plt.close(fig)
     plt.clf()
-    print('Graphed treelet heatmap.')
+    plot_treelet_worker_rays(treelet_stats, stats.worker_stats, 'processedRays')
+    plt.savefig(os.path.join(path, 'treelet_worker_processedRays.png'))
+    plt.close(fig)
+    plt.clf()
+    print('Graphed treelet-worker heatmap.')
 
     return
 
@@ -860,10 +982,10 @@ def main():
     parser.add_argument('--graph-path', default='graphs/',
                         help='Directory to write the generated graphs to.')
     args = parser.parse_args()
-
     #compare_model()
-    print('Reading diagnostics from {:s}...'.format(args.diagnostics_directory))
+    print('Reading diagnostics from {:s}...'.format(args.diagnostics_directory), end='')
     diagnostics = Stats(args.diagnostics_directory)
+    print()
     print('Done reading diagnostics.')
     if False:
         path = write_trace(stats, args.trace_path)
