@@ -856,7 +856,7 @@ int main(int argc, char *argv[]) {
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:twhd:a:R",
+        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:tw:hd:a:R",
                                     long_options, nullptr);
 
         if (opt == -1) {
