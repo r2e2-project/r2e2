@@ -18,7 +18,7 @@ using namespace std::chrono;
 using namespace PollerShortNames;
 
 ExecutionLoop::ExecutionLoop()
-    : signals_({SIGCHLD, SIGCONT, SIGHUP, SIGTERM, SIGQUIT}),
+    : signals_({SIGCHLD, SIGCONT, SIGHUP, SIGTERM, SIGQUIT, SIGINT}),
       signal_fd_(signals_) {
     signals_.set_as_mask();
 
@@ -504,6 +504,9 @@ Poller::Action::Result ExecutionLoop::handle_signal(
     case SIGTERM:
     case SIGQUIT:
         throw runtime_error("interrupted by signal");
+
+    case SIGINT:
+        return ResultType::Exit;
 
     default:
         throw runtime_error("unknown signal");

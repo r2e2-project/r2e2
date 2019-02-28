@@ -50,13 +50,6 @@ constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr milliseconds WRITE_STATS_INTERVAL{5'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
-class interrupt_error : public runtime_error {
-  public:
-    interrupt_error(const string &s) : runtime_error(s) {}
-};
-
-void sigint_handler(int) { throw interrupt_error("killed by interupt signal"); }
-
 shared_ptr<Sampler> loadSampler() {
     auto reader = global::manager.GetReader(ObjectType::Sampler);
     protobuf::Sampler proto_sampler;
@@ -630,19 +623,17 @@ void LambdaMaster::run() {
             });
     }
 
-    try {
-        while (true) {
-            auto res = loop.loop_once().result;
-            if (res != PollerResult::Success && res != PollerResult::Timeout)
-                break;
-        }
-    } catch (const interrupt_error &) {
+    while (true) {
+        auto res = loop.loop_once().result;
+        if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 
     if (config.diagnosticsDir.length()) {
         vector<storage::GetRequest> getRequests;
         for (const auto &workerkv : workers) {
             const auto &worker = workerkv.second;
+            worker.connection->socket().close();
+
             getRequests.emplace_back(
                 "logs/"s + to_string(worker.id) + ".DIAG",
                 config.diagnosticsDir + "/" + to_string(worker.id) + ".DIAG");
@@ -822,8 +813,6 @@ int main(int argc, char *argv[]) {
     if (argc <= 0) {
         abort();
     }
-
-    signal(SIGINT, sigint_handler);
 
     google::InitGoogleLogging(argv[0]);
 
