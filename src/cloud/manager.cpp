@@ -19,7 +19,7 @@ static_assert(
     "COUNT enum value for SceneManager Type must be the last entry in "
     "the enum declaration.");
 
-string SceneManager::ObjectKey::to_string() const {
+string ObjectKey::to_string() const {
     return SceneManager::getFileName(type, id);
 }
 
@@ -152,8 +152,7 @@ map<ObjectType, vector<SceneManager::Object>> SceneManager::listObjects() {
     return result;
 }
 
-map<SceneManager::ObjectKey, set<SceneManager::ObjectKey>>
-SceneManager::listObjectDependencies() {
+map<ObjectKey, set<ObjectKey>> SceneManager::listObjectDependencies() {
     if (!sceneFD.initialized()) {
         throw runtime_error("SceneManager is not initialized");
     }
@@ -185,7 +184,8 @@ void SceneManager::loadManifest() {
 vector<double> SceneManager::getTreeletProbs() const {
     vector<double> result;
 
-    ifstream fin{getScenePath() + "/" + getFileName(ObjectType::TreeletInfo, 0)};
+    ifstream fin{getScenePath() + "/" +
+                 getFileName(ObjectType::TreeletInfo, 0)};
 
     if (!fin.good()) {
         return {};

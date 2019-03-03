@@ -53,8 +53,6 @@ struct QueueStats {
 };
 
 struct WorkerStats {
-    using ObjectKey = SceneManager::ObjectKey;
-
     /* required stats */
     uint64_t _finishedPaths{0};
     RayStats aggregateStats;

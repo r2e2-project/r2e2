@@ -43,7 +43,6 @@ using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
-using ObjectKey = SceneManager::ObjectKey;
 
 constexpr milliseconds WORKER_REQUEST_INTERVAL{250};
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
@@ -497,8 +496,8 @@ bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
     const auto treeletId = request.treelet;
 
     /* let's see if we have a worker that has that treelet */
-    const SceneObjectInfo &info = sceneObjects.at(
-        SceneManager::ObjectKey{ObjectType::Treelet, treeletId});
+    const SceneObjectInfo &info =
+        sceneObjects.at(ObjectKey{ObjectType::Treelet, treeletId});
     if (info.workers.size() == 0) {
         return false;
     }

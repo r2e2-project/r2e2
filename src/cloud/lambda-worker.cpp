@@ -199,10 +199,8 @@ ResultType LambdaWorker::handleRayQueue() {
             const bool emptyVisit = newRay.toVisit.empty();
 
             if (newRay.isShadowRay) {
-                if (hit) {
-                    newRay.Ld = 0.f;
-                    finishedQueue.push_back(move(newRay));
-                } else if (emptyVisit) {
+                if (hit || emptyVisit) {
+                    newRay.Ld = hit ? 0.f : newRay.Ld;
                     finishedQueue.push_back(move(newRay));
                 } else {
                     processedRays.push_back(move(newRay));
@@ -231,19 +229,19 @@ ResultType LambdaWorker::handleRayQueue() {
 
         const TreeletId nextTreelet = ray.currentTreelet();
         workerStats.recordDemandedRay(
-            SceneManager::ObjectKey{ObjectType::Treelet, nextTreelet});
+            ObjectKey{ObjectType::Treelet, nextTreelet});
 
         if (treeletIds.count(nextTreelet)) {
             pushRayQueue(move(ray));
         } else {
             if (treeletToWorker.count(nextTreelet)) {
                 workerStats.recordSendingRay(
-                    SceneManager::ObjectKey{ObjectType::Treelet, nextTreelet});
+                    ObjectKey{ObjectType::Treelet, nextTreelet});
                 outQueue[nextTreelet].push_back(move(ray));
                 outQueueSize++;
             } else {
                 workerStats.recordPendingRay(
-                    SceneManager::ObjectKey{ObjectType::Treelet, nextTreelet});
+                    ObjectKey{ObjectType::Treelet, nextTreelet});
                 neededTreelets.insert(nextTreelet);
                 pendingQueue[nextTreelet].push_back(move(ray));
                 pendingQueueSize++;
@@ -286,7 +284,7 @@ ResultType LambdaWorker::handleOutQueue() {
 
                     outQueueSize--;
                     workerStats.recordSentRay(
-                        SceneManager::ObjectKey{ObjectType::Treelet, q.first});
+                        ObjectKey{ObjectType::Treelet, q.first});
 
                     const size_t len = rayStr.length() + 4;
                     if (len + packetLen > UDP_MTU_BYTES) {
@@ -463,8 +461,8 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
 void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
     vector<storage::GetRequest> requests;
-    for (const protobuf::ObjectKey& ObjectKey : objects.object_ids()) {
-        SceneManager::ObjectKey id = from_protobuf(ObjectKey);
+    for (const protobuf::ObjectKey& objectKey : objects.object_ids()) {
+        const ObjectKey id = from_protobuf(objectKey);
         if (id.type == ObjectType::TriangleMesh) {
             /* triangle meshes are packed into treelets, so ignore */
             continue;
@@ -472,38 +470,27 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
         if (id.type == ObjectType::Treelet) {
             treeletIds.insert(id.id);
         }
-        string filePath = id.to_string();
+        const string filePath = id.to_string();
         requests.emplace_back(filePath, filePath);
     }
     storageBackend->get(requests);
 }
 
 void LambdaWorker::pushRayQueue(RayState&& state) {
-    uint32_t treelet_id;
-    if (state.toVisit.size() > 0) {
-        treelet_id = state.toVisit.front().treelet;
-    } else {
-        treelet_id = state.hit.get().treelet;
-    }
     workerStats.recordWaitingRay(
-        SceneManager::ObjectKey{ObjectType::Treelet, treelet_id});
+        ObjectKey{ObjectType::Treelet, state.currentTreelet()});
     rayQueue.push_back(move(state));
 }
 
 RayState LambdaWorker::popRayQueue() {
     RayState state = move(rayQueue.front());
     rayQueue.pop_front();
-    uint32_t treeletID;
-    if (state.toVisit.size() > 0) {
-        treeletID = state.toVisit.front().treelet;
-    } else {
-        treeletID = state.hit.get().treelet;
-    }
+
     workerStats.recordProcessedRay(
-        SceneManager::ObjectKey{ObjectType::Treelet, treeletID});
+        ObjectKey{ObjectType::Treelet, state.currentTreelet()});
+
     return state;
 }
-
 
 bool LambdaWorker::processMessage(const Message& message) {
     /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
@@ -609,8 +596,8 @@ bool LambdaWorker::processMessage(const Message& message) {
                     pendingQueueSize -= treeletPending.size();
 
                     while (!treeletPending.empty()) {
-                        workerStats.recordSendingRay(SceneManager::ObjectKey{
-                            ObjectType::Treelet, treeletId});
+                        workerStats.recordSendingRay(
+                            ObjectKey{ObjectType::Treelet, treeletId});
                         treeletOut.push_back(move(treeletPending.front()));
                         treeletPending.pop_front();
                     }
@@ -628,12 +615,12 @@ bool LambdaWorker::processMessage(const Message& message) {
         while (!reader.eof()) {
             if (reader.read(&proto)) {
                 if (proto.to_visit_size() > 0) {
-                    SceneManager::ObjectKey treeletID{
-                        ObjectType::Treelet, proto.to_visit(0).treelet()};
+                    ObjectKey treeletID{ObjectType::Treelet,
+                                        proto.to_visit(0).treelet()};
                     workerStats.recordReceivedRay(treeletID);
                 } else {
-                    SceneManager::ObjectKey treeletID{ObjectType::Treelet,
-                                                      proto.hit().treelet()};
+                    ObjectKey treeletID{ObjectType::Treelet,
+                                        proto.hit().treelet()};
                     workerStats.recordReceivedRay(treeletID);
                 }
                 pushRayQueue(move(from_protobuf(proto)));

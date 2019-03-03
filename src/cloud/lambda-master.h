@@ -57,8 +57,6 @@ class LambdaMaster {
     std::string getSummary();
 
   private:
-    using ObjectKey = SceneManager::ObjectKey;
-
     struct SceneObjectInfo {
         SceneManager::ObjectID id;
         size_t size;

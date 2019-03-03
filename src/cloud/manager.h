@@ -11,6 +11,8 @@
 
 namespace pbrt {
 
+using ObjectID = size_t;
+
 enum class ObjectType {
     Treelet,
     TriangleMesh,
@@ -27,6 +29,20 @@ enum class ObjectType {
     COUNT
 };
 
+struct ObjectKey {
+    ObjectType type;
+    ObjectID id;
+
+    bool operator<(const ObjectKey& other) const {
+        if (type == other.type) {
+            return id < other.id;
+        }
+        return type < other.type;
+    }
+
+    std::string to_string() const;
+};
+
 class SceneManager {
   public:
     using ObjectID = size_t;
@@ -36,20 +52,6 @@ class SceneManager {
         off_t size;
 
         Object(const size_t id, const off_t size) : id(id), size(size) {}
-    };
-
-    struct ObjectKey {
-        ObjectType type;
-        ObjectID id;
-
-        bool operator<(const ObjectKey& other) const {
-            if (type == other.type) {
-                return id < other.id;
-            }
-            return type < other.type;
-        }
-
-        std::string to_string() const;
     };
 
     SceneManager() {}

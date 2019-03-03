@@ -286,7 +286,7 @@ protobuf::TextureParams to_protobuf(const TextureParams& texture_params) {
     return params;
 }
 
-protobuf::ObjectKey to_protobuf(const SceneManager::ObjectKey& ObjectKey) {
+protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey) {
     protobuf::ObjectKey proto;
     proto.set_type(to_underlying(ObjectKey.type));
     proto.set_id(ObjectKey.id);
@@ -641,9 +641,8 @@ TextureParams from_protobuf(
     return TextureParams(geom_params, material_params, fTex, sTex);
 }
 
-SceneManager::ObjectKey from_protobuf(const protobuf::ObjectKey& ObjectKey) {
-    return SceneManager::ObjectKey{static_cast<ObjectType>(ObjectKey.type()),
-                                   ObjectKey.id()};
+ObjectKey from_protobuf(const protobuf::ObjectKey& objectKey) {
+    return ObjectKey{static_cast<ObjectType>(objectKey.type()), objectKey.id()};
 }
 
 protobuf::Light light::to_protobuf(const string& name, const ParamSet& params,
