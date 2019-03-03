@@ -614,15 +614,13 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         while (!reader.eof()) {
             if (reader.read(&proto)) {
+                ObjectKey treeletID;
                 if (proto.to_visit_size() > 0) {
-                    ObjectKey treeletID{ObjectType::Treelet,
-                                        proto.to_visit(0).treelet()};
-                    workerStats.recordReceivedRay(treeletID);
+                    treeletID = {ObjectType::Treelet, proto.to_visit(0).treelet()};
                 } else {
-                    ObjectKey treeletID{ObjectType::Treelet,
-                                        proto.hit().treelet()};
-                    workerStats.recordReceivedRay(treeletID);
+                    treeletID = {ObjectType::Treelet, proto.hit().treelet()};
                 }
+                workerStats.recordReceivedRay(treeletID);
                 pushRayQueue(move(from_protobuf(proto)));
             }
         }
