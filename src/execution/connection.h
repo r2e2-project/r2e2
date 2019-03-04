@@ -117,37 +117,13 @@ class UDPConnection {
     void enqueue_datagram(PacketData&& packet);
 
     // How many microseconds are we ahead of our pace?
-    int64_t micros_ahead_of_pace() const {
-        if (!pacing_) return -1;
-        auto now = std::chrono::steady_clock::now();
-        int64_t elapsed_micros =
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                now - rate_reference_pt_)
-                .count();
-        int64_t elapsed_micros_if_at_pace =
-            bits_since_reference_ / rate_Mb_per_s_;
-        return elapsed_micros_if_at_pace - elapsed_micros;
-    }
-
+    int64_t micros_ahead_of_pace() const;
     bool within_pace() { return micros_ahead_of_pace() <= 0; }
 
     bool queue_empty() { return outgoing_datagrams_.empty(); }
-
-    const PacketData& queue_front() const { return outgoing_datagrams_.top(); }
-
-    void queue_pop() {
-        if (pacing_) {
-            const PacketData& sent = outgoing_datagrams_.top();
-            bits_since_reference_ += sent.data.length() * 8;
-            if (std::chrono::steady_clock::now() >=
-                rate_reference_pt_ + reference_reset_time_) {
-                reset_reference();
-            }
-        }
-        outgoing_datagrams_.pop();
-    }
-
+    void queue_pop();
     size_t queue_size() { return outgoing_datagrams_.size(); }
+    const PacketData& queue_front() const { return outgoing_datagrams_.top(); }
 
     UDPSocket& socket() { return socket_; }
 
@@ -155,11 +131,7 @@ class UDPConnection {
     size_t bytes_received{0};
 
   private:
-    void reset_reference() {
-        if (!pacing_) return;
-        rate_reference_pt_ = std::chrono::steady_clock::now();
-        bits_since_reference_ = 0;
-    }
+    void reset_reference();
 };
 
 using TCPConnection = Connection<TCPSocket>;

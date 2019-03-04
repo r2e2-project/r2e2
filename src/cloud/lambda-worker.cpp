@@ -616,7 +616,8 @@ bool LambdaWorker::processMessage(const Message& message) {
             if (reader.read(&proto)) {
                 ObjectKey treeletID;
                 if (proto.to_visit_size() > 0) {
-                    treeletID = {ObjectType::Treelet, proto.to_visit(0).treelet()};
+                    treeletID = {ObjectType::Treelet,
+                                 proto.to_visit(0).treelet()};
                 } else {
                     treeletID = {ObjectType::Treelet, proto.hit().treelet()};
                 }
