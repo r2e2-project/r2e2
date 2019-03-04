@@ -29,8 +29,7 @@ class LambdaWorker {
   public:
     LambdaWorker(const std::string& coordinatorIP,
                  const uint16_t coordinatorPort,
-                 const std::string& storageBackendUri,
-                 const bool sendReliably);
+                 const std::string& storageBackendUri, const bool sendReliably);
 
     void run();
     void terminate() { terminated = true; }
@@ -52,6 +51,14 @@ class LambdaWorker {
             : id(id), address(std::move(addr)) {}
     };
 
+    struct RayPacket {
+        size_t rayCount;
+        std::string data;
+
+        RayPacket(const size_t rayCount, std::string&& data)
+            : rayCount(rayCount), data(std::move(data)) {}
+    };
+
     bool processMessage(const meow::Message& message);
     void initializeScene();
 
@@ -66,6 +73,9 @@ class LambdaWorker {
     Poller::Action::Result::Type handlePeers();
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleNeededTreelets();
+
+    Poller::Action::Result::Type handleUdpSend();
+    Poller::Action::Result::Type handleUdpReceive();
 
     Poller::Action::Result::Type handleWorkerStats();
     Poller::Action::Result::Type handleDiagnostics();
@@ -94,7 +104,6 @@ class LambdaWorker {
     UniqueDirectory workingDirectory;
     std::unique_ptr<StorageBackend> storageBackend;
     std::shared_ptr<TCPConnection> coordinatorConnection;
-    std::shared_ptr<UDPConnection> udpConnection;
     meow::MessageParser messageParser{};
     meow::MessageParser tcpMessageParser{};
     Optional<WorkerId> workerId;
@@ -102,6 +111,12 @@ class LambdaWorker {
     int32_t mySeed;
     bool peerRequested{false};
     std::string outputName;
+
+    /* Sending rays to other nodes */
+    UDPConnection udpConnection{true};
+    std::deque<std::pair<Address, std::string>> servicePackets{};
+    std::map<TreeletId, std::deque<RayPacket>> rayPackets{};
+    size_t rayPacketsSize{0};
 
     /* Scene Data */
     bool initialized{false};
@@ -111,7 +126,7 @@ class LambdaWorker {
     std::shared_ptr<Sampler> sampler{};
     std::unique_ptr<Scene> fakeScene{};
     std::vector<std::shared_ptr<Light>> lights{};
-    std::shared_ptr<CloudBVH> bvh{};
+    std::shared_ptr<CloudBVH> bvh;
     std::set<uint32_t> treeletIds{};
     MemoryArena arena;
 

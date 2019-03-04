@@ -76,9 +76,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                        << endl;
 
     PbrtOptions.nThreads = 1;
-    manager.init(".");
-
     bvh = make_shared<CloudBVH>();
+    manager.init(".");
 
     srand(time(nullptr));
     do {
@@ -101,14 +100,19 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { LOG(INFO) << "Connection to coordinator failed."; },
         [this]() { this->terminate(); });
 
-    udpConnection = loop.make_udp_connection(
-        [this](shared_ptr<UDPConnection>, Address&& addr, string&& data) {
-            RECORD_INTERVAL("parseUDP");
-            this->messageParser.parse(data);
-            return true;
+    loop.poller().add_action(Poller::Action(
+        udpConnection.socket(), Direction::Out,
+        bind(&LambdaWorker::handleUdpSend, this),
+        [this]() {
+            return (!servicePackets.empty() || !rayPackets.empty()) &&
+                   udpConnection.within_pace();
         },
-        []() { LOG(INFO) << "UDP connection to coordinator failed."; },
-        [this]() { this->terminate(); }, true);
+        []() { throw runtime_error("udp out failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        udpConnection.socket(), Direction::In,
+        bind(&LambdaWorker::handleUdpReceive, this), [this]() { return true; },
+        []() { throw runtime_error("udp in failed"); }));
 
     /* trace rays */
     loop.poller().add_action(Poller::Action(
@@ -258,15 +262,15 @@ ResultType LambdaWorker::handleOutQueue() {
     for (auto& q : outQueue) {
         if (q.second.empty()) continue;
 
-        auto& workerCandidates = treeletToWorker[q.first];
-        auto& peer = peers.at(
-            *random::sample(workerCandidates.begin(), workerCandidates.end()));
+        const auto treeletId = q.first;
+        auto& outRays = q.second;
 
         string unpackedRay;
 
-        while (!q.second.empty() || !unpackedRay.empty()) {
+        while (!outRays.empty() || !unpackedRay.empty()) {
             ostringstream oss;
             size_t packetLen = 5;
+            size_t rayCount = 0;
 
             {
                 protobuf::RecordWriter writer{&oss};
@@ -274,17 +278,18 @@ ResultType LambdaWorker::handleOutQueue() {
                 if (!unpackedRay.empty()) {
                     writer.write(unpackedRay);
                     unpackedRay.clear();
+                    rayCount++;
                 }
 
-                while (packetLen < UDP_MTU_BYTES && !q.second.empty()) {
-                    RayState ray = move(q.second.front());
-                    q.second.pop_front();
+                while (packetLen < UDP_MTU_BYTES && !outRays.empty()) {
+                    RayState ray = move(outRays.front());
+                    outRays.pop_front();
+                    outQueueSize--;
 
                     string rayStr = protoutil::to_string(to_protobuf(ray));
 
-                    outQueueSize--;
                     workerStats.recordSentRay(
-                        ObjectKey{ObjectType::Treelet, q.first});
+                        ObjectKey{ObjectType::Treelet, treeletId});
 
                     const size_t len = rayStr.length() + 4;
                     if (len + packetLen > UDP_MTU_BYTES) {
@@ -294,15 +299,15 @@ ResultType LambdaWorker::handleOutQueue() {
 
                     packetLen += len;
                     writer.write(rayStr);
+                    rayCount++;
                 }
             }
 
             oss.flush();
             Message message{OpCode::SendRays, oss.str()};
             auto messageStr = message.str();
-            udpConnection->enqueue_datagram(
-                peer.address, move(messageStr), PacketPriority::Normal,
-                sendReliably ? PacketType::Reliable : PacketType::Unreliable);
+            rayPackets[treeletId].emplace_back(rayCount, move(messageStr));
+            rayPacketsSize++;
         }
     }
 
@@ -326,8 +331,7 @@ ResultType LambdaWorker::handlePeers() {
         switch (peer.state) {
         case Worker::State::Connecting: {
             auto message = createConnectionRequest(peer);
-            udpConnection->enqueue_datagram(peer.address, message.str(),
-                                            PacketPriority::High);
+            servicePackets.emplace_back(peer.address, message.str());
             peer.tries++;
             break;
         }
@@ -376,6 +380,55 @@ ResultType LambdaWorker::handleNeededTreelets() {
     return ResultType::Continue;
 }
 
+ResultType LambdaWorker::handleUdpSend() {
+    RECORD_INTERVAL("sendUDP");
+
+    /* we always send service packets first */
+    auto sendUdpPacket = [this](const Address& peer, const string& payload) {
+        udpConnection.bytes_sent += payload.length();
+        udpConnection.socket().sendto(peer, payload);
+        udpConnection.record_send(payload.length());
+    };
+
+    if (!servicePackets.empty()) {
+        auto& datagram = servicePackets.front();
+        sendUdpPacket(datagram.first, datagram.second);
+        servicePackets.pop_front();
+        return ResultType::Continue;
+    }
+
+    /* packet to send */
+    auto queue = rayPackets.begin();
+    const TreeletId treeletId = queue->first;
+    deque<RayPacket>& packets = queue->second;
+    RayPacket& packet = packets.front();
+
+    /* peer to send the packet to */
+    auto& peerCandidates = treeletToWorker[treeletId];
+    auto& peer =
+        peers.at(*random::sample(peerCandidates.begin(), peerCandidates.end()));
+
+    sendUdpPacket(peer.address, packet.data);
+    packets.pop_front();
+    rayPacketsSize--;
+
+    if (packets.empty()) rayPackets.erase(treeletId);
+
+    return ResultType::Continue;
+}
+
+ResultType LambdaWorker::handleUdpReceive() {
+    RECORD_INTERVAL("receiveUDP");
+
+    auto datagram = udpConnection.socket().recvfrom();
+    auto& data = datagram.second;
+    udpConnection.bytes_received += data.length();
+
+    messageParser.parse(data);
+
+    return ResultType::Continue;
+}
+
 ResultType LambdaWorker::handleWorkerStats() {
     RECORD_INTERVAL("handleWorkerStats");
     workerStatsTimer.reset();
@@ -390,7 +443,7 @@ ResultType LambdaWorker::handleWorkerStats() {
             return peer.second.state == Worker::State::Connecting;
         });
     qStats.connected = peers.size() - qStats.connecting;
-    qStats.outstandingUdp = this->udpConnection->queue_size();
+    qStats.outstandingUdp = rayPacketsSize;
 
     auto proto = to_protobuf(workerStats);
     Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
@@ -404,15 +457,14 @@ ResultType LambdaWorker::handleDiagnostics() {
     workerDiagnosticsTimer.reset();
 
     workerDiagnostics.bytesSent =
-        this->udpConnection->bytes_sent - lastDiagnostics.bytesSent;
+        udpConnection.bytes_sent - lastDiagnostics.bytesSent;
 
     workerDiagnostics.bytesReceived =
-        this->udpConnection->bytes_received - lastDiagnostics.bytesReceived;
+        udpConnection.bytes_received - lastDiagnostics.bytesReceived;
 
-    workerDiagnostics.outstandingUdp = this->udpConnection->queue_size();
-
-    lastDiagnostics.bytesSent = this->udpConnection->bytes_sent;
-    lastDiagnostics.bytesReceived = this->udpConnection->bytes_received;
+    workerDiagnostics.outstandingUdp = rayPacketsSize;
+    lastDiagnostics.bytesSent = udpConnection.bytes_sent;
+    lastDiagnostics.bytesReceived = udpConnection.bytes_received;
 
     const auto timestamp =
         duration_cast<microseconds>(now() - workerDiagnostics.startTime)
@@ -507,10 +559,8 @@ bool LambdaWorker::processMessage(const Message& message) {
         peers.emplace(0, Worker{0, move(addrCopy)});
 
         /* send connection request */
-        Message connRequest = createConnectionRequest(peers.at(0));
-        udpConnection->enqueue_datagram(coordinatorAddr, connRequest.str(),
-                                        PacketPriority::High);
-
+        Message message = createConnectionRequest(peers.at(0));
+        servicePackets.emplace_back(coordinatorAddr, message.str());
         break;
     }
 
@@ -562,8 +612,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         auto& peer = peers.at(otherWorkerId);
         auto message = createConnectionResponse(peer);
-        udpConnection->enqueue_datagram(peer.address, message.str(),
-                                        PacketPriority::High);
+        servicePackets.emplace_back(peer.address, message.str());
         break;
     }
 

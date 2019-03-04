@@ -228,20 +228,15 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
     const function<bool(shared_ptr<UDPConnection>, Address &&, string &&)>
         &data_callback,
     const function<void()> &error_callback,
-    const function<void()> &close_callback, const bool pacing) {
-    UDPSocket socket;
-    socket.set_blocking(false);
+    const function<void()> &close_callback) {
+    auto conn_it = udp_connections_.emplace(udp_connections_.end(),
+                                            make_shared<UDPConnection>(false));
 
-    auto connection_it = udp_connections_.emplace(
-        udp_connections_.end(),
-        make_shared<UDPConnection>(move(socket), pacing));
+    shared_ptr<UDPConnection> &connection = *conn_it;
 
-    shared_ptr<UDPConnection> &connection = *connection_it;
-
-    auto real_close_callback = [connection_it, cc = move(close_callback),
-                                this]() {
+    auto real_close_callback = [conn_it, cc = move(close_callback), this]() {
         cc();
-        remove_connection<UDPConnection>(connection_it);
+        remove_connection<UDPConnection>(conn_it);
     };
 
     auto fderror_callback = [error_callback, real_close_callback] {
@@ -255,42 +250,7 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
          close_callback{move(real_close_callback)}]() {
             auto datagram = connection->socket_.recvfrom();
             auto &data = datagram.second;
-
             connection->bytes_received += data.length();
-
-            if (data.length() > 0) {
-                Chunk chunk(data);
-                auto first_byte = static_cast<PacketType>(chunk.octet());
-
-                chunk = chunk(1);
-
-                switch (first_byte) {
-                case PacketType::Unreliable:
-                    data = data.substr(1);
-                    break;
-
-                case PacketType::Reliable: {
-                    if (chunk.size() >= 8) {
-                        connection->to_be_acked_[datagram.first].push_back(
-                            chunk.be64());
-                        data = data.substr(9);
-                    }
-
-                    break;
-                }
-
-                case PacketType::Ack:
-                    while (chunk.size()) {
-                        connection->received_acks_.insert(chunk.be64());
-                        chunk = chunk(8);
-                    }
-
-                    return ResultType::Continue;
-
-                default:
-                    throw runtime_error("invalid packet");
-                }
-            }
 
             if (not data_callback(connection, move(datagram.first),
                                   move(data))) {
@@ -305,82 +265,16 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
     poller_.add_action(Poller::Action(
         connection->socket_, Direction::Out,
         [connection]() {
-            auto &datagram = connection->queue_front();
-            connection->bytes_sent += datagram.data.length();
-            connection->socket_.sendto(datagram.destination, datagram.data);
-
-            if (!datagram.data.empty() and
-                datagram.data[0] == to_underlying(PacketType::Reliable)) {
-                connection->outstanding_packets_.emplace_back(
-                    make_pair(steady_clock::now() + 10s, move(datagram)));
-            }
-
-            connection->queue_pop();
+            auto &datagram = connection->packet_queue_.front();
+            connection->bytes_sent += datagram.second.length();
+            connection->socket_.sendto(datagram.first, datagram.second);
+            connection->packet_queue_.pop();
             return ResultType::Continue;
         },
-        [connection] {
-            return (not connection->queue_empty()) and
-                   connection->within_pace();
-        },
+        [connection] { return not connection->packet_queue_.empty(); },
         fderror_callback));
 
-    poller_.add_action(Poller::Action(
-        connection->ackHandleTimer.fd, Direction::In,
-        [connection]() {
-            RECORD_INTERVAL("handleAcks");
-            connection->ackHandleTimer.reset();
-
-            // sending acknowledgements
-            for (auto &ackkv : connection->to_be_acked_) {
-                string ack;
-
-                for (size_t i = 0; i < ackkv.second.size(); i++) {
-                    ack += put_field(ackkv.second[i]);
-
-                    if (ack.length() >= 1'400 or i == ackkv.second.size() - 1) {
-                        connection->enqueue_datagram(ackkv.first, move(ack),
-                                                     PacketPriority::High,
-                                                     PacketType::Ack);
-
-                        ack = {};
-                    }
-                }
-            }
-
-            connection->to_be_acked_.clear();
-
-            // processing received acks
-            if (connection->received_acks_.empty() or
-                connection->outstanding_packets_.empty()) {
-                return ResultType::Continue;
-            }
-
-            const auto now = steady_clock::now();
-            while (connection->outstanding_packets_.size() and
-                   connection->outstanding_packets_.front().first <= now) {
-                auto &packet = connection->outstanding_packets_.front().second;
-
-                if (!connection->received_acks_.count(packet.sequence_number)) {
-                    connection->enqueue_datagram(move(packet));
-                } else {
-                    connection->received_acks_.erase(packet.sequence_number);
-                }
-
-                connection->outstanding_packets_.pop_front();
-            }
-
-            return ResultType::Continue;
-        },
-        [connection] {
-            return connection->to_be_acked_.size() or
-                   (connection->received_acks_.size() and
-                    connection->outstanding_packets_.size() and
-                    connection->outstanding_packets_.front().first <=
-                        steady_clock::now());
-        },
-        fderror_callback));
-
-    return *connection_it;
+    return *conn_it;
 }
 
 template <class ConnectionType>
