@@ -19,6 +19,7 @@ namespace meow {
       Hey = 0x1,
       Ping,
       Pong,
+      Ack,
       GetObjects,
       GenerateRays,
       GetWorker,
@@ -38,6 +39,7 @@ namespace meow {
         "Hey",
         "Ping",
         "Pong",
+        "Ack",
         "GetObjects",
         "GenerateRays",
         "GetWorker",
@@ -50,14 +52,19 @@ namespace meow {
         "Bye"};
 
   private:
+    bool reliable_ { false };
+    uint64_t sequence_number_ { 0 };
     uint32_t payload_length_ { 0 };
     OpCode opcode_ { OpCode::Hey };
     std::string payload_ {};
 
   public:
     Message( const Chunk & chunk );
-    Message( const OpCode opcode, std::string && payload );
+    Message( const OpCode opcode, std::string && payload,
+             const uint64_t sequence_number = 0, const bool reliable = false );
 
+    bool reliable() const { return reliable_; }
+    uint64_t sequence_number() const { return sequence_number_; }
     OpCode opcode() const { return opcode_; }
     uint32_t payload_length() const { return payload_length_; }
     const std::string & payload() const { return payload_; }

@@ -4,6 +4,8 @@
 
 using namespace std;
 
+string put_field(const bool n) { return n ? "\x01" : "\x00"; }
+
 string put_field(const uint64_t n) {
     const uint64_t network_order = htobe64(n);
     return string(reinterpret_cast<const char *>(&network_order),

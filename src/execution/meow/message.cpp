@@ -16,22 +16,29 @@ constexpr char const* Message::OPCODE_NAMES[to_underlying(Message::OpCode::COUNT
 
 Message::Message( const Chunk & chunk )
 {
-  if ( chunk.size() < 5 ) {
+  if ( chunk.size() < 14 ) {
     throw out_of_range( "incomplete header" );
   }
-  payload_length_ = chunk( 0, 4 ).be32();
-  opcode_ = static_cast<OpCode>( chunk( 4, 1 ).octet() );
-  payload_ = chunk( 5 ).to_string();
+
+  reliable_ = chunk( 0, 1 ).octet();
+  sequence_number_ = chunk( 1, 8 ).be64();
+  payload_length_ = chunk( 9, 4 ).be32();
+  opcode_ = static_cast<OpCode>( chunk( 13, 1 ).octet() );
+  payload_ = chunk( 14 ).to_string();
 }
 
-Message::Message( const OpCode opcode, string && payload )
-  : payload_length_( payload.length() ), opcode_( opcode ),
+Message::Message( const OpCode opcode, string && payload,
+                  const uint64_t sequence_number, const bool reliable )
+  : reliable_(reliable), sequence_number_( sequence_number ),
+    payload_length_( payload.length() ), opcode_( opcode ),
     payload_( move( payload ) )
 {}
 
 string Message::str() const
 {
   string output;
+  output += put_field( reliable_ );
+  output += put_field( sequence_number_ );
   output += put_field( payload_length_ );
   output += to_underlying( opcode_ );
   output += payload_;
@@ -41,7 +48,7 @@ string Message::str() const
 
 uint32_t Message::expected_length( const Chunk & chunk )
 {
-  return 5 + ( ( chunk.size() < 5 ) ? 0 : chunk( 0, 4 ).be32() );
+  return 14 + ( ( chunk.size() < 14 ) ? 0 : chunk( 0, 4 ).be32() );
 }
 
 void MessageParser::parse( const string & buf )
