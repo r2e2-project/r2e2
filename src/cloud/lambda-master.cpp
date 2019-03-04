@@ -324,6 +324,12 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                 this->config.workerStatsDir + "/" + to_string(workerIt->first) +
                     ".STATS",
                 ios::out | ios::trunc);
+
+            workerIt->second.statsOstream
+                << "start "
+                << duration_cast<microseconds>(startTime.time_since_epoch())
+                       .count()
+                << endl;
         }
 
         /* assigns the minimal necessary scene objects for working with a
