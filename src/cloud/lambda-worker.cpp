@@ -567,6 +567,8 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             state.remainingBounces = maxDepth;
             state.StartTrace();
 
+            workerStats.recordDemandedRay(ObjectKey{ObjectType::Treelet, 0});
+
             pushRayQueue(move(state));
         }
     }
