@@ -735,15 +735,10 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         while (!reader.eof()) {
             if (reader.read(&proto)) {
-                ObjectKey treeletID;
-                if (proto.to_visit_size() > 0) {
-                    treeletID = {ObjectType::Treelet,
-                                 proto.to_visit(0).treelet()};
-                } else {
-                    treeletID = {ObjectType::Treelet, proto.hit().treelet()};
-                }
+                RayState ray = from_protobuf(proto);
+                ObjectKey treeletID{ObjectType::Treelet, ray.currentTreelet()};
                 workerStats.recordReceivedRay(treeletID);
-                pushRayQueue(move(from_protobuf(proto)));
+                pushRayQueue(move(ray));
             }
         }
 
