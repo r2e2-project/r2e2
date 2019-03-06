@@ -24,6 +24,8 @@ from concurrent.futures import ThreadPoolExecutor
 from matplotlib.colors import LogNorm
 from PIL import Image
 from typing import List
+from multiprocessing import Pool
+from functools import partial
 sns.set_style("ticks", {'axes.grid': True})
 TREELET_TYPE = 0
 
@@ -116,6 +118,9 @@ class WorkerStats(object):
         stat_keys = set()
         self.timestamps = []
         with open(file_path, 'r') as f:
+            _, start_timestamp = f.readline().strip().split(' ')
+            self.start_timestamp = int(start_timestamp)
+
             prev_timestamp = None
             for line in f:
                 split_line  = line.strip().split(' ')
@@ -159,41 +164,61 @@ class WorkerStats(object):
                         v = 0
                     ll.append(v)
 
+def _load_fn(diagnostics_directory, path):
+    diag = None
+    if path.endswith('DIAG'):
+        diag = WorkerDiagnostics(int(path[:path.find('.DIAG')]),
+                                 os.path.join(diagnostics_directory, path))
+    stats = None
+    if path.endswith('STATS'):
+        stats = WorkerStats(int(path[:path.find('.STATS')]),
+                            os.path.join(diagnostics_directory, path))
+    print('.', end='', flush=True)
+    return diag, stats
 
 class Stats(object):
     def __init__(self, diagnostics_directory : str):
         worker_files = os.listdir(diagnostics_directory)
         self.worker_diagnostics = []
         self.worker_stats = []
-        for path in worker_files[:60]:
-            if path.endswith('DIAG'):
-                self.worker_diagnostics.append(
-                    WorkerDiagnostics(int(path[:path.find('.DIAG')]),
-                                      os.path.join(diagnostics_directory, path)))
-            if path.endswith('STATS'):
-                self.worker_stats.append(
-                    WorkerStats(int(path[:path.find('.STATS')]),
-                                os.path.join(diagnostics_directory, path)))
-            print('.', end='', flush=True)
+        with Pool() as p:
+            results = p.map(partial(_load_fn, diagnostics_directory), worker_files)
+            for d, s in results:
+                if d:
+                    self.worker_diagnostics.append(d)
+                if s:
+                    self.worker_stats.append(s)
 
     def write_csv(self, path: str):
-        quanta = 1.0 * 1e9 # seconds -> nanoseconds
+        quanta = 2.0 * 1e6 # seconds -> microseconds
         start_timestamp = self.worker_stats[0].start_timestamp
         end_timestamp = 0
         for stats in self.worker_stats:
             start_ts = stats.start_timestamp
-            start_timestamp = min(start_timestamp, start_ts)
             end_ts = start_ts + stats.timestamps[-1]
+            if start_ts < start_timestamp or end_ts > end_timestamp:
+                print('Current min {:d}, max {:d}'.format(start_timestamp, end_timestamp))
+                print('Worker id {:d}, min {:d}, max {:d}, path {:s}'.format(stats.idx,
+                                                                  start_ts, end_ts, stats.path))
+            start_timestamp = min(start_timestamp, start_ts)
             end_timestamp = max(end_timestamp, end_ts)
 
         for diag in self.worker_diagnostics:
             start_ts = diag.start_timestamp
-            start_timestamp = min(start_timestamp, start_ts)
             end_ts = start_ts + stats.timestamps[-1]
+            if start_ts < start_timestamp or end_ts > end_timestamp:
+                print('Current min {:d}, max {:d}'.format(start_timestamp, end_timestamp))
+                print('Worker id {:d}, min {:d}, max {:d}, path {:s}'.format(diag.idx,
+                                                                             start_ts, end_ts, diag.path))
+            start_timestamp = min(start_timestamp, start_ts)
             end_timestamp = max(end_timestamp, end_ts)
 
         total_duration = end_timestamp - start_timestamp
         num_timepoints = int(math.ceil(total_duration / quanta))
+        print('Time bounds: ({:f}, {:f}), {:f} seconds'.format(start_timestamp * 1e-6,  end_timestamp * 1e-6,
+                                                         total_duration * 1e-6))
+        print('Quantizing to {:2f} second interval'.format(quanta * 1e-6))
+        print('# timepoints:', num_timepoints)
 
         # Pre-process data to fixed quantization
         #fieldnames = ['workerID', 'treeletID', 'timestamp',
@@ -207,37 +232,46 @@ class Stats(object):
         # rays processed,  rays generated, etc
         per_worker_treelet_data = {}
         csv_data = {}
+        print('Quantizing worker stats', end='', flush=True)
         for stats in self.worker_stats:
             min_timestamp = stats.start_timestamp
             max_timestamp = min_timestamp + stats.timestamps[-1]
             # Get the treelet fields and quantize to global time scale
             treelet_rows = defaultdict(lambda: defaultdict(list))
-            for treelet_id, treelet_stats in stats.treelet_stats:
+            for treelet_id, treelet_stats in stats.treelet_stats.items():
                 for field, key in [('processedRays', 'raysProcessed'),
                                    ('waitingRays', 'raysWaiting'),
                                    ('demandedRays', 'raysGenerated'),
                                    ('sendingRays', 'raysSending'),
                                    ('receivedRays', 'raysReceived')]:
-                    _, quantized_data = quantize_sequence(
-                        stats.timestamps, treelet_stats[field], quanta,
+                    quantized_timestamps, quantized_data = quantize_sequence(
+                        [min_timestamp + x for x in  stats.timestamps], treelet_stats[field],
+                        quanta,
                         start=start_timestamp, end=end_timestamp)
+                    # print('Field', field)
+                    # print('Timepoints', [min_timestamp + x for x in  stats.timestamps])
+                    # print('Data', treelet_stats[field])
+                    # print('Key', key)
+                    # print('Timepoints', quantized_timestamps)
+                    # print('Data', quantized_data)
                     treelet_rows[treelet_id][key] = quantized_data
             # Insert rows into per_worker_treelet_data
-            for treelet_id, _ in stats.treelet_stats:
+            for treelet_id, _ in stats.treelet_stats.items():
                 for i in range(num_timepoints):
                     timepoint = start_timestamp + quanta * i
                     data = {
-                        'workerID': tstats.tidx,
+                        'workerID': stats.idx,
                         'treeletID': treelet_id,
                         'timestamp': timepoint,
                     }
-                    for k, v in treelet_rows[treelet_id]:
+                    for k, v in treelet_rows[treelet_id].items():
                         data[k] = v[i]
-                    per_worker_treelet_data[(stats.tidx, treelet_id, timepoint)] = data
-                
+                    per_worker_treelet_data[(stats.idx, treelet_id, timepoint)] = data
+            print('.', end='', flush=True)
+        print()
 
         for diag in self.worker_diagnostics:
-            for treelet_id, treelet_stats in stats.treelet_stats:
+            for treelet_id, treelet_stats in stats.treelet_stats.items():
                 for tidx in range(num_timepoints):
                     # tracingRaysTime
                     timestamp = tidx * quanta
@@ -245,9 +279,11 @@ class Stats(object):
 
         print('Writing {:s}...'.format(path))
         with open(path, 'w', newline='') as csvfile:
-            writer  = csv.Dictwriter(csvfile, fieldnames=fieldnames)
-            for k, v in per_worker_treelet_data:
+            writer  = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for k, v in per_worker_treelet_data.items():
                 writer.writerow(v)
+        print('Wrote {:s}.'.format(path))
 
 
 class Constants(object):
