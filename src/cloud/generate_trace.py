@@ -7,6 +7,7 @@ import os
 import argparse
 import pint
 import math
+import csv
 
 U = pint.UnitRegistry()
 
@@ -57,7 +58,7 @@ class WorkerDiagnostics(object):
         self.top_level_actions = set()
         with open(file_path, 'r') as f:
             _, start_timestamp = f.readline().strip().split(' ')
-            self.start = int(start_timestamp)
+            self.start_timestamp = int(start_timestamp)
 
             for line in f:
                 timestamp, json_data = line.strip().split(' ')
@@ -115,6 +116,7 @@ class WorkerStats(object):
         stat_keys = set()
         self.timestamps = []
         with open(file_path, 'r') as f:
+            prev_timestamp = None
             for line in f:
                 split_line  = line.strip().split(' ')
                 if len(split_line) < 2:
@@ -135,8 +137,13 @@ class WorkerStats(object):
                     if typ != TREELET_TYPE:
                         continue
                     for k, v in stats.items():
-                        treelet_stats[typ_id][k][timestamp] = v
+                        prev_v = 0
+                        if (prev_timestamp is not None and
+                            prev_timestamp in treelet_stats[typ_id][k]):
+                            prev_v = treelet_stats[typ_id][k][prev_timestamp]
+                        treelet_stats[typ_id][k][timestamp] = float(v) - prev_v
                         stat_keys.add(k)
+                prev_timestamp = int(timestamp)
 
         self.treelet_stats = {}
         for treelet_id in treelet_stats.keys():
@@ -158,7 +165,7 @@ class Stats(object):
         worker_files = os.listdir(diagnostics_directory)
         self.worker_diagnostics = []
         self.worker_stats = []
-        for path in worker_files:
+        for path in worker_files[:60]:
             if path.endswith('DIAG'):
                 self.worker_diagnostics.append(
                     WorkerDiagnostics(int(path[:path.find('.DIAG')]),
@@ -168,6 +175,79 @@ class Stats(object):
                     WorkerStats(int(path[:path.find('.STATS')]),
                                 os.path.join(diagnostics_directory, path)))
             print('.', end='', flush=True)
+
+    def write_csv(self, path: str):
+        quanta = 1.0 * 1e9 # seconds -> nanoseconds
+        start_timestamp = self.worker_stats[0].start_timestamp
+        end_timestamp = 0
+        for stats in self.worker_stats:
+            start_ts = stats.start_timestamp
+            start_timestamp = min(start_timestamp, start_ts)
+            end_ts = start_ts + stats.timestamps[-1]
+            end_timestamp = max(end_timestamp, end_ts)
+
+        for diag in self.worker_diagnostics:
+            start_ts = diag.start_timestamp
+            start_timestamp = min(start_timestamp, start_ts)
+            end_ts = start_ts + stats.timestamps[-1]
+            end_timestamp = max(end_timestamp, end_ts)
+
+        total_duration = end_timestamp - start_timestamp
+        num_timepoints = int(math.ceil(total_duration / quanta))
+
+        # Pre-process data to fixed quantization
+        #fieldnames = ['workerID', 'treeletID', 'timestamp',
+        #              'tracingRaysTime', 'idleTime',
+        #              'raysWaiting', 'raysProcessed', 'raysGenerated', 'raysSending', 'raysReceived',
+        #              'bandwidthIn', 'bandwidthOut']
+        fieldnames = ['workerID', 'treeletID', 'timestamp',
+                      'raysWaiting', 'raysProcessed', 'raysGenerated', 'raysSending', 'raysReceived']
+        # bandwidth, tracing time
+        per_worker_data = {}
+        # rays processed,  rays generated, etc
+        per_worker_treelet_data = {}
+        csv_data = {}
+        for stats in self.worker_stats:
+            min_timestamp = stats.start_timestamp
+            max_timestamp = min_timestamp + stats.timestamps[-1]
+            # Get the treelet fields and quantize to global time scale
+            treelet_rows = defaultdict(lambda: defaultdict(list))
+            for treelet_id, treelet_stats in stats.treelet_stats:
+                for field, key in [('processedRays', 'raysProcessed'),
+                                   ('waitingRays', 'raysWaiting'),
+                                   ('demandedRays', 'raysGenerated'),
+                                   ('sendingRays', 'raysSending'),
+                                   ('receivedRays', 'raysReceived')]:
+                    _, quantized_data = quantize_sequence(
+                        stats.timestamps, treelet_stats[field], quanta,
+                        start=start_timestamp, end=end_timestamp)
+                    treelet_rows[treelet_id][key] = quantized_data
+            # Insert rows into per_worker_treelet_data
+            for treelet_id, _ in stats.treelet_stats:
+                for i in range(num_timepoints):
+                    timepoint = start_timestamp + quanta * i
+                    data = {
+                        'workerID': tstats.tidx,
+                        'treeletID': treelet_id,
+                        'timestamp': timepoint,
+                    }
+                    for k, v in treelet_rows[treelet_id]:
+                        data[k] = v[i]
+                    per_worker_treelet_data[(stats.tidx, treelet_id, timepoint)] = data
+                
+
+        for diag in self.worker_diagnostics:
+            for treelet_id, treelet_stats in stats.treelet_stats:
+                for tidx in range(num_timepoints):
+                    # tracingRaysTime
+                    timestamp = tidx * quanta
+            
+
+        print('Writing {:s}...'.format(path))
+        with open(path, 'w', newline='') as csvfile:
+            writer  = csv.Dictwriter(csvfile, fieldnames=fieldnames)
+            for k, v in per_worker_treelet_data:
+                writer.writerow(v)
 
 
 class Constants(object):
@@ -381,40 +461,80 @@ def merge_sequences(timepoints : List[List[int]],
     return merged_timepoints, merged_data
 
 
-def quantize_sequence(timepoints, data, quantization):
-    quantized_sequence = []
+def quantize_sequence(timepoints, data, quanta, start=None, end=None):
+    quantized_timepoints = []
+    quantized_data = []
+
+    def push(timepoint, data):
+        quantized_timepoints.append(timepoint)
+        quantized_data.append(data)
 
     if len(data) == 0:
         return []
 
-    current_time = timepoints[0]
-    offset = 1
-    summed_value = 0
-    while offset < len(timepoints):
-        timePrev = timepoints[offset - 1]
-        valuePrev = data[offset - 1]
-        time = timepoints[offset]
-        value = data[offset]
-    
-        interval = float(time - timePrev)
-        contribution = value / interval
-        #print(metric_name, value, time, timePrev, interval)
-        if time >= current_time:
-            # Add % contribution from prior interval
-            alpha = 1.0 - (time - current_time) / interval
-            beta = 1.0 - alpha
-            #print(time, current_time, alpha)
-            summed_value += contribution * alpha
-            quantized_sequence.append((current_time, summed_value))
+    current_time = start or timepoints[0]
+    end_time = end or timepoints[-1]
 
-            current_time += quantization
-            summed_value = 0
-    
-            summed_value += contribution * beta
+    # Insert zeros up to the start of timepoints if the start time is before
+    # timepoints
+    while current_time < timepoints[0]:
+        push(current_time, 0)
+        current_time += quanta
+    push(current_time, 0)
+
+    # Find the starting offset if the start is inside the sequence
+    offset = 1
+    if start:
+        while offset < len(timepoints):
+            time = timepoints[offset]
+            if time > current_time:
+                break
+            offset += 1
+            
+    current_time_in_interval = current_time
+    summed_value = 0
+    # Sum over multiple timepoints
+    while offset < len(timepoints) and current_time + quanta < end_time:
+        # Invariant: timepoints[offset - 1] <= current_time + quanta < timepoints[offset]
+        prev_timepoint = timepoints[offset - 1]
+        prev_value = data[offset - 1]
+        timepoint = timepoints[offset]
+        value = data[offset]
+
+        interval = float(timepoint - prev_timepoint)
+        contribution = value / interval
+
+        # Add the contribution from this interval
+        next_time_in_interval = min(timepoint, current_time + quanta)
+        this_interval = (next_time_in_interval - current_time_in_interval)
+        if this_interval > 0:
+            this_contribution = value * (this_interval / interval) / this_interval
         else:
-            summed_value += contribution
-        offset += 1
-    return quantized_sequence
+            this_contribution = 0
+
+        summed_value += this_contribution
+
+        if current_time + quanta < timepoint:
+            # We've reached the end of this quanta, so append a new entry
+            push(current_time + quanta, summed_value)
+            summed_value = 0
+            current_time += quanta
+            current_time_in_interval = current_time
+            if current_time + quanta > timepoint:
+                # Step to the next timepoint only if we've moved past the current
+                # one
+                offset += 1
+        else:
+            # Still inside the quanta, so step to the next timepoint
+            current_time_in_interval = timepoint
+            offset += 1
+
+    # Add zeros at the end of the sequence
+    while current_time + quanta < end_time:
+        push(current_time + quanta, 0)
+        current_time += quanta
+
+    return quantized_timepoints, quantized_data
 
 
 def heatmap(data, row_labels, col_labels, ax=None,
@@ -632,6 +752,37 @@ def plot_worker_heatmap(all_worker_stats, metric):
     return fig
 
 
+def plot_utilization_heatmap(all_worker_diags):
+    '''Plot a treelet metric over time for all treelets'''
+    workers = {}
+    for w in all_worker_diags:
+        workers[int(w.idx)] = w
+    # Number of rows
+    worker_ids = list(sorted(workers.keys()))
+
+    # Determine number of columns
+    timestamp_sets = [set(stats.timestamps) for stats in all_worker_diags]
+    timestamps = set()
+    for s in timestamp_sets:
+        timestamps = timestamps.union(s)
+    timestamps = sorted(list(timestamps))
+    num_timepoints = len(timestamps)
+
+    data = np.zeros((len(worker_ids), num_timepoints))
+    row_labels = []
+    for i, idx in enumerate(worker_ids):
+        row_labels.append(idx)
+        ts = workers[idx].timestamps
+        for j, t in enumerate(timestamps):
+            if t in ts:
+                data[i, j] = workers[idx].percentage_busy(ts.index(t))
+    col_labels = [int(x * 1e-6) for x in timestamps]
+    fig = plt.figure(dpi=300)
+    ax = plt.subplot()
+    im, cbar = heatmap(data, row_labels, col_labels, ax=ax, aspect='auto')
+    return fig
+
+
 def aggregate_treelet_stats(all_worker_stats):
     # Get the list of treelet ids and stat keys
     treelet_ids = set()
@@ -801,6 +952,10 @@ def plot_metrics(stats, path):
         print('Graphed least busy worker action heatmap.')
 
     print('Graphing worker heatmaps...')
+    plot_utilization_heatmap(stats.worker_diagnostics)
+    plt.savefig(os.path.join(path, 'worker_utilization_heatmap.png'))
+    plt.close(fig)
+    plt.clf()
     for metric in ['processedRays', 'receivedRays', 'sendingRays']:
         plot_worker_heatmap(stats.worker_stats, metric)
         plt.savefig(os.path.join(path, 'worker_heatmap_{:s}.png'.format(metric)))
@@ -986,6 +1141,7 @@ def main():
     print('Reading diagnostics from {:s}...'.format(args.diagnostics_directory), end='')
     diagnostics = Stats(args.diagnostics_directory)
     print()
+    diagnostics.write_csv('test.csv')
     print('Done reading diagnostics.')
     if False:
         path = write_trace(stats, args.trace_path)
