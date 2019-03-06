@@ -317,7 +317,7 @@ ResultType LambdaWorker::handleOutQueue() {
             }
 
             oss.flush();
-            cout << "seqNo = " << sequenceNumber << endl;
+
             Message message{OpCode::SendRays, oss.str(), sendReliably,
                             sequenceNumber};
 
