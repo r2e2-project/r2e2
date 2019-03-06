@@ -385,7 +385,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
 ResultType LambdaMaster::handleWriteWorkerStats() {
     const auto timestamp =
-        duration_cast<microseconds>(steady_clock::now() - startTime).count();
+        duration_cast<microseconds>(now() - startTime).count();
 
     for (const auto &workerkv : workers) {
         const auto &worker = workerkv.second;
@@ -402,7 +402,7 @@ ResultType LambdaMaster::handleStatusMessage() {
 
     aggregateQueueStats();
 
-    const auto elapsedTime = steady_clock::now() - startTime;
+    const auto elapsedTime = now() - startTime;
     const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
 
     LOG(INFO) << "QUEUES " << setfill('0') << setw(6)

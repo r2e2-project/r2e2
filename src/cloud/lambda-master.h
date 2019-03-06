@@ -177,8 +177,7 @@ class LambdaMaster {
     TimerFD writeOutputTimer;
     TimerFD writeWorkerStatsTimer;
 
-    const std::chrono::steady_clock::time_point startTime{
-        std::chrono::steady_clock::now()};
+    const timepoint_t startTime{now()};
 
     /* Worker stats */
     WorkerStats workerStats;
