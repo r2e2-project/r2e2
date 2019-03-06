@@ -28,8 +28,8 @@ Message::Message( const Chunk & chunk )
 }
 
 Message::Message( const OpCode opcode, string && payload,
-                  const uint64_t sequence_number, const bool reliable )
-  : reliable_(reliable), sequence_number_( sequence_number ),
+                  const bool reliable, const uint64_t sequence_number )
+  : reliable_( reliable ), sequence_number_( sequence_number ),
     payload_length_( payload.length() ), opcode_( opcode ),
     payload_( move( payload ) )
 {}
@@ -48,7 +48,7 @@ string Message::str() const
 
 uint32_t Message::expected_length( const Chunk & chunk )
 {
-  return 14 + ( ( chunk.size() < 14 ) ? 0 : chunk( 0, 4 ).be32() );
+  return 14 + ( ( chunk.size() < 14 ) ? 0 : chunk( 9, 4 ).be32() );
 }
 
 void MessageParser::parse( const string & buf )
@@ -65,6 +65,6 @@ void MessageParser::parse( const string & buf )
 
     Message message { Chunk { reinterpret_cast<const uint8_t *>( raw_buffer_.data() ), expected_length } };
     raw_buffer_.erase( 0, expected_length );
-    completed_messages_.emplace( move( message ) );
+    completed_messages_.push_back( move( message ) );
   }
 }

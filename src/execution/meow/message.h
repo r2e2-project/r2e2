@@ -58,10 +58,12 @@ namespace meow {
     OpCode opcode_ { OpCode::Hey };
     std::string payload_ {};
 
+    bool read_ { false };
+
   public:
     Message( const Chunk & chunk );
     Message( const OpCode opcode, std::string && payload,
-             const uint64_t sequence_number = 0, const bool reliable = false );
+             const bool reliable = false, const uint64_t sequence_number = 0 );
 
     bool reliable() const { return reliable_; }
     uint64_t sequence_number() const { return sequence_number_; }
@@ -72,22 +74,27 @@ namespace meow {
     std::string str() const;
 
     static uint32_t expected_length( const Chunk & chunk );
+
+    bool is_read() const { return read_; }
+    void set_read() { read_ = true;}
   };
 
   class MessageParser
   {
   private:
     std::string raw_buffer_ {};
-    std::queue<Message> completed_messages_ {};
+    std::deque<Message> completed_messages_ {};
 
   public:
     void parse( const std::string & buf );
 
     bool empty() const { return completed_messages_.empty(); }
     Message & front() { return completed_messages_.front(); }
-    void pop() { completed_messages_.pop(); }
-    void push( Message && msg ) { completed_messages_.push( std::move( msg ) ); }
+    void pop() { completed_messages_.pop_front(); }
+    void push( Message && msg ) { completed_messages_.push_back( std::move( msg ) ); }
     size_t size() const { return completed_messages_.size(); }
+
+    std::deque<Message> & completed_messages() { return completed_messages_; }
   };
 
 }

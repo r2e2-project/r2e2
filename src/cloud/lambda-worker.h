@@ -52,11 +52,21 @@ class LambdaWorker {
     };
 
     struct RayPacket {
+        TreeletId targetTreelet;
         size_t rayCount;
         std::string data;
 
-        RayPacket(const size_t rayCount, std::string&& data)
-            : rayCount(rayCount), data(std::move(data)) {}
+        bool reliable{false};
+        uint64_t sequenceNumber;
+
+        RayPacket(const TreeletId targetTreelet, const size_t rayCount,
+                  std::string&& data, const bool reliable = false,
+                  const uint64_t sequenceNumber = 0)
+            : targetTreelet(targetTreelet),
+              rayCount(rayCount),
+              data(std::move(data)),
+              reliable(reliable),
+              sequenceNumber(sequenceNumber) {}
     };
 
     bool processMessage(const meow::Message& message);
@@ -76,6 +86,7 @@ class LambdaWorker {
 
     Poller::Action::Result::Type handleUdpSend();
     Poller::Action::Result::Type handleUdpReceive();
+    Poller::Action::Result::Type handleRayAcknowledgements();
 
     Poller::Action::Result::Type handleWorkerStats();
     Poller::Action::Result::Type handleDiagnostics();
@@ -113,10 +124,16 @@ class LambdaWorker {
     std::string outputName;
 
     /* Sending rays to other nodes */
+    using packet_clock = std::chrono::steady_clock;
+
     UDPConnection udpConnection{true};
     std::deque<std::pair<Address, std::string>> servicePackets{};
-    std::map<TreeletId, std::deque<RayPacket>> rayPackets{};
-    size_t rayPacketsSize{0};
+    std::deque<RayPacket> rayPackets{};
+    std::deque<std::pair<packet_clock::time_point, RayPacket>>
+        outstandingRayPackets{};
+    std::map<Address, std::vector<uint64_t>> receivedRayPackets;
+    std::set<uint64_t> receivedAcks{};
+    uint64_t sequenceNumber{0};
 
     /* Scene Data */
     bool initialized{false};
@@ -149,6 +166,7 @@ class LambdaWorker {
     TimerFD peerTimer;
     TimerFD workerStatsTimer;
     TimerFD workerDiagnosticsTimer;
+    TimerFD handleRayAcknowledgementsTimer;
 
     bool terminated{false};
 };

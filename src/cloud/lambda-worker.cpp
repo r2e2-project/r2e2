@@ -27,6 +27,7 @@
 #include "messages/utils.h"
 #include "net/address.h"
 #include "net/requests.h"
+#include "net/util.h"
 #include "storage/backend.h"
 #include "util/exception.h"
 #include "util/path.h"
@@ -47,6 +48,7 @@ using PollerResult = Poller::Result::Type;
 
 constexpr size_t UDP_MTU_BYTES{1'400};
 constexpr milliseconds PEER_CHECK_INTERVAL{1'000};
+constexpr milliseconds HANDLE_ACKS_INTERVAL{2'000};
 constexpr milliseconds WORKER_STATS_INTERVAL{500};
 constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
@@ -60,7 +62,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       storageBackend(StorageBackend::create_backend(storageUri)),
       peerTimer(PEER_CHECK_INTERVAL),
       workerStatsTimer(WORKER_STATS_INTERVAL),
-      workerDiagnosticsTimer(WORKER_DIAGNOSTICS_INTERVAL) {
+      workerDiagnosticsTimer(WORKER_DIAGNOSTICS_INTERVAL),
+      handleRayAcknowledgementsTimer(HANDLE_ACKS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
 
     roost::chdir(workingDirectory.name());
@@ -101,6 +104,21 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { this->terminate(); });
 
     loop.poller().add_action(Poller::Action(
+        udpConnection.socket(), Direction::In,
+        bind(&LambdaWorker::handleUdpReceive, this), [this]() { return true; },
+        []() { throw runtime_error("udp in failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        handleRayAcknowledgementsTimer.fd, Direction::In,
+        bind(&LambdaWorker::handleRayAcknowledgements, this),
+        [this]() {
+            return !receivedRayPackets.empty() ||
+                   (!receivedAcks.empty() && !outstandingRayPackets.empty() &&
+                    outstandingRayPackets.front().first <= packet_clock::now());
+        },
+        []() { throw runtime_error("acks failed"); }));
+
+    loop.poller().add_action(Poller::Action(
         udpConnection.socket(), Direction::Out,
         bind(&LambdaWorker::handleUdpSend, this),
         [this]() {
@@ -108,11 +126,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                    udpConnection.within_pace();
         },
         []() { throw runtime_error("udp out failed"); }));
-
-    loop.poller().add_action(Poller::Action(
-        udpConnection.socket(), Direction::In,
-        bind(&LambdaWorker::handleUdpReceive, this), [this]() { return true; },
-        []() { throw runtime_error("udp in failed"); }));
 
     /* trace rays */
     loop.poller().add_action(Poller::Action(
@@ -269,7 +282,7 @@ ResultType LambdaWorker::handleOutQueue() {
 
         while (!outRays.empty() || !unpackedRay.empty()) {
             ostringstream oss;
-            size_t packetLen = 5;
+            size_t packetLen = 14;
             size_t rayCount = 0;
 
             {
@@ -304,10 +317,12 @@ ResultType LambdaWorker::handleOutQueue() {
             }
 
             oss.flush();
-            Message message{OpCode::SendRays, oss.str()};
-            auto messageStr = message.str();
-            rayPackets[treeletId].emplace_back(rayCount, move(messageStr));
-            rayPacketsSize++;
+            cout << "seqNo = " << sequenceNumber << endl;
+            Message message{OpCode::SendRays, oss.str(), sendReliably,
+                            sequenceNumber};
+
+            rayPackets.emplace_back(treeletId, rayCount, move(message.str()),
+                                    sendReliably, sequenceNumber++);
         }
     }
 
@@ -331,7 +346,7 @@ ResultType LambdaWorker::handlePeers() {
         switch (peer.state) {
         case Worker::State::Connecting: {
             auto message = createConnectionRequest(peer);
-            servicePackets.emplace_back(peer.address, message.str());
+            servicePackets.emplace_front(peer.address, message.str());
             peer.tries++;
             break;
         }
@@ -380,6 +395,43 @@ ResultType LambdaWorker::handleNeededTreelets() {
     return ResultType::Continue;
 }
 
+ResultType LambdaWorker::handleRayAcknowledgements() {
+    handleRayAcknowledgementsTimer.reset();
+
+    // sending acknowledgements
+    for (auto& receivedKv : receivedRayPackets) {
+        string ack;
+
+        for (size_t i = 0; i < receivedKv.second.size(); i++) {
+            ack += put_field(receivedKv.second[i]);
+
+            if (ack.length() >= 1'400 or i == receivedKv.second.size() - 1) {
+                Message msg{OpCode::Ack, move(ack)};
+                servicePackets.emplace_back(receivedKv.first, move(msg.str()));
+                ack = {};
+            }
+        }
+    }
+
+    receivedRayPackets.clear();
+
+    const auto now = packet_clock::now();
+    while (!receivedAcks.empty() && !outstandingRayPackets.empty() &&
+           outstandingRayPackets.front().first <= now) {
+        auto& packet = outstandingRayPackets.front().second;
+
+        if (receivedAcks.count(packet.sequenceNumber) == 0) {
+            rayPackets.push_back(move(packet));
+        } else {
+            receivedAcks.erase(packet.sequenceNumber);
+        }
+
+        outstandingRayPackets.pop_front();
+    }
+
+    return ResultType::Continue;
+}
+
 ResultType LambdaWorker::handleUdpSend() {
     RECORD_INTERVAL("sendUDP");
 
@@ -398,22 +450,21 @@ ResultType LambdaWorker::handleUdpSend() {
     }
 
     /* packet to send */
-    auto queue = rayPackets.begin();
-    const TreeletId treeletId = queue->first;
-    deque<RayPacket>& packets = queue->second;
-    RayPacket& packet = packets.front();
+    RayPacket& packet = rayPackets.front();
 
     /* peer to send the packet to */
-    auto& peerCandidates = treeletToWorker[treeletId];
+    auto& peerCandidates = treeletToWorker[packet.targetTreelet];
     auto& peer =
         peers.at(*random::sample(peerCandidates.begin(), peerCandidates.end()));
 
     sendUdpPacket(peer.address, packet.data);
-    packets.pop_front();
-    rayPacketsSize--;
 
-    if (packets.empty()) rayPackets.erase(treeletId);
+    if (packet.reliable) {
+        outstandingRayPackets.emplace_back(packet_clock::now() + 10s,
+                                           move(packet));
+    }
 
+    rayPackets.pop_front();
     return ResultType::Continue;
 }
 
@@ -425,6 +476,16 @@ ResultType LambdaWorker::handleUdpReceive() {
     udpConnection.bytes_received += data.length();
 
     messageParser.parse(data);
+
+    for (auto it = messageParser.completed_messages().begin();
+         it != messageParser.completed_messages().end() && !it->is_read();
+         it++) {
+        it->set_read();
+
+        if (it->reliable()) {
+            receivedRayPackets[datagram.first].push_back(it->sequence_number());
+        }
+    }
 
     return ResultType::Continue;
 }
@@ -443,7 +504,7 @@ ResultType LambdaWorker::handleWorkerStats() {
             return peer.second.state == Worker::State::Connecting;
         });
     qStats.connected = peers.size() - qStats.connecting;
-    qStats.outstandingUdp = rayPacketsSize;
+    qStats.outstandingUdp = rayPackets.size();
 
     auto proto = to_protobuf(workerStats);
     Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
@@ -462,7 +523,7 @@ ResultType LambdaWorker::handleDiagnostics() {
     workerDiagnostics.bytesReceived =
         udpConnection.bytes_received - lastDiagnostics.bytesReceived;
 
-    workerDiagnostics.outstandingUdp = rayPacketsSize;
+    workerDiagnostics.outstandingUdp = rayPackets.size();
     lastDiagnostics.bytesSent = udpConnection.bytes_sent;
     lastDiagnostics.bytesReceived = udpConnection.bytes_received;
 
@@ -560,13 +621,24 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         /* send connection request */
         Message message = createConnectionRequest(peers.at(0));
-        servicePackets.emplace_back(coordinatorAddr, message.str());
+        servicePackets.emplace_front(coordinatorAddr, message.str());
         break;
     }
 
     case OpCode::Ping: {
         Message pong{OpCode::Pong, ""};
         coordinatorConnection->enqueue_write(pong.str());
+        break;
+    }
+
+    case OpCode::Ack: {
+        Chunk chunk(message.payload());
+
+        while (chunk.size()) {
+            receivedAcks.insert(chunk.be64());
+            chunk = chunk(8);
+        }
+
         break;
     }
 
@@ -612,7 +684,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         auto& peer = peers.at(otherWorkerId);
         auto message = createConnectionResponse(peer);
-        servicePackets.emplace_back(peer.address, message.str());
+        servicePackets.emplace_front(peer.address, message.str());
         break;
     }
 
@@ -689,9 +761,28 @@ bool LambdaWorker::processMessage(const Message& message) {
     return true;
 }
 
+// Minimum, where negative numbers are regarded as infinitely positive.
+int min_neg_infinity(const int a, const int b) {
+    if (a < 0) return b;
+    if (b < 0) return a;
+    return min(a, b);
+}
+
 void LambdaWorker::run() {
     while (!terminated) {
-        auto res = loop.loop_once().result;
+        // timeouts treat -1 as positive infinity
+        int min_timeout_ms = -1;
+
+        // If this connection is not within pace, it requests a timeout when it
+        // would be, so that we can re-poll and schedule it.
+        const int64_t millis_ahead_of_pace =
+            udpConnection.micros_ahead_of_pace() / 1000;
+        const int conn_timeout_ms =
+            (millis_ahead_of_pace <= 0) ? -1 : millis_ahead_of_pace;
+
+        min_timeout_ms = min_neg_infinity(min_timeout_ms, conn_timeout_ms);
+
+        auto res = loop.loop_once(min_timeout_ms).result;
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 }
