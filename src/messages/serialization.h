@@ -30,6 +30,7 @@ public:
     void write(const std::string & string);
 
     void write(const uint32_t& integer);
+    void write(const uint64_t& integer);
 
     void write_empty();
 
@@ -55,6 +56,7 @@ public:
     bool read(std::string* string);
 
     bool read(uint32_t* integer);
+    bool read(uint64_t* integer);
 
     bool eof() const { return eof_; }
 

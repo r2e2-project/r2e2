@@ -282,11 +282,12 @@ ResultType LambdaWorker::handleOutQueue() {
 
         while (!outRays.empty() || !unpackedRay.empty()) {
             ostringstream oss;
-            size_t packetLen = 14;
+            size_t packetLen = 26;
             size_t rayCount = 0;
 
             {
                 protobuf::RecordWriter writer{&oss};
+                writer.write(*workerId);
 
                 if (!unpackedRay.empty()) {
                     writer.write(unpackedRay);
@@ -734,6 +735,9 @@ bool LambdaWorker::processMessage(const Message& message) {
     case OpCode::SendRays: {
         protobuf::RecordReader reader{istringstream{message.payload()}};
         protobuf::RayState proto;
+
+        WorkerId senderId;
+        reader.read(&senderId);
 
         while (!reader.eof()) {
             if (reader.read(&proto)) {
