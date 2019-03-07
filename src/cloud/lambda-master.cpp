@@ -384,6 +384,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 }
 
 ResultType LambdaMaster::handleWriteWorkerStats() {
+    writeWorkerStatsTimer.reset();
+
     const auto timestamp =
         duration_cast<microseconds>(now() - startTime).count();
 
