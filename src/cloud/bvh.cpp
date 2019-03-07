@@ -204,12 +204,12 @@ void CloudBVH::Trace(RayState &rayState) {
 
     Transform *lastTransform = nullptr;
 
-    const uint32_t currentTreelet = rayState.toVisit.back().treelet;
-    loadTreelet(currentTreelet); /* we don't load any other treelets */
+    const uint32_t CurrentTreelet = rayState.toVisit.back().treelet;
+    loadTreelet(CurrentTreelet); /* we don't load any other treelets */
 
     while (true) {
         auto &top = rayState.toVisit.back();
-        if (currentTreelet != top.treelet) {
+        if (CurrentTreelet != top.treelet) {
             break;
         }
 

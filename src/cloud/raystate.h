@@ -49,7 +49,7 @@ struct RayState {
     bool isShadowRay{false};
 
     void StartTrace();
-    uint32_t currentTreelet() const;
+    uint32_t CurrentTreelet() const;
 };
 
 }  // namespace pbrt

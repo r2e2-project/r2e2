@@ -244,7 +244,7 @@ ResultType LambdaWorker::handleRayQueue() {
         RayState ray = move(processedRays.front());
         processedRays.pop_front();
 
-        const TreeletId nextTreelet = ray.currentTreelet();
+        const TreeletId nextTreelet = ray.CurrentTreelet();
         workerStats.recordDemandedRay(
             ObjectKey{ObjectType::Treelet, nextTreelet});
 
@@ -593,7 +593,7 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
 
 void LambdaWorker::pushRayQueue(RayState&& state) {
     workerStats.recordWaitingRay(
-        ObjectKey{ObjectType::Treelet, state.currentTreelet()});
+        ObjectKey{ObjectType::Treelet, state.CurrentTreelet()});
     rayQueue.push_back(move(state));
 }
 
@@ -602,7 +602,7 @@ RayState LambdaWorker::popRayQueue() {
     rayQueue.pop_front();
 
     workerStats.recordProcessedRay(
-        ObjectKey{ObjectType::Treelet, state.currentTreelet()});
+        ObjectKey{ObjectType::Treelet, state.CurrentTreelet()});
 
     return state;
 }
@@ -738,7 +738,7 @@ bool LambdaWorker::processMessage(const Message& message) {
         while (!reader.eof()) {
             if (reader.read(&proto)) {
                 RayState ray = from_protobuf(proto);
-                ObjectKey treeletID{ObjectType::Treelet, ray.currentTreelet()};
+                ObjectKey treeletID{ObjectType::Treelet, ray.CurrentTreelet()};
                 workerStats.recordReceivedRay(treeletID);
                 pushRayQueue(move(ray));
             }

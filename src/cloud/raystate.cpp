@@ -10,7 +10,7 @@ void RayState::StartTrace() {
     toVisit.push_back({});
 }
 
-uint32_t RayState::currentTreelet() const {
+uint32_t RayState::CurrentTreelet() const {
     if (!toVisit.empty()) {
         return toVisit.back().treelet;
     } else if (hit.initialized()) {
