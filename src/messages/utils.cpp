@@ -185,34 +185,6 @@ protobuf::TriangleMesh to_protobuf(const TriangleMesh& tm) {
     return proto_tm;
 }
 
-protobuf::VisitNode to_protobuf(const RayState::TreeletNode& node) {
-    protobuf::VisitNode proto_visit;
-    proto_visit.set_treelet(node.treelet);
-    proto_visit.set_node(node.node);
-    return proto_visit;
-}
-
-protobuf::RayState to_protobuf(const RayState& state) {
-    protobuf::RayState proto_state;
-    proto_state.set_sample_id(state.sample.id);
-    proto_state.set_sample_num(state.sample.num);
-    *proto_state.mutable_sample_pixel() = to_protobuf(state.sample.pixel);
-    *proto_state.mutable_sample_p_film() = to_protobuf(state.sample.pFilm);
-    proto_state.set_sample_weight(state.sample.weight);
-    *proto_state.mutable_ray() = to_protobuf(state.ray);
-
-    if (state.hit) {
-        *proto_state.mutable_hit() = to_protobuf(state.hitNode);
-    }
-
-    *proto_state.mutable_beta() = to_protobuf(state.beta);
-    *proto_state.mutable_ld() = to_protobuf(state.Ld);
-    proto_state.set_remaining_bounces(state.remainingBounces);
-    proto_state.set_is_shadow_ray(state.isShadowRay);
-
-    return proto_state;
-}
-
 protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample) {
     protobuf::SampleData proto_sample;
     *proto_sample.mutable_p_film() = to_protobuf(sample.sample.pFilm);
@@ -492,31 +464,6 @@ TriangleMesh from_protobuf(const protobuf::TriangleMesh& proto_tm) {
             nullptr,
             nullptr,
             nullptr};
-}
-
-RayState::TreeletNode from_protobuf(const protobuf::VisitNode& proto_node) {
-    RayState::TreeletNode node;
-    node.treelet = proto_node.treelet();
-    node.node = proto_node.node();
-    return node;
-}
-
-RayState from_protobuf(const protobuf::RayState& proto_state) {
-    RayState state;
-
-    state.sample.id = proto_state.sample_id();
-    state.sample.num = proto_state.sample_num();
-    state.sample.pixel = from_protobuf(proto_state.sample_pixel());
-    state.sample.pFilm = from_protobuf(proto_state.sample_p_film());
-    state.sample.weight = proto_state.sample_weight();
-    state.ray = from_protobuf(proto_state.ray());
-
-    state.beta = from_protobuf(proto_state.beta());
-    state.Ld = from_protobuf(proto_state.ld());
-    state.remainingBounces = proto_state.remaining_bounces();
-    state.isShadowRay = proto_state.is_shadow_ray();
-
-    return state;
 }
 
 CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& proto_s) {

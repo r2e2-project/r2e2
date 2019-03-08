@@ -5,7 +5,6 @@
 
 #include "cloud/integrator.h"
 #include "cloud/manager.h"
-#include "cloud/raystate.h"
 #include "cloud/stats.h"
 #include "core/geometry.h"
 #include "core/light.h"
@@ -63,8 +62,6 @@ protobuf::RGBSpectrum to_protobuf(const RGBSpectrum& spectrum);
 protobuf::RayDifferential to_protobuf(const RayDifferential& ray);
 protobuf::AnimatedTransform to_protobuf(const AnimatedTransform& transform);
 protobuf::TriangleMesh to_protobuf(const TriangleMesh& triangleMesh);
-protobuf::VisitNode to_protobuf(const RayState::TreeletNode& node);
-protobuf::RayState to_protobuf(const RayState& state);
 protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample);
 protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 protobuf::Scene to_protobuf(const Scene& scene);
@@ -88,8 +85,6 @@ Matrix4x4 from_protobuf(const protobuf::Matrix& matrix);
 RGBSpectrum from_protobuf(const protobuf::RGBSpectrum& spectrum);
 RayDifferential from_protobuf(const protobuf::RayDifferential& ray);
 TriangleMesh from_protobuf(const protobuf::TriangleMesh& mesh);
-RayState::TreeletNode from_protobuf(const protobuf::VisitNode& node);
-RayState from_protobuf(const protobuf::RayState& state);
 CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& sample);
 ParamSet from_protobuf(const protobuf::ParamSet& paramset);
 Scene from_protobuf(const protobuf::Scene& scene);

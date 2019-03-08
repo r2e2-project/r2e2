@@ -12,20 +12,6 @@
 
 namespace pbrt {
 
-template <class T, uint8_t N>
-class SimpleStack {
-  public:
-    bool empty() const { return head == 0; }
-    const T &top() const { return items[head - 1]; }
-    void push(T &&t) { items[head++] = std::move(t); }
-    void pop() { head--; }
-    uint8_t size() const { return head; }
-
-  private:
-    uint8_t head{0};
-    T items[N];
-};
-
 struct RayState {
     struct TreeletNode {
         uint32_t treelet{0};
@@ -58,14 +44,25 @@ struct RayState {
 
     bool hit{false};
     TreeletNode hitNode{};
-    Transform hitTransform{};
 
+    Transform hitTransform{};
     Transform rayTransform{};
-    SimpleStack<TreeletNode, 64> toVisit{};
+
+    uint8_t toVisitHead{0};
+    TreeletNode toVisit[64];
+
+    bool toVisitEmpty() const { return toVisitHead == 0; }
+    const TreeletNode &toVisitTop() const { return toVisit[toVisitHead - 1]; }
+    void toVisitPush(TreeletNode &&t) { toVisit[toVisitHead++] = std::move(t); }
+    void toVisitPop() { toVisitHead--; }
 
     void SetHit(const TreeletNode &node);
     void StartTrace();
     uint32_t CurrentTreelet() const;
+
+    /* serialization */
+    static std::string serialize(const RayState &);
+    static RayState deserialize(const std::string &);
 };
 
 }  // namespace pbrt

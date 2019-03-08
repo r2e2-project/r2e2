@@ -162,10 +162,10 @@ void CloudIntegrator::Render(const Scene &scene) {
         RayState state = move(rayQueue.back());
         rayQueue.pop_back();
 
-        if (!state.toVisit.empty()) {
+        if (!state.toVisitEmpty()) {
             auto newRay = Trace(move(state), bvh);
             const bool hit = newRay.hit;
-            const bool emptyVisit = newRay.toVisit.empty();
+            const bool emptyVisit = newRay.toVisitEmpty();
 
             if (newRay.isShadowRay) {
                 if (hit) {

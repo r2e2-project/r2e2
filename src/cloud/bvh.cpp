@@ -199,20 +199,20 @@ void CloudBVH::Trace(RayState &rayState) {
     Vector3f invDir{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
     int dirIsNeg[3] = {invDir.x < 0, invDir.y < 0, invDir.z < 0};
 
-    const uint32_t currentTreelet = rayState.toVisit.top().treelet;
+    const uint32_t currentTreelet = rayState.toVisitTop().treelet;
     loadTreelet(currentTreelet); /* we don't load any other treelets */
 
     bool hasTransform = false;
     bool transformChanged = false;
 
     while (true) {
-        auto &top = rayState.toVisit.top();
+        auto &top = rayState.toVisitTop();
         if (currentTreelet != top.treelet) {
             break;
         }
 
         RayState::TreeletNode current = move(top);
-        rayState.toVisit.pop();
+        rayState.toVisitPop();
 
         auto &treelet = treelets_[current.treelet];
         auto &node = treelet.nodes[current.node];
@@ -245,7 +245,7 @@ void CloudBVH::Trace(RayState &rayState) {
                         if (current.primitive + 1 < node.primitive_count) {
                             RayState::TreeletNode next_primitive = current;
                             next_primitive.primitive++;
-                            rayState.toVisit.push(move(next_primitive));
+                            rayState.toVisitPush(move(next_primitive));
                         }
 
                         TransformedPrimitive *tp =
@@ -263,7 +263,7 @@ void CloudBVH::Trace(RayState &rayState) {
                             next.treelet = cbvh->bvh_root_;
                             next.node = 0;
                             next.transformed = true;
-                            rayState.toVisit.push(move(next));
+                            rayState.toVisitPush(move(next));
                             transformChanged = true;
                             break;
                         }
@@ -275,7 +275,7 @@ void CloudBVH::Trace(RayState &rayState) {
                     current.primitive++;
                 }
 
-                if (rayState.toVisit.empty()) break;
+                if (rayState.toVisitEmpty()) break;
             } else {
                 RayState::TreeletNode children[2];
                 for (int i = 0; i < 2; i++) {
@@ -286,15 +286,15 @@ void CloudBVH::Trace(RayState &rayState) {
                 }
 
                 if (dirIsNeg[node.axis]) {
-                    rayState.toVisit.push(move(children[LEFT]));
-                    rayState.toVisit.push(move(children[RIGHT]));
+                    rayState.toVisitPush(move(children[LEFT]));
+                    rayState.toVisitPush(move(children[RIGHT]));
                 } else {
-                    rayState.toVisit.push(move(children[RIGHT]));
-                    rayState.toVisit.push(move(children[LEFT]));
+                    rayState.toVisitPush(move(children[RIGHT]));
+                    rayState.toVisitPush(move(children[LEFT]));
                 }
             }
         } else {
-            if (rayState.toVisit.empty()) break;
+            if (rayState.toVisitEmpty()) break;
         }
     }
 }

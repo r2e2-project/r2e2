@@ -208,12 +208,12 @@ ResultType LambdaWorker::handleRayQueue() {
 
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayState ray = popRayQueue();
-        if (!ray.toVisit.empty()) {
-            const uint32_t rayTreelet = ray.toVisit.top().treelet;
+        if (!ray.toVisitEmpty()) {
+            const uint32_t rayTreelet = ray.toVisitTop().treelet;
             auto newRay = CloudIntegrator::Trace(move(ray), bvh);
 
             const bool hit = newRay.hit;
-            const bool emptyVisit = newRay.toVisit.empty();
+            const bool emptyVisit = newRay.toVisitEmpty();
 
             if (newRay.isShadowRay) {
                 if (hit || emptyVisit) {
@@ -300,7 +300,7 @@ ResultType LambdaWorker::handleOutQueue() {
                     outRays.pop_front();
                     outQueueSize--;
 
-                    string rayStr = protoutil::to_string(to_protobuf(ray));
+                    string rayStr = RayState::serialize(ray);
 
                     workerStats.recordSentRay(
                         ObjectKey{ObjectType::Treelet, treeletId});
@@ -740,8 +740,9 @@ bool LambdaWorker::processMessage(const Message& message) {
         reader.read(&senderId);
 
         while (!reader.eof()) {
-            if (reader.read(&proto)) {
-                RayState ray = from_protobuf(proto);
+            string rayStr;
+            if (reader.read(&rayStr)) {
+                RayState ray = RayState::deserialize(rayStr);
                 ObjectKey treeletID{ObjectType::Treelet, ray.CurrentTreelet()};
                 workerStats.recordReceivedRay(treeletID);
                 pushRayQueue(move(ray));
