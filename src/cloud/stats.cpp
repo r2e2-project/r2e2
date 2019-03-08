@@ -32,39 +32,40 @@ void RayStats::merge(const RayStats& other) {
     pendingRays += other.pendingRays;
 }
 
-#define INCREMENT_FIELD(name__)        \
-    do {                               \
-        aggregateStats.name__ += 1;    \
-        objectStats[type].name__ += 1; \
+#define INCREMENT_FIELD(name__)                                           \
+    do {                                                                  \
+        aggregateStats.name__ += 1;                                       \
+        objectStats[ObjectKey{ObjectType::Treelet, ray.CurrentTreelet()}] \
+            .name__ += 1;                                                 \
     } while (false)
 
 void WorkerStats::recordFinishedPath() { _finishedPaths += 1; }
 
-void WorkerStats::recordSentRay(const ObjectKey& type) {
+void WorkerStats::recordSentRay(const RayState& ray) {
     INCREMENT_FIELD(sentRays);
 }
 
-void WorkerStats::recordReceivedRay(const ObjectKey& type) {
+void WorkerStats::recordReceivedRay(const RayState& ray) {
     INCREMENT_FIELD(receivedRays);
 }
 
-void WorkerStats::recordWaitingRay(const ObjectKey& type) {
+void WorkerStats::recordWaitingRay(const RayState& ray) {
     INCREMENT_FIELD(waitingRays);
 }
 
-void WorkerStats::recordProcessedRay(const ObjectKey& type) {
+void WorkerStats::recordProcessedRay(const RayState& ray) {
     INCREMENT_FIELD(processedRays);
 }
 
-void WorkerStats::recordDemandedRay(const ObjectKey& type) {
+void WorkerStats::recordDemandedRay(const RayState& ray) {
     INCREMENT_FIELD(demandedRays);
 }
 
-void WorkerStats::recordSendingRay(const ObjectKey& type) {
+void WorkerStats::recordSendingRay(const RayState& ray) {
     INCREMENT_FIELD(sendingRays);
 }
 
-void WorkerStats::recordPendingRay(const ObjectKey& type) {
+void WorkerStats::recordPendingRay(const RayState& ray) {
     INCREMENT_FIELD(pendingRays);
 }
 
@@ -114,7 +115,8 @@ void WorkerDiagnostics::reset() {
     metricsOverTime.clear();
 }
 
-WorkerDiagnostics::Recorder WorkerDiagnostics::recordInterval(const std::string& name) {
+WorkerDiagnostics::Recorder WorkerDiagnostics::recordInterval(
+    const std::string& name) {
     nameStack.push_back(name);
     std::string recorderName = "";
     for (const auto& n : nameStack) {

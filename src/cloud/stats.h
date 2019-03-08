@@ -7,6 +7,7 @@
 #include "cloud/estimators.h"
 #include "cloud/lambda.h"
 #include "cloud/manager.h"
+#include "cloud/raystate.h"
 
 namespace pbrt {
 
@@ -69,15 +70,13 @@ struct WorkerStats {
     uint64_t pendingRays() const { return aggregateStats.pendingRays; }
 
     void recordFinishedPath();
-    void recordSentRay(const ObjectKey& type);
-    void recordReceivedRay(const ObjectKey& type);
-    void recordWaitingRay(const ObjectKey& type);
-    void recordProcessedRay(const ObjectKey& type);
-    void recordRayInterval(const ObjectKey& type, timepoint_t start,
-                           timepoint_t end);
-    void recordDemandedRay(const ObjectKey& type);
-    void recordSendingRay(const ObjectKey& type);
-    void recordPendingRay(const ObjectKey& type);
+    void recordSentRay(const RayState& ray);
+    void recordReceivedRay(const RayState& ray);
+    void recordWaitingRay(const RayState& ray);
+    void recordProcessedRay(const RayState& ray);
+    void recordDemandedRay(const RayState& ray);
+    void recordSendingRay(const RayState& ray);
+    void recordPendingRay(const RayState& ray);
 
     void reset();
     void merge(const WorkerStats& other);
