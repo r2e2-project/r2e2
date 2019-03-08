@@ -19,8 +19,7 @@ using namespace std;
 
 namespace pbrt {
 
-CloudBVH::CloudBVH(const uint32_t bvh_root)
-    : bvh_root_(bvh_root) {
+CloudBVH::CloudBVH(const uint32_t bvh_root) : bvh_root_(bvh_root) {
     if (MaxThreadIndex() > 1) {
         throw runtime_error("Cannot use CloudBVH with multiple threads");
     }
@@ -57,8 +56,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
     }
 
     vector<TreeletNode> nodes;
-    auto reader =
-        global::manager.GetReader(ObjectType::Treelet, root_id);
+    auto reader = global::manager.GetReader(ObjectType::Treelet, root_id);
 
     stack<pair<uint32_t, Child>> q;
 
@@ -154,8 +152,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
                 auto &proto_t = proto_node.triangles(i);
                 const auto tm_id = proto_t.mesh_id();
 
-                const auto material_id =
-                    triangle_mesh_material_ids_[tm_id];
+                const auto material_id = triangle_mesh_material_ids_[tm_id];
                 /* load the Material if necessary */
                 if (materials_.count(material_id) == 0) {
                     auto material_reader = global::manager.GetReader(
@@ -202,42 +199,55 @@ void CloudBVH::Trace(RayState &rayState) {
     Vector3f invDir{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
     int dirIsNeg[3] = {invDir.x < 0, invDir.y < 0, invDir.z < 0};
 
-    Transform *lastTransform = nullptr;
+    const uint32_t currentTreelet = rayState.toVisit.top().treelet;
+    loadTreelet(currentTreelet); /* we don't load any other treelets */
 
-    const uint32_t CurrentTreelet = rayState.toVisit.back().treelet;
-    loadTreelet(CurrentTreelet); /* we don't load any other treelets */
+    bool hasTransform = false;
+    bool transformChanged = false;
 
     while (true) {
-        auto &top = rayState.toVisit.back();
-        if (CurrentTreelet != top.treelet) {
+        auto &top = rayState.toVisit.top();
+        if (currentTreelet != top.treelet) {
             break;
         }
 
-        auto current = move(top);
-        rayState.toVisit.pop_back();
+        RayState::TreeletNode current = move(top);
+        rayState.toVisit.pop();
 
         auto &treelet = treelets_[current.treelet];
         auto &node = treelet.nodes[current.node];
 
         /* prepare the ray */
-        if (current.transform.get() != lastTransform) {
-            lastTransform = current.transform.get();
-            ray = current.transform ? Inverse(*current.transform)(rayState.ray)
-                                    : rayState.ray;
+        if (current.transformed != hasTransform || transformChanged) {
+            transformChanged = false;
+
+            ray = current.transformed
+                      ? Inverse(rayState.rayTransform)(rayState.ray)
+                      : rayState.ray;
+
             invDir = Vector3f{1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z};
             dirIsNeg[0] = invDir.x < 0;
             dirIsNeg[1] = invDir.y < 0;
             dirIsNeg[2] = invDir.z < 0;
         }
 
+        hasTransform = current.transformed;
+
         // Check ray against BVH node
         if (node.bounds.IntersectP(ray, invDir, dirIsNeg)) {
             if (node.leaf) {
                 auto &primitives = treelet.primitives;
-                for (int i = node.primitive_offset;
+
+                for (int i = node.primitive_offset + current.primitive;
                      i < node.primitive_offset + node.primitive_count; i++) {
                     if (primitives[i]->GetType() ==
                         PrimitiveType::Transformed) {
+                        if (current.primitive + 1 < node.primitive_count) {
+                            RayState::TreeletNode next_primitive = current;
+                            next_primitive.primitive++;
+                            rayState.toVisit.push(move(next_primitive));
+                        }
+
                         TransformedPrimitive *tp =
                             dynamic_cast<TransformedPrimitive *>(
                                 primitives[i].get());
@@ -246,21 +256,23 @@ void CloudBVH::Trace(RayState &rayState) {
                             dynamic_pointer_cast<CloudBVH>(tp->GetPrimitive());
 
                         if (cbvh) {
-                            Transform t;
-                            tp->GetTransform().Interpolate(ray.time, &t);
+                            tp->GetTransform().Interpolate(
+                                ray.time, &rayState.rayTransform);
 
                             RayState::TreeletNode next;
                             next.treelet = cbvh->bvh_root_;
                             next.node = 0;
-                            next.transform = make_shared<Transform>(move(t));
-                            rayState.toVisit.push_back(move(next));
-                            continue; /* to the next primitive */
+                            next.transformed = true;
+                            rayState.toVisit.push(move(next));
+                            transformChanged = true;
+                            break;
                         }
-                    }
-                    if (primitives[i]->Intersect(ray, &isect)) {
+                    } else if (primitives[i]->Intersect(ray, &isect)) {
                         rayState.ray.tMax = ray.tMax;
-                        rayState.hit.reset(move(current));
+                        rayState.SetHit(current);
                     }
+
+                    current.primitive++;
                 }
 
                 if (rayState.toVisit.empty()) break;
@@ -270,15 +282,15 @@ void CloudBVH::Trace(RayState &rayState) {
                     children[i].treelet =
                         node.has[i] ? current.treelet : node.child[i];
                     children[i].node = node.has[i] ? node.child[i] : 0;
-                    children[i].transform = current.transform;
+                    children[i].transformed = current.transformed;
                 }
 
                 if (dirIsNeg[node.axis]) {
-                    rayState.toVisit.push_back(move(children[LEFT]));
-                    rayState.toVisit.push_back(move(children[RIGHT]));
+                    rayState.toVisit.push(move(children[LEFT]));
+                    rayState.toVisit.push(move(children[RIGHT]));
                 } else {
-                    rayState.toVisit.push_back(move(children[RIGHT]));
-                    rayState.toVisit.push_back(move(children[LEFT]));
+                    rayState.toVisit.push(move(children[RIGHT]));
+                    rayState.toVisit.push(move(children[LEFT]));
                 }
             }
         } else {
@@ -288,11 +300,11 @@ void CloudBVH::Trace(RayState &rayState) {
 }
 
 bool CloudBVH::Intersect(RayState &rayState, SurfaceInteraction *isect) const {
-    if (!rayState.hit.initialized()) {
+    if (!rayState.hit) {
         return false;
     }
 
-    auto &hit = *rayState.hit;
+    auto &hit = rayState.hitNode;
     loadTreelet(hit.treelet);
 
     auto &treelet = treelets_[hit.treelet];
@@ -305,18 +317,15 @@ bool CloudBVH::Intersect(RayState &rayState, SurfaceInteraction *isect) const {
 
     Ray ray = rayState.ray;
 
-    if (hit.transform) {
-        ray = Inverse(*hit.transform)(ray);
+    if (hit.transformed) {
+        ray = Inverse(rayState.hitTransform)(ray);
     }
 
-    for (int i = node.primitive_offset;
-         i < node.primitive_offset + node.primitive_count; i++)
-        primitives[i]->Intersect(ray, isect);
-
+    primitives[node.primitive_offset + hit.primitive]->Intersect(ray, isect);
     rayState.ray.tMax = ray.tMax;
 
-    if (hit.transform && !hit.transform->IsIdentity()) {
-        *isect = (*hit.transform)(*isect);
+    if (hit.transformed && !rayState.hitTransform.IsIdentity()) {
+        *isect = (rayState.hitTransform)(*isect);
     }
 
     return true;

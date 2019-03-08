@@ -59,7 +59,6 @@ vector<RayState> CloudIntegrator::Shade(RayState &&rayState,
             RayState newRay;
             newRay.beta = rayState.beta * f * AbsDot(wi, it.shading.n) / pdf;
             newRay.ray = it.SpawnRay(wi);
-            newRay.bounces = rayState.bounces + 1;
             newRay.remainingBounces = rayState.remainingBounces - 1;
             newRay.sample = rayState.sample;
             newRay.StartTrace();
@@ -68,12 +67,10 @@ vector<RayState> CloudIntegrator::Shade(RayState &&rayState,
             ++nIntersectionTests;
         } else {
             global::workerStats.recordFinishedPath();
-            ReportValue(pathLength, rayState.bounces);
         }
     } else {
         /* we're done with this path */
         global::workerStats.recordFinishedPath();
-        ReportValue(pathLength, rayState.bounces);
     }
 
     if (it.bsdf->NumComponents(bsdfFlags) > 0) {
@@ -167,7 +164,7 @@ void CloudIntegrator::Render(const Scene &scene) {
 
         if (!state.toVisit.empty()) {
             auto newRay = Trace(move(state), bvh);
-            const bool hit = newRay.hit.initialized();
+            const bool hit = newRay.hit;
             const bool emptyVisit = newRay.toVisit.empty();
 
             if (newRay.isShadowRay) {
@@ -187,7 +184,7 @@ void CloudIntegrator::Render(const Scene &scene) {
                 finishedRays.push_back(move(newRay));
                 global::workerStats.recordFinishedPath();
             }
-        } else if (state.hit.initialized()) {
+        } else if (state.hit) {
             auto newRays =
                 Shade(move(state), bvh, scene.lights, sampler, arena);
             for (auto &newRay : newRays) {

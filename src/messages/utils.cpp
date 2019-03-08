@@ -189,10 +189,6 @@ protobuf::VisitNode to_protobuf(const RayState::TreeletNode& node) {
     protobuf::VisitNode proto_visit;
     proto_visit.set_treelet(node.treelet);
     proto_visit.set_node(node.node);
-    if (node.transform) {
-        *proto_visit.mutable_transform() =
-            to_protobuf(node.transform->GetMatrix());
-    }
     return proto_visit;
 }
 
@@ -205,17 +201,12 @@ protobuf::RayState to_protobuf(const RayState& state) {
     proto_state.set_sample_weight(state.sample.weight);
     *proto_state.mutable_ray() = to_protobuf(state.ray);
 
-    for (auto& tv : state.toVisit) {
-        *proto_state.add_to_visit() = to_protobuf(tv);
-    }
-
-    if (state.hit.initialized()) {
-        *proto_state.mutable_hit() = to_protobuf(*state.hit);
+    if (state.hit) {
+        *proto_state.mutable_hit() = to_protobuf(state.hitNode);
     }
 
     *proto_state.mutable_beta() = to_protobuf(state.beta);
     *proto_state.mutable_ld() = to_protobuf(state.Ld);
-    proto_state.set_bounces(state.bounces);
     proto_state.set_remaining_bounces(state.remainingBounces);
     proto_state.set_is_shadow_ray(state.isShadowRay);
 
@@ -507,12 +498,6 @@ RayState::TreeletNode from_protobuf(const protobuf::VisitNode& proto_node) {
     RayState::TreeletNode node;
     node.treelet = proto_node.treelet();
     node.node = proto_node.node();
-
-    if (proto_node.has_transform()) {
-        node.transform =
-            make_shared<Transform>(from_protobuf(proto_node.transform()));
-    }
-
     return node;
 }
 
@@ -526,17 +511,8 @@ RayState from_protobuf(const protobuf::RayState& proto_state) {
     state.sample.weight = proto_state.sample_weight();
     state.ray = from_protobuf(proto_state.ray());
 
-    for (size_t i = 0; i < proto_state.to_visit_size(); i++) {
-        state.toVisit.push_back(from_protobuf(proto_state.to_visit(i)));
-    }
-
-    if (proto_state.has_hit()) {
-        state.hit.reset(from_protobuf(proto_state.hit()));
-    }
-
     state.beta = from_protobuf(proto_state.beta());
     state.Ld = from_protobuf(proto_state.ld());
-    state.bounces = proto_state.bounces();
     state.remainingBounces = proto_state.remaining_bounces();
     state.isShadowRay = proto_state.is_shadow_ray();
 

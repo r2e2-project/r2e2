@@ -209,10 +209,10 @@ ResultType LambdaWorker::handleRayQueue() {
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayState ray = popRayQueue();
         if (!ray.toVisit.empty()) {
-            const uint32_t rayTreelet = ray.toVisit.back().treelet;
+            const uint32_t rayTreelet = ray.toVisit.top().treelet;
             auto newRay = CloudIntegrator::Trace(move(ray), bvh);
 
-            const bool hit = newRay.hit.initialized();
+            const bool hit = newRay.hit;
             const bool emptyVisit = newRay.toVisit.empty();
 
             if (newRay.isShadowRay) {
@@ -229,7 +229,7 @@ ResultType LambdaWorker::handleRayQueue() {
                 finishedQueue.push_back(move(newRay));
                 workerStats.recordFinishedPath();
             }
-        } else if (ray.hit.initialized()) {
+        } else if (ray.hit) {
             auto newRays =
                 CloudIntegrator::Shade(move(ray), bvh, lights, sampler, arena);
             for (auto& newRay : newRays) {
