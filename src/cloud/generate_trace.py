@@ -56,6 +56,7 @@ class WorkerDiagnostics(object):
         self.path = file_path
         self.metrics = defaultdict(list)
         time_per_action = defaultdict(dict)
+        bytes_sent_per_worker = defaultdict(dict)
         self.timestamps = []
         self.top_level_actions = set()
         with open(file_path, 'r') as f:
@@ -79,9 +80,16 @@ class WorkerDiagnostics(object):
                     del data['metricsOverTime']
                 if 'intervalsPerAction' in data:
                     del data['intervalsPerAction']
+                if 'bytesSentPerWorker' in data:
+                    for k, v in data['bytesSentPerWorker'].items():
+                        bytes_sent_per_worker[k][timestamp] = v
+                    del data['bytesSentPerWorker']
+                if 'bytesReceivedPerWorker' in data:
+                    del data['bytesReceivedPerWorker']
                 for name, value in data.items():
                     self.metrics[name].append(float(value))
         self.time_per_action = defaultdict(list)
+        self.bytes_sent_per_worker = defaultdict(list)
         for t in self.timestamps:
             for k, v in time_per_action.items():
                 if t in v:
@@ -89,6 +97,12 @@ class WorkerDiagnostics(object):
                 else:
                     value = 0
                 self.time_per_action[k].append(value)
+            for k, v in bytes_sent_per_worker.items():
+                if t in v:
+                    value = v[t]
+                else:
+                    value = 0
+                self.bytes_sent_per_worker[k].append(value)
 
     def percentage_action(self, action, idx=-1):
         if len(self.timestamps) == 0:
@@ -121,7 +135,7 @@ class WorkerStats(object):
             _, start_timestamp = f.readline().strip().split(' ')
             self.start_timestamp = int(start_timestamp)
 
-            prev_timestamp = None
+            prev_data = defaultdict(dict)
             for line in f:
                 split_line  = line.strip().split(' ')
                 if len(split_line) < 2:
@@ -141,14 +155,14 @@ class WorkerStats(object):
                     stats = ray_stats['stats']
                     if typ != TREELET_TYPE:
                         continue
-                    for k, v in stats.items():
+                    for metric_name, v in stats.items():
                         prev_v = 0
-                        if (prev_timestamp is not None and
-                            prev_timestamp in treelet_stats[typ_id][k]):
-                            prev_v = treelet_stats[typ_id][k][prev_timestamp]
-                        treelet_stats[typ_id][k][timestamp] = float(v) - prev_v
-                        stat_keys.add(k)
-                prev_timestamp = int(timestamp)
+                        if (typ_id in prev_data and
+                            metric_name in prev_data[typ_id]):
+                            prev_v = prev_data[typ_id][metric_name]
+                        treelet_stats[typ_id][metric_name][timestamp] = float(v) - prev_v
+                        prev_data[typ_id][metric_name] = float(v)
+                        stat_keys.add(metric_name)
 
         self.treelet_stats = {}
         for treelet_id in treelet_stats.keys():
@@ -203,15 +217,17 @@ class Stats(object):
             start_timestamp = min(start_timestamp, start_ts)
             end_timestamp = max(end_timestamp, end_ts)
 
-        for diag in self.worker_diagnostics:
-            start_ts = diag.start_timestamp
-            end_ts = start_ts + stats.timestamps[-1]
-            if start_ts < start_timestamp or end_ts > end_timestamp:
-                print('Current min {:d}, max {:d}'.format(start_timestamp, end_timestamp))
-                print('Worker id {:d}, min {:d}, max {:d}, path {:s}'.format(diag.idx,
-                                                                             start_ts, end_ts, diag.path))
-            start_timestamp = min(start_timestamp, start_ts)
-            end_timestamp = max(end_timestamp, end_ts)
+        #for diag in self.worker_diagnostics:
+        #    start_ts = diag.start_timestamp
+        #    end_ts = start_ts + stats.timestamps[-1]
+        #    if start_ts < start_timestamp or end_ts > end_timestamp:
+        #        print('Current min {:d}, max {:d}'.format(start_timestamp, end_timestamp))
+        #        print('Worker id {:d}, min {:d}, max {:d}, path {:s}'.format(diag.idx,
+        #                                                                     start_ts, end_ts, diag.path))
+        #    start_timestamp = min(start_timestamp, start_ts)
+        #    end_timestamp = max(end_timestamp, end_ts)
+
+        end_timestamp += quanta * 2
 
         total_duration = end_timestamp - start_timestamp
         num_timepoints = int(math.ceil(total_duration / quanta))
@@ -225,11 +241,15 @@ class Stats(object):
         #              'tracingRaysTime', 'idleTime',
         #              'raysWaiting', 'raysProcessed', 'raysGenerated', 'raysSending', 'raysReceived',
         #              'bandwidthIn', 'bandwidthOut']
-        fieldnames = ['workerID', 'treeletID', 'timestamp',
-                      'raysWaiting', 'raysProcessed', 'raysGenerated', 'raysSending', 'raysReceived']
         # bandwidth, tracing time
         per_worker_data = {}
+        per_worker_worker_fieldnames = [
+            'workerID', 'targetWorkerID', 'timestamp', 'bytesSent']
+        per_worker_worker_data = {}
         # rays processed,  rays generated, etc
+        per_worker_treelet_fieldnames = [
+            'workerID', 'treeletID', 'timestamp',
+            'raysWaiting', 'raysProcessed', 'raysGenerated', 'raysSending', 'raysReceived']
         per_worker_treelet_data = {}
         csv_data = {}
         print('Quantizing worker stats', end='', flush=True)
@@ -245,15 +265,10 @@ class Stats(object):
                                    ('sendingRays', 'raysSending'),
                                    ('receivedRays', 'raysReceived')]:
                     quantized_timestamps, quantized_data = quantize_sequence(
-                        [min_timestamp + x for x in  stats.timestamps], treelet_stats[field],
+                        [min_timestamp] + [min_timestamp + x for x in stats.timestamps],
+                        [0] + treelet_stats[field],
                         quanta,
                         start=start_timestamp, end=end_timestamp)
-                    # print('Field', field)
-                    # print('Timepoints', [min_timestamp + x for x in  stats.timestamps])
-                    # print('Data', treelet_stats[field])
-                    # print('Key', key)
-                    # print('Timepoints', quantized_timestamps)
-                    # print('Data', quantized_data)
                     treelet_rows[treelet_id][key] = quantized_data
             # Insert rows into per_worker_treelet_data
             for treelet_id, _ in stats.treelet_stats.items():
@@ -279,7 +294,7 @@ class Stats(object):
 
         print('Writing {:s}...'.format(path))
         with open(path, 'w', newline='') as csvfile:
-            writer  = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer  = csv.DictWriter(csvfile, fieldnames=per_worker_treelet_fieldnames)
             writer.writeheader()
             for k, v in per_worker_treelet_data.items():
                 writer.writerow(v)
@@ -497,7 +512,7 @@ def merge_sequences(timepoints : List[List[int]],
     return merged_timepoints, merged_data
 
 
-def quantize_sequence(timepoints, data, quanta, start=None, end=None):
+def quantize_sequence(timepoints, data, quanta, start=None, end=None, rate=False):
     quantized_timepoints = []
     quantized_data = []
 
@@ -513,10 +528,9 @@ def quantize_sequence(timepoints, data, quanta, start=None, end=None):
 
     # Insert zeros up to the start of timepoints if the start time is before
     # timepoints
-    while current_time < timepoints[0]:
+    while current_time + quanta < timepoints[0]:
         push(current_time, 0)
         current_time += quanta
-    push(current_time, 0)
 
     # Find the starting offset if the start is inside the sequence
     offset = 1
@@ -527,10 +541,11 @@ def quantize_sequence(timepoints, data, quanta, start=None, end=None):
                 break
             offset += 1
             
-    current_time_in_interval = current_time
+    current_time_in_interval = min(timepoints[offset - 1], current_time)
+    prev_summed_value = 0
     summed_value = 0
     # Sum over multiple timepoints
-    while offset < len(timepoints) and current_time + quanta < end_time:
+    while offset < len(timepoints) and current_time < end_time:
         # Invariant: timepoints[offset - 1] <= current_time + quanta < timepoints[offset]
         prev_timepoint = timepoints[offset - 1]
         prev_value = data[offset - 1]
@@ -538,25 +553,30 @@ def quantize_sequence(timepoints, data, quanta, start=None, end=None):
         value = data[offset]
 
         interval = float(timepoint - prev_timepoint)
-        contribution = value / interval
+        contribution = value
+        if rate:
+            contribution /= interval
 
         # Add the contribution from this interval
         next_time_in_interval = min(timepoint, current_time + quanta)
-        this_interval = (next_time_in_interval - current_time_in_interval)
+        this_interval = float(next_time_in_interval - current_time_in_interval)
         if this_interval > 0:
-            this_contribution = value * (this_interval / interval) / this_interval
+            this_contribution = value * (this_interval / interval)
+            if rate:
+                 this_contribution /= this_interval
         else:
             this_contribution = 0
 
         summed_value += this_contribution
 
-        if current_time + quanta < timepoint:
+        if current_time + quanta <= timepoint:
             # We've reached the end of this quanta, so append a new entry
-            push(current_time + quanta, summed_value)
+            push(current_time, prev_summed_value)
+            prev_summed_value = summed_value
             summed_value = 0
             current_time += quanta
             current_time_in_interval = current_time
-            if current_time + quanta > timepoint:
+            if current_time > timepoint:
                 # Step to the next timepoint only if we've moved past the current
                 # one
                 offset += 1
@@ -566,8 +586,10 @@ def quantize_sequence(timepoints, data, quanta, start=None, end=None):
             offset += 1
 
     # Add zeros at the end of the sequence
-    while current_time + quanta < end_time:
-        push(current_time + quanta, 0)
+    while current_time < end_time:
+        push(current_time, prev_summed_value)
+        prev_summed_value = summed_value
+        summed_value = 0
         current_time += quanta
 
     return quantized_timepoints, quantized_data
