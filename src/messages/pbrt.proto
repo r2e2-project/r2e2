@@ -285,6 +285,7 @@ message QueueStats {
     uint64 connecting = 5;
     uint64 connected = 6;
     uint64 outstanding_udp = 7;
+    uint64 queued_udp = 8;
 }
 
 message ObjectRayStats {

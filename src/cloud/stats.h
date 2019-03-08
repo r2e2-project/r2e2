@@ -50,6 +50,7 @@ struct QueueStats {
     uint64_t connecting{0};
     uint64_t connected{0};
     uint64_t outstandingUdp{0};
+    uint64_t queuedUdp{0};
 };
 
 struct WorkerStats {

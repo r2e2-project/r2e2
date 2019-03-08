@@ -505,7 +505,8 @@ ResultType LambdaWorker::handleWorkerStats() {
             return peer.second.state == Worker::State::Connecting;
         });
     qStats.connected = peers.size() - qStats.connecting;
-    qStats.outstandingUdp = rayPackets.size();
+    qStats.outstandingUdp = outstandingRayPackets.size();
+    qStats.queuedUdp = rayPackets.size();
 
     auto proto = to_protobuf(workerStats);
     Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
