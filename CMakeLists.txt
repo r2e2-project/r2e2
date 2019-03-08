@@ -637,6 +637,19 @@ TARGET_LINK_LIBRARIES ( pbrt_test ${ALL_PBRT_LIBS} )
 
 ADD_TEST ( pbrt_unit_test pbrt_test )
 
+FILE ( GLOB UNIT_TEST_SOURCE
+  src/tests/util/*.cpp
+  src/tests/gtest/*.cc
+  )
+
+ADD_EXECUTABLE ( unit_test ${UNIT_TEST_SOURCE} )
+ADD_SANITIZERS ( unit_test )
+TARGET_COMPILE_FEATURES ( unit_test PRIVATE ${PBRT_CXX11_FEATURES} )
+TARGET_LINK_LIBRARIES ( unit_test ${ALL_PBRT_LIBS} )
+
+ADD_TEST ( util_unit_test unit_test )
+
+
 # Installation
 
 INSTALL ( TARGETS

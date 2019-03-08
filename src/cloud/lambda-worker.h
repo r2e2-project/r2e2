@@ -20,6 +20,7 @@
 #include "execution/meow/message.h"
 #include "net/address.h"
 #include "storage/backend.h"
+#include "util/seq_no_set.h"
 #include "util/temp_dir.h"
 #include "util/timerfd.h"
 
