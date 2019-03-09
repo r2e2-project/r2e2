@@ -49,7 +49,7 @@ std::string Message::str( const OpCode opcode, const std::string & payload,
 
   output += put_field( reliable );
   output += put_field( sequence_number );
-  output += put_field( payload.length() );
+  output += put_field( static_cast<uint32_t>( payload.length() ) );
   output += to_underlying( opcode );
   output += payload;
   return output;
