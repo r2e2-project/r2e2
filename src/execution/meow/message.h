@@ -4,7 +4,7 @@
 #define PBRT_EXECUTION_MEOW_MESSAGE_H
 
 #include <string>
-#include <queue>
+#include <list>
 
 #include "util/chunk.h"
 #include "util/util.h"
@@ -87,7 +87,7 @@ namespace meow {
   {
   private:
     std::string raw_buffer_ {};
-    std::deque<Message> completed_messages_ {};
+    std::list<Message> completed_messages_ {};
 
   public:
     void parse( const std::string & buf );
@@ -98,7 +98,7 @@ namespace meow {
     void push( Message && msg ) { completed_messages_.push_back( std::move( msg ) ); }
     size_t size() const { return completed_messages_.size(); }
 
-    std::deque<Message> & completed_messages() { return completed_messages_; }
+    std::list<Message> & completed_messages() { return completed_messages_; }
   };
 
 }

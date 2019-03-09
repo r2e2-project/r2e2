@@ -476,14 +476,24 @@ ResultType LambdaWorker::handleUdpReceive() {
     udpConnection.bytes_received += data.length();
 
     messageParser.parse(data);
+    auto& messages = messageParser.completed_messages();
 
-    for (auto it = messageParser.completed_messages().begin();
-         it != messageParser.completed_messages().end() && !it->is_read();
-         it++) {
+    auto it = messages.end();
+    while (it != messages.begin()) {
+        it--;
         it->set_read();
 
         if (it->reliable()) {
-            toBeAcked[datagram.first].push_back(it->sequence_number());
+            const auto seqNo = it->sequence_number();
+            toBeAcked[datagram.first].push_back(seqNo);
+            auto& received = receivedSeqNos[datagram.first];
+
+            if (received.contains(seqNo)) {
+                /* we already have received this message, let's discard it */
+                it = messages.erase(it);
+            } else {
+                received.insert(seqNo);
+            }
         }
     }
 
