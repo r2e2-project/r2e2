@@ -73,6 +73,10 @@ namespace meow {
 
     std::string str() const;
 
+    static std::string str( const OpCode opcode, const std::string & payload,
+                            const bool reliable = false,
+                            const uint64_t sequence_number = 0 );
+
     static uint32_t expected_length( const Chunk & chunk );
 
     bool is_read() const { return read_; }

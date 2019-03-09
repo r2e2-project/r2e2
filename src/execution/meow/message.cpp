@@ -36,13 +36,22 @@ Message::Message( const OpCode opcode, string && payload,
 
 string Message::str() const
 {
-  string output;
-  output += put_field( reliable_ );
-  output += put_field( sequence_number_ );
-  output += put_field( payload_length_ );
-  output += to_underlying( opcode_ );
-  output += payload_;
+  return Message::str( opcode_, payload_, reliable_, sequence_number_ );
+}
 
+std::string Message::str( const OpCode opcode, const std::string & payload,
+                          const bool reliable,
+                          const uint64_t sequence_number ) {
+  string output;
+  output.reserve( sizeof(reliable) + sizeof(sequence_number) +
+                  sizeof(opcode) + sizeof(payload.length()) +
+                  payload.length() );
+
+  output += put_field( reliable );
+  output += put_field( sequence_number );
+  output += put_field( payload.length() );
+  output += to_underlying( opcode );
+  output += payload;
   return output;
 }
 

@@ -213,7 +213,7 @@ ResultType LambdaWorker::handleRayQueue() {
         if (!ray.toVisitEmpty()) {
             const uint32_t rayTreelet = ray.toVisitTop().treelet;
             auto newRayPtr = CloudIntegrator::Trace(move(rayPtr), bvh);
-            auto &newRay = *newRayPtr;
+            auto& newRay = *newRayPtr;
 
             const bool hit = newRay.hit;
             const bool emptyVisit = newRay.toVisitEmpty();
@@ -318,10 +318,9 @@ ResultType LambdaWorker::handleOutQueue() {
 
             oss.flush();
 
-            Message message{OpCode::SendRays, oss.str(), sendReliably,
-                            sequenceNumber};
-
-            rayPackets.emplace_back(treeletId, rayCount, move(message.str()),
+            rayPackets.emplace_back(treeletId, rayCount,
+                                    Message::str(OpCode::SendRays, oss.str(),
+                                                 sendReliably, sequenceNumber),
                                     sendReliably, sequenceNumber++);
         }
     }
