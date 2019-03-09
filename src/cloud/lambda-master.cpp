@@ -806,7 +806,6 @@ void usage(const char *argv0, int exitCode) {
          << "  -r --aws-region REGION     region to run lambdas in" << endl
          << "  -b --storage-backend NAME  storage backend URI" << endl
          << "  -l --lambdas N             how many lambdas to run" << endl
-         << "  -t --treelet-stats         show treelet use stats" << endl
          << "  -R --reliable-udp          send ray packets reliably" << endl
          << "  -w --worker-stats DIR      dump worker stats" << endl
          << "  -d --diagnostics DIR       collect worker diagnostics" << endl
@@ -833,7 +832,6 @@ int main(int argc, char *argv[]) {
     string storageBackendUri;
     string region{"us-west-2"};
     bool sendReliably = false;
-    bool treeletStats = false;
     string workerStatsDir;
     string diagnosticsDir;
     Assignment assignment = Assignment::Uniform;
@@ -847,7 +845,6 @@ int main(int argc, char *argv[]) {
         {"lambdas", required_argument, nullptr, 'l'},
         {"assignment", required_argument, nullptr, 'a'},
         {"reliable-udp", no_argument, nullptr, 'R'},
-        {"treelet-stats", no_argument, nullptr, 't'},
         {"worker-stats", required_argument, nullptr, 'w'},
         {"diagnostics", required_argument, nullptr, 'd'},
         {"help", no_argument, nullptr, 'h'},
@@ -855,7 +852,7 @@ int main(int argc, char *argv[]) {
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:tw:hd:a:R",
+        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:w:hd:a:R",
                                     long_options, nullptr);
 
         if (opt == -1) {
@@ -871,7 +868,6 @@ int main(int argc, char *argv[]) {
         case 'r': region = optarg; break;
         case 'b': storageBackendUri = optarg; break;
         case 'l': numLambdas = stoul(optarg); break;
-        case 't': treeletStats = true; break;
         case 'w': workerStatsDir = optarg; break;
         case 'd': diagnosticsDir = optarg; break;
         case 'h': usage(argv[0], 0); break;
@@ -903,8 +899,8 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {treeletStats, assignment, diagnosticsDir,
-                                  workerStatsDir, sendReliably};
+    MasterConfiguration config = {assignment, diagnosticsDir, workerStatsDir,
+                                  sendReliably};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,

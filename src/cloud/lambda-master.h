@@ -36,7 +36,6 @@ enum class Assignment {
 };
 
 struct MasterConfiguration {
-    bool treeletStats;
     Assignment assignment;
     std::string diagnosticsDir;
     std::string workerStatsDir;
