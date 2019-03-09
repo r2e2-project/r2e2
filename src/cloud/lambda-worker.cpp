@@ -279,6 +279,12 @@ ResultType LambdaWorker::handleOutQueue() {
         const auto treeletId = q.first;
         auto& outRays = q.second;
 
+        const auto& candidates = treeletToWorker[treeletId];
+        const auto& peerAddress =
+            peers.at(*random::sample(candidates.begin(), candidates.end()))
+                .address;
+        auto& peerSeqNo = sequenceNumbers[peerAddress];
+
         string unpackedRay;
 
         while (!outRays.empty() || !unpackedRay.empty()) {
@@ -318,10 +324,12 @@ ResultType LambdaWorker::handleOutQueue() {
 
             oss.flush();
 
-            rayPackets.emplace_back(treeletId, rayCount,
+            rayPackets.emplace_back(peerAddress, treeletId, rayCount,
                                     Message::str(OpCode::SendRays, oss.str(),
-                                                 sendReliably, sequenceNumber),
-                                    sendReliably, sequenceNumber++);
+                                                 sendReliably, peerSeqNo),
+                                    sendReliably, peerSeqNo);
+
+            peerSeqNo++;
         }
     }
 
@@ -414,16 +422,16 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
 
     toBeAcked.clear();
 
+    // retransmit outstanding packets
     const auto now = packet_clock::now();
 
     while (!receivedAcks.empty() && !outstandingRayPackets.empty() &&
            outstandingRayPackets.front().first <= now) {
         auto& packet = outstandingRayPackets.front().second;
+        auto& thisReceivedAcks = receivedAcks[packet.destination];
 
-        if (receivedAcks.count(packet.sequenceNumber) == 0) {
+        if (!thisReceivedAcks.contains(packet.sequenceNumber)) {
             rayPackets.push_back(move(packet));
-        } else {
-            receivedAcks.erase(packet.sequenceNumber);
         }
 
         outstandingRayPackets.pop_front();
@@ -453,11 +461,7 @@ ResultType LambdaWorker::handleUdpSend() {
     RayPacket& packet = rayPackets.front();
 
     /* peer to send the packet to */
-    auto& peerCandidates = treeletToWorker[packet.targetTreelet];
-    auto& peer =
-        peers.at(*random::sample(peerCandidates.begin(), peerCandidates.end()));
-
-    sendUdpPacket(peer.address, packet.data);
+    sendUdpPacket(packet.destination, packet.data);
 
     if (packet.reliable) {
         outstandingRayPackets.emplace_back(packet_clock::now() + 10s,
@@ -481,19 +485,33 @@ ResultType LambdaWorker::handleUdpReceive() {
     auto it = messages.end();
     while (it != messages.begin()) {
         it--;
+
+        if (it->is_read()) break;
         it->set_read();
 
         if (it->reliable()) {
             const auto seqNo = it->sequence_number();
             toBeAcked[datagram.first].push_back(seqNo);
-            auto& received = receivedSeqNos[datagram.first];
+            auto& received = receivedPacketSeqNos[datagram.first];
 
             if (received.contains(seqNo)) {
-                /* we already have received this message, let's discard it */
                 it = messages.erase(it);
+                continue;
             } else {
                 received.insert(seqNo);
             }
+        }
+
+        if (it->opcode() == OpCode::Ack) {
+            Chunk chunk(it->payload());
+            auto& thisReceivedAcks = receivedAcks[datagram.first];
+
+            while (chunk.size()) {
+                thisReceivedAcks.insert(chunk.be64());
+                chunk = chunk(8);
+            }
+
+            it = messages.erase(it);
         }
     }
 
@@ -641,17 +659,6 @@ bool LambdaWorker::processMessage(const Message& message) {
     case OpCode::Ping: {
         Message pong{OpCode::Pong, ""};
         coordinatorConnection->enqueue_write(pong.str());
-        break;
-    }
-
-    case OpCode::Ack: {
-        Chunk chunk(message.payload());
-
-        while (chunk.size()) {
-            receivedAcks.insert(chunk.be64());
-            chunk = chunk(8);
-        }
-
         break;
     }
 
