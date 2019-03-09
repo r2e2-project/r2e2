@@ -61,8 +61,8 @@ struct RayState {
     uint32_t CurrentTreelet() const;
 
     /* serialization */
-    static std::string serialize(const RayState &);
-    static RayState deserialize(const std::string &);
+    static std::string serialize(const RayState &, const bool = true);
+    static RayState deserialize(const std::string &, const bool = true);
 };
 
 }  // namespace pbrt
