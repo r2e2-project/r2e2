@@ -309,6 +309,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                     errorMessage << " (" << worker.aws.logStream << ")";
                 }
 
+                LOG(INFO) << "dead worker stats: "
+                          << protoutil::to_json(to_protobuf(worker.stats));
+
                 throw runtime_error(errorMessage.str());
             });
 
