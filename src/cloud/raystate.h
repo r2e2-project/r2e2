@@ -12,6 +12,9 @@
 
 namespace pbrt {
 
+struct RayState;
+using RayStatePtr = std::unique_ptr<RayState>;
+
 struct RayState {
     struct TreeletNode {
         uint32_t treelet{0};
@@ -61,8 +64,8 @@ struct RayState {
     uint32_t CurrentTreelet() const;
 
     /* serialization */
-    static std::string serialize(const RayState &, const bool = true);
-    static RayState deserialize(const std::string &, const bool = true);
+    static std::string serialize(const RayStatePtr &, const bool = true);
+    static RayStatePtr deserialize(const std::string &, const bool = true);
 };
 
 }  // namespace pbrt

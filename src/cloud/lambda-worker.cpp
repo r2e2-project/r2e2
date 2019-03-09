@@ -202,15 +202,18 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
 
 ResultType LambdaWorker::handleRayQueue() {
     RECORD_INTERVAL("handleRayQueue");
-    deque<RayState> processedRays;
+    deque<RayStatePtr> processedRays;
 
     constexpr size_t MAX_RAYS = 20'000;
 
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
-        RayState ray = popRayQueue();
+        RayStatePtr rayPtr = popRayQueue();
+        RayState& ray = *rayPtr;
+
         if (!ray.toVisitEmpty()) {
             const uint32_t rayTreelet = ray.toVisitTop().treelet;
-            auto newRay = CloudIntegrator::Trace(move(ray), bvh);
+            auto newRayPtr = CloudIntegrator::Trace(move(rayPtr), bvh);
+            auto &newRay = *newRayPtr;
 
             const bool hit = newRay.hit;
             const bool emptyVisit = newRay.toVisitEmpty();
@@ -218,20 +221,21 @@ ResultType LambdaWorker::handleRayQueue() {
             if (newRay.isShadowRay) {
                 if (hit || emptyVisit) {
                     newRay.Ld = hit ? 0.f : newRay.Ld;
-                    finishedQueue.push_back(move(newRay));
+                    finishedQueue.push_back(move(newRayPtr));
                 } else {
-                    processedRays.push_back(move(newRay));
+                    processedRays.push_back(move(newRayPtr));
                 }
             } else if (!emptyVisit || hit) {
-                processedRays.push_back(move(newRay));
+                processedRays.push_back(move(newRayPtr));
             } else if (emptyVisit) {
                 newRay.Ld = 0.f;
-                finishedQueue.push_back(move(newRay));
+                finishedQueue.push_back(move(newRayPtr));
                 workerStats.recordFinishedPath();
             }
         } else if (ray.hit) {
-            auto newRays =
-                CloudIntegrator::Shade(move(ray), bvh, lights, sampler, arena);
+            auto newRays = CloudIntegrator::Shade(move(rayPtr), bvh, lights,
+                                                  sampler, arena);
+
             for (auto& newRay : newRays) {
                 processedRays.push_back(move(newRay));
             }
@@ -241,21 +245,21 @@ ResultType LambdaWorker::handleRayQueue() {
     }
 
     while (!processedRays.empty()) {
-        RayState ray = move(processedRays.front());
+        RayStatePtr ray = move(processedRays.front());
         processedRays.pop_front();
 
-        workerStats.recordDemandedRay(ray);
-        const TreeletId nextTreelet = ray.CurrentTreelet();
+        workerStats.recordDemandedRay(*ray);
+        const TreeletId nextTreelet = ray->CurrentTreelet();
 
         if (treeletIds.count(nextTreelet)) {
             pushRayQueue(move(ray));
         } else {
             if (treeletToWorker.count(nextTreelet)) {
-                workerStats.recordSendingRay(ray);
+                workerStats.recordSendingRay(*ray);
                 outQueue[nextTreelet].push_back(move(ray));
                 outQueueSize++;
             } else {
-                workerStats.recordPendingRay(ray);
+                workerStats.recordPendingRay(*ray);
                 neededTreelets.insert(nextTreelet);
                 pendingQueue[nextTreelet].push_back(move(ray));
                 pendingQueueSize++;
@@ -293,12 +297,12 @@ ResultType LambdaWorker::handleOutQueue() {
                 }
 
                 while (packetLen < UDP_MTU_BYTES && !outRays.empty()) {
-                    RayState ray = move(outRays.front());
+                    RayStatePtr ray = move(outRays.front());
                     outRays.pop_front();
                     outQueueSize--;
 
                     string rayStr = RayState::serialize(ray);
-                    workerStats.recordSentRay(ray);
+                    workerStats.recordSentRay(*ray);
 
                     const size_t len = rayStr.length() + 4;
                     if (len + packetLen > UDP_MTU_BYTES) {
@@ -552,7 +556,9 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
             CameraSample cameraSample = sampler->GetCameraSample(pixel);
 
-            RayState state;
+            RayStatePtr statePtr = make_unique<RayState>();
+            RayState& state = *statePtr;
+
             state.sample.id =
                 (pixel.x + pixel.y * sampleExtent.x) * samplesPerPixel + sample;
             state.sample.num = sample;
@@ -566,7 +572,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
             workerStats.recordDemandedRay(state);
 
-            pushRayQueue(move(state));
+            pushRayQueue(move(statePtr));
         }
     }
 }
@@ -588,16 +594,16 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
     storageBackend->get(requests);
 }
 
-void LambdaWorker::pushRayQueue(RayState&& state) {
-    workerStats.recordWaitingRay(state);
+void LambdaWorker::pushRayQueue(RayStatePtr&& state) {
+    workerStats.recordWaitingRay(*state);
     rayQueue.push_back(move(state));
 }
 
-RayState LambdaWorker::popRayQueue() {
-    RayState state = move(rayQueue.front());
+RayStatePtr LambdaWorker::popRayQueue() {
+    RayStatePtr state = move(rayQueue.front());
     rayQueue.pop_front();
 
-    workerStats.recordProcessedRay(state);
+    workerStats.recordProcessedRay(*state);
 
     return state;
 }
@@ -714,8 +720,8 @@ bool LambdaWorker::processMessage(const Message& message) {
                     pendingQueueSize -= treeletPending.size();
 
                     while (!treeletPending.empty()) {
-                        auto &front = treeletPending.front();
-                        workerStats.recordSendingRay(front);
+                        auto& front = treeletPending.front();
+                        workerStats.recordSendingRay(*front);
                         treeletOut.push_back(move(front));
                         treeletPending.pop_front();
                     }
@@ -728,7 +734,6 @@ bool LambdaWorker::processMessage(const Message& message) {
 
     case OpCode::SendRays: {
         protobuf::RecordReader reader{istringstream{message.payload()}};
-        protobuf::RayState proto;
 
         WorkerId senderId;
         reader.read(&senderId);
@@ -736,8 +741,8 @@ bool LambdaWorker::processMessage(const Message& message) {
         while (!reader.eof()) {
             string rayStr;
             if (reader.read(&rayStr)) {
-                RayState ray = RayState::deserialize(rayStr);
-                workerStats.recordReceivedRay(ray);
+                RayStatePtr ray = RayState::deserialize(rayStr);
+                workerStats.recordReceivedRay(*ray);
                 pushRayQueue(move(ray));
             }
         }

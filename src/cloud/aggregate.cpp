@@ -62,7 +62,8 @@ int main(int argc, char const *argv[]) {
 
                 string rayStr;
                 finishedReader.read(&rayStr);
-                auto rayState = RayState::deserialize(rayStr);
+                auto rayStatePtr = RayState::deserialize(rayStr);
+                auto & rayState = *rayStatePtr;
 
                 Spectrum L{rayState.Ld * rayState.beta};
 

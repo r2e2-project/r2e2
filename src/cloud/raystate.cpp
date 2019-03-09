@@ -35,13 +35,13 @@ void RayState::SetHit(const TreeletNode &node) {
     }
 }
 
-string RayState::serialize(const RayState &rayState, const bool compress) {
-    const size_t size = offset_of(rayState, &RayState::toVisit) +
-                        sizeof(RayState::TreeletNode) * rayState.toVisitHead;
+string RayState::serialize(const RayStatePtr &rayState, const bool compress) {
+    const size_t size = offset_of(*rayState, &RayState::toVisit) +
+                        sizeof(RayState::TreeletNode) * rayState->toVisitHead;
 
     string result;
     result.resize(size);
-    memcpy(&result[0], &rayState, size);
+    memcpy(&result[0], rayState.get(), size);
 
     if (compress) {
         string compressed;
@@ -60,20 +60,20 @@ string RayState::serialize(const RayState &rayState, const bool compress) {
     return result;
 }
 
-RayState RayState::deserialize(const string &data, const bool decompress) {
-    RayState result;
+RayStatePtr RayState::deserialize(const string &data, const bool decompress) {
+    RayStatePtr result = make_unique<RayState>();
 
     if (decompress) {
-        const auto decompressedSize =
-            LZ4_decompress_safe(data.data(), reinterpret_cast<char *>(&result),
-                                data.length(), sizeof(RayState));
+        const auto decompressedSize = LZ4_decompress_safe(
+            data.data(), reinterpret_cast<char *>(result.get()), data.length(),
+            sizeof(RayState));
 
         if (decompressedSize < 0) {
             throw runtime_error("ray decompression failed");
         }
     } else {
-        memcpy(&result, data.data(), data.length());
+        memcpy(result.get(), data.data(), data.length());
     }
 
-    return result;
+    return move(result);
 }

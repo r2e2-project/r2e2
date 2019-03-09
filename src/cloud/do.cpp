@@ -66,9 +66,9 @@ int main(int argc, char const *argv[]) {
 
         global::manager.init(scenePath);
 
-        vector<RayState> rayStates;
-        vector<RayState> outputRays;
-        vector<RayState> finishedRays;
+        vector<RayStatePtr> rayStates;
+        vector<RayStatePtr> outputRays;
+        vector<RayStatePtr> finishedRays;
 
         /* loading all the rays */
         {
@@ -93,23 +93,28 @@ int main(int argc, char const *argv[]) {
         auto lights = loadLights();
         auto fakeScene = loadFakeScene();
 
-        for (auto & light : lights) {
+        for (auto &light : lights) {
             light->Preprocess(fakeScene);
         }
 
-        for (auto &rayState : rayStates) {
+        for (auto &rayStatePtr : rayStates) {
+            auto &rayState = *rayStatePtr;
+
             if (!rayState.toVisitEmpty()) {
-                auto newRay = CloudIntegrator::Trace(move(rayState), treelet);
-                if (!newRay.isShadowRay || !newRay.hit) {
-                    outputRays.push_back(move(newRay));
+                auto newRayPtr =
+                    CloudIntegrator::Trace(move(rayStatePtr), treelet);
+
+                if (!newRayPtr->isShadowRay || !newRayPtr->hit) {
+                    outputRays.push_back(move(newRayPtr));
                 }
             } else if (rayState.isShadowRay) {
                 if (!rayState.hit) {
-                    finishedRays.push_back(move(rayState));
+                    finishedRays.push_back(move(rayStatePtr));
                 }
             } else if (rayState.hit) {
-                auto newRays = CloudIntegrator::Shade(move(rayState), treelet,
-                                                      lights, sampler, arena);
+                auto newRays = CloudIntegrator::Shade(
+                    move(rayStatePtr), treelet, lights, sampler, arena);
+
                 for (auto &newRay : newRays) {
                     outputRays.push_back(move(newRay));
                 }

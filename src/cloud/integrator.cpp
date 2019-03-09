@@ -5,8 +5,8 @@
 #include <deque>
 #include <iterator>
 
-#include "cloud/stats.h"
 #include "cloud/manager.h"
+#include "cloud/stats.h"
 #include "core/paramset.h"
 
 using namespace std;
@@ -19,19 +19,18 @@ STAT_COUNTER("Intersections/Regular ray intersection tests",
 STAT_COUNTER("Intersections/Shadow ray intersection tests", nShadowTests);
 STAT_INT_DISTRIBUTION("Integrator/Path length", pathLength);
 
-RayState CloudIntegrator::Trace(RayState &&rayState,
-                                const shared_ptr<CloudBVH> &treelet) {
-    RayState result{move(rayState)};
-    treelet->Trace(result);
-    return result;
+RayStatePtr CloudIntegrator::Trace(RayStatePtr &&rayState,
+                                   const shared_ptr<CloudBVH> &treelet) {
+    treelet->Trace(*rayState);
+    return move(rayState);
 }
 
-vector<RayState> CloudIntegrator::Shade(RayState &&rayState,
-                                        const shared_ptr<CloudBVH> &treelet,
-                                        const vector<shared_ptr<Light>> &lights,
-                                        shared_ptr<Sampler> &sampler,
-                                        MemoryArena &arena) {
-    vector<RayState> newRays;
+vector<RayStatePtr> CloudIntegrator::Shade(
+    RayStatePtr &&rayStatePtr, const shared_ptr<CloudBVH> &treelet,
+    const vector<shared_ptr<Light>> &lights, shared_ptr<Sampler> &sampler,
+    MemoryArena &arena) {
+    vector<RayStatePtr> newRays;
+    auto &rayState = *rayStatePtr;
 
     SurfaceInteraction it;
     rayState.ray.tMax = Infinity;
@@ -56,13 +55,16 @@ vector<RayState> CloudIntegrator::Shade(RayState &&rayState,
                                        BSDF_ALL, &flags);
 
         if (!f.IsBlack() && pdf > 0.f) {
-            RayState newRay;
+            RayStatePtr newRayPtr = make_unique<RayState>();
+            auto &newRay = *newRayPtr;
+
             newRay.beta = rayState.beta * f * AbsDot(wi, it.shading.n) / pdf;
             newRay.ray = it.SpawnRay(wi);
             newRay.remainingBounces = rayState.remainingBounces - 1;
             newRay.sample = rayState.sample;
             newRay.StartTrace();
-            newRays.push_back(move(newRay));
+
+            newRays.push_back(move(newRayPtr));
 
             ++nIntersectionTests;
         } else {
@@ -98,12 +100,15 @@ vector<RayState> CloudIntegrator::Shade(RayState &&rayState,
 
             if (!f.IsBlack()) {
                 /* now we have to shoot the ray to the light source */
-                RayState shadowRay{move(rayState)};
+                RayStatePtr shadowRayPtr = move(rayStatePtr);
+                auto &shadowRay = *shadowRayPtr;
+
                 shadowRay.ray = visibility.P0().SpawnRayTo(visibility.P1());
                 shadowRay.Ld = (f * Li / lightPdf) / lightSelectPdf;
                 shadowRay.isShadowRay = true;
                 shadowRay.StartTrace();
-                newRays.push_back(move(shadowRay));
+
+                newRays.push_back(move(shadowRayPtr));
 
                 ++nShadowTests;
             }
@@ -125,8 +130,8 @@ void CloudIntegrator::Render(const Scene &scene) {
     Bounds2i sampleBounds = camera->film->GetSampleBounds();
     unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
-    deque<RayState> rayQueue;
-    deque<RayState> finishedRays;
+    deque<RayStatePtr> rayQueue;
+    deque<RayStatePtr> finishedRays;
 
     /* Generate all the samples */
     size_t i = 0;
@@ -139,7 +144,9 @@ void CloudIntegrator::Render(const Scene &scene) {
         do {
             CameraSample cameraSample = sampler->GetCameraSample(pixel);
 
-            RayState state;
+            RayStatePtr statePtr = make_unique<RayState>();
+            auto &state = *statePtr;
+
             state.sample.id = i++;
             state.sample.num = sample_num++;
             state.sample.pixel = pixel;
@@ -151,7 +158,7 @@ void CloudIntegrator::Render(const Scene &scene) {
             state.remainingBounces = maxDepth;
             state.StartTrace();
 
-            rayQueue.push_back(move(state));
+            rayQueue.push_back(move(statePtr));
 
             ++nIntersectionTests;
             ++nCameraRays;
@@ -159,34 +166,36 @@ void CloudIntegrator::Render(const Scene &scene) {
     }
 
     while (not rayQueue.empty()) {
-        RayState state = move(rayQueue.back());
+        RayStatePtr statePtr = move(rayQueue.back());
+        RayState &state = *statePtr;
         rayQueue.pop_back();
 
         if (!state.toVisitEmpty()) {
-            auto newRay = Trace(move(state), bvh);
+            auto newRayPtr = Trace(move(statePtr), bvh);
+            auto &newRay = *newRayPtr;
             const bool hit = newRay.hit;
             const bool emptyVisit = newRay.toVisitEmpty();
 
             if (newRay.isShadowRay) {
                 if (hit) {
                     newRay.Ld = 0.f;
-                    finishedRays.push_back(move(newRay));
+                    finishedRays.push_back(move(newRayPtr));
                     continue; /* discard */
                 } else if (emptyVisit) {
-                    finishedRays.push_back(move(newRay));
+                    finishedRays.push_back(move(newRayPtr));
                 } else {
-                    rayQueue.push_back(move(newRay));
+                    rayQueue.push_back(move(newRayPtr));
                 }
             } else if (!emptyVisit || hit) {
-                rayQueue.push_back(move(newRay));
+                rayQueue.push_back(move(newRayPtr));
             } else {
                 newRay.Ld = 0.f;
-                finishedRays.push_back(move(newRay));
+                finishedRays.push_back(move(newRayPtr));
                 global::workerStats.recordFinishedPath();
             }
         } else if (state.hit) {
             auto newRays =
-                Shade(move(state), bvh, scene.lights, sampler, arena);
+                Shade(move(statePtr), bvh, scene.lights, sampler, arena);
             for (auto &newRay : newRays) {
                 rayQueue.push_back(move(newRay));
             }
@@ -203,7 +212,9 @@ void CloudIntegrator::Render(const Scene &scene) {
 
     unordered_map<size_t, CSample> allSamples;
 
-    for (const auto &state : finishedRays) {
+    for (const auto &statePtr : finishedRays) {
+        const auto &state = *statePtr;
+
         if (allSamples.count(state.sample.id) == 0) {
             allSamples[state.sample.id].pFilm = state.sample.pFilm;
             allSamples[state.sample.id].weight = state.sample.weight;

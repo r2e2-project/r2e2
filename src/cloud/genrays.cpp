@@ -72,7 +72,9 @@ int main(int argc, char const *argv[]) {
                 CloudIntegrator::SampleData sampleData;
                 sampleData.sample = sampler->GetCameraSample(pixel);
 
-                RayState state;
+                RayStatePtr statePtr = make_unique<RayState>();
+                RayState &state = *statePtr;
+
                 state.sample.id = i++;
                 state.sample.num = sample_num++;
                 state.sample.pixel = pixel;
@@ -82,7 +84,7 @@ int main(int argc, char const *argv[]) {
                 state.ray.ScaleDifferentials(rayScale);
                 state.StartTrace();
 
-                rayWriter.write(RayState::serialize(state));
+                rayWriter.write(RayState::serialize(statePtr));
                 sampleWriter.write(to_protobuf(sampleData));
             } while (sampler->StartNextSample());
         }

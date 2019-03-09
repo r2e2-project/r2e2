@@ -97,8 +97,8 @@ class LambdaWorker {
     void generateRays(const Bounds2i& cropWindow);
     void getObjects(const protobuf::GetObjects& objects);
 
-    void pushRayQueue(RayState&& state);
-    RayState popRayQueue();
+    void pushRayQueue(RayStatePtr&& state);
+    RayStatePtr popRayQueue();
 
     /* Logging & Diagnostics */
     const std::string logBase{"pbrt-worker"};
@@ -148,10 +148,10 @@ class LambdaWorker {
     MemoryArena arena;
 
     /* Rays */
-    std::deque<RayState> rayQueue{};
-    std::deque<RayState> finishedQueue{};
-    std::map<TreeletId, std::deque<RayState>> pendingQueue{};
-    std::map<TreeletId, std::deque<RayState>> outQueue{};
+    std::deque<RayStatePtr> rayQueue{};
+    std::deque<RayStatePtr> finishedQueue{};
+    std::map<TreeletId, std::deque<RayStatePtr>> pendingQueue{};
+    std::map<TreeletId, std::deque<RayStatePtr>> outQueue{};
     size_t pendingQueueSize{0};
     size_t outQueueSize{0};
 
