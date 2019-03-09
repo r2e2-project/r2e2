@@ -31,12 +31,8 @@ void SeqNoSet::insert(uint64_t value) {
     }
 }
 
-uint64_t SeqNoSet::size() const {
-    return smallest_not_in_set_ + set_.size();
-}
+uint64_t SeqNoSet::size() const { return smallest_not_in_set_ + set_.size(); }
 
-uint64_t SeqNoSet::numberOfItemsInMemory() const {
-    return set_.size();
-}
+uint64_t SeqNoSet::numberOfItemsInMemory() const { return set_.size(); }
 
 }  // namespace pbrt

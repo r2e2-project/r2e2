@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PBRT_UTIL_SEQ_NO_SET_H
+#define PBRT_UTIL_SEQ_NO_SET_H
 
 #include <cstdint>
 #include <set>
@@ -27,3 +28,5 @@ class SeqNoSet {
 };
 
 }  // namespace pbrt
+
+#endif /* PBRT_UTIL_SEQ_NO_SET_H */
