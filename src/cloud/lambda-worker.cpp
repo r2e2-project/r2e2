@@ -112,7 +112,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         handleRayAcknowledgementsTimer.fd, Direction::In,
         bind(&LambdaWorker::handleRayAcknowledgements, this),
         [this]() {
-            return !receivedRayPackets.empty() ||
+            return !toBeAcked.empty() ||
                    (!receivedAcks.empty() && !outstandingRayPackets.empty() &&
                     outstandingRayPackets.front().first <= packet_clock::now());
         },
@@ -398,7 +398,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
     handleRayAcknowledgementsTimer.reset();
 
     // sending acknowledgements
-    for (auto& receivedKv : receivedRayPackets) {
+    for (auto& receivedKv : toBeAcked) {
         string ack;
 
         for (size_t i = 0; i < receivedKv.second.size(); i++) {
@@ -412,9 +412,10 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         }
     }
 
-    receivedRayPackets.clear();
+    toBeAcked.clear();
 
     const auto now = packet_clock::now();
+
     while (!receivedAcks.empty() && !outstandingRayPackets.empty() &&
            outstandingRayPackets.front().first <= now) {
         auto& packet = outstandingRayPackets.front().second;
@@ -482,7 +483,7 @@ ResultType LambdaWorker::handleUdpReceive() {
         it->set_read();
 
         if (it->reliable()) {
-            receivedRayPackets[datagram.first].push_back(it->sequence_number());
+            toBeAcked[datagram.first].push_back(it->sequence_number());
         }
     }
 

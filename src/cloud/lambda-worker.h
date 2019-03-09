@@ -132,7 +132,7 @@ class LambdaWorker {
     std::deque<RayPacket> rayPackets{};
     std::deque<std::pair<packet_clock::time_point, RayPacket>>
         outstandingRayPackets{};
-    std::map<Address, std::vector<uint64_t>> receivedRayPackets;
+    std::map<Address, std::vector<uint64_t>> toBeAcked;
     std::set<uint64_t> receivedAcks{};
     uint64_t sequenceNumber{0};
 
