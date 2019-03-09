@@ -616,12 +616,19 @@ protobuf::Sampler sampler::to_protobuf(const string& name,
     return proto_sampler;
 }
 
-shared_ptr<Sampler> sampler::from_protobuf(const protobuf::Sampler& ps) {
+shared_ptr<Sampler> sampler::from_protobuf(const protobuf::Sampler& ps,
+                                           const int samplesPerPixel) {
     Sampler* sampler;
 
     const string& name = ps.name();
-    const ParamSet paramSet = pbrt::from_protobuf(ps.paramset());
     const Bounds2i sampleBounds = pbrt::from_protobuf(ps.sample_bounds());
+    ParamSet paramSet = pbrt::from_protobuf(ps.paramset());
+
+    if (samplesPerPixel > 0) {
+        unique_ptr<int[]> pixelSamples = make_unique<int[]>(1);
+        pixelSamples[0] = samplesPerPixel;
+        paramSet.AddInt("pixelsamples", move(pixelSamples), 1);
+    }
 
     if (name == "lowdiscrepancy" || name == "02sequence") {
         sampler = CreateZeroTwoSequenceSampler(paramSet);
