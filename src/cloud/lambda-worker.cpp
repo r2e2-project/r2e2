@@ -48,8 +48,8 @@ using PollerResult = Poller::Result::Type;
 
 constexpr size_t UDP_MTU_BYTES{1'400};
 constexpr milliseconds PEER_CHECK_INTERVAL{1'000};
-constexpr milliseconds HANDLE_ACKS_INTERVAL{2'000};
-constexpr milliseconds WORKER_STATS_INTERVAL{500};
+constexpr milliseconds HANDLE_ACKS_INTERVAL{250};
+constexpr milliseconds WORKER_STATS_INTERVAL{1'000};
 constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
@@ -464,7 +464,7 @@ ResultType LambdaWorker::handleUdpSend() {
     sendUdpPacket(packet.destination, packet.data);
 
     if (packet.reliable) {
-        outstandingRayPackets.emplace_back(packet_clock::now() + 10s,
+        outstandingRayPackets.emplace_back(packet_clock::now() + 1s,
                                            move(packet));
     }
 
