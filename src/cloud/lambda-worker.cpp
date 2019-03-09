@@ -55,11 +55,13 @@ constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const uint16_t coordinatorPort,
-                           const string& storageUri, const bool sendReliably)
+                           const string& storageUri, const bool sendReliably,
+                           const int samplesPerPixel)
     : sendReliably(sendReliably),
       coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
       storageBackend(StorageBackend::create_backend(storageUri)),
+      samplesPerPixel(samplesPerPixel),
       peerTimer(PEER_CHECK_INTERVAL),
       workerStatsTimer(WORKER_STATS_INTERVAL),
       workerDiagnosticsTimer(WORKER_DIAGNOSTICS_INTERVAL),
@@ -816,7 +818,7 @@ void LambdaWorker::loadSampler() {
     auto reader = manager.GetReader(ObjectType::Sampler);
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);
-    sampler = sampler::from_protobuf(proto_sampler);
+    sampler = sampler::from_protobuf(proto_sampler, samplesPerPixel);
 
     /* if (workerId.initialized()) {
         sampler = sampler->Clone(*workerId);
@@ -875,6 +877,7 @@ void usage(const char* argv0, int exitCode) {
          << "  -p --port PORT             port of coordinator" << endl
          << "  -s --storage-backend NAME  storage backend URI" << endl
          << "  -R --reliable-udp          send ray packets reliably" << endl
+         << "  -S --samples N             number of samples per pixel" << endl
          << "  -h --help                  show help information" << endl;
 }
 
@@ -885,19 +888,21 @@ int main(int argc, char* argv[]) {
     string publicIp;
     string storageUri;
     bool sendReliably = false;
+    int samplesPerPixel = 0;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
         {"ip", required_argument, nullptr, 'i'},
         {"storage-backend", required_argument, nullptr, 's'},
         {"reliable-udp", no_argument, nullptr, 'R'},
+        {"samples", required_argument, nullptr, 'S'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:s:hR", long_options, nullptr);
+            getopt_long(argc, argv, "p:i:s:S:hR", long_options, nullptr);
 
         if (opt == -1) break;
 
@@ -907,6 +912,7 @@ int main(int argc, char* argv[]) {
         case 'i': publicIp = optarg; break;
         case 's': storageUri = optarg; break;
         case 'R': sendReliably = true; break;
+        case 'S' : samplesPerPixel = stoi(optarg); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
         default: usage(argv[0], EXIT_FAILURE);
         }
@@ -921,7 +927,7 @@ int main(int argc, char* argv[]) {
 
     try {
         worker = make_unique<LambdaWorker>(publicIp, listenPort, storageUri,
-                                           sendReliably);
+                                           sendReliably, samplesPerPixel);
         worker->run();
     } catch (const exception& e) {
         LOG(INFO) << argv[0] << ": " << e.what();

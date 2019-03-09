@@ -49,11 +49,11 @@ constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr milliseconds WRITE_STATS_INTERVAL{5'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
-shared_ptr<Sampler> loadSampler() {
+shared_ptr<Sampler> loadSampler(const int samplesPerPixel) {
     auto reader = global::manager.GetReader(ObjectType::Sampler);
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);
-    return sampler::from_protobuf(proto_sampler);
+    return sampler::from_protobuf(proto_sampler, samplesPerPixel);
 }
 
 void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
@@ -245,7 +245,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
     udpConnection->socket().bind({"0.0.0.0", listenPort});
 
-    totalPaths = this->sampleBounds.Area() * loadSampler()->samplesPerPixel;
+    totalPaths = this->sampleBounds.Area() *
+                 loadSampler(config.samplesPerPixel)->samplesPerPixel;
 
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaMaster::handleMessages, this),
@@ -771,6 +772,7 @@ HTTPRequest LambdaMaster::generateRequest() {
     proto.set_storage_backend(storageBackendUri);
     proto.set_coordinator(publicAddress);
     proto.set_send_reliably(config.sendReliably);
+    proto.set_samples_per_pixel(config.samplesPerPixel);
 
     return LambdaInvocationRequest(
                awsCredentials, awsRegion, lambdaFunctionName,
@@ -809,6 +811,7 @@ void usage(const char *argv0, int exitCode) {
          << "  -R --reliable-udp          send ray packets reliably" << endl
          << "  -w --worker-stats DIR      dump worker stats" << endl
          << "  -d --diagnostics DIR       collect worker diagnostics" << endl
+         << "  -S --samples N             number of samples per pixel" << endl
          << "  -a --assignment TYPE       indicate assignment type:" << endl
          << "                             * uniform (default)" << endl
          << "                             * static" << endl
@@ -835,6 +838,7 @@ int main(int argc, char *argv[]) {
     string workerStatsDir;
     string diagnosticsDir;
     Assignment assignment = Assignment::Uniform;
+    int samplesPerPixel = 0;
 
     struct option long_options[] = {
         {"scene-path", required_argument, nullptr, 's'},
@@ -847,12 +851,13 @@ int main(int argc, char *argv[]) {
         {"reliable-udp", no_argument, nullptr, 'R'},
         {"worker-stats", required_argument, nullptr, 'w'},
         {"diagnostics", required_argument, nullptr, 'd'},
+        {"samples", required_argument, nullptr, 'S'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:w:hd:a:R",
+        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:w:hd:a:S:R",
                                     long_options, nullptr);
 
         if (opt == -1) {
@@ -870,6 +875,7 @@ int main(int argc, char *argv[]) {
         case 'l': numLambdas = stoul(optarg); break;
         case 'w': workerStatsDir = optarg; break;
         case 'd': diagnosticsDir = optarg; break;
+        case 'S': samplesPerPixel = stoi(optarg); break;
         case 'h': usage(argv[0], 0); break;
         case 'a': {
             if (strcmp(optarg, "static") == 0) {
@@ -890,7 +896,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (scene.empty() || listenPort == 0 || numLambdas < 0 ||
-        publicIp.empty() || storageBackendUri.empty() || region.empty()) {
+        samplesPerPixel < 0 || publicIp.empty() || storageBackendUri.empty() ||
+        region.empty()) {
         usage(argv[0], 2);
     }
 
@@ -900,7 +907,7 @@ int main(int argc, char *argv[]) {
     unique_ptr<LambdaMaster> master;
 
     MasterConfiguration config = {assignment, diagnosticsDir, workerStatsDir,
-                                  sendReliably};
+                                  sendReliably, samplesPerPixel};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,

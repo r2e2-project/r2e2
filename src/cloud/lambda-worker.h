@@ -30,7 +30,8 @@ class LambdaWorker {
   public:
     LambdaWorker(const std::string& coordinatorIP,
                  const uint16_t coordinatorPort,
-                 const std::string& storageBackendUri, const bool sendReliably);
+                 const std::string& storageBackendUri, const bool sendReliably,
+                 const int samplesPerPixel);
 
     void run();
     void terminate() { terminated = true; }
@@ -146,6 +147,7 @@ class LambdaWorker {
 
     /* Scene Data */
     bool initialized{false};
+    int samplesPerPixel{0};
     std::vector<std::unique_ptr<Transform>> transformCache{};
     std::shared_ptr<Camera> camera{};
     std::unique_ptr<FilmTile> filmTile{};
@@ -165,8 +167,8 @@ class LambdaWorker {
     size_t outQueueSize{0};
 
     std::map<TreeletId, std::vector<WorkerId>> treeletToWorker{};
-    std::set<TreeletId> neededTreelets;
-    std::set<TreeletId> requestedTreelets;
+    std::set<TreeletId> neededTreelets{};
+    std::set<TreeletId> requestedTreelets{};
 
     /* Always-on FD */
     FileDescriptor dummyFD{STDOUT_FILENO};

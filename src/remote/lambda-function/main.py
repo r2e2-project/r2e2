@@ -30,6 +30,9 @@ def handler(event, context):
     if event['sendReliably']:
         command += ['--reliable-udp']
 
+    if event['samplesPerPixel']:
+        command += ['--samples', str(event['samplesPerPixel'])]
+
     retcode = run_command(command)
     print("retcode={}".format(retcode))
 

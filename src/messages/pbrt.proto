@@ -229,6 +229,7 @@ message InvocationPayload {
     string storage_backend = 1;
     string coordinator = 2;
     bool send_reliably = 3;
+    int32 samples_per_pixel = 4;
 }
 
 message ObjectKey {

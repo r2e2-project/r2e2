@@ -40,6 +40,7 @@ struct MasterConfiguration {
     std::string diagnosticsDir;
     std::string workerStatsDir;
     bool sendReliably;
+    int samplesPerPixel;
 };
 
 class LambdaMaster {
