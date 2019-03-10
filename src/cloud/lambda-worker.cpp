@@ -601,8 +601,23 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             state.StartTrace();
 
             workerStats.recordDemandedRay(state);
+            const auto nextTreelet = state.CurrentTreelet();
 
-            pushRayQueue(move(statePtr));
+            if (treeletIds.count(nextTreelet)) {
+                pushRayQueue(move(statePtr));
+            }
+            else {
+                if (treeletToWorker.count(nextTreelet)) {
+                    workerStats.recordSendingRay(state);
+                    outQueue[nextTreelet].push_back(move(statePtr));
+                    outQueueSize++;
+                } else {
+                    workerStats.recordPendingRay(state);
+                    neededTreelets.insert(nextTreelet);
+                    pendingQueue[nextTreelet].push_back(move(statePtr));
+                    pendingQueueSize++;
+                }
+            }
         }
     }
 }
