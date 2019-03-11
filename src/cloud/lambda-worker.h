@@ -8,6 +8,7 @@
 #include <string>
 
 #include "cloud/bvh.h"
+#include "cloud/lambda-master.h"
 #include "cloud/lambda.h"
 #include "cloud/raystate.h"
 #include "cloud/stats.h"
@@ -31,7 +32,8 @@ class LambdaWorker {
     LambdaWorker(const std::string& coordinatorIP,
                  const uint16_t coordinatorPort,
                  const std::string& storageBackendUri, const bool sendReliably,
-                 const int samplesPerPixel);
+                 const int samplesPerPixel,
+                 const FinishedRayAction finishedRayAction);
 
     void run();
     void terminate() { terminated = true; }
@@ -123,10 +125,11 @@ class LambdaWorker {
     meow::MessageParser messageParser{};
     meow::MessageParser tcpMessageParser{};
     Optional<WorkerId> workerId;
-    std::map<WorkerId, Worker> peers;
+    std::map<WorkerId, Worker> peers{};
     int32_t mySeed;
     bool peerRequested{false};
     std::string outputName;
+    FinishedRayAction finishedRayAction;
 
     /* Sending rays to other nodes */
     using packet_clock = std::chrono::steady_clock;

@@ -29,14 +29,12 @@
 
 namespace pbrt {
 
-enum class Assignment {
-    All,
-    Static,
-    Uniform,
-};
+enum class Assignment { All, Static, Uniform };
+enum class FinishedRayAction { Discard, SendBack, Upload };
 
 struct MasterConfiguration {
     Assignment assignment;
+    FinishedRayAction finishedRayAction;
     std::string diagnosticsDir;
     std::string workerStatsDir;
     bool sendReliably;

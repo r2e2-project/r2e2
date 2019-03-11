@@ -772,6 +772,7 @@ HTTPRequest LambdaMaster::generateRequest() {
     proto.set_coordinator(publicAddress);
     proto.set_send_reliably(config.sendReliably);
     proto.set_samples_per_pixel(config.samplesPerPixel);
+    proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
 
     return LambdaInvocationRequest(
                awsCredentials, awsRegion, lambdaFunctionName,
@@ -815,6 +816,10 @@ void usage(const char *argv0, int exitCode) {
          << "                             * uniform (default)" << endl
          << "                             * static" << endl
          << "                             * all" << endl
+         << "  -f --finished-ray ACTION   what to do with finished rays" << endl
+         << "                             * discard (default)" << endl
+         << "                             * send" << endl
+         << "                             * upload" << endl
          << "  -h --help                  show help information" << endl;
 
     exit(exitCode);
@@ -838,6 +843,7 @@ int main(int argc, char *argv[]) {
     string diagnosticsDir;
     Assignment assignment = Assignment::Uniform;
     int samplesPerPixel = 0;
+    FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
 
     struct option long_options[] = {
         {"scene-path", required_argument, nullptr, 's'},
@@ -847,6 +853,7 @@ int main(int argc, char *argv[]) {
         {"storage-backend", required_argument, nullptr, 'b'},
         {"lambdas", required_argument, nullptr, 'l'},
         {"assignment", required_argument, nullptr, 'a'},
+        {"finished-ray", required_argument, nullptr, 'f'},
         {"reliable-udp", no_argument, nullptr, 'R'},
         {"worker-stats", required_argument, nullptr, 'w'},
         {"diagnostics", required_argument, nullptr, 'd'},
@@ -856,15 +863,15 @@ int main(int argc, char *argv[]) {
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:w:hd:a:S:R",
+        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:w:hd:a:S:f:R",
                                     long_options, nullptr);
 
         if (opt == -1) {
             break;
         }
 
-        // clang-format off
         switch (opt) {
+        // clang-format off
         case 'R': sendReliably = true; break;
         case 's': scene = optarg; break;
         case 'p': listenPort = stoi(optarg); break;
@@ -875,23 +882,39 @@ int main(int argc, char *argv[]) {
         case 'w': workerStatsDir = optarg; break;
         case 'd': diagnosticsDir = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
-        case 'h': usage(argv[0], 0); break;
-        case 'a': {
+        case 'h': usage(argv[0], EXIT_SUCCESS); break;
+            // clang-format on
+
+        case 'a':
             if (strcmp(optarg, "static") == 0) {
                 assignment = Assignment::Static;
             } else if (strcmp(optarg, "uniform") == 0) {
                 assignment = Assignment::Uniform;
-            } else if (strcmp(optarg, "all") == 0 ) {
+            } else if (strcmp(optarg, "all") == 0) {
                 assignment = Assignment::All;
             } else {
-                usage(argv[0], 2);
+                usage(argv[0], EXIT_FAILURE);
             }
+
+            break;
+
+        case 'f':
+            if (strcmp(optarg, "discard") == 0) {
+                finishedRayAction = FinishedRayAction::Discard;
+            } else if (strcmp(optarg, "send") == 0) {
+                finishedRayAction = FinishedRayAction::SendBack;
+            } else if (strcmp(optarg, "upload") == 0) {
+                finishedRayAction = FinishedRayAction::Upload;
+            } else {
+                usage(argv[0], EXIT_FAILURE);
+            }
+
+            break;
+
+        default:
+            usage(argv[0], EXIT_FAILURE);
             break;
         }
-
-        default: usage(argv[0], 2); break;
-        }
-        // clang-format on
     }
 
     if (scene.empty() || listenPort == 0 || numLambdas < 0 ||
@@ -905,8 +928,9 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {assignment, diagnosticsDir, workerStatsDir,
-                                  sendReliably, samplesPerPixel};
+    MasterConfiguration config = {assignment,     finishedRayAction,
+                                  diagnosticsDir, workerStatsDir,
+                                  sendReliably,   samplesPerPixel};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,
