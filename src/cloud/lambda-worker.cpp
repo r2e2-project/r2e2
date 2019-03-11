@@ -341,9 +341,61 @@ ResultType LambdaWorker::handleOutQueue() {
     return ResultType::Continue;
 }
 
+protobuf::FinishedRay createFinishedRay(const size_t sampleId,
+                                        const Point2f& pFilm,
+                                        const Float weight, const Spectrum L) {
+    protobuf::FinishedRay proto;
+    proto.set_sample_id(sampleId);
+    *proto.mutable_p_film() = to_protobuf(pFilm);
+    proto.set_weight(weight);
+    *proto.mutable_l() = to_protobuf(L);
+    return proto;
+}
+
 ResultType LambdaWorker::handleFinishedQueue() {
     RECORD_INTERVAL("handleFinishedQueue");
-    finishedQueue.clear();
+
+    switch (finishedRayAction) {
+    case FinishedRayAction::Discard:
+        finishedQueue.clear();
+        break;
+
+    case FinishedRayAction::SendBack: {
+        ostringstream oss;
+
+        {
+            protobuf::RecordWriter writer{&oss};
+
+            while (!finishedQueue.empty()) {
+                RayStatePtr rayPtr = move(finishedQueue.front());
+                RayState& ray = *rayPtr;
+                finishedQueue.pop_front();
+
+                Spectrum L{ray.beta * ray.Ld};
+
+                if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
+                    L = Spectrum(0.f);
+                }
+
+                writer.write(createFinishedRay(ray.sample.id, ray.sample.pFilm,
+                                               ray.sample.weight, L));
+            }
+        }
+
+        oss.flush();
+        Message message{OpCode::FinishedRays, oss.str()};
+        auto messageStr = message.str();
+        coordinatorConnection->enqueue_write(move(messageStr));
+        break;
+    }
+
+    case FinishedRayAction::Upload:
+        break;
+
+    default:
+        throw runtime_error("invalid finished ray action");
+    }
+
     return ResultType::Continue;
 }
 
@@ -935,7 +987,7 @@ int main(int argc, char* argv[]) {
         case 'i': publicIp = optarg; break;
         case 's': storageUri = optarg; break;
         case 'R': sendReliably = true; break;
-        case 'S' : samplesPerPixel = stoi(optarg); break;
+        case 'S': samplesPerPixel = stoi(optarg); break;
         case 'f': finishedRayAction = (FinishedRayAction)stoi(optarg); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
         default: usage(argv[0], EXIT_FAILURE);
