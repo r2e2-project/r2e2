@@ -72,7 +72,7 @@ RayStatePtr RayState::deserialize(const string &data, const bool decompress) {
             throw runtime_error("ray decompression failed");
         }
     } else {
-        memcpy(result.get(), data.data(), data.length());
+        memcpy(result.get(), data.data(), min(sizeof(RayState), data.length()));
     }
 
     return move(result);
