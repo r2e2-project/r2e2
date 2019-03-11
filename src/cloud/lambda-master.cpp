@@ -462,7 +462,7 @@ ResultType LambdaMaster::handleMessages() {
 ResultType LambdaMaster::handleWorkerRequests() {
     workerRequestTimer.reset();
 
-    if (initializedWorkers < numberOfLambdas * 0.90) {
+    if (initializedWorkers < numberOfLambdas * 0.99) {
         return ResultType::Continue;
     }
 
