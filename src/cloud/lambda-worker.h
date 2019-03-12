@@ -34,13 +34,16 @@ class LambdaWorker {
                  const std::string& storageBackendUri, const bool sendReliably,
                  const int samplesPerPixel,
                  const FinishedRayAction finishedRayAction,
-                 const float raysLogRate);
+                 const float rayActionsLogRate);
 
     void run();
     void terminate() { terminated = true; }
     void uploadLogs();
 
   private:
+    using packet_clock = std::chrono::steady_clock;
+    using rays_clock = std::chrono::system_clock;
+
     struct Worker {
         enum class State { Connecting, Connected };
 
@@ -77,6 +80,8 @@ class LambdaWorker {
               sequenceNumber(sequenceNumber) {}
     };
 
+    enum class RayAction { Queued, Received };
+
     bool processMessage(const meow::Message& message);
     void initializeScene();
 
@@ -108,14 +113,18 @@ class LambdaWorker {
     void pushRayQueue(RayStatePtr&& state);
     RayStatePtr popRayQueue();
 
+    void logRayAction(const RayState& state, const RayAction action);
+
     /* Logging & Diagnostics */
     const std::string logBase{"pbrt-worker"};
     const std::string infoLogName{logBase + ".INFO"};
     const std::string diagnosticsName{logBase + ".DIAG"};
+    const std::string rayActionsName{logBase + ".RAYS"};
     const std::string logPrefix{"logs/"};
     std::ofstream diagnosticsOstream{};
-    const float raysLogRate;
-    const bool trackRays{raysLogRate > 0};
+    std::ofstream rayActionsOstream{};
+    const float rayActionsLogRate;
+    const bool trackRays{rayActionsLogRate > 0};
 
     WorkerDiagnostics lastDiagnostics;
 
@@ -135,8 +144,6 @@ class LambdaWorker {
     const FinishedRayAction finishedRayAction;
 
     /* Sending rays to other nodes */
-    using packet_clock = std::chrono::steady_clock;
-
     UDPConnection udpConnection{true};
     std::deque<std::pair<Address, std::string>> servicePackets{};
 

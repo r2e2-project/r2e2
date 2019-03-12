@@ -172,6 +172,11 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     global::manager.init(scenePath);
     loadCamera();
 
+    if (config.collectDiagnostics || config.collectWorkerStats ||
+        config.rayActionsLogRate > 0) {
+        roost::create_directories(config.logsDirectory);
+    }
+
     /* get the list of all objects and create entries for tracking their
      * assignment to workers for each */
     for (auto &kv : global::manager.listObjects()) {
@@ -270,7 +275,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                        [this]() { return true; },
                        []() { throw runtime_error("status print failed"); }));
 
-    if (config.workerStatsDir.length()) {
+    if (config.collectWorkerStats) {
         loop.poller().add_action(Poller::Action(
             writeWorkerStatsTimer.fd, Direction::In,
             bind(&LambdaMaster::handleWriteWorkerStats, this),
@@ -322,9 +327,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                          forward_as_tuple(currentWorkerID, move(connection)))
                 .first;
 
-        if (this->config.workerStatsDir.length()) {
+        if (this->config.collectWorkerStats) {
             workerIt->second.statsOstream.open(
-                this->config.workerStatsDir + "/" + to_string(workerIt->first) +
+                this->config.logsDirectory + "/" + to_string(workerIt->first) +
                     ".STATS",
                 ios::out | ios::trunc);
 
@@ -639,7 +644,7 @@ void LambdaMaster::run() {
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 
-    if (config.diagnosticsDir.length()) {
+    if (config.collectDiagnostics) {
         vector<storage::GetRequest> getRequests;
         for (const auto &workerkv : workers) {
             const auto &worker = workerkv.second;
@@ -647,13 +652,21 @@ void LambdaMaster::run() {
 
             getRequests.emplace_back(
                 "logs/"s + to_string(worker.id) + ".DIAG",
-                config.diagnosticsDir + "/" + to_string(worker.id) + ".DIAG");
+                config.logsDirectory + "/" + to_string(worker.id) + ".DIAG");
+
+            if (config.rayActionsLogRate) {
+                getRequests.emplace_back(
+                    "logs/"s + to_string(worker.id) + ".RAYS",
+                    config.logsDirectory + "/" + to_string(worker.id) +
+                        ".RAYS");
+            }
         }
 
-        cerr << "Downloading " << getRequests.size()
-             << " diagnostic file(s)... ";
-        this_thread::sleep_for(5s);
+        cerr << "Downloading " << getRequests.size() << " log file(s)... ";
+
+        this_thread::sleep_for(6s);
         storageBackend->get(getRequests);
+
         cerr << "done." << endl;
     }
 
@@ -773,7 +786,7 @@ HTTPRequest LambdaMaster::generateRequest() {
     proto.set_send_reliably(config.sendReliably);
     proto.set_samples_per_pixel(config.samplesPerPixel);
     proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
-    proto.set_rays_log_rate(config.raysLogRate);
+    proto.set_ray_actions_log_rate(config.rayActionsLogRate);
 
     return LambdaInvocationRequest(
                awsCredentials, awsRegion, lambdaFunctionName,
@@ -810,10 +823,12 @@ void usage(const char *argv0, int exitCode) {
          << "  -b --storage-backend NAME  storage backend URI" << endl
          << "  -l --lambdas N             how many lambdas to run" << endl
          << "  -R --reliable-udp          send ray packets reliably" << endl
-         << "  -w --worker-stats DIR      dump worker stats" << endl
-         << "  -d --diagnostics DIR       collect worker diagnostics" << endl
-         << "  -S --samples N             number of samples per pixel" << endl
+         << "  -w --worker-stats          dump worker stats" << endl
+         << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
+         << "  -D --logs-dir DIR          set logs directory (default: logs/)"
+         << endl
+         << "  -S --samples N             number of samples per pixel" << endl
          << "  -a --assignment TYPE       indicate assignment type:" << endl
          << "                             * uniform (default)" << endl
          << "                             * static" << endl
@@ -841,12 +856,14 @@ int main(int argc, char *argv[]) {
     string storageBackendUri;
     string region{"us-west-2"};
     bool sendReliably = false;
-    string workerStatsDir;
-    string diagnosticsDir;
+    bool collectWorkerStats = false;
+    bool collectDiagnostics = false;
+    float rayActionsLogRate = 0.0;
+    string logsDirectory = "logs/";
+
     Assignment assignment = Assignment::Uniform;
     int samplesPerPixel = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
-    float raysLogRate = 0.0;
 
     struct option long_options[] = {
         {"scene-path", required_argument, nullptr, 's'},
@@ -858,16 +875,17 @@ int main(int argc, char *argv[]) {
         {"assignment", required_argument, nullptr, 'a'},
         {"finished-ray", required_argument, nullptr, 'f'},
         {"reliable-udp", no_argument, nullptr, 'R'},
-        {"worker-stats", required_argument, nullptr, 'w'},
-        {"diagnostics", required_argument, nullptr, 'd'},
-        {"samples", required_argument, nullptr, 'S'},
+        {"worker-stats", no_argument, nullptr, 'w'},
+        {"diagnostics", no_argument, nullptr, 'd'},
         {"log-rays", required_argument, nullptr, 'L'},
+        {"logs-dir", required_argument, nullptr, 'D'},
+        {"samples", required_argument, nullptr, 'S'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:w:hd:a:S:f:L:R",
+        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:whdD:a:S:f:L:R",
                                     long_options, nullptr);
 
         if (opt == -1) {
@@ -883,10 +901,11 @@ int main(int argc, char *argv[]) {
         case 'r': region = optarg; break;
         case 'b': storageBackendUri = optarg; break;
         case 'l': numLambdas = stoul(optarg); break;
-        case 'w': workerStatsDir = optarg; break;
-        case 'd': diagnosticsDir = optarg; break;
+        case 'w': collectWorkerStats = true; break;
+        case 'd': collectDiagnostics = true; break;
+        case 'D': logsDirectory = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
-        case 'L': raysLogRate = stof(optarg); break;
+        case 'L': rayActionsLogRate = stof(optarg); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
             // clang-format on
 
@@ -923,8 +942,9 @@ int main(int argc, char *argv[]) {
     }
 
     if (scene.empty() || listenPort == 0 || numLambdas < 0 ||
-        samplesPerPixel < 0 || raysLogRate < 0 || raysLogRate > 1.0 ||
-        publicIp.empty() || storageBackendUri.empty() || region.empty()) {
+        samplesPerPixel < 0 || rayActionsLogRate < 0 ||
+        rayActionsLogRate > 1.0 || publicIp.empty() ||
+        storageBackendUri.empty() || region.empty()) {
         usage(argv[0], 2);
     }
 
@@ -933,9 +953,10 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {
-        assignment,   finishedRayAction, diagnosticsDir, workerStatsDir,
-        sendReliably, samplesPerPixel,   raysLogRate};
+    MasterConfiguration config = {assignment,         finishedRayAction,
+                                  sendReliably,       samplesPerPixel,
+                                  collectDiagnostics, collectWorkerStats,
+                                  rayActionsLogRate,  logsDirectory};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,

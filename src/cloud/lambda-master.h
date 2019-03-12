@@ -35,11 +35,12 @@ enum class FinishedRayAction { Discard, SendBack, Upload };
 struct MasterConfiguration {
     Assignment assignment;
     FinishedRayAction finishedRayAction;
-    std::string diagnosticsDir;
-    std::string workerStatsDir;
     bool sendReliably;
     int samplesPerPixel;
-    float raysLogRate;
+    bool collectDiagnostics;
+    bool collectWorkerStats;
+    float rayActionsLogRate;
+    std::string logsDirectory;
 };
 
 class LambdaMaster {

@@ -34,8 +34,8 @@ def handler(event, context):
     if event['samplesPerPixel']:
         command += ['--samples', str(event['samplesPerPixel'])]
 
-    if event['raysLogRate']:
-        command += ['--log-rays', str(event['raysLogRate'])]
+    if event['rayActionsLogRate']:
+        command += ['--log-rays', str(event['rayActionsLogRate'])]
 
     retcode = run_command(command)
     print("retcode={}".format(retcode))

@@ -59,8 +59,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const string& storageUri, const bool sendReliably,
                            const int samplesPerPixel,
                            const FinishedRayAction finishedRayAction,
-                           const float raysLogRate)
-    : raysLogRate(raysLogRate),
+                           const float rayActionsLogRate)
+    : rayActionsLogRate(rayActionsLogRate),
       sendReliably(sendReliably),
       coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
@@ -84,6 +84,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                               workerDiagnostics.startTime.time_since_epoch())
                               .count()
                        << endl;
+
+    if (trackRays) {
+        rayActionsOstream.open(rayActionsName, ios::out | ios::trunc);
+        rayActionsOstream << "x,y,sample,workerID,timestamp,action" << endl;
+    }
 
     PbrtOptions.nThreads = 1;
     bvh = make_shared<CloudBVH>();
@@ -205,6 +210,27 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
         proto.add_treelet_ids(treeletId);
     }
     return {OpCode::ConnectionResponse, protoutil::to_string(proto)};
+}
+
+void LambdaWorker::logRayAction(const RayState& state, const RayAction action) {
+    if (!trackRays || !state.trackRay) return;
+
+    rayActionsOstream << state.sample.pixel.x << ',' << state.sample.pixel.y
+                      << ',' << state.sample.num << ',' << *workerId << ','
+                      << duration_cast<milliseconds>(
+                             rays_clock::now().time_since_epoch())
+                             .count()
+                      << ',';
+
+    // clang-format off
+    switch (action) {
+    case RayAction::Queued: rayActionsOstream << "queued"; break;
+    case RayAction::Received: rayActionsOstream << "received"; break;
+    default: throw runtime_error("invalid ray action");
+    }
+    // clang-format on
+
+    rayActionsOstream << endl;
 }
 
 ResultType LambdaWorker::handleRayQueue() {
@@ -637,7 +663,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
     /* for ray tracking */
     mt19937 randEngine(random_device{}());
-    bernoulli_distribution bd{raysLogRate};
+    bernoulli_distribution bd{rayActionsLogRate};
 
     for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
         for (const Point2i pixel : bounds) {
@@ -937,10 +963,16 @@ void LambdaWorker::uploadLogs() {
 
     google::FlushLogFiles(google::INFO);
     diagnosticsOstream.close();
+    rayActionsOstream.close();
 
     vector<storage::PutRequest> putLogsRequest = {
         {infoLogName, logPrefix + to_string(*workerId)},
         {diagnosticsName, logPrefix + to_string(*workerId) + ".DIAG"}};
+
+    if (trackRays) {
+        putLogsRequest.emplace_back(rayActionsName,
+                                    logPrefix + to_string(*workerId) + ".RAYS");
+    }
 
     storageBackend->put(putLogsRequest);
 }
@@ -971,7 +1003,7 @@ int main(int argc, char* argv[]) {
     bool sendReliably = false;
     int samplesPerPixel = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
-    float raysLogRate = 0.0;
+    float rayActionsLogRate = 0.0;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
@@ -998,7 +1030,7 @@ int main(int argc, char* argv[]) {
         case 's': storageUri = optarg; break;
         case 'R': sendReliably = true; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
-        case 'L': raysLogRate = stof(optarg); break;
+        case 'L': rayActionsLogRate = stof(optarg); break;
         case 'f': finishedRayAction = (FinishedRayAction)stoi(optarg); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
         default: usage(argv[0], EXIT_FAILURE);
@@ -1006,7 +1038,7 @@ int main(int argc, char* argv[]) {
         // clang-format on
     }
 
-    if (listenPort == 0 || raysLogRate < 0 || raysLogRate > 1.0 ||
+    if (listenPort == 0 || rayActionsLogRate < 0 || rayActionsLogRate > 1.0 ||
         publicIp.empty() || storageUri.empty()) {
         usage(argv[0], EXIT_FAILURE);
     }
@@ -1016,7 +1048,7 @@ int main(int argc, char* argv[]) {
     try {
         worker = make_unique<LambdaWorker>(publicIp, listenPort, storageUri,
                                            sendReliably, samplesPerPixel,
-                                           finishedRayAction, raysLogRate);
+                                           finishedRayAction, rayActionsLogRate);
         worker->run();
     } catch (const exception& e) {
         LOG(INFO) << argv[0] << ": " << e.what();
