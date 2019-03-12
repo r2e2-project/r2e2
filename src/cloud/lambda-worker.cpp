@@ -342,6 +342,7 @@ ResultType LambdaWorker::handleOutQueue() {
 
                     string rayStr = RayState::serialize(ray);
                     workerStats.recordSentRay(*ray);
+                    logRayAction(*ray, RayAction::Queued);
 
                     const size_t len = rayStr.length() + 4;
                     if (len + packetLen > UDP_MTU_BYTES) {
@@ -864,6 +865,7 @@ bool LambdaWorker::processMessage(const Message& message) {
             if (reader.read(&rayStr)) {
                 RayStatePtr ray = RayState::deserialize(rayStr);
                 workerStats.recordReceivedRay(*ray);
+                logRayAction(*ray, RayAction::Received);
                 pushRayQueue(move(ray));
             }
         }
