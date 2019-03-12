@@ -33,7 +33,8 @@ class LambdaWorker {
                  const uint16_t coordinatorPort,
                  const std::string& storageBackendUri, const bool sendReliably,
                  const int samplesPerPixel,
-                 const FinishedRayAction finishedRayAction);
+                 const FinishedRayAction finishedRayAction,
+                 const float logRaysRate);
 
     void run();
     void terminate() { terminated = true; }
@@ -113,13 +114,14 @@ class LambdaWorker {
     const std::string diagnosticsName{logBase + ".DIAG"};
     const std::string logPrefix{"logs/"};
     std::ofstream diagnosticsOstream{};
+    const float logRaysRate;
 
     WorkerDiagnostics lastDiagnostics;
 
     const bool sendReliably;
-    Address coordinatorAddr;
+    const Address coordinatorAddr;
+    const UniqueDirectory workingDirectory;
     ExecutionLoop loop{};
-    UniqueDirectory workingDirectory;
     std::unique_ptr<StorageBackend> storageBackend;
     std::shared_ptr<TCPConnection> coordinatorConnection;
     meow::MessageParser messageParser{};
@@ -129,7 +131,7 @@ class LambdaWorker {
     int32_t mySeed;
     bool peerRequested{false};
     std::string outputName;
-    FinishedRayAction finishedRayAction;
+    const FinishedRayAction finishedRayAction;
 
     /* Sending rays to other nodes */
     using packet_clock = std::chrono::steady_clock;
