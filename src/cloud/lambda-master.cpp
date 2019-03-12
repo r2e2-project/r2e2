@@ -773,6 +773,7 @@ HTTPRequest LambdaMaster::generateRequest() {
     proto.set_send_reliably(config.sendReliably);
     proto.set_samples_per_pixel(config.samplesPerPixel);
     proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
+    proto.set_rays_log_rate(config.raysLogRate);
 
     return LambdaInvocationRequest(
                awsCredentials, awsRegion, lambdaFunctionName,
@@ -812,6 +813,7 @@ void usage(const char *argv0, int exitCode) {
          << "  -w --worker-stats DIR      dump worker stats" << endl
          << "  -d --diagnostics DIR       collect worker diagnostics" << endl
          << "  -S --samples N             number of samples per pixel" << endl
+         << "  -L --log-rays RATE         log ray actions" << endl
          << "  -a --assignment TYPE       indicate assignment type:" << endl
          << "                             * uniform (default)" << endl
          << "                             * static" << endl
@@ -844,6 +846,7 @@ int main(int argc, char *argv[]) {
     Assignment assignment = Assignment::Uniform;
     int samplesPerPixel = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
+    float raysLogRate = 0.0;
 
     struct option long_options[] = {
         {"scene-path", required_argument, nullptr, 's'},
@@ -858,12 +861,13 @@ int main(int argc, char *argv[]) {
         {"worker-stats", required_argument, nullptr, 'w'},
         {"diagnostics", required_argument, nullptr, 'd'},
         {"samples", required_argument, nullptr, 'S'},
+        {"log-rays", required_argument, nullptr, 'L'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:w:hd:a:S:f:R",
+        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:w:hd:a:S:f:L:R",
                                     long_options, nullptr);
 
         if (opt == -1) {
@@ -882,6 +886,7 @@ int main(int argc, char *argv[]) {
         case 'w': workerStatsDir = optarg; break;
         case 'd': diagnosticsDir = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
+        case 'L': raysLogRate = stof(optarg); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
             // clang-format on
 
@@ -918,8 +923,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (scene.empty() || listenPort == 0 || numLambdas < 0 ||
-        samplesPerPixel < 0 || publicIp.empty() || storageBackendUri.empty() ||
-        region.empty()) {
+        samplesPerPixel < 0 || raysLogRate < 0 || raysLogRate > 1.0 ||
+        publicIp.empty() || storageBackendUri.empty() || region.empty()) {
         usage(argv[0], 2);
     }
 
@@ -928,9 +933,9 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {assignment,     finishedRayAction,
-                                  diagnosticsDir, workerStatsDir,
-                                  sendReliably,   samplesPerPixel};
+    MasterConfiguration config = {
+        assignment,   finishedRayAction, diagnosticsDir, workerStatsDir,
+        sendReliably, samplesPerPixel,   raysLogRate};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,

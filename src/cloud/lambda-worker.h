@@ -34,7 +34,7 @@ class LambdaWorker {
                  const std::string& storageBackendUri, const bool sendReliably,
                  const int samplesPerPixel,
                  const FinishedRayAction finishedRayAction,
-                 const float logRaysRate);
+                 const float raysLogRate);
 
     void run();
     void terminate() { terminated = true; }
@@ -114,7 +114,7 @@ class LambdaWorker {
     const std::string diagnosticsName{logBase + ".DIAG"};
     const std::string logPrefix{"logs/"};
     std::ofstream diagnosticsOstream{};
-    const float logRaysRate;
+    const float raysLogRate;
 
     WorkerDiagnostics lastDiagnostics;
 

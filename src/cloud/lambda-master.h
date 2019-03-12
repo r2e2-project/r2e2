@@ -39,6 +39,7 @@ struct MasterConfiguration {
     std::string workerStatsDir;
     bool sendReliably;
     int samplesPerPixel;
+    float raysLogRate;
 };
 
 class LambdaMaster {
