@@ -115,6 +115,7 @@ class LambdaWorker {
     const std::string logPrefix{"logs/"};
     std::ofstream diagnosticsOstream{};
     const float raysLogRate;
+    const bool trackRays{raysLogRate > 0};
 
     WorkerDiagnostics lastDiagnostics;
 

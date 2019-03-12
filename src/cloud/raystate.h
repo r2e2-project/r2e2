@@ -38,7 +38,7 @@ struct RayState {
     RayState(const RayState &) = delete;
     RayState &operator=(const RayState &) = delete;
 
-    bool logActions{false};
+    bool trackRay{false};
     Sample sample;
     RayDifferential ray;
     Spectrum beta{1.f};

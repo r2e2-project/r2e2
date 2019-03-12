@@ -635,6 +635,10 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
     const auto samplesPerPixel = sampler->samplesPerPixel;
     const Float rayScale = 1 / sqrt((Float)samplesPerPixel);
 
+    /* for ray tracking */
+    mt19937 randEngine(random_device{}());
+    bernoulli_distribution bd{raysLogRate};
+
     for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
         for (const Point2i pixel : bounds) {
             sampler->StartPixel(pixel);
@@ -646,6 +650,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             RayStatePtr statePtr = make_unique<RayState>();
             RayState& state = *statePtr;
 
+            state.trackRay = trackRays ? bd(randEngine) : false;
             state.sample.id =
                 (pixel.x + pixel.y * sampleExtent.x) * samplesPerPixel + sample;
             state.sample.num = sample;
