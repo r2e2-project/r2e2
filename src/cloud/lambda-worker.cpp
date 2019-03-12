@@ -87,7 +87,9 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     if (trackRays) {
         rayActionsOstream.open(rayActionsName, ios::out | ios::trunc);
-        rayActionsOstream << "x,y,sample,workerID,timestamp,action" << endl;
+        rayActionsOstream
+            << "x,y,sample,shadowRay,workerID,treeletID,timestamp,action"
+            << endl;
     }
 
     PbrtOptions.nThreads = 1;
@@ -215,17 +217,26 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
 void LambdaWorker::logRayAction(const RayState& state, const RayAction action) {
     if (!trackRays || !state.trackRay) return;
 
-    rayActionsOstream << state.sample.pixel.x << ',' << state.sample.pixel.y
-                      << ',' << state.sample.num << ',' << *workerId << ','
-                      << duration_cast<milliseconds>(
+    // clang-format off
+    // "x,y,sample,shadowRay,workerID,treeletID,timestamp,action"
+    rayActionsOstream << state.sample.pixel.x << ','
+                      << state.sample.pixel.y << ','
+                      << state.sample.num << ','
+                      << state.isShadowRay << ','
+                      << *workerId << ','
+                      << state.CurrentTreelet() << ','
+                      << duration_cast<microseconds>(
                              rays_clock::now().time_since_epoch())
                              .count()
                       << ',';
+    // clang-format on
 
     // clang-format off
     switch (action) {
-    case RayAction::Queued: rayActionsOstream << "queued"; break;
-    case RayAction::Received: rayActionsOstream << "received"; break;
+    case RayAction::Generated: rayActionsOstream << "Generated"; break;
+    case RayAction::Queued: rayActionsOstream << "Queued"; break;
+    case RayAction::Received: rayActionsOstream << "Received"; break;
+    case RayAction::Finished: rayActionsOstream << "Finished"; break;
     default: throw runtime_error("invalid ray action");
     }
     // clang-format on
@@ -254,6 +265,7 @@ ResultType LambdaWorker::handleRayQueue() {
             if (newRay.isShadowRay) {
                 if (hit || emptyVisit) {
                     newRay.Ld = hit ? 0.f : newRay.Ld;
+                    logRayAction(*newRayPtr, RayAction::Finished);
                     finishedQueue.push_back(move(newRayPtr));
                 } else {
                     processedRays.push_back(move(newRayPtr));
@@ -262,6 +274,7 @@ ResultType LambdaWorker::handleRayQueue() {
                 processedRays.push_back(move(newRayPtr));
             } else if (emptyVisit) {
                 newRay.Ld = 0.f;
+                logRayAction(*newRayPtr, RayAction::Finished);
                 finishedQueue.push_back(move(newRayPtr));
                 workerStats.recordFinishedPath();
             }
@@ -271,6 +284,11 @@ ResultType LambdaWorker::handleRayQueue() {
 
             for (auto& newRay : newRays) {
                 processedRays.push_back(move(newRay));
+            }
+
+            if (newRays.empty()) {
+                /* rayPtr is not touched if if Shade() returned nothing */
+                logRayAction(*rayPtr, RayAction::Finished);
             }
         } else {
             throw runtime_error("invalid ray in ray queue");
@@ -689,7 +707,9 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             state.remainingBounces = maxDepth;
             state.StartTrace();
 
+            logRayAction(state, RayAction::Generated);
             workerStats.recordDemandedRay(state);
+
             const auto nextTreelet = state.CurrentTreelet();
 
             if (treeletIds.count(nextTreelet)) {
@@ -1048,9 +1068,9 @@ int main(int argc, char* argv[]) {
     unique_ptr<LambdaWorker> worker;
 
     try {
-        worker = make_unique<LambdaWorker>(publicIp, listenPort, storageUri,
-                                           sendReliably, samplesPerPixel,
-                                           finishedRayAction, rayActionsLogRate);
+        worker = make_unique<LambdaWorker>(
+            publicIp, listenPort, storageUri, sendReliably, samplesPerPixel,
+            finishedRayAction, rayActionsLogRate);
         worker->run();
     } catch (const exception& e) {
         LOG(INFO) << argv[0] << ": " << e.what();
