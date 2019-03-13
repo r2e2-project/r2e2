@@ -50,6 +50,7 @@ class LambdaWorker {
         WorkerId id;
         Address address;
         State state{State::Connecting};
+        packet_clock::time_point nextKeepAlive{};
         int32_t seed{0};
         uint32_t tries{0};
 

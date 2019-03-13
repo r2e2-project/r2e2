@@ -52,6 +52,7 @@ constexpr milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr milliseconds HANDLE_ACKS_INTERVAL{250};
 constexpr milliseconds WORKER_STATS_INTERVAL{1'000};
 constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
+constexpr milliseconds KEEP_ALIVE_INTERVAL{20'000};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
@@ -450,6 +451,8 @@ ResultType LambdaWorker::handlePeers() {
     RECORD_INTERVAL("handlePeers");
     peerTimer.reset();
 
+    const auto now = packet_clock::now();
+
     for (auto& kv : peers) {
         auto& peerId = kv.first;
         auto& peer = kv.second;
@@ -464,6 +467,12 @@ ResultType LambdaWorker::handlePeers() {
 
         case Worker::State::Connected:
             /* send keep alive */
+            if (peerId > 0 && peer.nextKeepAlive < now) {
+                peer.nextKeepAlive = now + KEEP_ALIVE_INTERVAL;
+                servicePackets.emplace_back(peer.address,
+                                            Message::str(OpCode::Ping, ""));
+            }
+
             break;
         }
     }
@@ -782,8 +791,8 @@ bool LambdaWorker::processMessage(const Message& message) {
     }
 
     case OpCode::Ping: {
-        Message pong{OpCode::Pong, ""};
-        coordinatorConnection->enqueue_write(pong.str());
+        /* Message pong{OpCode::Pong, ""};
+        coordinatorConnection->enqueue_write(pong.str()); */
         break;
     }
 
@@ -848,6 +857,7 @@ bool LambdaWorker::processMessage(const Message& message) {
         if (peer.state != Worker::State::Connected &&
             proto.your_seed() == mySeed) {
             peer.state = Worker::State::Connected;
+            peer.nextKeepAlive = packet_clock::now() + KEEP_ALIVE_INTERVAL;
 
             for (const auto treeletId : proto.treelet_ids()) {
                 peer.treelets.insert(treeletId);
