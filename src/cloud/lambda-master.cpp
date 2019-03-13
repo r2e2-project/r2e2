@@ -577,7 +577,6 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
     }
 
     case OpCode::WorkerStats: {
-        high_resolution_clock::time_point now = high_resolution_clock::now();
         protobuf::WorkerStats proto;
         protoutil::from_string(message.payload(), proto);
         auto stats = from_protobuf(proto);
@@ -629,22 +628,21 @@ void LambdaMaster::run() {
     /* request launching the lambdas */
     StatusBar::get();
 
-    cerr << "Launching " << numberOfLambdas << " lambda(s)..." << endl;
+    cerr << "Launching " << numberOfLambdas << " lambda(s)... ";
     for (size_t i = 0; i < numberOfLambdas; i++) {
         loop.make_http_request<SSLConnection>(
             "start-worker", awsAddress, generateRequest(),
             [](const uint64_t, const string &, const HTTPResponse &) {},
-            [](const uint64_t, const string &) {
-                LOG(ERROR) << "invocation request failed";
-            });
+            [](const uint64_t, const string &) {});
     }
+    cerr << "done." << endl;
 
     while (true) {
         auto res = loop.loop_once().result;
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 
-    if (config.collectDiagnostics) {
+    if (config.collectDiagnostics || config.rayActionsLogRate > 0.0) {
         vector<storage::GetRequest> getRequests;
         for (const auto &workerkv : workers) {
             const auto &worker = workerkv.second;
@@ -662,9 +660,9 @@ void LambdaMaster::run() {
             }
         }
 
-        cerr << "Downloading " << getRequests.size() << " log file(s)... ";
+        cerr << "\nDownloading " << getRequests.size() << " log file(s)... ";
 
-        this_thread::sleep_for(6s);
+        this_thread::sleep_for(10s);
         storageBackend->get(getRequests);
 
         cerr << "done." << endl;
