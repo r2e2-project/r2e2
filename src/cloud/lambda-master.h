@@ -77,6 +77,8 @@ class LambdaMaster {
         WorkerStats stats;
         mutable std::ofstream statsOstream;
 
+        bool startPrinted{false};
+
         struct {
             std::string logStream;
         } aws;
@@ -181,7 +183,6 @@ class LambdaMaster {
 
     /* Worker stats */
     WorkerStats workerStats;
-    DemandTracker demandTracker{};
     size_t initializedWorkers{0};
     size_t diagnosticsReceived{0};
 

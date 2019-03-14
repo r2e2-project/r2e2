@@ -275,14 +275,6 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                        [this]() { return true; },
                        []() { throw runtime_error("status print failed"); }));
 
-    if (config.collectWorkerStats) {
-        loop.poller().add_action(Poller::Action(
-            writeWorkerStatsTimer.fd, Direction::In,
-            bind(&LambdaMaster::handleWriteWorkerStats, this),
-            [this]() { return true; },
-            []() { throw runtime_error("write worker stats failed"); }));
-    }
-
     loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfLambdas](
                                                     ExecutionLoop &loop,
                                                     TCPSocket &&socket) {
@@ -332,12 +324,6 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                 this->config.logsDirectory + "/" + to_string(workerIt->first) +
                     ".STATS",
                 ios::out | ios::trunc);
-
-            workerIt->second.statsOstream
-                << "start "
-                << duration_cast<microseconds>(startTime.time_since_epoch())
-                       .count()
-                << endl;
         }
 
         /* assigns the minimal necessary scene objects for working with a
@@ -390,22 +376,6 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         currentWorkerID++;
         return true;
     });
-}
-
-ResultType LambdaMaster::handleWriteWorkerStats() {
-    writeWorkerStatsTimer.reset();
-
-    const auto timestamp =
-        duration_cast<microseconds>(now() - startTime).count();
-
-    for (const auto &workerkv : workers) {
-        const auto &worker = workerkv.second;
-        worker.statsOstream << timestamp << " "
-                            << protoutil::to_json(to_protobuf(worker.stats))
-                            << endl;
-    }
-
-    return ResultType::Continue;
 }
 
 ResultType LambdaMaster::handleStatusMessage() {
@@ -581,23 +551,25 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         protoutil::from_string(message.payload(), proto);
         auto stats = from_protobuf(proto);
 
-        demandTracker.submit(workerId, stats);
-
         /* merge into global worker stats */
         workerStats.merge(stats);
+
         /* merge into local worker stats */
-        workers.at(workerId).stats.merge(stats);
-        /* sort treelet load */
-        int treeletID = 0;
-        vector<tuple<uint64_t, uint64_t>> treeletLoads;
-        for (auto &kv : workerStats.objectStats) {
-            auto &rayStats = kv.second;
-            uint64_t load = rayStats.waitingRays - rayStats.processedRays;
-            treeletLoads.push_back(make_tuple(load, kv.first.id));
+        auto &worker = workers.at(workerId);
+        worker.stats.merge(stats);
+
+        if (config.collectWorkerStats) {
+            if (!worker.startPrinted) {
+                worker.statsOstream << "start " << proto.worker_start_us()
+                                    << '\n';
+
+                worker.startPrinted = true;
+            }
+
+            worker.statsOstream << proto.timestamp_us() << " "
+                                << protoutil::to_json(to_protobuf(worker.stats))
+                                << '\n';
         }
-        sort(treeletLoads.begin(), treeletLoads.end(),
-             greater<tuple<uint64_t, uint64_t>>());
-        treeletPriority = treeletLoads;
 
         break;
     }
