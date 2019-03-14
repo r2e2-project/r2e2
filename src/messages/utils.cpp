@@ -292,6 +292,11 @@ protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
         (*ray_stats->mutable_id()) = to_protobuf(kv.first);
         (*ray_stats->mutable_stats()) = to_protobuf(kv.second);
     }
+
+    proto.set_worker_start_us(
+        duration_cast<microseconds>(stats.startTime.time_since_epoch())
+            .count());
+
     return proto;
 }
 

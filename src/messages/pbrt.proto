@@ -326,6 +326,8 @@ message WorkerStats {
     RayStats aggregate_stats = 2;
     QueueStats queue_stats = 3;
     repeated ObjectRayStats object_stats = 4;
+    uint64 worker_start_us = 5;
+    uint64 timestamp_us = 6;
 }
 
 message WorkerDiagnostics {

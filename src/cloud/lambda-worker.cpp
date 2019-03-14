@@ -649,6 +649,10 @@ ResultType LambdaWorker::handleWorkerStats() {
     qStats.queuedUdp = rayPackets.size();
 
     auto proto = to_protobuf(workerStats);
+
+    proto.set_timestamp_us(
+        duration_cast<microseconds>(now() - workerStats.startTime).count());
+
     Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
     coordinatorConnection->enqueue_write(message.str());
     workerStats.reset();

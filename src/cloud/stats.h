@@ -61,6 +61,8 @@ struct WorkerStats {
     QueueStats queueStats;
     std::map<ObjectKey, RayStats> objectStats;
 
+    const timepoint_t startTime{now()};
+
     uint64_t finishedPaths() const { return _finishedPaths; }
     uint64_t sentRays() const { return aggregateStats.sentRays; }
     uint64_t receivedRays() const { return aggregateStats.receivedRays; }
