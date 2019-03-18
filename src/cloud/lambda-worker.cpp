@@ -158,7 +158,15 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     /* FIXME we're throwing out finished rays, for now */
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
-        [this]() { return finishedQueue.size() > 1000; },
+        [this]() {
+            // clang-format off
+            switch (this->finishedRayAction) {
+            case FinishedRayAction::Discard: return finishedQueue.size() > 1000;
+            case FinishedRayAction::SendBack: return !finishedQueue.empty();
+            default: return false;
+            }
+            // clang-format on
+        },
         []() { throw runtime_error("finished queue failed"); }));
 
     /* handle peers */
