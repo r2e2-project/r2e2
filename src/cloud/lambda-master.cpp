@@ -103,51 +103,16 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
     /* XXX count empty workers */
 }
 
-/**
- * Computes the bounds for `tileIndex` when `bounds` is split into `tileCount`
- * tiles.
- *
- * Does this recursively, by splitting `bounds` in half (vertically first, iff
- * `splitVertical` is `true`), putting the even indexed tiles in one half, and
- * the odd indexed tiles in the other half.
- *
- * The split direction will alternate between vertical and horizontal.
- *
- * If the splitting results in trying to split a 1-pixel line in half, throws an
- * exception.
- */
-Optional<Bounds2i> getTile(uint32_t tileIndex, uint32_t tileCount,
-                           Bounds2i bounds, bool splitVertical = true) {
-    if (tileCount == 1) {
-        return {true, bounds};
-    } else {
-        Bounds2i firstSplit;
-        Bounds2i secondSplit;
-        if (splitVertical) {
-            auto yMid = (bounds.pMax.y + bounds.pMin.y) / 2;
-            if (yMid == bounds.pMin.y || yMid == bounds.pMax.y) {
-                return {false};
-            }
-            firstSplit = Bounds2i{bounds.pMin, Point2i{bounds.pMax.x, yMid}};
-            secondSplit = Bounds2i{Point2i{bounds.pMin.x, yMid}, bounds.pMax};
-        } else {
-            auto xMid = (bounds.pMax.x + bounds.pMin.x) / 2;
-            if (xMid == bounds.pMin.x || xMid == bounds.pMax.x) {
-                return {false};
-            }
-            firstSplit = Bounds2i{bounds.pMin, Point2i{xMid, bounds.pMax.y}};
-            secondSplit = Bounds2i{Point2i{xMid, bounds.pMin.y}, bounds.pMax};
-        }
-        if (tileIndex % 2 == 0) {
-            uint32_t evenTiles = tileCount - tileCount / 2;
-            return getTile(tileIndex / 2, evenTiles, firstSplit,
-                           !splitVertical);
-        } else {
-            uint32_t oddTiles = tileCount / 2;
-            return getTile(tileIndex / 2, oddTiles, secondSplit,
-                           !splitVertical);
-        }
+int getTileSize(const Bounds2i &bounds, const size_t N) {
+    int tileSize = ceil(sqrt(bounds.Area() / N));
+    const Vector2i extent = bounds.Diagonal();
+
+    while (ceil(1.0 * extent.x / tileSize) * ceil(1.0 * extent.y / tileSize) >
+           N) {
+        tileSize++;
     }
+
+    return tileSize;
 }
 
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
@@ -253,7 +218,12 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
     udpConnection->socket().bind({"0.0.0.0", listenPort});
 
-    totalPaths = this->sampleBounds.Area() *
+    const Vector2i sampleExtent = sampleBounds.Diagonal();
+    const int tileSize = getTileSize(sampleBounds, numberOfLambdas);
+    const Point2i nTiles((sampleExtent.x + tileSize - 1) / tileSize,
+                         (sampleExtent.y + tileSize - 1) / tileSize);
+
+    totalPaths = sampleBounds.Area() *
                  loadSampler(config.samplesPerPixel)->samplesPerPixel;
 
     loop.poller().add_action(Poller::Action(
@@ -278,9 +248,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                        [this]() { return true; },
                        []() { throw runtime_error("status print failed"); }));
 
-    loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfLambdas](
-                                                    ExecutionLoop &loop,
-                                                    TCPSocket &&socket) {
+    loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfLambdas, nTiles,
+                                                 tileSize](ExecutionLoop &loop,
+                                                           TCPSocket &&socket) {
         LOG(INFO) << "Incoming connection from " << socket.peer_address().str()
                   << endl;
 
@@ -349,11 +319,15 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
         /* assign a tile to the worker */
         const WorkerId id = workerIt->first;  // indexed starting at 1
-        const uint32_t tileIndex = id - 1;    // indexed starting at 0
-        const uint32_t tileCount = numberOfLambdas <= 0 ? 4 : numberOfLambdas;
-
-        workerIt->second.tile =
-            getTile(tileIndex, tileCount, this->sampleBounds);
+        if (id <= nTiles.x * nTiles.y) {
+            const int tileX = (id - 1) % nTiles.x;
+            const int tileY = (id - 1) / nTiles.x;
+            const int x0 = this->sampleBounds.pMin.x + tileX * tileSize;
+            const int x1 = min(x0 + tileSize, this->sampleBounds.pMax.x);
+            const int y0 = this->sampleBounds.pMin.y + tileY * tileSize;
+            const int y1 = min(y0 + tileSize, this->sampleBounds.pMax.y);
+            workerIt->second.tile.reset(Point2i{x0, y0}, Point2i{x1, y1});
+        }
 
         /* assign treelet to worker based on most in-demand treelets */
         switch (this->config.assignment) {

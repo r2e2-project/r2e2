@@ -152,7 +152,6 @@ class LambdaMaster {
     std::deque<WorkerRequest> pendingWorkerRequests;
 
     /* Scene Data */
-    int tileSize{32};
     std::vector<std::unique_ptr<Transform>> transformCache{};
     std::shared_ptr<Camera> camera{};
     std::unique_ptr<FilmTile> filmTile{};
