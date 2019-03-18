@@ -176,6 +176,10 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         roost::create_directories(config.logsDirectory);
     }
 
+    if (config.cropWindow.initialized()) {
+        sampleBounds = *config.cropWindow;
+    }
+
     /* get the list of all objects and create entries for tracking their
      * assignment to workers for each */
     for (auto &kv : global::manager.listObjects()) {
@@ -810,7 +814,7 @@ void usage(const char *argv0, int exitCode) {
     exit(exitCode);
 }
 
-Optional<Bounds2i> pbrt::parseCropWindowOptarg(const string &optarg) {
+Optional<Bounds2i> parseCropWindowOptarg(const string &optarg) {
     vector<string> args = split(optarg, ",");
     if (args.size() != 4) return {};
 

@@ -199,8 +199,6 @@ class Schedule {
   private:
 };
 
-Optional<Bounds2i> parseCropWindowOptarg(const std::string &optarg);
-
 }  // namespace pbrt
 
 #endif /* PBRT_CLOUD_LAMBDA_MASTER_H */
