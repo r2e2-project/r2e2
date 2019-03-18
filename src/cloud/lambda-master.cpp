@@ -115,26 +115,24 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
  * If the splitting results in trying to split a 1-pixel line in half, throws an
  * exception.
  */
-Bounds2i getTile(uint32_t tileIndex, uint32_t tileCount, Bounds2i bounds,
-                 bool splitVertical = true) {
+Optional<Bounds2i> getTile(uint32_t tileIndex, uint32_t tileCount,
+                           Bounds2i bounds, bool splitVertical = true) {
     if (tileCount == 1) {
-        return bounds;
+        return {true, bounds};
     } else {
         Bounds2i firstSplit;
         Bounds2i secondSplit;
         if (splitVertical) {
             auto yMid = (bounds.pMax.y + bounds.pMin.y) / 2;
             if (yMid == bounds.pMin.y || yMid == bounds.pMax.y) {
-                throw runtime_error(
-                    "Tried to split a rectangle across an axis of length 1");
+                return {false};
             }
             firstSplit = Bounds2i{bounds.pMin, Point2i{bounds.pMax.x, yMid}};
             secondSplit = Bounds2i{Point2i{bounds.pMin.x, yMid}, bounds.pMax};
         } else {
             auto xMid = (bounds.pMax.x + bounds.pMin.x) / 2;
             if (xMid == bounds.pMin.x || xMid == bounds.pMax.x) {
-                throw runtime_error(
-                    "Tried to split a rectangle across an axis of length 1");
+                return {false};
             }
             firstSplit = Bounds2i{bounds.pMin, Point2i{xMid, bounds.pMax.y}};
             secondSplit = Bounds2i{Point2i{xMid, bounds.pMin.y}, bounds.pMax};
@@ -349,11 +347,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         const uint32_t tileIndex = id - 1;    // indexed starting at 0
         const uint32_t tileCount = numberOfLambdas <= 0 ? 4 : numberOfLambdas;
 
-        Bounds2i tile = getTile(tileIndex, tileCount, this->sampleBounds);
-        LOG(INFO) << "Worker " << id << "/" << numberOfLambdas
-                  << " was assigned tile " << tile << " from bounds "
-                  << this->sampleBounds << endl;
-        workerIt->second.tile.reset(tile);
+        workerIt->second.tile =
+            getTile(tileIndex, tileCount, this->sampleBounds);
 
         /* assign treelet to worker based on most in-demand treelets */
         switch (this->config.assignment) {
