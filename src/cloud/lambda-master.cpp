@@ -34,6 +34,7 @@
 #include "util/path.h"
 #include "util/random.h"
 #include "util/status_bar.h"
+#include "util/tokenize.h"
 
 using namespace std;
 using namespace std::chrono;
@@ -802,9 +803,24 @@ void usage(const char *argv0, int exitCode) {
          << "                             * discard (default)" << endl
          << "                             * send" << endl
          << "                             * upload" << endl
+         << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T)]"
+         << endl
          << "  -h --help                  show help information" << endl;
 
     exit(exitCode);
+}
+
+Optional<Bounds2i> pbrt::parseCropWindowOptarg(const string &optarg) {
+    vector<string> args = split(optarg, ",");
+    if (args.size() != 4) return {};
+
+    Point2i pMin, pMax;
+    pMin.x = stoi(args[0]);
+    pMin.y = stoi(args[1]);
+    pMax.x = stoi(args[2]);
+    pMax.y = stoi(args[3]);
+
+    return {true, Bounds2i{pMin, pMax}};
 }
 
 int main(int argc, char *argv[]) {
@@ -825,6 +841,7 @@ int main(int argc, char *argv[]) {
     bool collectDiagnostics = false;
     float rayActionsLogRate = 0.0;
     string logsDirectory = "logs/";
+    Optional<Bounds2i> cropWindow;
 
     Assignment assignment = Assignment::Uniform;
     int samplesPerPixel = 0;
@@ -845,12 +862,13 @@ int main(int argc, char *argv[]) {
         {"log-rays", required_argument, nullptr, 'L'},
         {"logs-dir", required_argument, nullptr, 'D'},
         {"samples", required_argument, nullptr, 'S'},
+        {"crop-window", required_argument, nullptr, 'c'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:whdD:a:S:f:L:R",
+        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:whdD:a:S:f:L:c:R",
                                     long_options, nullptr);
 
         if (opt == -1) {
@@ -900,6 +918,11 @@ int main(int argc, char *argv[]) {
 
             break;
 
+        case 'c':
+            cropWindow = parseCropWindowOptarg(optarg);
+            if (!cropWindow.initialized()) usage(argv[0], EXIT_FAILURE);
+            break;
+
         default:
             usage(argv[0], EXIT_FAILURE);
             break;
@@ -918,10 +941,10 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {assignment,         finishedRayAction,
-                                  sendReliably,       samplesPerPixel,
-                                  collectDiagnostics, collectWorkerStats,
-                                  rayActionsLogRate,  logsDirectory};
+    MasterConfiguration config = {
+        assignment,        finishedRayAction,  sendReliably,
+        samplesPerPixel,   collectDiagnostics, collectWorkerStats,
+        rayActionsLogRate, logsDirectory,      cropWindow};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,

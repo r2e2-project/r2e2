@@ -41,6 +41,7 @@ struct MasterConfiguration {
     bool collectWorkerStats;
     float rayActionsLogRate;
     std::string logsDirectory;
+    Optional<Bounds2i> cropWindow;
 };
 
 class LambdaMaster {
@@ -197,6 +198,8 @@ class Schedule {
   public:
   private:
 };
+
+Optional<Bounds2i> parseCropWindowOptarg(const std::string &optarg);
 
 }  // namespace pbrt
 
