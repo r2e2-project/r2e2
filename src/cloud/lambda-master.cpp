@@ -93,13 +93,6 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
         throw runtime_error("Unassigned treelets!");
     }
 
-    for (const auto &kv : probs) {
-        double allocatedWeight =
-            double(allocator.getLocations(kv.first).size()) / numWorkers;
-        LOG(INFO) << "Treelet: " << kv.first << " " << allocatedWeight << " / "
-                  << kv.second;
-    }
-
     /* XXX count empty workers */
 }
 
@@ -254,9 +247,6 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfLambdas, nTiles,
                                                  tileSize](ExecutionLoop &loop,
                                                            TCPSocket &&socket) {
-        LOG(INFO) << "Incoming connection from " << socket.peer_address().str()
-                  << endl;
-
         auto messageParser = make_shared<MessageParser>();
         auto connection = loop.add_connection<TCPSocket>(
             move(socket),
