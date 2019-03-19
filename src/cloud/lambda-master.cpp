@@ -237,10 +237,13 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         [this]() { return !pendingWorkerRequests.empty(); },
         []() { throw runtime_error("worker requests failed"); }));
 
-    loop.poller().add_action(Poller::Action(
-        writeOutputTimer.fd, Direction::In,
-        bind(&LambdaMaster::handleWriteOutput, this), [this]() { return true; },
-        []() { throw runtime_error("worker requests failed"); }));
+    if (config.finishedRayAction == FinishedRayAction::SendBack) {
+        loop.poller().add_action(Poller::Action(
+            writeOutputTimer.fd, Direction::In,
+            bind(&LambdaMaster::handleWriteOutput, this),
+            [this]() { return true; },
+            []() { throw runtime_error("worker requests failed"); }));
+    }
 
     loop.poller().add_action(
         Poller::Action(statusPrintTimer.fd, Direction::In,
