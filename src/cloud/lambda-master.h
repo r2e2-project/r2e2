@@ -78,7 +78,7 @@ class LambdaMaster {
         WorkerStats stats;
         mutable std::ofstream statsOstream;
 
-        bool startPrinted{false};
+        uint64_t nextStatusLogTimestamp{0};
 
         struct {
             std::string logStream;

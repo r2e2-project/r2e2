@@ -525,17 +525,20 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         auto &worker = workers.at(workerId);
         worker.stats.merge(stats);
 
-        if (config.collectWorkerStats) {
-            if (!worker.startPrinted) {
+        if (config.collectWorkerStats &&
+            worker.nextStatusLogTimestamp < proto.timestamp_us()) {
+            if (worker.nextStatusLogTimestamp == 0) {
                 worker.statsOstream << "start " << proto.worker_start_us()
                                     << '\n';
-
-                worker.startPrinted = true;
             }
 
             worker.statsOstream << proto.timestamp_us() << " "
                                 << protoutil::to_json(to_protobuf(worker.stats))
                                 << '\n';
+
+            worker.nextStatusLogTimestamp =
+                duration_cast<microseconds>(STATUS_PRINT_INTERVAL).count() +
+                proto.timestamp_us();
         }
 
         break;
