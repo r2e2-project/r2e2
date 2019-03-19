@@ -80,6 +80,16 @@ S3Client::S3Client( const AWSCredentials & credentials,
   : credentials_( credentials ), config_( config )
 {}
 
+HTTPRequest S3Client::create_download_request( const string & bucket,
+                                               const string & object ) const
+{
+    const string endpoint = ( config_.endpoint.length() > 0 )
+                            ? config_.endpoint : S3::endpoint( config_.region, bucket );
+
+    S3GetRequest request { credentials_, endpoint, config_.region, object };
+    return request.to_http_request();
+}
+
 void S3Client::download_file( const string & bucket, const string & object,
                               const roost::path & filename )
 {

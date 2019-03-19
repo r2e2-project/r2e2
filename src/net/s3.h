@@ -70,6 +70,11 @@ public:
                        const std::vector<storage::GetRequest> & download_requests,
                        const std::function<void( const storage::GetRequest & )> & success_callback
                          = []( const storage::GetRequest & ){} );
+
+  HTTPRequest create_download_request( const std::string & bucket,
+                                       const std::string & object ) const;
+
+  const S3ClientConfig & config() const { return config_; }
 };
 
 #endif /* PBRT_NET_S3_H */

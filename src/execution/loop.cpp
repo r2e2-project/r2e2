@@ -2,7 +2,9 @@
 
 #include "loop.h"
 
+#include <fcntl.h>
 #include <glog/logging.h>
+#include <sys/types.h>
 #include <chrono>
 #include <stdexcept>
 
@@ -11,6 +13,7 @@
 #include "net/util.h"
 #include "util/chunk.h"
 #include "util/exception.h"
+#include "util/file_descriptor.h"
 #include "util/optional.h"
 
 using namespace std;
@@ -317,6 +320,37 @@ uint64_t ExecutionLoop::make_listener(
         }));
 
     return current_id_++;
+}
+
+uint64_t ExecutionLoop::s3_download(const string &tag,
+                                    const S3StorageBackend &storage_backend,
+                                    const string &object,
+                                    const string &write_path,
+                                    DownloadCallback download_callback,
+                                    FailureCallbackFunc failure_callback) {
+    const Address addr{S3::endpoint(storage_backend.client().config().region,
+                                    storage_backend.bucket()),
+                       "https"};
+
+    const HTTPRequest download_request =
+        storage_backend.client().create_download_request(
+            storage_backend.bucket(), object);
+
+    return make_http_request<SSLConnection>(
+        tag, addr, download_request,
+        [write_path, download_callback](const uint64_t id, const string &tag,
+                                        const HTTPResponse &response) {
+            FileDescriptor file{CheckSystemCall(
+                "open", open(write_path.c_str(), O_RDWR | O_TRUNC | O_CREAT,
+                             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH |
+                                 S_IWOTH))};
+
+            file.write(response.body(), true);
+            download_callback(id, tag);
+        },
+        [failure_callback](const uint64_t id, const string &tag) {
+            failure_callback(id, tag);
+        });
 }
 
 uint64_t ExecutionLoop::add_child_process(const string &tag,

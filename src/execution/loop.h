@@ -17,6 +17,7 @@
 #include "util/signalfd.h"
 #include "util/child_process.h"
 #include "util/poller.h"
+#include "storage/backend_s3.h"
 
 class ExecutionLoop
 {
@@ -29,6 +30,8 @@ public:
                               const HTTPResponse & )> HTTPResponseCallbackFunc;
   typedef std::function<void( const uint64_t /* id */,
                               const std::string & /* tag */ )> FailureCallbackFunc;
+  typedef std::function<void( const uint64_t /* id */,
+                              const std::string & /* tag */)> DownloadCallback;
 
 private:
   uint64_t current_id_{ 0 };
@@ -99,6 +102,13 @@ public:
                               const HTTPRequest & request,
                               HTTPResponseCallbackFunc response_callback,
                               FailureCallbackFunc failure_callback );
+
+  uint64_t s3_download( const std::string & tag,
+                        const S3StorageBackend & storage_backend,
+                        const std::string & object,
+                        const std::string & download_path,
+                        DownloadCallback download_callback,
+                        FailureCallbackFunc failure_callback );
 
   uint64_t make_listener( const Address & address,
                           const std::function<bool(ExecutionLoop &,

@@ -24,6 +24,9 @@ public:
   void get( const std::vector<storage::GetRequest> & requests,
             const GetCallback & success_callback = []( const storage::GetRequest & ){} ) override;
 
+  const S3Client & client() const { return client_; }
+  const std::string & bucket() const { return bucket_; }
+
 };
 
 #endif /* PBRT_STORAGE_BACKEND_S3_HH */
