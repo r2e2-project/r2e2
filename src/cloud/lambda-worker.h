@@ -121,7 +121,7 @@ class LambdaWorker {
     const std::string infoLogName{logBase + ".INFO"};
     const std::string diagnosticsName{logBase + ".DIAG"};
     const std::string rayActionsName{logBase + ".RAYS"};
-    const std::string logPrefix{"logs/"};
+    std::string logPrefix{"logs/"};
     std::ofstream diagnosticsOstream{};
     std::ofstream rayActionsOstream{};
     const float rayActionsLogRate;

@@ -584,6 +584,7 @@ void LambdaMaster::run() {
 
     constexpr size_t EXTRA_LAMBDAS = 100;
 
+    cerr << "Job ID: " << jobId << endl;
     cerr << "Launching " << numberOfLambdas << " (+" << EXTRA_LAMBDAS
          << ") lambda(s)... ";
 
@@ -601,18 +602,19 @@ void LambdaMaster::run() {
     }
 
     if (config.collectDiagnostics || config.rayActionsLogRate > 0.0) {
+        string logPrefix = "logs/" + jobId + "/";
         vector<storage::GetRequest> getRequests;
         for (const auto &workerkv : workers) {
             const auto &worker = workerkv.second;
             worker.connection->socket().close();
 
             getRequests.emplace_back(
-                "logs/"s + to_string(worker.id) + ".DIAG",
+                logPrefix + to_string(worker.id) + ".DIAG",
                 config.logsDirectory + "/" + to_string(worker.id) + ".DIAG");
 
             if (config.rayActionsLogRate) {
                 getRequests.emplace_back(
-                    "logs/"s + to_string(worker.id) + ".RAYS",
+                    logPrefix + to_string(worker.id) + ".RAYS",
                     config.logsDirectory + "/" + to_string(worker.id) +
                         ".RAYS");
             }

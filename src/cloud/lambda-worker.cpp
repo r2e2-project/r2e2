@@ -793,7 +793,9 @@ bool LambdaWorker::processMessage(const Message& message) {
         workerId.reset(proto.worker_id());
         jobId.reset(proto.job_id());
 
+        logPrefix = "logs/" + (*jobId) + "/";
         outputName = to_string(*workerId) + ".rays";
+
         cerr << "worker-id=" << *workerId << endl;
 
         /* send connection request */
