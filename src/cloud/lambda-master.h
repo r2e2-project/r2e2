@@ -26,6 +26,7 @@
 #include "util/optional.h"
 #include "util/timerfd.h"
 #include "util/util.h"
+#include "util/uuid.h"
 
 namespace pbrt {
 
@@ -142,7 +143,8 @@ class LambdaMaster {
     ExecutionLoop loop{};
     std::shared_ptr<UDPConnection> udpConnection{};
 
-    WorkerId currentWorkerID{1};
+    const std::string jobId{uuid::generate()};
+    WorkerId currentWorkerId{1};
     std::map<WorkerId, Worker> workers{};
 
     /* Message Queues */

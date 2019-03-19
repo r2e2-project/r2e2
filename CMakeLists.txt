@@ -603,7 +603,7 @@ ADD_SANITIZERS ( pbrt_lambda_master )
 
 SET_TARGET_PROPERTIES ( pbrt_lambda_master PROPERTIES OUTPUT_NAME "pbrt-lambda-master" )
 TARGET_COMPILE_FEATURES ( pbrt_lambda_master PRIVATE ${PBRT_CXX11_FEATURES} )
-TARGET_LINK_LIBRARIES ( pbrt_lambda_master ${ALL_PBRT_LIBS} -ldl )
+TARGET_LINK_LIBRARIES ( pbrt_lambda_master ${ALL_PBRT_LIBS} -ldl -luuid )
 
 # pbrt-lambda-worker
 ADD_EXECUTABLE ( pbrt_lambda_worker src/cloud/lambda-worker.cpp )

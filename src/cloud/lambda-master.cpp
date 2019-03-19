@@ -126,6 +126,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
       writeOutputTimer(WRITE_OUTPUT_INTERVAL),
       writeWorkerStatsTimer(WRITE_STATS_INTERVAL),
       config(config) {
+    LOG(INFO) << "job-id=" << jobId;
+
     global::manager.init(scenePath);
     loadCamera();
 
@@ -247,7 +249,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfLambdas, nTiles,
                                                  tileSize](ExecutionLoop &loop,
                                                            TCPSocket &&socket) {
-        if (currentWorkerID > numberOfLambdas) {
+        if (currentWorkerId > numberOfLambdas) {
             socket.close();
             return false;
         }
@@ -255,7 +257,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         auto messageParser = make_shared<MessageParser>();
         auto connection = loop.add_connection<TCPSocket>(
             move(socket),
-            [this, ID = currentWorkerID, messageParser](
+            [this, ID = currentWorkerId, messageParser](
                 shared_ptr<TCPConnection> connection, string &&data) {
                 messageParser->parse(data);
 
@@ -268,7 +270,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                 return true;
             },
             []() { throw runtime_error("error occured"); },
-            [this, ID = currentWorkerID]() {
+            [this, ID = currentWorkerId]() {
                 const auto &worker = workers.at(ID);
 
                 ostringstream errorMessage;
@@ -286,8 +288,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
         auto workerIt =
             workers
-                .emplace(piecewise_construct, forward_as_tuple(currentWorkerID),
-                         forward_as_tuple(currentWorkerID, move(connection)))
+                .emplace(piecewise_construct, forward_as_tuple(currentWorkerId),
+                         forward_as_tuple(currentWorkerId, move(connection)))
                 .first;
 
         if (this->config.collectWorkerStats) {
@@ -345,7 +347,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             throw runtime_error("unrecognized assignment type");
         }
 
-        currentWorkerID++;
+        currentWorkerId++;
         return true;
     });
 }
@@ -488,8 +490,13 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
     case OpCode::Hey: {
         worker.aws.logStream = message.payload();
 
-        Message heyBackMessage{OpCode::Hey, to_string(workerId)};
-        worker.connection->enqueue_write(heyBackMessage.str());
+        {
+            protobuf::Hey heyProto;
+            heyProto.set_worker_id(workerId);
+            heyProto.set_job_id(jobId);
+            Message heyBackMessage{OpCode::Hey, protoutil::to_string(heyProto)};
+            worker.connection->enqueue_write(heyBackMessage.str());
+        }
 
         {
             /* send the list of assigned objects to the worker */

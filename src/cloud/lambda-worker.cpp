@@ -788,15 +788,17 @@ bool LambdaWorker::processMessage(const Message& message) {
 
     switch (message.opcode()) {
     case OpCode::Hey: {
-        workerId.reset(stoull(message.payload()));
-        outputName = to_string(*workerId) + ".rays";
+        protobuf::Hey proto;
+        protoutil::from_string(message.payload(), proto);
+        workerId.reset(proto.worker_id());
+        jobId.reset(proto.job_id());
 
+        outputName = to_string(*workerId) + ".rays";
         cerr << "worker-id=" << *workerId << endl;
 
+        /* send connection request */
         Address addrCopy{coordinatorAddr};
         peers.emplace(0, Worker{0, move(addrCopy)});
-
-        /* send connection request */
         Message message = createConnectionRequest(peers.at(0));
         servicePackets.emplace_front(coordinatorAddr, message.str());
         break;

@@ -138,6 +138,7 @@ class LambdaWorker {
     meow::MessageParser messageParser{};
     meow::MessageParser tcpMessageParser{};
     Optional<WorkerId> workerId;
+    Optional<std::string> jobId;
     std::map<WorkerId, Worker> peers{};
     int32_t mySeed;
     bool peerRequested{false};

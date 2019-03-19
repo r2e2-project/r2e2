@@ -239,6 +239,11 @@ message ObjectKey {
     uint64 id = 2;
 };
 
+message Hey {
+    uint64 worker_id = 1;
+    string job_id = 2;
+}
+
 message GetObjects {
     repeated ObjectKey object_ids = 1;
 }
