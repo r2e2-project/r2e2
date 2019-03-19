@@ -247,6 +247,11 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfLambdas, nTiles,
                                                  tileSize](ExecutionLoop &loop,
                                                            TCPSocket &&socket) {
+        if (currentWorkerID > numberOfLambdas) {
+            socket.close();
+            return false;
+        }
+
         auto messageParser = make_shared<MessageParser>();
         auto connection = loop.add_connection<TCPSocket>(
             move(socket),
@@ -570,8 +575,12 @@ void LambdaMaster::run() {
     /* request launching the lambdas */
     StatusBar::get();
 
-    cerr << "Launching " << numberOfLambdas << " lambda(s)... ";
-    for (size_t i = 0; i < numberOfLambdas; i++) {
+    constexpr size_t EXTRA_LAMBDAS = 100;
+
+    cerr << "Launching " << numberOfLambdas << " (+" << EXTRA_LAMBDAS
+         << ") lambda(s)... ";
+
+    for (size_t i = 0; i < numberOfLambdas + EXTRA_LAMBDAS; i++) {
         loop.make_http_request<SSLConnection>(
             "start-worker", awsAddress, generateRequest(),
             [](const uint64_t, const string &, const HTTPResponse &) {},
