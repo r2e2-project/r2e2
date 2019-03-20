@@ -67,7 +67,9 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
     Allocator allocator;
 
     map<TreeletId, double> probs;
-    for (size_t tid = 0; tid < tempProbs.size(); tid++) {
+    probs[0] = 0;
+
+    for (size_t tid = 1; tid < tempProbs.size(); tid++) {
         probs.emplace(tid, tempProbs[tid]);
         allocator.addTreelet(tid);
     }
@@ -305,7 +307,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         this->assignBaseSceneObjects(workerIt->second);
 
         auto doStaticAssign = [this](Worker &worker) {
-            /* assignTreelet(worker, 0); */
+            assignTreelet(worker, 0);
             for (const auto t : staticAssignments[worker.id - 1]) {
                 assignTreelet(worker, t);
             }
