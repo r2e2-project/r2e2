@@ -372,19 +372,23 @@ ResultType LambdaMaster::handleStatusMessage() {
               << " / connected: " << workerStats.queueStats.connected
               << " / outstanding: " << workerStats.queueStats.outstandingUdp;
 
+    auto percentage = [](const int n, const int total) -> double {
+        return ((int)(100 * (100.0 * n / total))) / 100.0;
+    };
+
     ostringstream oss;
     oss << "\033[0m"
         << "\033[48;5;022m"
         << " done paths: " << workerStats.finishedPaths() << " (" << fixed
-        << setprecision(1) << (100.0 * workerStats.finishedPaths() / totalPaths)
-        << "%)"
+        << setprecision(2)
+        << percentage(workerStats.finishedPaths(), totalPaths) << "%)"
         << " | workers: " << workers.size() << " (" << initializedWorkers << ")"
         << " | requests: " << pendingWorkerRequests.size() << " | \u2191 "
         << workerStats.sentRays() << " | \u2193 " << workerStats.receivedRays()
-        << " (" << fixed << setprecision(1)
-        << (workerStats.sentRays() == 0
-                ? 0
-                : (100.0 * workerStats.receivedRays() / workerStats.sentRays()))
+        << " (" << fixed << setprecision(2)
+        << (workerStats.sentRays() == 0 ? 0
+                                        : percentage(workerStats.receivedRays(),
+                                                     workerStats.sentRays()))
         << "%)"
         << " | time: " << setfill('0') << setw(2) << (elapsedSeconds / 60)
         << ":" << setw(2) << (elapsedSeconds % 60);
