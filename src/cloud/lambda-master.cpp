@@ -57,7 +57,8 @@ shared_ptr<Sampler> loadSampler(const int samplesPerPixel) {
     return sampler::from_protobuf(proto_sampler, samplesPerPixel);
 }
 
-void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
+void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers,
+                                        const bool zeroOnAll) {
     vector<double> tempProbs = global::manager.getTreeletProbs();
 
     if (tempProbs.size() == 0) {
@@ -67,9 +68,12 @@ void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers) {
     Allocator allocator;
 
     map<TreeletId, double> probs;
-    probs[0] = 0;
 
-    for (size_t tid = 1; tid < tempProbs.size(); tid++) {
+    if (zeroOnAll) {
+        probs[0] = 0;
+    }
+
+    for (size_t tid = zeroOnAll ? 1 : 0; tid < tempProbs.size(); tid++) {
         probs.emplace(tid, tempProbs[tid]);
         allocator.addTreelet(tid);
     }
@@ -174,8 +178,10 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         }
     }
 
-    if (config.assignment == Assignment::Static) {
-        loadStaticAssignment(numberOfLambdas);
+    if (config.assignment == Assignment::Static ||
+        config.assignment == Assignment::Static0) {
+        loadStaticAssignment(numberOfLambdas,
+                             config.assignment == Assignment::Static0);
     }
 
     udpConnection = loop.make_udp_connection(
@@ -306,8 +312,11 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
          */
         this->assignBaseSceneObjects(workerIt->second);
 
-        auto doStaticAssign = [this](Worker &worker) {
-            assignTreelet(worker, 0);
+        auto doStaticAssign = [this](Worker &worker, const bool zeroOnAll) {
+            if (zeroOnAll) {
+                assignTreelet(worker, 0);
+            }
+
             for (const auto t : staticAssignments[worker.id - 1]) {
                 assignTreelet(worker, t);
             }
@@ -334,7 +343,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         /* assign treelet to worker based on most in-demand treelets */
         switch (this->config.assignment) {
         case Assignment::Static:
-            doStaticAssign(workerIt->second);
+        case Assignment::Static0:
+            doStaticAssign(workerIt->second,
+                           this->config.assignment == Assignment::Static0);
             break;
 
         case Assignment::Uniform:
@@ -796,6 +807,7 @@ void usage(const char *argv0, int exitCode) {
          << "  -a --assignment TYPE       indicate assignment type:" << endl
          << "                             * uniform (default)" << endl
          << "                             * static" << endl
+         << "                             * static0" << endl
          << "                             * all" << endl
          << "  -f --finished-ray ACTION   what to do with finished rays" << endl
          << "                             * discard (default)" << endl
@@ -893,6 +905,8 @@ int main(int argc, char *argv[]) {
         case 'a':
             if (strcmp(optarg, "static") == 0) {
                 assignment = Assignment::Static;
+            } else if (strcmp(optarg, "static0") == 0) {
+                assignment = Assignment::Static0;
             } else if (strcmp(optarg, "uniform") == 0) {
                 assignment = Assignment::Uniform;
             } else if (strcmp(optarg, "all") == 0) {

@@ -30,7 +30,7 @@
 
 namespace pbrt {
 
-enum class Assignment { All, Static, Uniform };
+enum class Assignment { All, Static, Static0, Uniform };
 enum class FinishedRayAction { Discard, SendBack, Upload };
 
 struct MasterConfiguration {
@@ -189,7 +189,7 @@ class LambdaMaster {
     size_t diagnosticsReceived{0};
 
     /* Static Assignments */
-    void loadStaticAssignment(const uint32_t numWorkers);
+    void loadStaticAssignment(const uint32_t numWorkers, const bool zeroOnAll);
     std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
 
     const MasterConfiguration config;
