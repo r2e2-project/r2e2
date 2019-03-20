@@ -270,6 +270,58 @@ class Stats(object):
                         quanta,
                         start=start_timestamp, end=end_timestamp)
                     treelet_rows[treelet_id][key] = quantized_data
+
+                    # NOTE(apoms): THIS IS DEBUGGING CODE
+                    #
+                    # quant_sum = sum(quantized_data)
+                    # data_sum = sum(treelet_stats[field])
+                    # error = np.abs(quant_sum - data_sum) 
+                    # if error > 0.1:
+                    #     print('Error: {:f}, quant {:f}, data {:f}'.format(error, quant_sum, data_sum))
+                    #     quant_nz = [(x, t) for x, t in zip(quantized_data, quantized_timestamps)
+                    #                 if x != 0]
+                    #     quant_cumsum = [quant_nz[0][0]]
+                    #     for x in quant_nz[1:]:
+                    #         quant_cumsum.append(x[0] + quant_cumsum[-1])
+                    #     treelet_nz = [(x, t) for x, t in zip(treelet_stats[field],
+                    #                                          [min_timestamp + x for x in stats.timestamps])
+                    #                   if x != 0]
+                    #     treelet_cumsum = [treelet_nz[0][0]]
+                    #     for x in treelet_nz[1:]:
+                    #         treelet_cumsum.append(x[0] + treelet_cumsum[-1])
+
+                    #     from pprint import pprint
+                    #     pprint(s)
+                    #     print('Data : Quant')
+                    #     quant_offset = 0
+                    #     data_offset = 0
+                    #     for i in range(len(treelet_nz) + len(quant_nz)):
+                    #         if len(treelet_nz) > data_offset and len(quant_nz) > quant_offset:
+                    #             dt = treelet_nz[data_offset][1] / 1e9
+                    #             dq = quant_nz[quant_offset][1] / 1e9
+                    #             if dt > dq:
+                    #                 d = quant_nz[quant_offset][1] / 1e13
+                    #                 x = quant_cumsum[quant_offset]
+                    #                 print('\t\t', end='')
+                    #                 print('{:f}: {:f}'.format(d, x), end='')
+                    #                 quant_offset += 1
+                    #             else:
+                    #                 d = treelet_nz[data_offset][1] / 1e13
+                    #                 x = treelet_cumsum[data_offset]
+                    #                 print('{:f}: {:f}'.format(d, x), end='')
+                    #                 data_offset += 1
+                    #         elif len(treelet_nz) > data_offset:
+                    #             d = treelet_nz[data_offset][1] / 1e13
+                    #             x = treelet_cumsum[data_offset]
+                    #             print('{:f}: {:f}'.format(d, x), end='')
+                    #             data_offset += 1
+                    #         else:
+                    #             d = quant_nz[quant_offset][1] / 1e13
+                    #             x = quant_cumsum[quant_offset]
+                    #             print('\tt', end='')
+                    #             print('{:f}: {:f}'.format(d, x), end='')
+                    #             quant_offset += 1
+                    #         print()
             # Insert rows into per_worker_treelet_data
             for treelet_id, _ in stats.treelet_stats.items():
                 for i in range(num_timepoints):
@@ -541,7 +593,7 @@ def quantize_sequence(timepoints, data, quanta, start=None, end=None, rate=False
                 break
             offset += 1
             
-    current_time_in_interval = min(timepoints[offset - 1], current_time)
+    current_time_in_interval = max(timepoints[offset - 1], current_time)
     prev_summed_value = 0
     summed_value = 0
     # Sum over multiple timepoints
