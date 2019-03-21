@@ -459,14 +459,26 @@ ResultType LambdaWorker::handlePeers() {
     RECORD_INTERVAL("handlePeers");
     peerTimer.reset();
 
+    constexpr size_t MAX_TRIES = 10;
+
     const auto now = packet_clock::now();
 
-    for (auto& kv : peers) {
-        auto& peerId = kv.first;
-        auto& peer = kv.second;
+    for (auto it = peers.begin(); it != peers.end();) {
+        auto& peerId = it->first;
+        auto& peer = it->second;
 
         switch (peer.state) {
         case Worker::State::Connecting: {
+            if (peerId > 0 && peer.tries > MAX_TRIES) {
+                for (const auto treelet : peer.treelets) {
+                    neededTreelets.insert(treelet);
+                    requestedTreelets.erase(treelet);
+                }
+
+                it = peers.erase(it);
+                continue;
+            }
+
             auto message = createConnectionRequest(peer);
             servicePackets.emplace_front(peer.address, message.str());
             peer.tries++;
@@ -483,6 +495,8 @@ ResultType LambdaWorker::handlePeers() {
 
             break;
         }
+
+        it++;
     }
 
     return ResultType::Continue;
@@ -834,8 +848,15 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         if (peers.count(proto.worker_id()) == 0) {
             const auto dest = Address::decompose(proto.address());
-            peers.emplace(proto.worker_id(),
-                          Worker{proto.worker_id(), {dest.first, dest.second}});
+            auto it = peers
+                          .emplace(proto.worker_id(),
+                                   Worker{proto.worker_id(),
+                                          {dest.first, dest.second}})
+                          .first;
+
+            if (proto.treelet_id() != numeric_limits<TreeletId>::max()) {
+                it->second.treelets.insert(proto.treelet_id());
+            }
         }
 
         break;
