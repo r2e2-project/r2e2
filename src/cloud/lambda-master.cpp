@@ -566,7 +566,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
                                 << '\n';
 
             worker.nextStatusLogTimestamp =
-                duration_cast<microseconds>(STATUS_PRINT_INTERVAL).count() +
+                duration_cast<microseconds>(WRITE_STATS_INTERVAL).count() +
                 proto.timestamp_us();
         }
 
