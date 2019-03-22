@@ -243,10 +243,13 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action) {
     // clang-format off
     switch (action) {
     case RayAction::Generated: rayActionsOstream << "Generated"; break;
-    case RayAction::Queued: rayActionsOstream << "Queued"; break;
-    case RayAction::Received: rayActionsOstream << "Received"; break;
-    case RayAction::Finished: rayActionsOstream << "Finished"; break;
-    default: throw runtime_error("invalid ray action");
+    case RayAction::Traced:    rayActionsOstream << "Traced"; break;
+    case RayAction::Queued:    rayActionsOstream << "Queued"; break;
+    case RayAction::Received:  rayActionsOstream << "Received"; break;
+    case RayAction::Finished:  rayActionsOstream << "Finished"; break;
+
+    default:
+        throw runtime_error("invalid ray action");
     }
     // clang-format on
 
@@ -265,6 +268,7 @@ ResultType LambdaWorker::handleRayQueue() {
 
         if (!ray.toVisitEmpty()) {
             const uint32_t rayTreelet = ray.toVisitTop().treelet;
+            logRayAction(ray, RayAction::Traced);
             auto newRayPtr = CloudIntegrator::Trace(move(rayPtr), bvh);
             auto& newRay = *newRayPtr;
 
@@ -288,6 +292,7 @@ ResultType LambdaWorker::handleRayQueue() {
                 workerStats.recordFinishedPath();
             }
         } else if (ray.hit) {
+            logRayAction(ray, RayAction::Traced);
             auto newRays = CloudIntegrator::Shade(move(rayPtr), bvh, lights,
                                                   sampler, arena);
 

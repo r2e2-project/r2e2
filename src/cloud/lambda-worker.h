@@ -81,7 +81,7 @@ class LambdaWorker {
               sequenceNumber(sequenceNumber) {}
     };
 
-    enum class RayAction { Generated, Queued, Received, Finished };
+    enum class RayAction { Generated, Traced, Queued, Received, Finished };
 
     bool processMessage(const meow::Message& message);
     void initializeScene();
