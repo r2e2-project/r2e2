@@ -178,10 +178,9 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         }
     }
 
-    if (config.assignment == Assignment::Static ||
-        config.assignment == Assignment::Static0) {
+    if (config.assignment & (Assignment::Static | Assignment::StaticZero)) {
         loadStaticAssignment(numberOfLambdas,
-                             config.assignment == Assignment::Static0);
+                             config.assignment & Assignment::StaticZero);
     }
 
     udpConnection = loop.make_udp_connection(
@@ -312,9 +311,21 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
          */
         this->assignBaseSceneObjects(workerIt->second);
 
-        auto doStaticAssign = [this](Worker &worker, const bool zeroOnAll) {
+        auto doUniformAssign = [this](Worker &worker) {
+            assignTreelet(worker, (worker.id - 1) % treeletIds.size());
+        };
+
+        auto doStaticAssign = [this](Worker &worker, const bool zeroOnAll,
+                                     const bool uniform) {
             if (zeroOnAll) {
                 assignTreelet(worker, 0);
+            }
+
+            if (uniform) {
+                const TreeletId t = (worker.id - 1) % (treeletIds.size() -
+                                                       (zeroOnAll ? 1 : 0)) +
+                                    (zeroOnAll ? 1 : 0);
+                assignTreelet(worker, t);
             }
 
             for (const auto t : staticAssignments[worker.id - 1]) {
@@ -341,22 +352,17 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         }
 
         /* assign treelet to worker based on most in-demand treelets */
-        switch (this->config.assignment) {
-        case Assignment::Static:
-        case Assignment::Static0:
+        const auto assignment = this->config.assignment;
+
+        if (assignment & (Assignment::Static | Assignment::StaticZero)) {
             doStaticAssign(workerIt->second,
-                           this->config.assignment == Assignment::Static0);
-            break;
-
-        case Assignment::Uniform:
-            this->assignTreeletsUniformly(workerIt->second);
-            break;
-
-        case Assignment::All:
+                           this->config.assignment & Assignment::StaticZero,
+                           this->config.assignment & Assignment::Uniform);
+        } else if (assignment & Assignment::Uniform) {
+            doUniformAssign(workerIt->second);
+        } else if (assignment & Assignment::All) {
             doAllAssign(workerIt->second);
-            break;
-
-        default:
+        } else {
             throw runtime_error("unrecognized assignment type");
         }
 
@@ -698,12 +704,6 @@ void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
     assignObject(worker, ObjectKey{ObjectType::Lights, 0});
 }
 
-void LambdaMaster::assignTreeletsUniformly(Worker &worker) {
-    uint32_t wid = worker.id - 1;
-    /* assignTreelet(worker, 0); */
-    assignTreelet(worker, wid % treeletIds.size());
-}
-
 void LambdaMaster::assignTreelets(Worker &worker) {
     /* Scene assignment strategy
 
@@ -810,15 +810,17 @@ void usage(const char *argv0, int exitCode) {
          << endl
          << "  -S --samples N             number of samples per pixel" << endl
          << "  -a --assignment TYPE       indicate assignment type:" << endl
-         << "                             * uniform (default)" << endl
-         << "                             * static" << endl
-         << "                             * static0" << endl
-         << "                             * all" << endl
+         << "                               - uniform (default)" << endl
+         << "                               - static" << endl
+         << "                               - static+uniform" << endl
+         << "                               - static0" << endl
+         << "                               - static0+uniform" << endl
+         << "                               - all" << endl
          << "  -f --finished-ray ACTION   what to do with finished rays" << endl
-         << "                             * discard (default)" << endl
-         << "                             * send" << endl
-         << "                             * upload" << endl
-         << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T)]"
+         << "                               - discard (default)" << endl
+         << "                               - send" << endl
+         << "                               - upload" << endl
+         << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
          << endl
          << "  -h --help                  show help information" << endl;
 
@@ -858,7 +860,7 @@ int main(int argc, char *argv[]) {
     string logsDirectory = "logs/";
     Optional<Bounds2i> cropWindow;
 
-    Assignment assignment = Assignment::Uniform;
+    int assignment = Assignment::Uniform;
     int samplesPerPixel = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
 
@@ -911,7 +913,11 @@ int main(int argc, char *argv[]) {
             if (strcmp(optarg, "static") == 0) {
                 assignment = Assignment::Static;
             } else if (strcmp(optarg, "static0") == 0) {
-                assignment = Assignment::Static0;
+                assignment = Assignment::StaticZero;
+            } else if (strcmp(optarg, "static+uniform") == 0) {
+                assignment = Assignment::Static | Assignment::Uniform;
+            } else if (strcmp(optarg, "static0+uniform") == 0) {
+                assignment = Assignment::StaticZero | Assignment::Uniform;
             } else if (strcmp(optarg, "uniform") == 0) {
                 assignment = Assignment::Uniform;
             } else if (strcmp(optarg, "all") == 0) {

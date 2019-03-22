@@ -188,7 +188,7 @@ vector<double> SceneManager::getTreeletProbs() const {
                  getFileName(ObjectType::TreeletInfo, 0)};
 
     if (!fin.good()) {
-        return {};
+        throw runtime_error("TINFO file not found");
     }
 
     size_t count = 0;

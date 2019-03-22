@@ -30,11 +30,18 @@
 
 namespace pbrt {
 
-enum class Assignment { All, Static, Static0, Uniform };
+struct Assignment {
+    // clang-format off
+    static constexpr int All        = (1 << 0);
+    static constexpr int Static     = (1 << 1);
+    static constexpr int StaticZero = (1 << 2);
+    static constexpr int Uniform    = (1 << 3);
+    // clang-format on
+};
 enum class FinishedRayAction { Discard, SendBack, Upload };
 
 struct MasterConfiguration {
-    Assignment assignment;
+    int assignment; /* look at `struct Assignment` */
     FinishedRayAction finishedRayAction;
     bool sendReliably;
     int samplesPerPixel;
