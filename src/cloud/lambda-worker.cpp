@@ -353,9 +353,10 @@ ResultType LambdaWorker::handleOutQueue() {
                 .address;
         auto& peerSeqNo = sequenceNumbers[peerAddress];
 
-        string unpackedRay;
+        string unpackedRayStr;
+        RayStatePtr unpackedRayPtr;
 
-        while (!outRays.empty() || !unpackedRay.empty()) {
+        while (!outRays.empty() || !unpackedRayStr.empty()) {
             ostringstream oss;
             size_t packetLen = 26;
             size_t rayCount = 0;
@@ -366,9 +367,14 @@ ResultType LambdaWorker::handleOutQueue() {
                 protobuf::RecordWriter writer{&oss};
                 writer.write(*workerId);
 
-                if (!unpackedRay.empty()) {
-                    writer.write(unpackedRay);
-                    unpackedRay.clear();
+                if (!unpackedRayStr.empty()) {
+                    writer.write(unpackedRayStr);
+
+                    if (unpackedRayPtr->trackRay) {
+                        trackedRays.push_back(move(unpackedRayPtr));
+                    }
+
+                    unpackedRayStr.clear();
                     rayCount++;
                 }
 
@@ -381,14 +387,15 @@ ResultType LambdaWorker::handleOutQueue() {
                     workerStats.recordSentRay(*ray);
                     logRayAction(*ray, RayAction::Queued);
 
-                    if (ray->trackRay) {
-                        trackedRays.push_back(move(ray));
-                    }
-
                     const size_t len = rayStr.length() + 4;
                     if (len + packetLen > UDP_MTU_BYTES) {
-                        unpackedRay.swap(rayStr);
+                        unpackedRayStr.swap(rayStr);
+                        unpackedRayPtr = move(ray);
                         break;
+                    }
+
+                    if (ray->trackRay) {
+                        trackedRays.push_back(move(ray));
                     }
 
                     packetLen += len;
@@ -618,13 +625,13 @@ ResultType LambdaWorker::handleUdpSend() {
     /* peer to send the packet to */
     sendUdpPacket(packet.destination, packet.data);
 
+    for (auto& rayPtr : packet.trackedRays) {
+        logRayAction(*rayPtr, RayAction::Sent);
+    }
+
     if (packet.reliable) {
         outstandingRayPackets.emplace_back(packet_clock::now() + 1s,
                                            move(packet));
-    }
-
-    for (auto & rayPtr : packet.trackedRays) {
-        logRayAction(*rayPtr, RayAction::Sent);
     }
 
     rayPackets.pop_front();
