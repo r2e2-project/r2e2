@@ -245,6 +245,8 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action) {
     case RayAction::Generated: rayActionsOstream << "Generated"; break;
     case RayAction::Traced:    rayActionsOstream << "Traced"; break;
     case RayAction::Queued:    rayActionsOstream << "Queued"; break;
+    case RayAction::Pending:   rayActionsOstream << "Pending"; break;
+    case RayAction::Sent:      rayActionsOstream << "Sent"; break;
     case RayAction::Received:  rayActionsOstream << "Received"; break;
     case RayAction::Finished:  rayActionsOstream << "Finished"; break;
 
@@ -266,9 +268,10 @@ ResultType LambdaWorker::handleRayQueue() {
         RayStatePtr rayPtr = popRayQueue();
         RayState& ray = *rayPtr;
 
+        logRayAction(ray, RayAction::Traced);
+
         if (!ray.toVisitEmpty()) {
             const uint32_t rayTreelet = ray.toVisitTop().treelet;
-            logRayAction(ray, RayAction::Traced);
             auto newRayPtr = CloudIntegrator::Trace(move(rayPtr), bvh);
             auto& newRay = *newRayPtr;
 
@@ -292,7 +295,6 @@ ResultType LambdaWorker::handleRayQueue() {
                 workerStats.recordFinishedPath();
             }
         } else if (ray.hit) {
-            logRayAction(ray, RayAction::Traced);
             auto newRays = CloudIntegrator::Shade(move(rayPtr), bvh, lights,
                                                   sampler, arena);
 
@@ -324,6 +326,7 @@ ResultType LambdaWorker::handleRayQueue() {
                 outQueue[nextTreelet].push_back(move(ray));
                 outQueueSize++;
             } else {
+                logRayAction(*ray, RayAction::Pending);
                 workerStats.recordPendingRay(*ray);
                 neededTreelets.insert(nextTreelet);
                 pendingQueue[nextTreelet].push_back(move(ray));
@@ -357,6 +360,8 @@ ResultType LambdaWorker::handleOutQueue() {
             size_t packetLen = 26;
             size_t rayCount = 0;
 
+            vector<unique_ptr<RayState>> trackedRays;
+
             {
                 protobuf::RecordWriter writer{&oss};
                 writer.write(*workerId);
@@ -376,6 +381,10 @@ ResultType LambdaWorker::handleOutQueue() {
                     workerStats.recordSentRay(*ray);
                     logRayAction(*ray, RayAction::Queued);
 
+                    if (ray->trackRay) {
+                        trackedRays.push_back(move(ray));
+                    }
+
                     const size_t len = rayStr.length() + 4;
                     if (len + packetLen > UDP_MTU_BYTES) {
                         unpackedRay.swap(rayStr);
@@ -390,10 +399,16 @@ ResultType LambdaWorker::handleOutQueue() {
 
             oss.flush();
 
-            rayPackets.emplace_back(peerAddress, treeletId, rayCount,
-                                    Message::str(OpCode::SendRays, oss.str(),
-                                                 sendReliably, peerSeqNo),
-                                    sendReliably, peerSeqNo);
+            RayPacket rayPacket{peerAddress,
+                                treeletId,
+                                rayCount,
+                                Message::str(OpCode::SendRays, oss.str(),
+                                             sendReliably, peerSeqNo),
+                                sendReliably,
+                                peerSeqNo};
+
+            rayPacket.trackedRays = move(trackedRays);
+            rayPackets.emplace_back(move(rayPacket));
 
             peerSeqNo++;
         }
@@ -606,6 +621,10 @@ ResultType LambdaWorker::handleUdpSend() {
     if (packet.reliable) {
         outstandingRayPackets.emplace_back(packet_clock::now() + 1s,
                                            move(packet));
+    }
+
+    for (auto & rayPtr : packet.trackedRays) {
+        logRayAction(*rayPtr, RayAction::Sent);
     }
 
     rayPackets.pop_front();

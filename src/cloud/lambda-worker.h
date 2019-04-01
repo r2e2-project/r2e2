@@ -69,6 +69,8 @@ class LambdaWorker {
         bool reliable{false};
         uint64_t sequenceNumber;
 
+        std::vector<std::unique_ptr<RayState>> trackedRays;
+
         RayPacket(const Address& addr, const TreeletId targetTreelet,
                   const size_t rayCount, std::string&& data,
                   const bool reliable = false,
@@ -81,7 +83,15 @@ class LambdaWorker {
               sequenceNumber(sequenceNumber) {}
     };
 
-    enum class RayAction { Generated, Traced, Queued, Received, Finished };
+    enum class RayAction {
+        Generated,
+        Traced,
+        Pending,
+        Queued,
+        Sent,
+        Received,
+        Finished
+    };
 
     bool processMessage(const meow::Message& message);
     void initializeScene();
