@@ -629,35 +629,32 @@ void LambdaMaster::run() {
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 
-    if (config.collectDiagnostics || config.rayActionsLogRate > 0.0) {
-        string logPrefix = "logs/" + jobId + "/";
-        vector<storage::GetRequest> getRequests;
-        for (const auto &workerkv : workers) {
-            const auto &worker = workerkv.second;
-            worker.connection->socket().close();
+    vector<storage::GetRequest> getRequests;
+    const string logPrefix = "logs/" + jobId + "/";
 
+    for (const auto &workerkv : workers) {
+        const auto &worker = workerkv.second;
+        worker.connection->socket().close();
+        worker.statsOstream.close();
+
+        if (config.collectDiagnostics) {
             getRequests.emplace_back(
                 logPrefix + to_string(worker.id) + ".DIAG",
                 config.logsDirectory + "/" + to_string(worker.id) + ".DIAG");
-
-            if (config.rayActionsLogRate) {
-                getRequests.emplace_back(
-                    logPrefix + to_string(worker.id) + ".RAYS",
-                    config.logsDirectory + "/" + to_string(worker.id) +
-                        ".RAYS");
-            }
         }
 
-        cerr << "\nDownloading " << getRequests.size() << " log file(s)... ";
-
-        this_thread::sleep_for(10s);
-        storageBackend->get(getRequests);
-
-        cerr << "done." << endl;
+        if (config.rayActionsLogRate) {
+            getRequests.emplace_back(
+                logPrefix + to_string(worker.id) + ".RAYS",
+                config.logsDirectory + "/" + to_string(worker.id) + ".RAYS");
+        }
     }
 
-    for (const auto &worker : workers) {
-        worker.second.statsOstream.close();
+    if (!getRequests.empty()) {
+        cerr << "\nDownloading " << getRequests.size() << " log file(s)... ";
+        this_thread::sleep_for(10s);
+        storageBackend->get(getRequests);
+        cerr << "done." << endl;
     }
 }
 
