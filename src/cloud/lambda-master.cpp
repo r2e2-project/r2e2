@@ -239,6 +239,11 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         [this]() { return !pendingWorkerRequests.empty(); },
         []() { throw runtime_error("worker requests failed"); }));
 
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, bind(&LambdaMaster::handleConnectAll, this),
+        [this]() { return this->initializedWorkers == this->numberOfLambdas; },
+        []() { throw runtime_error("connectAll failed"); }));
+
     if (config.finishedRayAction == FinishedRayAction::SendBack) {
         loop.poller().add_action(Poller::Action(
             writeOutputTimer.fd, Direction::In,
@@ -369,6 +374,30 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         currentWorkerId++;
         return true;
     });
+}
+
+ResultType LambdaMaster::handleConnectAll() {
+    ostringstream oss;
+    protobuf::ConnectTo proto;
+
+    {
+        protobuf::RecordWriter writer{&oss};
+        for (auto &workerkv : workers) {
+            auto &worker = workerkv.second;
+            proto.set_worker_id(worker.id);
+            proto.set_address(worker.udpAddress->str());
+            writer.write(proto);
+        }
+    }
+
+    const string connectAllStr =
+        Message::str(OpCode::MultipleConnect, oss.str());
+
+    for (auto &workerkv : workers) {
+        workerkv.second.connection->enqueue_write(connectAllStr);
+    }
+
+    return ResultType::Cancel;
 }
 
 ResultType LambdaMaster::handleStatusMessage() {

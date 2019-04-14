@@ -831,6 +831,15 @@ bool LambdaWorker::processMessage(const Message& message) {
     /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
          << "]\n"; */
 
+    auto handleConnectTo = [this](const protobuf::ConnectTo& proto) {
+        if (peers.count(proto.worker_id()) == 0 &&
+            proto.worker_id() != *workerId) {
+            const auto dest = Address::decompose(proto.address());
+            peers.emplace(proto.worker_id(),
+                          Worker{proto.worker_id(), {dest.first, dest.second}});
+        }
+    };
+
     switch (message.opcode()) {
     case OpCode::Hey: {
         protobuf::Hey proto;
@@ -876,11 +885,17 @@ bool LambdaWorker::processMessage(const Message& message) {
     case OpCode::ConnectTo: {
         protobuf::ConnectTo proto;
         protoutil::from_string(message.payload(), proto);
+        handleConnectTo(proto);
+        break;
+    }
 
-        if (peers.count(proto.worker_id()) == 0) {
-            const auto dest = Address::decompose(proto.address());
-            peers.emplace(proto.worker_id(),
-                          Worker{proto.worker_id(), {dest.first, dest.second}});
+    case OpCode::MultipleConnect: {
+        protobuf::ConnectTo proto;
+        protobuf::RecordReader reader{istringstream{message.payload()}};
+
+        while (!reader.eof()) {
+            reader.read(&proto);
+            handleConnectTo(proto);
         }
 
         break;
