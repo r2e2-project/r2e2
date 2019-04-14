@@ -526,8 +526,8 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
             worker.connection->enqueue_write(heyBackMessage.str());
         }
 
-        {
-            /* send the list of assigned objects to the worker */
+        /* {
+            // send the list of assigned objects to the worker
             protobuf::GetObjects proto;
             for (const ObjectKey &id : worker.objects) {
                 *proto.add_object_ids() = to_protobuf(id);
@@ -541,7 +541,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
             *proto.mutable_crop_window() = to_protobuf(*worker.tile);
             Message message{OpCode::GenerateRays, protoutil::to_string(proto)};
             worker.connection->enqueue_write(message.str());
-        }
+        } */
 
         break;
     }
