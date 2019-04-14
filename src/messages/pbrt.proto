@@ -258,8 +258,7 @@ message GetWorker {
 
 message ConnectTo {
     uint64 worker_id = 1;
-    uint32 treelet_id = 2;
-    string address = 3;
+    string address = 2;
 }
 
 message ConnectRequest {

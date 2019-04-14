@@ -489,20 +489,15 @@ bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
         return false;
     }
 
-    auto makeMessage = [](const Worker &worker,
-                          const TreeletId treeletId) -> Message {
+    auto makeMessage = [](const Worker &worker) {
         protobuf::ConnectTo proto;
         proto.set_worker_id(worker.id);
-        proto.set_treelet_id(treeletId);
         proto.set_address(worker.udpAddress->str());
-        return {OpCode::ConnectTo, protoutil::to_string(proto)};
+        return Message::str(OpCode::ConnectTo, protoutil::to_string(proto));
     };
 
-    worker.connection->enqueue_write(
-        makeMessage(selectedWorker, treeletId).str());
-
-    selectedWorker.connection->enqueue_write(
-        makeMessage(worker, numeric_limits<TreeletId>::max()).str());
+    worker.connection->enqueue_write(makeMessage(selectedWorker));
+    selectedWorker.connection->enqueue_write(makeMessage(worker));
 
     return true;
 }

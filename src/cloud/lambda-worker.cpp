@@ -879,15 +879,8 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         if (peers.count(proto.worker_id()) == 0) {
             const auto dest = Address::decompose(proto.address());
-            auto it = peers
-                          .emplace(proto.worker_id(),
-                                   Worker{proto.worker_id(),
-                                          {dest.first, dest.second}})
-                          .first;
-
-            if (proto.treelet_id() != numeric_limits<TreeletId>::max()) {
-                it->second.treelets.insert(proto.treelet_id());
-            }
+            peers.emplace(proto.worker_id(),
+                          Worker{proto.worker_id(), {dest.first, dest.second}});
         }
 
         break;
