@@ -121,13 +121,6 @@ class LambdaMaster {
 
     void assignBaseSceneObjects(Worker &worker);
 
-    // Assigns this worker a single treelet per a uniform assignment of
-    // treelets over workers. Assumes that treelet ids are in [0, t], where 0
-    // is the root treelet and is assigned to everyone.  Assumes that worker
-    // ids are in [0, w];
-    void assignTreeletsUniformly(Worker &worker);
-    void assignTreelets(Worker &worker);
-
     void updateObjectUsage(const Worker &worker);
 
     void aggregateQueueStats();

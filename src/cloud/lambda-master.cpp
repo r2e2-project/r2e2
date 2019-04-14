@@ -701,59 +701,6 @@ void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
     assignObject(worker, ObjectKey{ObjectType::Lights, 0});
 }
 
-void LambdaMaster::assignTreelets(Worker &worker) {
-    /* Scene assignment strategy
-
-       When a worker connects to the master:
-       1. The master consults the list of residentSceneObjects to determine if
-          there are objects which have not been assigned to a worker yet. If so,
-          it assigns as many of those objects as it can to the worker.
-       2. If all treelets have been allocated at least once, then find the
-       treelet with the largest load
-     */
-
-    /* NOTE(apoms): for now, we only assign one treelet to each worker, but
-     * should be able to support assigning multiple based on freeSpace in the
-     * future */
-    const size_t freeSpace = worker.freeSpace;
-
-    /* if some objects are unassigned, assign them */
-    while (!unassignedTreelets.empty()) {
-        ObjectKey id = unassignedTreelets.top();
-        size_t size = treeletTotalSizes.at(id.id);
-        if (size < freeSpace) {
-            assignTreelet(worker, id.id);
-            unassignedTreelets.pop();
-            return;
-        }
-    }
-
-    /* otherwise, find the object with the largest discrepancy between rays
-     * requested and rays processed */
-    ObjectKey highestID = *treeletIds.begin();
-    float highestLoad = -1;
-    for (auto &tup : treeletPriority) {
-        uint64_t id = get<1>(tup);
-        uint64_t load = get<0>(tup);
-        ObjectKey treeletId{ObjectType::Treelet, id};
-        const SceneObjectInfo &info = sceneObjects.at(treeletId);
-
-        size_t size = treeletTotalSizes[id];
-        if (load > highestLoad && size < freeSpace) {
-            highestID = treeletId;
-            highestLoad = load;
-        }
-    }
-
-    /* if we have not received stats info about the load of any scene
-     * object, randomly pick a treelet */
-    if (highestLoad == 0) {
-        highestID = *random::sample(treeletIds.begin(), treeletIds.end());
-    }
-
-    assignTreelet(worker, highestID.id);
-}
-
 void LambdaMaster::updateObjectUsage(const Worker &worker) {}
 
 HTTPRequest LambdaMaster::generateRequest() {
