@@ -436,6 +436,8 @@ ResultType LambdaMaster::handleStatusMessage() {
                                         : percentage(workerStats.receivedRays(),
                                                      workerStats.sentRays()))
         << "%)"
+        << " | connections: " << workerStats.queueStats.connected << " ("
+        << workerStats.queueStats.connecting << ")"
         << " | time: " << setfill('0') << setw(2) << (elapsedSeconds / 60)
         << ":" << setw(2) << (elapsedSeconds % 60);
 
