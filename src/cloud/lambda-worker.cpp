@@ -182,11 +182,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("messages failed"); }));
 
     /* request new peers for neighboring treelets */
-    loop.poller().add_action(Poller::Action(
+    /* loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out,
         bind(&LambdaWorker::handleNeededTreelets, this),
         [this]() { return !neededTreelets.empty(); },
-        []() { throw runtime_error("treelet request failed"); }));
+        []() { throw runtime_error("treelet request failed"); })); */
 
     /* send updated stats */
     loop.poller().add_action(Poller::Action(
@@ -926,6 +926,7 @@ bool LambdaWorker::processMessage(const Message& message) {
             for (const auto treeletId : proto.treelet_ids()) {
                 peer.treelets.insert(treeletId);
                 treeletToWorker[treeletId].push_back(otherWorkerId);
+                neededTreelets.erase(treeletId);
                 requestedTreelets.erase(treeletId);
 
                 if (pendingQueue.count(treeletId)) {
