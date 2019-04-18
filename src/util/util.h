@@ -10,6 +10,7 @@
 std::string safe_getenv( const std::string & key );
 std::string safe_getenv_or( const std::string & key, const std::string & def_val );
 std::string format_bytes( size_t bytes );
+std::string format_num( size_t num );
 
 template <typename E>
 constexpr auto to_underlying( E e ) noexcept

@@ -42,3 +42,21 @@ string format_bytes( size_t bytes )
   oss << fixed << setprecision( 1 ) << val << " " << sizes[ i ];
   return oss.str();
 }
+
+string format_num( size_t num )
+{
+  const char * sizes[] = { "", "\u00d710\u00b3",
+                           "\u00d710\u2076",
+                           "\u00d710\u2079",
+                           "\u00d710\u00b9\u00b2" };
+  double val = num;
+
+  size_t i;
+  for ( i = 0; i < 4 and num >= 1000; i++, num /= 1000 ) {
+    val = num / 1000.0;
+  }
+
+  ostringstream oss;
+  oss << fixed << setprecision( 1 ) << val << sizes[ i ];
+  return oss.str();
+}

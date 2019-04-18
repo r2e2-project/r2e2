@@ -35,6 +35,7 @@
 #include "util/random.h"
 #include "util/status_bar.h"
 #include "util/tokenize.h"
+#include "util/util.h"
 
 using namespace std;
 using namespace std::chrono;
@@ -447,18 +448,18 @@ ResultType LambdaMaster::handleStatusMessage() {
         << " done paths: " << workerStats.finishedPaths() << " (" << fixed
         << setprecision(2)
         << percentage(workerStats.finishedPaths(), totalPaths) << "%)"
-        << " | workers: " << workers.size() << " (" << initializedWorkers << ")"
-        << " | requests: " << pendingWorkerRequests.size() << " | \u2191 "
-        << workerStats.sentRays() << " | \u2193 " << workerStats.receivedRays()
-        << " (" << fixed << setprecision(2)
+        << " | \u03bb: " << workers.size() << " (" << initializedWorkers << ")"
+        << " | \u2191 " << format_num(workerStats.sentRays()) << " | \u2193 "
+        << format_num(workerStats.receivedRays()) << " (" << fixed
+        << setprecision(2)
         << (workerStats.sentRays() == 0 ? 0
                                         : percentage(workerStats.receivedRays(),
                                                      workerStats.sentRays()))
         << "%)"
-        << " | connections: " << workerStats.queueStats.connected << " ("
+        << " | \u21c4: " << workerStats.queueStats.connected << " ("
         << workerStats.queueStats.connecting << ")"
-        << " | time: " << setfill('0') << setw(2) << (elapsedSeconds / 60)
-        << ":" << setw(2) << (elapsedSeconds % 60);
+        << " | " << setfill('0') << setw(2) << (elapsedSeconds / 60) << ":"
+        << setw(2) << (elapsedSeconds % 60);
 
     StatusBar::set_text(oss.str());
 
