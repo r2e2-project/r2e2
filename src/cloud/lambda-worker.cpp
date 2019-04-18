@@ -486,8 +486,6 @@ ResultType LambdaWorker::handlePeers() {
     RECORD_INTERVAL("handlePeers");
     peerTimer.reset();
 
-    constexpr size_t MAX_TRIES = 10;
-
     const auto now = packet_clock::now();
 
     for (auto it = peers.begin(); it != peers.end();) {
@@ -496,16 +494,6 @@ ResultType LambdaWorker::handlePeers() {
 
         switch (peer.state) {
         case Worker::State::Connecting: {
-            if (peerId > 0 && peer.tries > MAX_TRIES) {
-                for (const auto treelet : peer.treelets) {
-                    neededTreelets.insert(treelet);
-                    requestedTreelets.erase(treelet);
-                }
-
-                it = peers.erase(it);
-                continue;
-            }
-
             auto message = createConnectionRequest(peer);
             servicePackets.emplace_front(peer.address, message.str());
             peer.tries++;
