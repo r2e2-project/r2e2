@@ -394,7 +394,26 @@ ResultType LambdaMaster::handleConnectAll() {
         Message::str(OpCode::MultipleConnect, oss.str());
 
     for (auto &workerkv : workers) {
-        workerkv.second.connection->enqueue_write(connectAllStr);
+        auto &worker = workerkv.second;
+
+        protobuf::GetObjects proto;
+        for (const ObjectKey &id : worker.objects) {
+            *proto.add_object_ids() = to_protobuf(id);
+        }
+
+        const string getDepsStr =
+            Message::str(OpCode::GetObjects, protoutil::to_string(proto));
+
+        worker.connection->enqueue_write(getDepsStr);
+        worker.connection->enqueue_write(connectAllStr);
+
+        if (worker.tile.initialized()) {
+            protobuf::GenerateRays proto;
+            *proto.mutable_crop_window() = to_protobuf(*worker.tile);
+            const string genRaysStr =
+                Message::str(OpCode::GenerateRays, protoutil::to_string(proto));
+            worker.connection->enqueue_write(genRaysStr);
+        }
     }
 
     return ResultType::Cancel;
