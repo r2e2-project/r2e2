@@ -68,6 +68,7 @@ class LambdaWorker {
 
         bool reliable{false};
         uint64_t sequenceNumber;
+        size_t retries{0};
 
         std::vector<std::unique_ptr<RayState>> trackedRays;
 

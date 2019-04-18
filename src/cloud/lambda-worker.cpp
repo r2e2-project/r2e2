@@ -581,6 +581,22 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         auto& thisReceivedAcks = receivedAcks[packet.destination];
 
         if (!thisReceivedAcks.contains(packet.sequenceNumber)) {
+            packet.retries++;
+
+            if (packet.retries > 1) {
+                sequenceNumbers[packet.destination]--;
+
+                const auto& candidates = treeletToWorker[packet.targetTreelet];
+                const auto& peerAddress =
+                    peers
+                        .at(*random::sample(candidates.begin(),
+                                            candidates.end()))
+                        .address;
+
+                packet.destination = peerAddress;
+                packet.sequenceNumber = sequenceNumbers[packet.destination]++;
+            }
+
             rayPackets.push_back(move(packet));
         }
 
