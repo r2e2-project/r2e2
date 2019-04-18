@@ -52,7 +52,7 @@ constexpr milliseconds PEER_CHECK_INTERVAL{1'000};
 constexpr milliseconds HANDLE_ACKS_INTERVAL{250};
 constexpr milliseconds WORKER_STATS_INTERVAL{1'000};
 constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
-constexpr milliseconds KEEP_ALIVE_INTERVAL{20'000};
+constexpr milliseconds KEEP_ALIVE_INTERVAL{40'000};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
