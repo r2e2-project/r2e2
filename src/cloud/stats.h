@@ -139,7 +139,6 @@ class DemandTracker {
 };
 
 namespace global {
-extern WorkerStats workerStats;
 extern WorkerDiagnostics workerDiagnostics;
 }  // namespace global
 

@@ -8,7 +8,6 @@ using namespace chrono;
 
 namespace pbrt {
 namespace global {
-WorkerStats workerStats;
 WorkerDiagnostics workerDiagnostics;
 }  // namespace global
 

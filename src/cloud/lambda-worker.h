@@ -138,6 +138,7 @@ class LambdaWorker {
     const float rayActionsLogRate;
     const bool trackRays{rayActionsLogRate > 0};
 
+    WorkerStats workerStats;
     WorkerDiagnostics lastDiagnostics;
 
     const bool sendReliably;
