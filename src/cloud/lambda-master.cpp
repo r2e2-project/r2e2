@@ -644,6 +644,17 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         break;
     }
 
+    case OpCode::FinishedPaths: {
+        Chunk chunk{message.payload()};
+
+        while (chunk.size()) {
+            finishedPathIds.insert(chunk.be64());
+            chunk = chunk(8);
+        }
+
+        break;
+    }
+
     default:
         throw runtime_error("unhandled message opcode: " +
                             to_string(to_underlying(message.opcode())));

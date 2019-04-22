@@ -24,6 +24,7 @@
 #include "net/http_request.h"
 #include "storage/backend.h"
 #include "util/optional.h"
+#include "util/seq_no_set.h"
 #include "util/timerfd.h"
 #include "util/util.h"
 #include "util/uuid.h"
@@ -159,6 +160,7 @@ class LambdaMaster {
     std::shared_ptr<Camera> camera{};
     std::unique_ptr<FilmTile> filmTile{};
     size_t totalPaths{0};
+    SeqNoSet finishedPathIds{};
 
     /* Scene Objects */
     Bounds2i sampleBounds;
