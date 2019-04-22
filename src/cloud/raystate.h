@@ -24,7 +24,7 @@ struct RayState {
     };
 
     struct Sample {
-        size_t id;
+        uint64_t id;
         int64_t num;
         Point2i pixel;
         Point2f pFilm;
@@ -63,6 +63,8 @@ struct RayState {
     void SetHit(const TreeletNode &node);
     void StartTrace();
     uint32_t CurrentTreelet() const;
+
+    uint64_t PathID() const { return sample.id; }
 
     /* serialization */
     static std::string serialize(const RayStatePtr &, const bool = true);
