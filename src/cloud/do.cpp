@@ -113,7 +113,7 @@ int main(int argc, char const *argv[]) {
                 }
             } else if (rayState.hit) {
                 auto newRays = CloudIntegrator::Shade(
-                    move(rayStatePtr), treelet, lights, sampler, arena);
+                    move(rayStatePtr), treelet, lights, sampler, arena).first;
 
                 for (auto &newRay : newRays) {
                     outputRays.push_back(move(newRay));

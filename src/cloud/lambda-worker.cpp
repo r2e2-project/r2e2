@@ -296,7 +296,7 @@ ResultType LambdaWorker::handleRayQueue() {
             }
         } else if (ray.hit) {
             auto newRays = CloudIntegrator::Shade(move(rayPtr), bvh, lights,
-                                                  sampler, arena);
+                                                  sampler, arena).first;
 
             for (auto& newRay : newRays) {
                 processedRays.push_back(move(newRay));

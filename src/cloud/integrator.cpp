@@ -25,12 +25,14 @@ RayStatePtr CloudIntegrator::Trace(RayStatePtr &&rayState,
     return move(rayState);
 }
 
-vector<RayStatePtr> CloudIntegrator::Shade(
+pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
     RayStatePtr &&rayStatePtr, const shared_ptr<CloudBVH> &treelet,
     const vector<shared_ptr<Light>> &lights, shared_ptr<Sampler> &sampler,
     MemoryArena &arena) {
     vector<RayStatePtr> newRays;
     auto &rayState = *rayStatePtr;
+
+    bool pathFinished = false;
 
     SurfaceInteraction it;
     rayState.ray.tMax = Infinity;
@@ -69,11 +71,11 @@ vector<RayStatePtr> CloudIntegrator::Shade(
 
             ++nIntersectionTests;
         } else {
-            global::workerStats.recordFinishedPath();
+            pathFinished = true;
         }
     } else {
         /* we're done with this path */
-        global::workerStats.recordFinishedPath();
+        pathFinished = true;
     }
 
     if (it.bsdf->NumComponents(bsdfFlags) > 0) {
@@ -82,7 +84,7 @@ vector<RayStatePtr> CloudIntegrator::Shade(
         int lightNum;
         Float lightSelectPdf;
         if (nLights == 0) {
-            return newRays;
+            return {move(newRays), pathFinished};
         }
 
         lightSelectPdf = Float(1) / nLights;
@@ -116,7 +118,7 @@ vector<RayStatePtr> CloudIntegrator::Shade(
         }
     }
 
-    return newRays;
+    return {move(newRays), pathFinished};
 }
 
 void CloudIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
@@ -192,11 +194,10 @@ void CloudIntegrator::Render(const Scene &scene) {
             } else {
                 newRay.Ld = 0.f;
                 finishedRays.push_back(move(newRayPtr));
-                global::workerStats.recordFinishedPath();
             }
         } else if (state.hit) {
             auto newRays =
-                Shade(move(statePtr), bvh, scene.lights, sampler, arena);
+                Shade(move(statePtr), bvh, scene.lights, sampler, arena).first;
             for (auto &newRay : newRays) {
                 rayQueue.push_back(move(newRay));
             }
