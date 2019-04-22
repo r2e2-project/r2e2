@@ -258,6 +258,11 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action) {
     rayActionsOstream << endl;
 }
 
+void LambdaWorker::recordFinishedPath(const uint64_t pathId) {
+    workerStats.recordFinishedPath();
+    finishedPathIds.push_back(pathId);
+}
+
 ResultType LambdaWorker::handleRayQueue() {
     RECORD_INTERVAL("handleRayQueue");
     deque<RayStatePtr> processedRays;
@@ -267,6 +272,8 @@ ResultType LambdaWorker::handleRayQueue() {
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayStatePtr rayPtr = popRayQueue();
         RayState& ray = *rayPtr;
+
+        const uint64_t pathId = ray.PathID();
 
         logRayAction(ray, RayAction::Traced);
 
@@ -292,7 +299,7 @@ ResultType LambdaWorker::handleRayQueue() {
                 newRay.Ld = 0.f;
                 logRayAction(*newRayPtr, RayAction::Finished);
                 finishedQueue.push_back(move(newRayPtr));
-                workerStats.recordFinishedPath();
+                recordFinishedPath(pathId);
             }
         } else if (ray.hit) {
             auto newRays = CloudIntegrator::Shade(move(rayPtr), bvh, lights,
@@ -302,7 +309,7 @@ ResultType LambdaWorker::handleRayQueue() {
                 processedRays.push_back(move(newRay));
             }
 
-            if (newRays.second) workerStats.recordFinishedPath();
+            if (newRays.second) recordFinishedPath(pathId);
 
             if (newRays.first.empty()) {
                 /* rayPtr is not touched if if Shade() returned nothing */

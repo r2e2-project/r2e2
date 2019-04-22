@@ -125,6 +125,8 @@ class LambdaWorker {
     void pushRayQueue(RayStatePtr&& state);
     RayStatePtr popRayQueue();
 
+    void recordFinishedPath(const uint64_t pathId);
+
     void logRayAction(const RayState& state, const RayAction action);
 
     /* Logging & Diagnostics */
@@ -192,6 +194,7 @@ class LambdaWorker {
     std::map<TreeletId, std::deque<RayStatePtr>> outQueue{};
     size_t pendingQueueSize{0};
     size_t outQueueSize{0};
+    std::deque<uint64_t> finishedPathIds{};
 
     std::map<TreeletId, std::vector<WorkerId>> treeletToWorker{};
     std::set<TreeletId> neededTreelets{};
