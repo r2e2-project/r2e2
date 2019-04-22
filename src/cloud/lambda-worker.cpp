@@ -296,13 +296,15 @@ ResultType LambdaWorker::handleRayQueue() {
             }
         } else if (ray.hit) {
             auto newRays = CloudIntegrator::Shade(move(rayPtr), bvh, lights,
-                                                  sampler, arena).first;
+                                                  sampler, arena);
 
-            for (auto& newRay : newRays) {
+            for (auto& newRay : newRays.first) {
                 processedRays.push_back(move(newRay));
             }
 
-            if (newRays.empty()) {
+            if (newRays.second) workerStats.recordFinishedPath();
+
+            if (newRays.first.empty()) {
                 /* rayPtr is not touched if if Shade() returned nothing */
                 logRayAction(*rayPtr, RayAction::Finished);
             }
