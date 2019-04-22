@@ -167,7 +167,6 @@ class LambdaMaster {
 
     std::set<ObjectKey> treeletIds;
     std::stack<ObjectKey> unassignedTreelets;
-    std::vector<std::tuple<uint64_t, uint64_t>> treeletPriority;
 
     std::map<ObjectKey, std::set<ObjectKey>> requiredDependentObjects;
     std::map<TreeletId, std::set<ObjectKey>> treeletFlattenDependencies;
