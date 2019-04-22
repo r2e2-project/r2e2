@@ -53,6 +53,7 @@ constexpr milliseconds HANDLE_ACKS_INTERVAL{250};
 constexpr milliseconds WORKER_STATS_INTERVAL{1'000};
 constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr milliseconds KEEP_ALIVE_INTERVAL{40'000};
+constexpr milliseconds FINISHED_PATHS_INTERVAL{5'000};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
@@ -71,6 +72,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       peerTimer(PEER_CHECK_INTERVAL),
       workerStatsTimer(WORKER_STATS_INTERVAL),
       workerDiagnosticsTimer(WORKER_DIAGNOSTICS_INTERVAL),
+      finishedPathsTimer(FINISHED_PATHS_INTERVAL),
       handleRayAcknowledgementsTimer(HANDLE_ACKS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
 
@@ -193,6 +195,13 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         workerStatsTimer.fd, Direction::In,
         bind(&LambdaWorker::handleWorkerStats, this), [this]() { return true; },
         []() { throw runtime_error("worker stats failed"); }));
+
+    /* send back finished paths */
+    loop.poller().add_action(
+        Poller::Action(finishedPathsTimer.fd, Direction::In,
+                       bind(&LambdaWorker::handleFinishedPaths, this),
+                       [this]() { return !finishedPathIds.empty(); },
+                       []() { throw runtime_error("finished paths failed"); }));
 
     /* record diagnostics */
     loop.poller().add_action(Poller::Action(
@@ -433,19 +442,36 @@ ResultType LambdaWorker::handleOutQueue() {
     return ResultType::Continue;
 }
 
-protobuf::FinishedRay createFinishedRay(const size_t sampleId,
-                                        const Point2f& pFilm,
-                                        const Float weight, const Spectrum L) {
-    protobuf::FinishedRay proto;
-    proto.set_sample_id(sampleId);
-    *proto.mutable_p_film() = to_protobuf(pFilm);
-    proto.set_weight(weight);
-    *proto.mutable_l() = to_protobuf(L);
-    return proto;
+ResultType LambdaWorker::handleFinishedPaths() {
+    RECORD_INTERVAL("handleFinishedPaths");
+    finishedPathsTimer.reset();
+
+    string payload;
+    for (const auto pathId : finishedPathIds) {
+        payload += put_field(pathId);
+    }
+
+    finishedPathIds.clear();
+
+    coordinatorConnection->enqueue_write(
+        Message::str(OpCode::FinishedPaths, payload));
+
+    return ResultType::Continue;
 }
 
 ResultType LambdaWorker::handleFinishedQueue() {
     RECORD_INTERVAL("handleFinishedQueue");
+
+    auto createFinishedRay = [](const size_t sampleId, const Point2f& pFilm,
+                                const Float weight,
+                                const Spectrum L) -> protobuf::FinishedRay {
+        protobuf::FinishedRay proto;
+        proto.set_sample_id(sampleId);
+        *proto.mutable_p_film() = to_protobuf(pFilm);
+        proto.set_weight(weight);
+        *proto.mutable_l() = to_protobuf(L);
+        return proto;
+    };
 
     switch (finishedRayAction) {
     case FinishedRayAction::Discard:
@@ -475,9 +501,9 @@ ResultType LambdaWorker::handleFinishedQueue() {
         }
 
         oss.flush();
-        Message message{OpCode::FinishedRays, oss.str()};
-        auto messageStr = message.str();
-        coordinatorConnection->enqueue_write(move(messageStr));
+        coordinatorConnection->enqueue_write(
+            Message::str(OpCode::FinishedRays, oss.str()));
+
         break;
     }
 

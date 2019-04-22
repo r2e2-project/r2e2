@@ -105,6 +105,7 @@ class LambdaWorker {
     Poller::Action::Result::Type handleRayQueue();
     Poller::Action::Result::Type handleOutQueue();
     Poller::Action::Result::Type handleFinishedQueue();
+    Poller::Action::Result::Type handleFinishedPaths();
     Poller::Action::Result::Type handlePeers();
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleNeededTreelets();
@@ -207,6 +208,7 @@ class LambdaWorker {
     TimerFD peerTimer;
     TimerFD workerStatsTimer;
     TimerFD workerDiagnosticsTimer;
+    TimerFD finishedPathsTimer;
     TimerFD handleRayAcknowledgementsTimer;
 
     bool terminated{false};
