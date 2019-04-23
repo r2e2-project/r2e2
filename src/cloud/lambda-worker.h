@@ -126,8 +126,6 @@ class LambdaWorker {
     void pushRayQueue(RayStatePtr&& state);
     RayStatePtr popRayQueue();
 
-    void recordFinishedPath(const uint64_t pathId);
-
     void logRayAction(const RayState& state, const RayAction action);
 
     /* Logging & Diagnostics */

@@ -267,13 +267,14 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action) {
     rayActionsOstream << endl;
 }
 
-void LambdaWorker::recordFinishedPath(const uint64_t pathId) {
-    workerStats.recordFinishedPath();
-    finishedPathIds.push_back(pathId);
-}
-
 ResultType LambdaWorker::handleRayQueue() {
     RECORD_INTERVAL("handleRayQueue");
+
+    auto recordFinishedPath = [this](const uint64_t pathId) {
+        this->workerStats.recordFinishedPath();
+        this->finishedPathIds.push_back(pathId);
+    };
+
     deque<RayStatePtr> processedRays;
 
     constexpr size_t MAX_RAYS = 20'000;

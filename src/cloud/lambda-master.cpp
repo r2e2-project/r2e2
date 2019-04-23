@@ -445,9 +445,9 @@ ResultType LambdaMaster::handleStatusMessage() {
     ostringstream oss;
     oss << "\033[0m"
         << "\033[48;5;022m"
-        << " done paths: " << workerStats.finishedPaths() << " (" << fixed
-        << setprecision(2)
-        << percentage(workerStats.finishedPaths(), totalPaths) << "%)"
+        << " paths: " << finishedPathIds.size() << " (" << fixed
+        << setprecision(2) << percentage(finishedPathIds.size(), totalPaths)
+        << "%) [" << workerStats.finishedPaths() << "]"
         << " | \u03bb: " << workers.size() << " (" << initializedWorkers << ")"
         << " | \u2191 " << format_num(workerStats.sentRays()) << " | \u2193 "
         << format_num(workerStats.receivedRays()) << " (" << fixed
