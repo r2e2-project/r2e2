@@ -448,7 +448,7 @@ ResultType LambdaMaster::handleStatusMessage() {
         << " paths: " << finishedPathIds.size() << " (" << fixed
         << setprecision(2) << percentage(finishedPathIds.size(), totalPaths)
         << "%) [" << setprecision(2)
-        << percentage(workerStats.finishedPaths(), totalPaths) << "]"
+        << percentage(workerStats.finishedPaths(), totalPaths) << "%]"
         << " | \u03bb: " << workers.size() << " (" << initializedWorkers << ")"
         << " | \u2191 " << format_num(workerStats.sentRays()) << " | \u2193 "
         << format_num(workerStats.receivedRays()) << " (" << fixed
