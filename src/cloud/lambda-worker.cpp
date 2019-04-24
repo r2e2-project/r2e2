@@ -631,6 +631,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
 
                 packet.destination = peerAddress;
                 packet.sequenceNumber = sequenceNumbers[packet.destination]++;
+                packet.retries = 0;
             }
 
             rayPackets.push_back(move(packet));
