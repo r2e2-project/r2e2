@@ -138,8 +138,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     global::manager.init(scenePath);
     loadCamera();
 
-    if (config.collectDiagnostics || config.collectWorkerStats ||
-        config.rayActionsLogRate > 0) {
+    if (config.collectDebugLogs || config.collectDiagnostics ||
+        config.collectWorkerStats || config.rayActionsLogRate > 0) {
         roost::create_directories(config.logsDirectory);
     }
 
@@ -449,7 +449,7 @@ ResultType LambdaMaster::handleStatusMessage() {
         << setprecision(2) << percentage(finishedPathIds.size(), totalPaths)
         << "%) [" << setprecision(2)
         << percentage(workerStats.finishedPaths(), totalPaths) << "%]"
-        << " | \u03bb: " << workers.size() << " (" << initializedWorkers << ")"
+        << " | \u03bb " << workers.size() << " (" << initializedWorkers << ")"
         << " | \u2191 " << format_num(workerStats.sentRays()) << " | \u2193 "
         << format_num(workerStats.receivedRays()) << " (" << fixed
         << setprecision(2)
@@ -695,6 +695,12 @@ void LambdaMaster::run() {
         worker.connection->socket().close();
         worker.statsOstream.close();
 
+        if (config.collectDebugLogs) {
+            getRequests.emplace_back(
+                logPrefix + to_string(worker.id) + ".INFO",
+                config.logsDirectory + "/" + to_string(worker.id) + ".INFO");
+        }
+
         if (config.collectDiagnostics) {
             getRequests.emplace_back(
                 logPrefix + to_string(worker.id) + ".DIAG",
@@ -805,6 +811,7 @@ void usage(const char *argv0, int exitCode) {
          << "  -b --storage-backend NAME  storage backend URI" << endl
          << "  -l --lambdas N             how many lambdas to run" << endl
          << "  -R --reliable-udp          send ray packets reliably" << endl
+         << "  -g --debug-logs            collect worker debug logs"
          << "  -w --worker-stats          dump worker stats" << endl
          << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
@@ -858,6 +865,7 @@ int main(int argc, char *argv[]) {
     bool sendReliably = false;
     bool collectWorkerStats = false;
     bool collectDiagnostics = false;
+    bool collectDebugLogs = false;
     float rayActionsLogRate = 0.0;
     string logsDirectory = "logs/";
     Optional<Bounds2i> cropWindow;
@@ -876,6 +884,7 @@ int main(int argc, char *argv[]) {
         {"assignment", required_argument, nullptr, 'a'},
         {"finished-ray", required_argument, nullptr, 'f'},
         {"reliable-udp", no_argument, nullptr, 'R'},
+        {"debug-logs", no_argument, nullptr, 'g'},
         {"worker-stats", no_argument, nullptr, 'w'},
         {"diagnostics", no_argument, nullptr, 'd'},
         {"log-rays", required_argument, nullptr, 'L'},
@@ -887,7 +896,7 @@ int main(int argc, char *argv[]) {
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:whdD:a:S:f:L:c:R",
+        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:whdD:a:S:f:L:c:Rg",
                                     long_options, nullptr);
 
         if (opt == -1) {
@@ -903,6 +912,7 @@ int main(int argc, char *argv[]) {
         case 'r': region = optarg; break;
         case 'b': storageBackendUri = optarg; break;
         case 'l': numLambdas = stoul(optarg); break;
+        case 'g': collectDebugLogs = true; break;
         case 'w': collectWorkerStats = true; break;
         case 'd': collectDiagnostics = true; break;
         case 'D': logsDirectory = optarg; break;
@@ -966,10 +976,11 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {
-        assignment,        finishedRayAction,  sendReliably,
-        samplesPerPixel,   collectDiagnostics, collectWorkerStats,
-        rayActionsLogRate, logsDirectory,      cropWindow};
+    MasterConfiguration config = {assignment,         finishedRayAction,
+                                  sendReliably,       samplesPerPixel,
+                                  collectDebugLogs,   collectDiagnostics,
+                                  collectWorkerStats, rayActionsLogRate,
+                                  logsDirectory,      cropWindow};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,

@@ -46,6 +46,7 @@ struct MasterConfiguration {
     FinishedRayAction finishedRayAction;
     bool sendReliably;
     int samplesPerPixel;
+    bool collectDebugLogs;
     bool collectDiagnostics;
     bool collectWorkerStats;
     float rayActionsLogRate;

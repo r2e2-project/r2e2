@@ -1116,7 +1116,7 @@ void LambdaWorker::uploadLogs() {
     rayActionsOstream.close();
 
     vector<storage::PutRequest> putLogsRequest = {
-        {infoLogName, logPrefix + to_string(*workerId)},
+        {infoLogName, logPrefix + to_string(*workerId) + ".INFO"},
         {diagnosticsName, logPrefix + to_string(*workerId) + ".DIAG"}};
 
     if (trackRays) {
