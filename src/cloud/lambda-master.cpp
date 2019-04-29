@@ -439,7 +439,7 @@ ResultType LambdaMaster::handleStatusMessage() {
               << " / outstanding: " << workerStats.queueStats.outstandingUdp;
 
     auto percentage = [](const int n, const int total) -> double {
-        return ((int)(100 * (100.0 * n / total))) / 100.0;
+        return total ? (((int)(100 * (100.0 * n / total))) / 100.0) : 0.0;
     };
 
     ostringstream oss;
@@ -453,10 +453,11 @@ ResultType LambdaMaster::handleStatusMessage() {
         << " | \u2191 " << format_num(workerStats.sentRays()) << " | \u2193 "
         << format_num(workerStats.receivedRays()) << " (" << fixed
         << setprecision(2)
-        << (workerStats.sentRays() == 0 ? 0
-                                        : percentage(workerStats.receivedRays(),
-                                                     workerStats.sentRays()))
+        << percentage(workerStats.receivedRays(), workerStats.sentRays())
         << "%)"
+        << " | \u21bb " << format_num(workerStats.resentRays()) << "(" << fixed
+        << setprecision(2)
+        << percentage(workerStats.resentRays(), workerStats.sentRays()) << "%)"
         << " | \u21c4 " << workerStats.queueStats.connected << " ("
         << workerStats.queueStats.connecting << ")"
         << " | " << setfill('0') << setw(2) << (elapsedSeconds / 60) << ":"
