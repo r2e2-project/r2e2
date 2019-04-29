@@ -811,7 +811,7 @@ void usage(const char *argv0, int exitCode) {
          << "  -b --storage-backend NAME  storage backend URI" << endl
          << "  -l --lambdas N             how many lambdas to run" << endl
          << "  -R --reliable-udp          send ray packets reliably" << endl
-         << "  -g --debug-logs            collect worker debug logs"
+         << "  -g --debug-logs            collect worker debug logs" << endl
          << "  -w --worker-stats          dump worker stats" << endl
          << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
