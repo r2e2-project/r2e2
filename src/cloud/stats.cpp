@@ -14,6 +14,7 @@ WorkerDiagnostics workerDiagnostics;
 void RayStats::reset() {
     sentRays = 0;
     receivedRays = 0;
+    resentRays = 0;
     waitingRays = 0;
     processedRays = 0;
     demandedRays = 0;
@@ -24,6 +25,7 @@ void RayStats::reset() {
 void RayStats::merge(const RayStats& other) {
     sentRays += other.sentRays;
     receivedRays += other.receivedRays;
+    resentRays += other.resentRays;
     waitingRays += other.waitingRays;
     processedRays += other.processedRays;
     demandedRays += other.demandedRays;
@@ -48,6 +50,10 @@ void WorkerStats::recordReceivedRay(const RayState& ray) {
     INCREMENT_FIELD(receivedRays);
 }
 
+void WorkerStats::recordResentRay(const RayState& ray) {
+    INCREMENT_FIELD(resentRays);
+}
+
 void WorkerStats::recordWaitingRay(const RayState& ray) {
     INCREMENT_FIELD(waitingRays);
 }
@@ -66,6 +72,17 @@ void WorkerStats::recordSendingRay(const RayState& ray) {
 
 void WorkerStats::recordPendingRay(const RayState& ray) {
     INCREMENT_FIELD(pendingRays);
+}
+
+void WorkerStats::recordSentRays(const uint32_t treeletId, const size_t count) {
+    aggregateStats.sentRays += count;
+    objectStats[ObjectKey{ObjectType::Treelet, treeletId}].sentRays += count;
+}
+
+void WorkerStats::recordResentRays(const uint32_t treeletId,
+                                   const size_t count) {
+    aggregateStats.resentRays += count;
+    objectStats[ObjectKey{ObjectType::Treelet, treeletId}].resentRays += count;
 }
 
 #undef INCREMENT_FIELD

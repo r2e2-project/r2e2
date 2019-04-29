@@ -27,6 +27,8 @@ struct RayStats {
     uint64_t sentRays{0};
     /* rays received for this scene object */
     uint64_t receivedRays{0};
+    /* rays that are retransmitted due to loss/timeout */
+    uint64_t resentRays{0};
     /* rays waiting to be processed for this scene object */
     uint64_t waitingRays{0};
     /* rays processed for this scene object */
@@ -66,6 +68,7 @@ struct WorkerStats {
     uint64_t finishedPaths() const { return _finishedPaths; }
     uint64_t sentRays() const { return aggregateStats.sentRays; }
     uint64_t receivedRays() const { return aggregateStats.receivedRays; }
+    uint64_t resentRays() const { return aggregateStats.resentRays; }
     uint64_t waitingRays() const { return aggregateStats.waitingRays; }
     uint64_t processedRays() const { return aggregateStats.processedRays; }
     uint64_t sendingRays() const { return aggregateStats.sendingRays; }
@@ -74,11 +77,15 @@ struct WorkerStats {
     void recordFinishedPath();
     void recordSentRay(const RayState& ray);
     void recordReceivedRay(const RayState& ray);
+    void recordResentRay(const RayState &ray);
     void recordWaitingRay(const RayState& ray);
     void recordProcessedRay(const RayState& ray);
     void recordDemandedRay(const RayState& ray);
     void recordSendingRay(const RayState& ray);
     void recordPendingRay(const RayState& ray);
+
+    void recordSentRays(const uint32_t treeletId, const size_t count);
+    void recordResentRays(const uint32_t treeletId, const size_t count);
 
     void reset();
     void merge(const WorkerStats& other);
