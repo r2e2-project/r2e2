@@ -403,7 +403,6 @@ ResultType LambdaWorker::handleOutQueue() {
                     outQueueSize--;
 
                     string rayStr = RayState::serialize(ray);
-                    workerStats.recordSentRay(*ray);
                     logRayAction(*ray, RayAction::Queued);
 
                     const size_t len = rayStr.length() + 4;
@@ -634,6 +633,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                 packet.retries = 0;
             }
 
+            packet.retransmission = true;
             rayPackets.push_back(move(packet));
         }
 
@@ -665,6 +665,13 @@ ResultType LambdaWorker::handleUdpSend() {
 
     /* peer to send the packet to */
     sendUdpPacket(packet.destination, packet.data);
+
+    /* do the necessary logging */
+    if (packet.retransmission) {
+        workerStats.recordResentRays(packet.targetTreelet, packet.rayCount);
+    } else {
+        workerStats.recordSentRays(packet.targetTreelet, packet.rayCount);
+    }
 
     for (auto& rayPtr : packet.trackedRays) {
         logRayAction(*rayPtr, RayAction::Sent);

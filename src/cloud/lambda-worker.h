@@ -66,6 +66,7 @@ class LambdaWorker {
         size_t rayCount;
         std::string data;
 
+        bool retransmission{false};
         bool reliable{false};
         uint64_t sequenceNumber;
         size_t retries{0};
