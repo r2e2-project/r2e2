@@ -540,8 +540,9 @@ ResultType LambdaWorker::handlePeers() {
             /* send keep alive */
             if (peerId > 0 && peer.nextKeepAlive < now) {
                 peer.nextKeepAlive = now + KEEP_ALIVE_INTERVAL;
-                servicePackets.emplace_back(peer.address,
-                                            Message::str(OpCode::Ping, ""));
+                servicePackets.emplace_back(
+                    peer.address,
+                    Message::str(OpCode::Ping, to_string(*workerId)));
             }
 
             break;
