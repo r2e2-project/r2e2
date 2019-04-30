@@ -45,10 +45,12 @@ string format_bytes( size_t bytes )
 
 string format_num( size_t num )
 {
-  const char * sizes[] = { "", "\u00d710\u00b3",
+  /* const char * sizes[] = { "", "\u00d710\u00b3",
                            "\u00d710\u2076",
                            "\u00d710\u2079",
-                           "\u00d710\u00b9\u00b2" };
+                           "\u00d710\u00b9\u00b2" }; */
+
+  const char * sizes[] = { "", "k", "M", "G", "T" };
   double val = num;
 
   size_t i;

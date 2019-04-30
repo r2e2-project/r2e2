@@ -36,7 +36,7 @@ void StatusBar::init()
 
   ostringstream oss;
   oss << "\n\0337\033[1;" << window_size_.ws_row - 1 << "r\033["
-      << window_size_.ws_row << ";1H\033[2K\0338\033[1A";
+      << window_size_.ws_row << ";1H\033[0J\0338\033[1A";
 
   cerr << oss.str() << flush;
 }
@@ -61,9 +61,9 @@ void StatusBar::set_text( const string & text )
 
   ostringstream oss;
   oss << HIDE_CURSOR
-      << "\0337\033[" << status_bar.window_size_.ws_row << ";1H\033[K"
+      << "\0337\033[" << status_bar.window_size_.ws_row << ";1H\033[J"
       << status_bar.text_
-      << "\033[K\0338"
+      << "\033[J\0338"
       << SHOW_CURSOR;
 
   cerr << oss.str() << flush;
