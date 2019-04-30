@@ -442,26 +442,29 @@ ResultType LambdaMaster::handleStatusMessage() {
         return total ? (((int)(100 * (100.0 * n / total))) / 100.0) : 0.0;
     };
 
+    constexpr char const *BG_DARK_GREEN = "\033[48;5;022m";
+    constexpr char const *BG_LIGHT_GREEN = "\033[48;5;028m";
+
     ostringstream oss;
-    oss << "\033[0m"
-        << "\033[48;5;022m"
-        << " paths: " << finishedPathIds.size() << " (" << fixed
-        << setprecision(2) << percentage(finishedPathIds.size(), totalPaths)
-        << "%) [" << setprecision(2)
-        << percentage(workerStats.finishedPaths(), totalPaths) << "%]"
-        << " | \u03bb " << workers.size() << " (" << initializedWorkers << ")"
-        << " | \u2191 " << format_num(workerStats.sentRays()) << " | \u2193 "
-        << format_num(workerStats.receivedRays()) << " (" << fixed
+    oss << "\033[0m" << BG_DARK_GREEN << " \u21af " << finishedPathIds.size()
+        << " (" << fixed << setprecision(2)
+        << percentage(finishedPathIds.size(), totalPaths) << "%) ["
         << setprecision(2)
+        << percentage(workerStats.finishedPaths(), totalPaths) << "%] "
+        << BG_LIGHT_GREEN << " \u03bb " << workers.size() << " ("
+        << initializedWorkers << ") "
+        << BG_DARK_GREEN << " \u2191 " << format_num(workerStats.sentRays()) << " "
+        << BG_LIGHT_GREEN << " \u2193 " << format_num(workerStats.receivedRays()) << " ("
+        << fixed << setprecision(2)
         << percentage(workerStats.receivedRays(), workerStats.sentRays())
-        << "%)"
-        << " | \u21bb " << format_num(workerStats.resentRays()) << "(" << fixed
+        << "%) "
+        << BG_DARK_GREEN << " \u21bb " << format_num(workerStats.resentRays()) << "(" << fixed
         << setprecision(2)
-        << percentage(workerStats.resentRays(), workerStats.sentRays()) << "%)"
-        << " | \u21c4 " << workerStats.queueStats.connected << " ("
-        << workerStats.queueStats.connecting << ")"
-        << " | " << setfill('0') << setw(2) << (elapsedSeconds / 60) << ":"
-        << setw(2) << (elapsedSeconds % 60);
+        << percentage(workerStats.resentRays(), workerStats.sentRays()) << "%) "
+        << BG_LIGHT_GREEN << " \u21c4 " << workerStats.queueStats.connected << " ("
+        << workerStats.queueStats.connecting << ") "
+        << BG_DARK_GREEN << " " << setfill('0') << setw(2) << (elapsedSeconds / 60) << ":"
+        << setw(2) << (elapsedSeconds % 60) << " ";
 
     StatusBar::set_text(oss.str());
 
