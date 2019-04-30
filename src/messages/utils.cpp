@@ -260,6 +260,7 @@ protobuf::RayStats to_protobuf(const RayStats& stats) {
     protobuf::RayStats proto;
     proto.set_sent_rays(stats.sentRays);
     proto.set_received_rays(stats.receivedRays);
+    proto.set_resent_rays(stats.resentRays);
     proto.set_waiting_rays(stats.waitingRays);
     proto.set_processed_rays(stats.processedRays);
     proto.set_demanded_rays(stats.demandedRays);
@@ -829,6 +830,7 @@ RayStats from_protobuf(const protobuf::RayStats& proto) {
     RayStats stats;
     stats.sentRays = proto.sent_rays();
     stats.receivedRays = proto.received_rays();
+    stats.resentRays = proto.resent_rays();
     stats.waitingRays = proto.waiting_rays();
     stats.processedRays = proto.processed_rays();
     stats.demandedRays = proto.demanded_rays();
