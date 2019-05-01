@@ -48,8 +48,8 @@ using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
 constexpr size_t UDP_MTU_BYTES{1'400};
-constexpr milliseconds PEER_CHECK_INTERVAL{1'000};
-constexpr milliseconds HANDLE_ACKS_INTERVAL{250};
+constexpr milliseconds PEER_CHECK_INTERVAL{250};
+constexpr milliseconds HANDLE_ACKS_INTERVAL{50};
 constexpr milliseconds WORKER_STATS_INTERVAL{1'000};
 constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr milliseconds KEEP_ALIVE_INTERVAL{40'000};
@@ -541,10 +541,10 @@ ResultType LambdaWorker::handlePeers() {
         case Worker::State::Connected:
             /* send keep alive */
             if (peerId > 0 && peer.nextKeepAlive < now) {
-                peer.nextKeepAlive = now + KEEP_ALIVE_INTERVAL;
+                peer.nextKeepAlive += KEEP_ALIVE_INTERVAL;
                 servicePackets.emplace_back(
                     peer.address,
-                    Message::str(OpCode::Ping, to_string(*workerId)));
+                    Message::str(OpCode::Ping, put_field(*workerId)));
             }
 
             break;
@@ -915,7 +915,7 @@ bool LambdaWorker::processMessage(const Message& message) {
     case OpCode::Ping: {
         /* Message pong{OpCode::Pong, ""};
         coordinatorConnection->enqueue_write(pong.str()); */
-        LOG(INFO) << "PING " << message.payload();
+        LOG(INFO) << "PING " << Chunk(message.payload()).be64();
         break;
     }
 
