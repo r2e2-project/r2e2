@@ -77,6 +77,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       handleRayAcknowledgementsTimer(HANDLE_ACKS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
 
+    LOG(INFO) << "WORKER UP";
+
     roost::chdir(workingDirectory.name());
 
     FLAGS_log_dir = ".";
@@ -913,6 +915,7 @@ bool LambdaWorker::processMessage(const Message& message) {
     case OpCode::Ping: {
         /* Message pong{OpCode::Pong, ""};
         coordinatorConnection->enqueue_write(pong.str()); */
+        LOG(INFO) << "PING " << message.payload();
         break;
     }
 
