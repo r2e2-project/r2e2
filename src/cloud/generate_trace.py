@@ -249,7 +249,7 @@ class Stats(object):
         # rays processed,  rays generated, etc
         per_worker_treelet_fieldnames = [
             'workerID', 'treeletID', 'timestamp',
-            'raysWaiting', 'raysProcessed', 'raysGenerated', 'raysSending', 'raysReceived']
+            'raysWaiting', 'raysProcessed', 'raysGenerated', 'raysSending', 'raysReceived', 'raysResent', 'raysSent']
         per_worker_treelet_data = {}
         csv_data = {}
         print('Quantizing worker stats', end='', flush=True)
@@ -263,7 +263,9 @@ class Stats(object):
                                    ('waitingRays', 'raysWaiting'),
                                    ('demandedRays', 'raysGenerated'),
                                    ('sendingRays', 'raysSending'),
-                                   ('receivedRays', 'raysReceived')]:
+                                   ('receivedRays', 'raysReceived'),
+                                   ('resentRays', 'raysResent'),
+                                   ('sentRays', 'raysSent')]:
                     quantized_timestamps, quantized_data = quantize_sequence(
                         [min_timestamp] + [min_timestamp + x for x in stats.timestamps],
                         [0] + treelet_stats[field],
@@ -275,7 +277,7 @@ class Stats(object):
                     #
                     # quant_sum = sum(quantized_data)
                     # data_sum = sum(treelet_stats[field])
-                    # error = np.abs(quant_sum - data_sum) 
+                    # error = np.abs(quant_sum - data_sum)
                     # if error > 0.1:
                     #     print('Error: {:f}, quant {:f}, data {:f}'.format(error, quant_sum, data_sum))
                     #     quant_nz = [(x, t) for x, t in zip(quantized_data, quantized_timestamps)
@@ -342,7 +344,7 @@ class Stats(object):
                 for tidx in range(num_timepoints):
                     # tracingRaysTime
                     timestamp = tidx * quanta
-            
+
 
         print('Writing {:s}...'.format(path))
         with open(path, 'w', newline='') as csvfile:
@@ -376,8 +378,8 @@ class Constants(object):
      SHADOW_RAY_SIZE = sum([x for _, x in RAY_FIELDS.items()])
      RADIANCE_RAY_SIZE = SHADOW_RAY_SIZE + sum(
          [x for _, x in RADIANCE_RAY_FIELDS.items()])
-     
-     
+
+
      # Global constants
      W = 1920 # image width
      H = 1080 # image height
@@ -385,7 +387,7 @@ class Constants(object):
      GEOMETRY_SIZE = 20 * U.gigabytes # size of the scene geometry
      TS = 1 * U.gigabytes # treelet size
      TT = GEOMETRY_SIZE / TS # total treelets
-     
+
      S = W * H * SAMPLES_PER_PIXEL # samples per pixel
      L = 5 # average path length (# of bounces)
      T = np.log(TT) # average number of treelets per ray
@@ -559,7 +561,7 @@ def merge_sequences(timepoints : List[List[int]],
     while True:
         for i in range(num_sequences):
             pass
-            
+
 
     return merged_timepoints, merged_data
 
@@ -592,7 +594,7 @@ def quantize_sequence(timepoints, data, quanta, start=None, end=None, rate=False
             if time > current_time:
                 break
             offset += 1
-            
+
     current_time_in_interval = max(timepoints[offset - 1], current_time)
     prev_summed_value = 0
     summed_value = 0
@@ -782,14 +784,14 @@ def plot_metric_heatmap(stats, metric_label, sort=False):
     for worker_id, metrics in stats.metrics.items():
         points = metrics[metric_label]
         for time, _ in points:
-            quantized_time = time // quantization 
+            quantized_time = time // quantization
             if quantized_time > num_timepoints:
                 num_timepoints = quantized_time
     num_timepoints = int(num_timepoints) + 1
 
     # Deteremine number of columns
     num_workers = len(stats.metrics)
-    
+
     data = np.zeros((num_workers, num_timepoints))
     row_labels = []
     for worker_idx, (worker_id, metrics) in enumerate(stats.metrics.items()):
@@ -814,7 +816,7 @@ def plot_action_heatmap(worker_stats):
 
     # Deteremine number of columns
     num_actions = len(worker_stats.top_level_actions)
-    
+
     data = np.zeros((num_actions, num_timepoints))
     row_labels = []
     for action_idx, action_name in enumerate(sorted(list(worker_stats.top_level_actions))):
@@ -902,7 +904,7 @@ def aggregate_treelet_stats(all_worker_stats):
             treelet_ids.add(treelet_id)
             for k, _ in treelet_stats.items():
                 stat_keys.add(k)
-            
+
     # Determine number of columns
     timestamp_sets = [set(stats.timestamps) for stats in all_worker_stats]
     timestamps = set()
@@ -1174,7 +1176,7 @@ def calculate_run_time(run_stats):
     treelet_size = (run_stats['treelet_size']
                     if 'treelet_size' in run_stats
                     else geometry_size / num_treelets)
-    
+
     # boot time + time to load treelets + max(io time, compute time)
     io_time = total_rays * traverasls_per_ray * ray_footprint / (num_workers * worker_max_bandwidth)
     compute_time = total_rays * cpu_time_per_ray_traversal / num_workers
@@ -1186,21 +1188,21 @@ def calculate_model_run_time(scene_stats, num_workers):
     total_rays = scene_stats.total_rays * (2 * scene_stats.path_length - 1)
     traversals_per_ray = scene_stats.traversals_per_ray
     ray_footprint = scene_stats.ray_footprint
-    
+
     total_bandwidth = total_rays * treelet_visits_per_ray * ray_footprint
-    
+
     worker_bandwidth = Constants.WORKER_BANDWIDTH
 
     G = scene_stats.geometry_size
-    TS = 0.1 # treelet size   
+    TS = 0.1 # treelet size
     TREELETS_PER_RAY = np.log(G / TS) / np.log(2)
     print(Constants.L)
     NR = 2200000000
-    #L_B = 30/1000 
+    #L_B = 30/1000
     L_B = 1/8
     BB_B = 5/8
     R = 64/(1000*1000*1000)
-    
+
     stats = {
         'boot_time': Constants.LAMBDA_BOOT_TIME,
         'worker_max_bandwidth': Constants.LAMBDA_BANDWIDTH,
@@ -1228,7 +1230,7 @@ def compare_model():
     plt.title('Render / $')
     plt.ylabel('Render time (seconds)')
     plt.xlabel('Dollars ($)')
-     
+
     plt.legend()
     plt.show()
     plt.savefig('model.png')
