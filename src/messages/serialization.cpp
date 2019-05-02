@@ -40,7 +40,7 @@ void RecordWriter::write(const uint32_t& integer) {
 }
 
 void RecordWriter::write(const uint64_t& integer) {
-    coded_output_.WriteLittleEndian64(8);
+    coded_output_.WriteLittleEndian32(8);
     coded_output_.WriteLittleEndian64(integer);
 }
 
