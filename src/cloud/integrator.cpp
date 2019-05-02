@@ -61,6 +61,7 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
             auto &newRay = *newRayPtr;
 
             newRay.trackRay = rayState.trackRay;
+            newRay.tick = rayState.tick;
             newRay.beta = rayState.beta * f * AbsDot(wi, it.shading.n) / pdf;
             newRay.ray = it.SpawnRay(wi);
             newRay.remainingBounces = rayState.remainingBounces - 1;

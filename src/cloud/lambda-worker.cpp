@@ -93,7 +93,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     if (trackRays) {
         rayActionsOstream.open(rayActionsName, ios::out | ios::trunc);
-        rayActionsOstream << "x,y,sample,hop,shadowRay,workerID,otherPartyID,"
+        rayActionsOstream << "x,y,sample,tick,hop,shadowRay,workerID,otherPartyID,"
                              "treeletID,timestamp,action"
                           << endl;
     }
@@ -237,13 +237,16 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
 
 void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                 const WorkerId otherParty) {
+    state.tick++;
+
     if (!trackRays || !state.trackRay) return;
 
     // clang-format off
-    // x,y,sample,hop,shadowRay,workerID,otherPartyID,treeletID,timestamp,action
+    // x,y,sample,tick,hop,shadowRay,workerID,otherPartyID,treeletID,timestamp,action
     rayActionsOstream << state.sample.pixel.x << ','
                       << state.sample.pixel.y << ','
                       << state.sample.num << ','
+                      << state.tick << ','
                       << state.hop << ','
                       << state.isShadowRay << ','
                       << *workerId << ','
