@@ -93,7 +93,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     if (trackRays) {
         rayActionsOstream.open(rayActionsName, ios::out | ios::trunc);
-        rayActionsOstream << "x,y,sample,shadowRay,workerID,otherPartyID,"
+        rayActionsOstream << "x,y,sample,hop,shadowRay,workerID,otherPartyID,"
                              "treeletID,timestamp,action"
                           << endl;
     }
@@ -240,10 +240,11 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
     if (!trackRays || !state.trackRay) return;
 
     // clang-format off
-    // "x,y,sample,shadowRay,workerID,otherPartyID,treeletID,timestamp,action"
+    // x,y,sample,hop,shadowRay,workerID,otherPartyID,treeletID,timestamp,action
     rayActionsOstream << state.sample.pixel.x << ','
                       << state.sample.pixel.y << ','
                       << state.sample.num << ','
+                      << state.hop << ','
                       << state.isShadowRay << ','
                       << *workerId << ','
                       << ((action == RayAction::Sent ||
@@ -1027,6 +1028,8 @@ bool LambdaWorker::processMessage(const Message& message) {
             string rayStr;
             if (reader.read(&rayStr)) {
                 RayStatePtr ray = RayState::deserialize(rayStr);
+                ray->hop++;
+
                 workerStats.recordReceivedRay(*ray);
                 logRayAction(*ray, RayAction::Received, senderId);
                 pushRayQueue(move(ray));

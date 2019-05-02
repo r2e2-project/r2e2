@@ -39,6 +39,8 @@ struct RayState {
     RayState &operator=(const RayState &) = delete;
 
     bool trackRay{false};
+    uint16_t hop{0};
+
     Sample sample;
     RayDifferential ray;
     Spectrum beta{1.f};
