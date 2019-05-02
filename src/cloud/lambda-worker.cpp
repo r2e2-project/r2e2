@@ -263,15 +263,14 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
     // clang-format off
     switch (action) {
     case RayAction::Generated: rayActionsOstream << "Generated"; break;
-    case RayAction::Traced:    rayActionsOstream << "Traced"; break;
-    case RayAction::Queued:    rayActionsOstream << "Queued"; break;
-    case RayAction::Pending:   rayActionsOstream << "Pending"; break;
-    case RayAction::Sent:      rayActionsOstream << "Sent"; break;
-    case RayAction::Received:  rayActionsOstream << "Received"; break;
-    case RayAction::Finished:  rayActionsOstream << "Finished"; break;
+    case RayAction::Traced:    rayActionsOstream << "Traced";    break;
+    case RayAction::Queued:    rayActionsOstream << "Queued";    break;
+    case RayAction::Pending:   rayActionsOstream << "Pending";   break;
+    case RayAction::Sent:      rayActionsOstream << "Sent";      break;
+    case RayAction::Received:  rayActionsOstream << "Received";  break;
+    case RayAction::Finished:  rayActionsOstream << "Finished";  break;
 
-    default:
-        throw runtime_error("invalid ray action");
+    default: throw runtime_error("invalid ray action");
     }
     // clang-format on
 
@@ -327,6 +326,7 @@ ResultType LambdaWorker::handleRayQueue() {
                                                   sampler, arena);
 
             for (auto& newRay : newRays.first) {
+                logRayAction(*newRay, RayAction::Generated);
                 processedRays.push_back(move(newRay));
             }
 
