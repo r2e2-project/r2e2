@@ -109,6 +109,7 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
                 shadowRay.ray = visibility.P0().SpawnRayTo(visibility.P1());
                 shadowRay.Ld = (f * Li / lightPdf) / lightSelectPdf;
                 shadowRay.isShadowRay = true;
+                shadowRay.hop = 0;
                 shadowRay.StartTrace();
 
                 newRays.push_back(move(shadowRayPtr));
