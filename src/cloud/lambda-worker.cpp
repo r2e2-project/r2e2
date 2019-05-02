@@ -93,9 +93,9 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     if (trackRays) {
         rayActionsOstream.open(rayActionsName, ios::out | ios::trunc);
-        rayActionsOstream
-            << "x,y,sample,shadowRay,workerID,treeletID,timestamp,action"
-            << endl;
+        rayActionsOstream << "x,y,sample,shadowRay,workerID,otherPartyID,"
+                             "treeletID,timestamp,action"
+                          << endl;
     }
 
     PbrtOptions.nThreads = 1;
@@ -235,16 +235,20 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
     return {OpCode::ConnectionResponse, protoutil::to_string(proto)};
 }
 
-void LambdaWorker::logRayAction(const RayState& state, const RayAction action) {
+void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
+                                const WorkerId otherParty) {
     if (!trackRays || !state.trackRay) return;
 
     // clang-format off
-    // "x,y,sample,shadowRay,workerID,treeletID,timestamp,action"
+    // "x,y,sample,shadowRay,workerID,otherPartyID,treeletID,timestamp,action"
     rayActionsOstream << state.sample.pixel.x << ','
                       << state.sample.pixel.y << ','
                       << state.sample.num << ','
                       << state.isShadowRay << ','
                       << *workerId << ','
+                      << ((action == RayAction::Sent ||
+                           action == RayAction::Received) ? otherParty
+                                                          : *workerId) << ','
                       << state.CurrentTreelet() << ','
                       << duration_cast<microseconds>(
                              rays_clock::now().time_since_epoch())
@@ -370,10 +374,10 @@ ResultType LambdaWorker::handleOutQueue() {
         auto& outRays = q.second;
 
         const auto& candidates = treeletToWorker[treeletId];
-        const auto& peerAddress =
-            peers.at(*random::sample(candidates.begin(), candidates.end()))
-                .address;
-        auto& peerSeqNo = sequenceNumbers[peerAddress];
+        const auto& peer =
+            peers.at(*random::sample(candidates.begin(), candidates.end()));
+
+        auto& peerSeqNo = sequenceNumbers[peer.address];
 
         string unpackedRayStr;
         RayStatePtr unpackedRayPtr;
@@ -427,7 +431,8 @@ ResultType LambdaWorker::handleOutQueue() {
 
             oss.flush();
 
-            RayPacket rayPacket{peerAddress,
+            RayPacket rayPacket{peer.address,
+                                peer.id,
                                 treeletId,
                                 rayCount,
                                 Message::str(OpCode::SendRays, oss.str(),
@@ -622,17 +627,15 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         if (!thisReceivedAcks.contains(packet.sequenceNumber)) {
             packet.retries++;
 
-            if (packet.retries > 1) {
-                sequenceNumbers[packet.destination]--;
+            if (false && packet.retries > 1) {
+                /* sequenceNumbers[packet.destination]-- */;
 
                 const auto& candidates = treeletToWorker[packet.targetTreelet];
-                const auto& peerAddress =
-                    peers
-                        .at(*random::sample(candidates.begin(),
-                                            candidates.end()))
-                        .address;
+                const auto& peer = peers.at(
+                    *random::sample(candidates.begin(), candidates.end()));
 
-                packet.destination = peerAddress;
+                packet.destination = peer.address;
+                packet.destinationId = peer.id;
                 packet.sequenceNumber = sequenceNumbers[packet.destination]++;
                 packet.retries = 0;
             }
@@ -678,7 +681,7 @@ ResultType LambdaWorker::handleUdpSend() {
     }
 
     for (auto& rayPtr : packet.trackedRays) {
-        logRayAction(*rayPtr, RayAction::Sent);
+        logRayAction(*rayPtr, RayAction::Sent, packet.destinationId);
     }
 
     if (packet.reliable) {
@@ -1025,7 +1028,7 @@ bool LambdaWorker::processMessage(const Message& message) {
             if (reader.read(&rayStr)) {
                 RayStatePtr ray = RayState::deserialize(rayStr);
                 workerStats.recordReceivedRay(*ray);
-                logRayAction(*ray, RayAction::Received);
+                logRayAction(*ray, RayAction::Received, senderId);
                 pushRayQueue(move(ray));
             }
         }

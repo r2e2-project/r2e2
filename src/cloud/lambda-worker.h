@@ -62,6 +62,7 @@ class LambdaWorker {
 
     struct RayPacket {
         Address destination;
+        WorkerId destinationId;
         TreeletId targetTreelet;
         size_t rayCount;
         std::string data;
@@ -73,11 +74,12 @@ class LambdaWorker {
 
         std::vector<std::unique_ptr<RayState>> trackedRays;
 
-        RayPacket(const Address& addr, const TreeletId targetTreelet,
-                  const size_t rayCount, std::string&& data,
-                  const bool reliable = false,
+        RayPacket(const Address& addr, const WorkerId destId,
+                  const TreeletId targetTreelet, const size_t rayCount,
+                  std::string&& data, const bool reliable = false,
                   const uint64_t sequenceNumber = 0)
             : destination(addr),
+              destinationId(destId),
               targetTreelet(targetTreelet),
               rayCount(rayCount),
               data(std::move(data)),
@@ -127,7 +129,8 @@ class LambdaWorker {
     void pushRayQueue(RayStatePtr&& state);
     RayStatePtr popRayQueue();
 
-    void logRayAction(const RayState& state, const RayAction action);
+    void logRayAction(const RayState& state, const RayAction action,
+                      const WorkerId otherParty = -1);
 
     /* Logging & Diagnostics */
     const std::string logBase{"pbrt-worker"};
