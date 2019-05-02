@@ -69,6 +69,7 @@ struct RayState {
     uint64_t PathID() const { return sample.id; }
 
     /* serialization */
+    size_t Size() const;
     static std::string serialize(const RayStatePtr &, const bool = true);
     static RayStatePtr deserialize(const std::string &, const bool = true);
 };

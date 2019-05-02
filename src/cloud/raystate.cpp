@@ -35,9 +35,13 @@ void RayState::SetHit(const TreeletNode &node) {
     }
 }
 
+size_t RayState::Size() const {
+    return offset_of(*this, &RayState::toVisit) +
+           sizeof(RayState::TreeletNode) * toVisitHead;
+}
+
 string RayState::serialize(const RayStatePtr &rayState, const bool compress) {
-    const size_t size = offset_of(*rayState, &RayState::toVisit) +
-                        sizeof(RayState::TreeletNode) * rayState->toVisitHead;
+    const size_t size = rayState->Size();
 
     string result;
     result.resize(size);
