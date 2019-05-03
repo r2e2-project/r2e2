@@ -93,9 +93,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     if (trackRays) {
         rayActionsOstream.open(rayActionsName, ios::out | ios::trunc);
-        rayActionsOstream << "x,y,sample,tick,hop,shadowRay,workerID,otherPartyID,"
-                             "treeletID,timestamp,action,size"
-                          << endl;
+        rayActionsOstream
+            << "x,y,sample,bounce,hop,tick,shadowRay,workerID,otherPartyID,"
+               "treeletID,timestamp,size,action"
+            << endl;
     }
 
     PbrtOptions.nThreads = 1;
@@ -237,17 +238,18 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
 
 void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                 const WorkerId otherParty) {
-    state.tick++;
+    const static auto START = rays_clock::now();
 
     if (!trackRays || !state.trackRay) return;
 
     // clang-format off
-    // x,y,sample,tick,hop,shadowRay,workerID,otherPartyID,treeletID,timestamp,action,size
+    // x,y,sample,bounce,hop,tick,shadowRay,workerID,otherPartyID,treeletID,timestamp,size,action
     rayActionsOstream << state.sample.pixel.x << ','
                       << state.sample.pixel.y << ','
                       << state.sample.num << ','
-                      << state.tick << ','
+                      << (maxDepth - state.remainingBounces) << ','
                       << state.hop << ','
+                      << state.tick << ','
                       << state.isShadowRay << ','
                       << *workerId << ','
                       << ((action == RayAction::Sent ||
@@ -255,8 +257,7 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                                           : *workerId) << ','
                       << state.CurrentTreelet() << ','
                       << duration_cast<microseconds>(
-                             rays_clock::now().time_since_epoch())
-                             .count() << ','
+                            rays_clock::now() - START).count() << ','
                       << state.Size() << ',';
     // clang-format on
 
@@ -686,6 +687,7 @@ ResultType LambdaWorker::handleUdpSend() {
 
     for (auto& rayPtr : packet.trackedRays) {
         logRayAction(*rayPtr, RayAction::Sent, packet.destinationId);
+        rayPtr->tick++;
     }
 
     if (packet.reliable) {
@@ -801,7 +803,6 @@ ResultType LambdaWorker::handleDiagnostics() {
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
     const Bounds2i sampleBounds = camera->film->GetSampleBounds();
     const Vector2i sampleExtent = sampleBounds.Diagonal();
-    const uint8_t maxDepth = 5;
     const auto samplesPerPixel = sampler->samplesPerPixel;
     const Float rayScale = 1 / sqrt((Float)samplesPerPixel);
 
@@ -1032,9 +1033,9 @@ bool LambdaWorker::processMessage(const Message& message) {
             if (reader.read(&rayStr)) {
                 RayStatePtr ray = RayState::deserialize(rayStr);
                 ray->hop++;
-
                 workerStats.recordReceivedRay(*ray);
                 logRayAction(*ray, RayAction::Received, senderId);
+                ray->tick = 0;
                 pushRayQueue(move(ray));
             }
         }

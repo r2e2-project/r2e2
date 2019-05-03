@@ -178,6 +178,7 @@ class LambdaWorker {
     std::map<Address, std::vector<uint64_t>> toBeAcked{};
 
     /* Scene Data */
+    const uint8_t maxDepth{5};
     bool initialized{false};
     int samplesPerPixel{0};
     std::vector<std::unique_ptr<Transform>> transformCache{};

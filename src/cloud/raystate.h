@@ -39,7 +39,7 @@ struct RayState {
     RayState &operator=(const RayState &) = delete;
 
     bool trackRay{false};
-    mutable uint32_t tick{0};
+    uint16_t tick{0};
     uint16_t hop{0};
 
     Sample sample;
