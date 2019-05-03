@@ -245,6 +245,14 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         [this]() { return this->initializedWorkers == this->numberOfLambdas; },
         []() { throw runtime_error("connectAll failed"); }));
 
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, bind(&LambdaMaster::handleGenerateRays, this),
+        [this]() {
+            return this->numberOfLambdas * this->numberOfLambdas ==
+                   workerStats.queueStats.connected;
+        },
+        []() { throw runtime_error("generate rays failed"); }));
+
     if (config.finishedRayAction == FinishedRayAction::SendBack) {
         loop.poller().add_action(Poller::Action(
             writeOutputTimer.fd, Direction::In,
@@ -377,6 +385,21 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     });
 }
 
+ResultType LambdaMaster::handleGenerateRays() {
+    for (auto &workerkv : workers) {
+        auto &worker = workerkv.second;
+        if (worker.tile.initialized()) {
+            protobuf::GenerateRays proto;
+            *proto.mutable_crop_window() = to_protobuf(*worker.tile);
+            const string genRaysStr =
+                Message::str(OpCode::GenerateRays, protoutil::to_string(proto));
+            worker.connection->enqueue_write(genRaysStr);
+        }
+    }
+
+    return ResultType::Cancel;
+}
+
 ResultType LambdaMaster::handleConnectAll() {
     ostringstream oss;
     protobuf::ConnectTo proto;
@@ -407,14 +430,6 @@ ResultType LambdaMaster::handleConnectAll() {
 
         worker.connection->enqueue_write(getDepsStr);
         worker.connection->enqueue_write(connectAllStr);
-
-        if (worker.tile.initialized()) {
-            protobuf::GenerateRays proto;
-            *proto.mutable_crop_window() = to_protobuf(*worker.tile);
-            const string genRaysStr =
-                Message::str(OpCode::GenerateRays, protoutil::to_string(proto));
-            worker.connection->enqueue_write(genRaysStr);
-        }
     }
 
     return ResultType::Cancel;
