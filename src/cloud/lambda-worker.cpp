@@ -62,8 +62,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const string& storageUri, const bool sendReliably,
                            const int samplesPerPixel,
                            const FinishedRayAction finishedRayAction,
-                           const float rayActionsLogRate)
+                           const float rayActionsLogRate,
+                           const float packetsLogRate)
     : rayActionsLogRate(rayActionsLogRate),
+      packetsLogRate(packetsLogRate),
       sendReliably(sendReliably),
       coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
@@ -1159,6 +1161,7 @@ void usage(const char* argv0, int exitCode) {
          << "  -R --reliable-udp          send ray packets reliably" << endl
          << "  -S --samples N             number of samples per pixel" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
+         << "  -P --log-packets RATE      log packets" << endl
          << "  -f --finished-ray ACTION   what to do with finished rays" << endl
          << "                             * 0: discard (default)" << endl
          << "                             * 1: send" << endl
@@ -1176,6 +1179,7 @@ int main(int argc, char* argv[]) {
     int samplesPerPixel = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
     float rayActionsLogRate = 0.0;
+    float packetsLogRate = 0.0;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
@@ -1184,6 +1188,7 @@ int main(int argc, char* argv[]) {
         {"reliable-udp", no_argument, nullptr, 'R'},
         {"samples", required_argument, nullptr, 'S'},
         {"log-rays", required_argument, nullptr, 'L'},
+        {"log-packets", required_argument, nullptr, 'P'},
         {"finished-ray", required_argument, nullptr, 'f'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
@@ -1191,7 +1196,7 @@ int main(int argc, char* argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:s:S:f:L:hR", long_options, nullptr);
+            getopt_long(argc, argv, "p:i:s:S:f:L:P:hR", long_options, nullptr);
 
         if (opt == -1) break;
 
@@ -1203,6 +1208,7 @@ int main(int argc, char* argv[]) {
         case 'R': sendReliably = true; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'L': rayActionsLogRate = stof(optarg); break;
+        case 'P': packetsLogRate = stof(optarg); break;
         case 'f': finishedRayAction = (FinishedRayAction)stoi(optarg); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
         default: usage(argv[0], EXIT_FAILURE);
@@ -1211,7 +1217,8 @@ int main(int argc, char* argv[]) {
     }
 
     if (listenPort == 0 || rayActionsLogRate < 0 || rayActionsLogRate > 1.0 ||
-        publicIp.empty() || storageUri.empty()) {
+        packetsLogRate < 0 || packetsLogRate > 1.0 || publicIp.empty() ||
+        storageUri.empty()) {
         usage(argv[0], EXIT_FAILURE);
     }
 
@@ -1220,7 +1227,7 @@ int main(int argc, char* argv[]) {
     try {
         worker = make_unique<LambdaWorker>(
             publicIp, listenPort, storageUri, sendReliably, samplesPerPixel,
-            finishedRayAction, rayActionsLogRate);
+            finishedRayAction, rayActionsLogRate, packetsLogRate);
         worker->run();
     } catch (const exception& e) {
         LOG(INFO) << argv[0] << ": " << e.what();

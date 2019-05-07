@@ -34,7 +34,8 @@ class LambdaWorker {
                  const std::string& storageBackendUri, const bool sendReliably,
                  const int samplesPerPixel,
                  const FinishedRayAction finishedRayAction,
-                 const float rayActionsLogRate);
+                 const float rayActionsLogRate,
+                 const float packetsLogRate);
 
     void run();
     void terminate() { terminated = true; }
@@ -141,7 +142,9 @@ class LambdaWorker {
     std::ofstream diagnosticsOstream{};
     std::ofstream rayActionsOstream{};
     const float rayActionsLogRate;
+    const float packetsLogRate;
     const bool trackRays{rayActionsLogRate > 0};
+    const bool trackPackets{packetsLogRate > 0};
 
     WorkerStats workerStats;
     WorkerDiagnostics lastDiagnostics;

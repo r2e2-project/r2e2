@@ -232,6 +232,7 @@ message InvocationPayload {
     int32 samples_per_pixel = 4;
     uint32 finished_ray_action = 5;
     float ray_actions_log_rate = 6;
+    float packets_log_rate = 7;
 }
 
 message ObjectKey {

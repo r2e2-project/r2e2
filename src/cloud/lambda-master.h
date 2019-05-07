@@ -50,6 +50,7 @@ struct MasterConfiguration {
     bool collectDiagnostics;
     bool collectWorkerStats;
     float rayActionsLogRate;
+    float packetsLogRate;
     std::string logsDirectory;
     Optional<Bounds2i> cropWindow;
 };

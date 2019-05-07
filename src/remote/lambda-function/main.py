@@ -37,6 +37,9 @@ def handler(event, context):
     if event['rayActionsLogRate']:
         command += ['--log-rays', str(event['rayActionsLogRate'])]
 
+    if event['packetsLogRate']:
+        command += ['--log-packets' str(event['packetsLogRate'])]
+
     retcode = run_command(command)
     print("retcode={}".format(retcode))
 

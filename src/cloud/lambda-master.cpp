@@ -795,6 +795,7 @@ HTTPRequest LambdaMaster::generateRequest() {
     proto.set_samples_per_pixel(config.samplesPerPixel);
     proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
     proto.set_ray_actions_log_rate(config.rayActionsLogRate);
+    proto.set_packets_log_rate(config.packetsLogRate);
 
     return LambdaInvocationRequest(
                awsCredentials, awsRegion, lambdaFunctionName,
@@ -835,6 +836,7 @@ void usage(const char *argv0, int exitCode) {
          << "  -w --worker-stats          dump worker stats" << endl
          << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
+         << "  -P --log-packets RATE      log packets" << endl
          << "  -D --logs-dir DIR          set logs directory (default: logs/)"
          << endl
          << "  -S --samples N             number of samples per pixel" << endl
@@ -887,6 +889,7 @@ int main(int argc, char *argv[]) {
     bool collectDiagnostics = false;
     bool collectDebugLogs = false;
     float rayActionsLogRate = 0.0;
+    float packetsLogRate = 0.0;
     string logsDirectory = "logs/";
     Optional<Bounds2i> cropWindow;
 
@@ -908,6 +911,7 @@ int main(int argc, char *argv[]) {
         {"worker-stats", no_argument, nullptr, 'w'},
         {"diagnostics", no_argument, nullptr, 'd'},
         {"log-rays", required_argument, nullptr, 'L'},
+        {"log-packets", required_argument, nullptr, 'P'},
         {"logs-dir", required_argument, nullptr, 'D'},
         {"samples", required_argument, nullptr, 'S'},
         {"crop-window", required_argument, nullptr, 'c'},
@@ -916,8 +920,9 @@ int main(int argc, char *argv[]) {
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "s:p:i:r:b:l:whdD:a:S:f:L:c:Rg",
-                                    long_options, nullptr);
+        const int opt =
+            getopt_long(argc, argv, "s:p:i:r:b:l:whdD:a:S:f:L:c:P:Rg",
+                        long_options, nullptr);
 
         if (opt == -1) {
             break;
@@ -938,6 +943,7 @@ int main(int argc, char *argv[]) {
         case 'D': logsDirectory = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'L': rayActionsLogRate = stof(optarg); break;
+        case 'P': packetsLogRate = stof(optarg); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
             // clang-format on
 
@@ -996,11 +1002,11 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {assignment,         finishedRayAction,
-                                  sendReliably,       samplesPerPixel,
-                                  collectDebugLogs,   collectDiagnostics,
-                                  collectWorkerStats, rayActionsLogRate,
-                                  logsDirectory,      cropWindow};
+    MasterConfiguration config = {
+        assignment,         finishedRayAction, sendReliably,
+        samplesPerPixel,    collectDebugLogs,  collectDiagnostics,
+        collectWorkerStats, rayActionsLogRate, packetsLogRate,
+        logsDirectory,      cropWindow};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,
