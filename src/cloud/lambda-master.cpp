@@ -210,7 +210,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             resp.set_worker_id(0);
             resp.set_my_seed(121212);
             resp.set_your_seed(req.my_seed());
-            Message responseMsg{OpCode::ConnectionResponse,
+            Message responseMsg{0, OpCode::ConnectionResponse,
                                 protoutil::to_string(resp)};
             worker.connection->enqueue_write(responseMsg.str());
 
@@ -391,8 +391,8 @@ ResultType LambdaMaster::handleGenerateRays() {
         if (worker.tile.initialized()) {
             protobuf::GenerateRays proto;
             *proto.mutable_crop_window() = to_protobuf(*worker.tile);
-            const string genRaysStr =
-                Message::str(OpCode::GenerateRays, protoutil::to_string(proto));
+            const string genRaysStr = Message::str(0, OpCode::GenerateRays,
+                                                   protoutil::to_string(proto));
             worker.connection->enqueue_write(genRaysStr);
         }
     }
@@ -415,7 +415,7 @@ ResultType LambdaMaster::handleConnectAll() {
     }
 
     const string connectAllStr =
-        Message::str(OpCode::MultipleConnect, oss.str());
+        Message::str(0, OpCode::MultipleConnect, oss.str());
 
     for (auto &workerkv : workers) {
         auto &worker = workerkv.second;
@@ -426,7 +426,7 @@ ResultType LambdaMaster::handleConnectAll() {
         }
 
         const string getDepsStr =
-            Message::str(OpCode::GetObjects, protoutil::to_string(proto));
+            Message::str(0, OpCode::GetObjects, protoutil::to_string(proto));
 
         worker.connection->enqueue_write(getDepsStr);
         worker.connection->enqueue_write(connectAllStr);
@@ -564,7 +564,7 @@ bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
         protobuf::ConnectTo proto;
         proto.set_worker_id(worker.id);
         proto.set_address(worker.udpAddress->str());
-        return Message::str(OpCode::ConnectTo, protoutil::to_string(proto));
+        return Message::str(0, OpCode::ConnectTo, protoutil::to_string(proto));
     };
 
     worker.connection->enqueue_write(makeMessage(selectedWorker));
@@ -588,8 +588,8 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
             protobuf::Hey heyProto;
             heyProto.set_worker_id(workerId);
             heyProto.set_job_id(jobId);
-            Message heyBackMessage{OpCode::Hey, protoutil::to_string(heyProto)};
-            worker.connection->enqueue_write(heyBackMessage.str());
+            Message msg{0, OpCode::Hey, protoutil::to_string(heyProto)};
+            worker.connection->enqueue_write(msg.str());
         }
 
         /* {

@@ -216,7 +216,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("handle diagnostics failed"); }));
 
     coordinatorConnection->enqueue_write(
-        Message(OpCode::Hey, safe_getenv_or(LOG_STREAM_ENVAR, "")).str());
+        Message::str(0, OpCode::Hey, safe_getenv_or(LOG_STREAM_ENVAR, "")));
 }
 
 Message LambdaWorker::createConnectionRequest(const Worker& peer) {
@@ -224,7 +224,7 @@ Message LambdaWorker::createConnectionRequest(const Worker& peer) {
     proto.set_worker_id(*workerId);
     proto.set_my_seed(mySeed);
     proto.set_your_seed(peer.seed);
-    return {OpCode::ConnectionRequest, protoutil::to_string(proto)};
+    return {*workerId, OpCode::ConnectionRequest, protoutil::to_string(proto)};
 }
 
 Message LambdaWorker::createConnectionResponse(const Worker& peer) {
@@ -235,7 +235,7 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
     for (const auto& treeletId : treeletIds) {
         proto.add_treelet_ids(treeletId);
     }
-    return {OpCode::ConnectionResponse, protoutil::to_string(proto)};
+    return {*workerId, OpCode::ConnectionResponse, protoutil::to_string(proto)};
 }
 
 void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
@@ -398,7 +398,6 @@ ResultType LambdaWorker::handleOutQueue() {
 
             {
                 protobuf::RecordWriter writer{&oss};
-                writer.write(*workerId);
 
                 if (!unpackedRayStr.empty()) {
                     writer.write(unpackedRayStr);
@@ -438,14 +437,15 @@ ResultType LambdaWorker::handleOutQueue() {
 
             oss.flush();
 
-            RayPacket rayPacket{peer.address,
-                                peer.id,
-                                treeletId,
-                                rayCount,
-                                Message::str(OpCode::SendRays, oss.str(),
-                                             sendReliably, peerSeqNo),
-                                sendReliably,
-                                peerSeqNo};
+            RayPacket rayPacket{
+                peer.address,
+                peer.id,
+                treeletId,
+                rayCount,
+                Message::str(*workerId, OpCode::SendRays, oss.str(),
+                             sendReliably, peerSeqNo),
+                sendReliably,
+                peerSeqNo};
 
             rayPacket.trackedRays = move(trackedRays);
             rayPackets.emplace_back(move(rayPacket));
@@ -469,7 +469,7 @@ ResultType LambdaWorker::handleFinishedPaths() {
     finishedPathIds.clear();
 
     coordinatorConnection->enqueue_write(
-        Message::str(OpCode::FinishedPaths, payload));
+        Message::str(*workerId, OpCode::FinishedPaths, payload));
 
     return ResultType::Continue;
 }
@@ -517,7 +517,7 @@ ResultType LambdaWorker::handleFinishedQueue() {
 
         oss.flush();
         coordinatorConnection->enqueue_write(
-            Message::str(OpCode::FinishedRays, oss.str()));
+            Message::str(*workerId, OpCode::FinishedRays, oss.str()));
 
         break;
     }
@@ -555,8 +555,8 @@ ResultType LambdaWorker::handlePeers() {
             if (peerId > 0 && peer.nextKeepAlive < now) {
                 peer.nextKeepAlive += KEEP_ALIVE_INTERVAL;
                 servicePackets.emplace_back(
-                    peer.address,
-                    Message::str(OpCode::Ping, put_field(*workerId)));
+                    peer.address, Message::str(*workerId, OpCode::Ping,
+                                               put_field(*workerId)));
             }
 
             break;
@@ -594,7 +594,8 @@ ResultType LambdaWorker::handleNeededTreelets() {
 
         protobuf::GetWorker proto;
         proto.set_treelet_id(treeletId);
-        Message message(OpCode::GetWorker, protoutil::to_string(proto));
+        Message message(*workerId, OpCode::GetWorker,
+                        protoutil::to_string(proto));
         coordinatorConnection->enqueue_write(message.str());
         requestedTreelets.insert(treeletId);
     }
@@ -614,7 +615,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
             ack += put_field(receivedKv.second[i]);
 
             if (ack.length() >= 1'400 or i == receivedKv.second.size() - 1) {
-                Message msg{OpCode::Ack, move(ack)};
+                Message msg{*workerId, OpCode::Ack, move(ack)};
                 servicePackets.emplace_back(receivedKv.first, move(msg.str()));
                 ack = {};
             }
@@ -769,7 +770,8 @@ ResultType LambdaWorker::handleWorkerStats() {
     proto.set_timestamp_us(
         duration_cast<microseconds>(now() - workerStats.startTime).count());
 
-    Message message{OpCode::WorkerStats, protoutil::to_string(proto)};
+    Message message{*workerId, OpCode::WorkerStats,
+                    protoutil::to_string(proto)};
     coordinatorConnection->enqueue_write(message.str());
     workerStats.reset();
     return ResultType::Continue;
@@ -1027,16 +1029,13 @@ bool LambdaWorker::processMessage(const Message& message) {
     case OpCode::SendRays: {
         protobuf::RecordReader reader{istringstream{message.payload()}};
 
-        WorkerId senderId;
-        reader.read(&senderId);
-
         while (!reader.eof()) {
             string rayStr;
             if (reader.read(&rayStr)) {
                 RayStatePtr ray = RayState::deserialize(rayStr);
                 ray->hop++;
                 workerStats.recordReceivedRay(*ray);
-                logRayAction(*ray, RayAction::Received, senderId);
+                logRayAction(*ray, RayAction::Received, message.sender_id());
                 ray->tick = 0;
                 pushRayQueue(move(ray));
             }
