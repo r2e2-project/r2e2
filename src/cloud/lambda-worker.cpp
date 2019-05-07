@@ -273,8 +273,6 @@ void LambdaWorker::logPacket(const uint64_t sequenceNumber,
 
 void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                 const WorkerId otherParty) {
-    const static auto START = rays_clock::now(); /* FIXME */
-
     if (!trackRays || !state.trackRay) return;
 
     // clang-format off
@@ -292,7 +290,7 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                                           : *workerId) << ','
                       << state.CurrentTreelet() << ','
                       << duration_cast<microseconds>(
-                            rays_clock::now() - START).count() << ','
+                            rays_clock::now().time_since_epoch()).count() << ','
                       << state.Size() << ',';
     // clang-format on
 
