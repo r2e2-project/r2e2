@@ -56,6 +56,7 @@ namespace meow {
         "Bye"};
 
   private:
+    bool tracked_ { false };
     bool reliable_ { false };
     uint64_t sequence_number_ { 0 };
     uint32_t payload_length_ { 0 };
@@ -67,8 +68,11 @@ namespace meow {
   public:
     Message( const Chunk & chunk );
     Message( const OpCode opcode, std::string && payload,
-             const bool reliable = false, const uint64_t sequence_number = 0 );
+             const bool reliable = false,
+             const uint64_t sequence_number = 0,
+             const bool tracked = false );
 
+    bool tracked() const { return tracked_; }
     bool reliable() const { return reliable_; }
     uint64_t sequence_number() const { return sequence_number_; }
     OpCode opcode() const { return opcode_; }
@@ -79,7 +83,8 @@ namespace meow {
 
     static std::string str( const OpCode opcode, const std::string & payload,
                             const bool reliable = false,
-                            const uint64_t sequence_number = 0 );
+                            const uint64_t sequence_number = 0,
+                            const bool tracked = false );
 
     static uint32_t expected_length( const Chunk & chunk );
 

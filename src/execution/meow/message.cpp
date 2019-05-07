@@ -16,37 +16,43 @@ constexpr char const* Message::OPCODE_NAMES[to_underlying(Message::OpCode::COUNT
 
 Message::Message( const Chunk & chunk )
 {
-  if ( chunk.size() < 14 ) {
+  if ( chunk.size() < 15 ) {
     throw out_of_range( "incomplete header" );
   }
 
-  reliable_ = chunk( 0, 1 ).octet();
-  sequence_number_ = chunk( 1, 8 ).be64();
-  payload_length_ = chunk( 9, 4 ).be32();
-  opcode_ = static_cast<OpCode>( chunk( 13, 1 ).octet() );
-  payload_ = chunk( 14 ).to_string();
+  Chunk c = chunk;
+
+  tracked_         = c.octet();
+  reliable_        = ( c = c( 1 ) ).octet();
+  sequence_number_ = ( c = c( 1 ) ).be64();
+  payload_length_  = ( c = c( 8 ) ).be32();
+  opcode_          = static_cast<OpCode>( ( c = c( 4 ) ).octet() );
+  payload_         = ( c = c( 1 ) ).to_string();
 }
 
 Message::Message( const OpCode opcode, string && payload,
-                  const bool reliable, const uint64_t sequence_number )
-  : reliable_( reliable ), sequence_number_( sequence_number ),
+                  const bool reliable, const uint64_t sequence_number,
+                  const bool tracked )
+  : tracked_( tracked ), reliable_( reliable ), sequence_number_( sequence_number ),
     payload_length_( payload.length() ), opcode_( opcode ),
     payload_( move( payload ) )
 {}
 
 string Message::str() const
 {
-  return Message::str( opcode_, payload_, reliable_, sequence_number_ );
+  return Message::str( opcode_, payload_, reliable_, sequence_number_, tracked_ );
 }
 
-std::string Message::str( const OpCode opcode, const std::string & payload,
+std::string Message::str( const OpCode opcode, const string & payload,
                           const bool reliable,
-                          const uint64_t sequence_number ) {
+                          const uint64_t sequence_number,
+                          const bool tracked ) {
   string output;
-  output.reserve( sizeof(reliable) + sizeof(sequence_number) +
+  output.reserve( sizeof(tracked) + sizeof(reliable) + sizeof(sequence_number) +
                   sizeof(opcode) + sizeof(payload.length()) +
                   payload.length() );
 
+  output += put_field( tracked );
   output += put_field( reliable );
   output += put_field( sequence_number );
   output += put_field( static_cast<uint32_t>( payload.length() ) );
@@ -57,7 +63,7 @@ std::string Message::str( const OpCode opcode, const std::string & payload,
 
 uint32_t Message::expected_length( const Chunk & chunk )
 {
-  return 14 + ( ( chunk.size() < 14 ) ? 0 : chunk( 9, 4 ).be32() );
+  return 15 + ( ( chunk.size() < 15 ) ? 0 : chunk( 10, 4 ).be32() );
 }
 
 void MessageParser::parse( const string & buf )

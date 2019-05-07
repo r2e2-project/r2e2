@@ -70,6 +70,7 @@ class LambdaWorker {
 
         bool retransmission{false};
         bool reliable{false};
+        bool tracked{false};
         uint64_t sequenceNumber;
         size_t retries{0};
 
