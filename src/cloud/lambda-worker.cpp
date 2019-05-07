@@ -101,6 +101,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             << endl;
     }
 
+    if (trackPackets) {
+        packetsLogOstream.open(packetsLogName, ios::out | ios::trunc);
+        packetsLogOstream << "action,seqNo" << endl;
+    }
+
     PbrtOptions.nThreads = 1;
     bvh = make_shared<CloudBVH>();
     manager.init(".");
@@ -238,9 +243,37 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
     return {*workerId, OpCode::ConnectionResponse, protoutil::to_string(proto)};
 }
 
+void LambdaWorker::logPacket(const uint64_t sequenceNumber,
+                             const PacketAction action,
+                             const WorkerId otherParty) {
+    if (!trackPackets) return;
+
+    // clang-format off
+    packetsLogOstream << *workerId << ','
+                      << otherParty << ','
+                      << sequenceNumber << ','
+                      << duration_cast<microseconds>(
+                            rays_clock::now().time_since_epoch()).count() << ',';
+    // clang-format on
+
+    // clang-format off
+    switch (action) {
+    case PacketAction::Queued:      packetsLogOstream << "Queued";      break;
+    case PacketAction::Sent:        packetsLogOstream << "Sent";        break;
+    case PacketAction::Received:    packetsLogOstream << "Received";    break;
+    case PacketAction::Acked:       packetsLogOstream << "Acked";       break;
+    case PacketAction::AckReceived: packetsLogOstream << "AckReceived"; break;
+
+    default: throw runtime_error("invalid packet action");
+    }
+    // clang-format on
+
+    packetsLogOstream << endl;
+}
+
 void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                 const WorkerId otherParty) {
-    const static auto START = rays_clock::now();
+    const static auto START = rays_clock::now(); /* FIXME */
 
     if (!trackRays || !state.trackRay) return;
 
@@ -437,15 +470,22 @@ ResultType LambdaWorker::handleOutQueue() {
 
             oss.flush();
 
+            const bool tracked = packetLogBD(randEngine);
+
             RayPacket rayPacket{
                 peer.address,
                 peer.id,
                 treeletId,
                 rayCount,
                 Message::str(*workerId, OpCode::SendRays, oss.str(),
-                             sendReliably, peerSeqNo),
+                             sendReliably, peerSeqNo, tracked),
                 sendReliably,
-                peerSeqNo};
+                peerSeqNo,
+                tracked};
+
+            if (tracked) {
+                logPacket(peerSeqNo, PacketAction::Queued, peer.id);
+            }
 
             rayPacket.trackedRays = move(trackedRays);
             rayPackets.emplace_back(move(rayPacket));
@@ -693,6 +733,11 @@ ResultType LambdaWorker::handleUdpSend() {
         rayPtr->tick++;
     }
 
+    if (trackPackets && packet.tracked) {
+        logPacket(packet.sequenceNumber, PacketAction::Sent,
+                  packet.destinationId);
+    }
+
     if (packet.reliable) {
         outstandingRayPackets.emplace_back(packet_clock::now() + PACKET_TIMEOUT,
                                            move(packet));
@@ -723,6 +768,11 @@ ResultType LambdaWorker::handleUdpReceive() {
             const auto seqNo = it->sequence_number();
             toBeAcked[datagram.first].push_back(seqNo);
             auto& received = receivedPacketSeqNos[datagram.first];
+
+            if (it->tracked()) {
+                logPacket(it->sequence_number(), PacketAction::Received,
+                          it->sender_id());
+            }
 
             if (received.contains(seqNo)) {
                 it = messages.erase(it);
@@ -811,7 +861,6 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
     const Float rayScale = 1 / sqrt((Float)samplesPerPixel);
 
     /* for ray tracking */
-    mt19937 randEngine(random_device{}());
     bernoulli_distribution bd{rayActionsLogRate};
 
     for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
@@ -1137,6 +1186,7 @@ void LambdaWorker::uploadLogs() {
     google::FlushLogFiles(google::INFO);
     diagnosticsOstream.close();
     rayActionsOstream.close();
+    packetsLogOstream.close();
 
     vector<storage::PutRequest> putLogsRequest = {
         {infoLogName, logPrefix + to_string(*workerId) + ".INFO"},
@@ -1145,6 +1195,11 @@ void LambdaWorker::uploadLogs() {
     if (trackRays) {
         putLogsRequest.emplace_back(rayActionsName,
                                     logPrefix + to_string(*workerId) + ".RAYS");
+    }
+
+    if (trackPackets) {
+        putLogsRequest.emplace_back(
+            packetsLogName, logPrefix + to_string(*workerId) + ".PACKETS");
     }
 
     storageBackend->put(putLogsRequest);

@@ -5,6 +5,7 @@
 #include <deque>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <string>
 
 #include "cloud/bvh.h"
@@ -34,8 +35,7 @@ class LambdaWorker {
                  const std::string& storageBackendUri, const bool sendReliably,
                  const int samplesPerPixel,
                  const FinishedRayAction finishedRayAction,
-                 const float rayActionsLogRate,
-                 const float packetsLogRate);
+                 const float rayActionsLogRate, const float packetsLogRate);
 
     void run();
     void terminate() { terminated = true; }
@@ -79,14 +79,15 @@ class LambdaWorker {
         RayPacket(const Address& addr, const WorkerId destId,
                   const TreeletId targetTreelet, const size_t rayCount,
                   std::string&& data, const bool reliable = false,
-                  const uint64_t sequenceNumber = 0)
+                  const uint64_t sequenceNumber = 0, const bool tracked = false)
             : destination(addr),
               destinationId(destId),
               targetTreelet(targetTreelet),
               rayCount(rayCount),
               data(std::move(data)),
               reliable(reliable),
-              sequenceNumber(sequenceNumber) {}
+              sequenceNumber(sequenceNumber),
+              tracked(tracked) {}
     };
 
     enum class RayAction {
@@ -98,6 +99,8 @@ class LambdaWorker {
         Received,
         Finished
     };
+
+    enum class PacketAction { Queued, Sent, Received, Acked, AckReceived };
 
     bool processMessage(const meow::Message& message);
     void initializeScene();
@@ -134,18 +137,26 @@ class LambdaWorker {
     void logRayAction(const RayState& state, const RayAction action,
                       const WorkerId otherParty = -1);
 
+    void logPacket(const uint64_t sequenceNumber, const PacketAction action,
+                   const WorkerId otherParty);
+
     /* Logging & Diagnostics */
     const std::string logBase{"pbrt-worker"};
     const std::string infoLogName{logBase + ".INFO"};
     const std::string diagnosticsName{logBase + ".DIAG"};
     const std::string rayActionsName{logBase + ".RAYS"};
+    const std::string packetsLogName{logBase + ".PACKETS"};
     std::string logPrefix{"logs/"};
     std::ofstream diagnosticsOstream{};
     std::ofstream rayActionsOstream{};
+    std::ofstream packetsLogOstream{};
     const float rayActionsLogRate;
     const float packetsLogRate;
     const bool trackRays{rayActionsLogRate > 0};
     const bool trackPackets{packetsLogRate > 0};
+
+    std::mt19937 randEngine{std::random_device{}()};
+    std::bernoulli_distribution packetLogBD{rayActionsLogRate};
 
     WorkerStats workerStats;
     WorkerDiagnostics lastDiagnostics;
