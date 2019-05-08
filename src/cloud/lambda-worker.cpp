@@ -103,7 +103,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     if (trackPackets) {
         packetsLogOstream.open(packetsLogName, ios::out | ios::trunc);
-        packetsLogOstream << "action,seqNo" << endl;
+        packetsLogOstream << "workerID,otherPartyID,seqNo,timestamp,action"
+                          << endl;
     }
 
     PbrtOptions.nThreads = 1;

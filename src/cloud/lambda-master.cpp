@@ -139,7 +139,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     loadCamera();
 
     if (config.collectDebugLogs || config.collectDiagnostics ||
-        config.collectWorkerStats || config.rayActionsLogRate > 0) {
+        config.collectWorkerStats || config.rayActionsLogRate > 0 ||
+        config.packetsLogRate > 0) {
         roost::create_directories(config.logsDirectory);
     }
 
@@ -998,8 +999,8 @@ int main(int argc, char *argv[]) {
 
     if (scene.empty() || listenPort == 0 || numLambdas < 0 ||
         samplesPerPixel < 0 || rayActionsLogRate < 0 ||
-        rayActionsLogRate > 1.0 || publicIp.empty() ||
-        storageBackendUri.empty() || region.empty()) {
+        rayActionsLogRate > 1.0 || packetsLogRate < 0 || packetsLogRate > 1.0 ||
+        publicIp.empty() || storageBackendUri.empty() || region.empty()) {
         usage(argv[0], 2);
     }
 

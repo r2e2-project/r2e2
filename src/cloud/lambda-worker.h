@@ -171,7 +171,7 @@ class LambdaWorker {
     const bool trackPackets{packetsLogRate > 0};
 
     std::mt19937 randEngine{std::random_device{}()};
-    std::bernoulli_distribution packetLogBD{rayActionsLogRate};
+    std::bernoulli_distribution packetLogBD{packetsLogRate};
 
     WorkerStats workerStats;
     WorkerDiagnostics lastDiagnostics;
