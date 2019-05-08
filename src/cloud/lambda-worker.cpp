@@ -583,7 +583,7 @@ ResultType LambdaWorker::handlePeers() {
         switch (peer.state) {
         case Worker::State::Connecting: {
             auto message = createConnectionRequest(peer);
-            servicePackets.emplace_front(peer.address, message.str());
+            servicePackets.emplace_front(peer.address, peer.id, message.str());
             peer.tries++;
             break;
         }
@@ -593,8 +593,9 @@ ResultType LambdaWorker::handlePeers() {
             if (peerId > 0 && peer.nextKeepAlive < now) {
                 peer.nextKeepAlive += KEEP_ALIVE_INTERVAL;
                 servicePackets.emplace_back(
-                    peer.address, Message::str(*workerId, OpCode::Ping,
-                                               put_field(*workerId)));
+                    peer.address, peer.id,
+                    Message::str(*workerId, OpCode::Ping,
+                                 put_field(*workerId)));
             }
 
             break;
@@ -647,14 +648,26 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
 
     // sending acknowledgements
     for (auto& receivedKv : toBeAcked) {
+        auto& received = receivedKv.second;
         string ack;
+        const auto destId = addressToWorker[receivedKv.first];
+        vector<uint64_t> trackedSeqNos;
 
-        for (size_t i = 0; i < receivedKv.second.size(); i++) {
-            ack += put_field(receivedKv.second[i]);
+        for (size_t i = 0; i < received.size(); i++) {
+            ack += put_field(received[i].first);
+            ack += put_field(received[i].second);
 
-            if (ack.length() >= 1'400 or i == receivedKv.second.size() - 1) {
+            if (received[i].second) {
+                trackedSeqNos.push_back(received[i].first);
+            }
+
+            if (ack.length() >= 1'400 or i == received.size() - 1) {
                 Message msg{*workerId, OpCode::Ack, move(ack)};
-                servicePackets.emplace_back(receivedKv.first, move(msg.str()));
+                ServicePacket servicePacket{receivedKv.first, destId,
+                                            move(msg.str()), true};
+                servicePacket.trackedSeqNos = move(trackedSeqNos);
+                servicePackets.push_back(move(servicePacket));
+
                 ack = {};
             }
         }
@@ -708,7 +721,14 @@ ResultType LambdaWorker::handleUdpSend() {
 
     if (!servicePackets.empty()) {
         auto& datagram = servicePackets.front();
-        sendUdpPacket(datagram.first, datagram.second);
+        sendUdpPacket(datagram.destination, datagram.data);
+
+        if (datagram.ackPacket && !datagram.trackedSeqNos.empty()) {
+            for (const auto seqNo : datagram.trackedSeqNos) {
+                logPacket(seqNo, PacketAction::Acked, datagram.destinationId);
+            }
+        }
+
         servicePackets.pop_front();
         return ResultType::Continue;
     }
@@ -764,7 +784,8 @@ ResultType LambdaWorker::handleUdpReceive() {
 
         if (it->reliable()) {
             const auto seqNo = it->sequence_number();
-            toBeAcked[datagram.first].push_back(seqNo);
+            toBeAcked[datagram.first].emplace_back(seqNo, it->tracked());
+
             auto& received = receivedPacketSeqNos[datagram.first];
 
             if (it->tracked()) {
@@ -785,8 +806,17 @@ ResultType LambdaWorker::handleUdpReceive() {
             auto& thisReceivedAcks = receivedAcks[datagram.first];
 
             while (chunk.size()) {
-                thisReceivedAcks.insert(chunk.be64());
+                const auto seqNo = chunk.be64();
+                thisReceivedAcks.insert(seqNo);
                 chunk = chunk(8);
+
+                const bool tracked = chunk.octet();
+                chunk = chunk(1);
+
+                if (tracked) {
+                    logPacket(seqNo, PacketAction::AckReceived,
+                              it->sender_id());
+                }
             }
 
             it = messages.erase(it);
@@ -948,6 +978,9 @@ bool LambdaWorker::processMessage(const Message& message) {
             const auto dest = Address::decompose(proto.address());
             peers.emplace(proto.worker_id(),
                           Worker{proto.worker_id(), {dest.first, dest.second}});
+
+            addressToWorker.emplace(Address{dest.first, dest.second},
+                                    proto.worker_id());
         }
     };
 
@@ -967,7 +1000,7 @@ bool LambdaWorker::processMessage(const Message& message) {
         Address addrCopy{coordinatorAddr};
         peers.emplace(0, Worker{0, move(addrCopy)});
         Message message = createConnectionRequest(peers.at(0));
-        servicePackets.emplace_front(coordinatorAddr, message.str());
+        servicePackets.emplace_front(coordinatorAddr, 0, message.str());
         break;
     }
 
@@ -1026,7 +1059,8 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         auto& peer = peers.at(otherWorkerId);
         auto message = createConnectionResponse(peer);
-        servicePackets.emplace_front(peer.address, message.str());
+        servicePackets.emplace_front(peer.address, otherWorkerId,
+                                     message.str());
         break;
     }
 

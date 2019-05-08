@@ -61,6 +61,21 @@ class LambdaWorker {
             : id(id), address(std::move(addr)) {}
     };
 
+    struct ServicePacket {
+        Address destination;
+        WorkerId destinationId;
+        std::string data;
+        bool ackPacket;
+        std::vector<uint64_t> trackedSeqNos {};
+
+        ServicePacket(const Address& addr, const WorkerId destId,
+                      std::string&& data, const bool ackPacket = false)
+            : destination(addr),
+              destinationId(destId),
+              data(move(data)),
+              ackPacket(ackPacket) {}
+    };
+
     struct RayPacket {
         Address destination;
         WorkerId destinationId;
@@ -172,6 +187,7 @@ class LambdaWorker {
     Optional<WorkerId> workerId;
     Optional<std::string> jobId;
     std::map<WorkerId, Worker> peers{};
+    std::map<Address, WorkerId> addressToWorker{};
     int32_t mySeed;
     bool peerRequested{false};
     std::string outputName;
@@ -179,7 +195,7 @@ class LambdaWorker {
 
     /* Sending rays to other nodes */
     UDPConnection udpConnection{true};
-    std::deque<std::pair<Address, std::string>> servicePackets{};
+    std::deque<ServicePacket> servicePackets{};
 
     /* outgoing rays */
     std::deque<RayPacket> rayPackets{};
@@ -190,7 +206,7 @@ class LambdaWorker {
 
     /* incoming rays */
     std::map<Address, SeqNoSet> receivedPacketSeqNos{};
-    std::map<Address, std::vector<uint64_t>> toBeAcked{};
+    std::map<Address, std::vector<std::pair<uint64_t, bool>>> toBeAcked{};
 
     /* Scene Data */
     const uint8_t maxDepth{5};
