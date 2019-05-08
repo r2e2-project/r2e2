@@ -732,6 +732,12 @@ void LambdaMaster::run() {
                 logPrefix + to_string(worker.id) + ".RAYS",
                 config.logsDirectory + "/" + to_string(worker.id) + ".RAYS");
         }
+
+        if (config.packetsLogRate) {
+            getRequests.emplace_back(
+                logPrefix + to_string(worker.id) + ".PACKETS",
+                config.logsDirectory + "/" + to_string(worker.id) + ".PACKETS");
+        }
     }
 
     if (!getRequests.empty()) {
