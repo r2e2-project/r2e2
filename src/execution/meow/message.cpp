@@ -24,7 +24,7 @@ Message::Message( const Chunk & chunk )
 
   tracked_         = c.octet();
   reliable_        = ( c = c( 1 ) ).octet();
-  sender_id_       = ( c = c( 1 ) ).be32();
+  sender_id_       = ( c = c( 1 ) ).be64();
   sequence_number_ = ( c = c( 8 ) ).be64();
   payload_length_  = ( c = c( 8 ) ).be32();
   opcode_          = static_cast<OpCode>( ( c = c( 4 ) ).octet() );
