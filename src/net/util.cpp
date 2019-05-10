@@ -19,3 +19,9 @@ string put_field(const uint32_t n) {
     return string(reinterpret_cast<const char *>(&network_order),
                   sizeof(network_order));
 }
+
+string put_field(const uint16_t n) {
+    const uint16_t network_order = htobe16(n);
+    return string(reinterpret_cast<const char *>(&network_order),
+                  sizeof(network_order));
+}

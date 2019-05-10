@@ -56,6 +56,7 @@ namespace meow {
         "Bye"};
 
   private:
+    uint16_t attempt_ { 0 };
     bool tracked_ { false };
     bool reliable_ { false };
     uint64_t sender_id_ { 0 };
@@ -75,6 +76,7 @@ namespace meow {
              const uint64_t sequence_number = 0,
              const bool tracked = false );
 
+    uint16_t attempt() const { return attempt_; }
     uint64_t sender_id() const { return sender_id_; }
     bool tracked() const { return tracked_; }
     bool reliable() const { return reliable_; }
@@ -95,7 +97,7 @@ namespace meow {
     static uint32_t expected_length( const Chunk & chunk );
 
     bool is_read() const { return read_; }
-    void set_read() { read_ = true;}
+    void set_read() { read_ = true; }
   };
 
   class MessageParser

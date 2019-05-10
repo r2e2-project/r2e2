@@ -6,6 +6,7 @@
 std::string put_field(const bool n);
 std::string put_field(const uint64_t n);
 std::string put_field(const uint32_t n);
+std::string put_field(const uint16_t n);
 
 /* avoid implicit conversions */
 template <class T>

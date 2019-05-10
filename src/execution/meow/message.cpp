@@ -16,13 +16,14 @@ constexpr char const* Message::OPCODE_NAMES[to_underlying(Message::OpCode::COUNT
 
 Message::Message( const Chunk & chunk )
 {
-  if ( chunk.size() < 23 ) {
+  if ( chunk.size() < 25 ) {
     throw out_of_range( "incomplete header" );
   }
 
   Chunk c = chunk;
 
-  tracked_         = c.octet();
+  attempt_         = c.be16();
+  tracked_         = ( c = c( 2 ) ).octet();
   reliable_        = ( c = c( 1 ) ).octet();
   sender_id_       = ( c = c( 1 ) ).be64();
   sequence_number_ = ( c = c( 8 ) ).be64();
@@ -54,10 +55,11 @@ std::string Message::str( const uint64_t sender_id,
                           const uint64_t sequence_number,
                           const bool tracked ) {
   string output;
-  output.reserve( sizeof(tracked) + sizeof(reliable) + sizeof(sender_id) +
+  output.reserve( sizeof(uint16_t) + sizeof(tracked) + sizeof(reliable) + sizeof(sender_id) +
                   sizeof(sequence_number) + sizeof(opcode) +
                   sizeof(payload.length()) + payload.length() );
 
+  output += put_field( static_cast<uint16_t>( 0 ) );
   output += put_field( tracked );
   output += put_field( reliable );
   output += put_field( sender_id );
@@ -70,7 +72,7 @@ std::string Message::str( const uint64_t sender_id,
 
 uint32_t Message::expected_length( const Chunk & chunk )
 {
-  return 23 + ( ( chunk.size() < 23 ) ? 0 : chunk( 18, 4 ).be32() );
+  return 25 + ( ( chunk.size() < 25 ) ? 0 : chunk( 18, 4 ).be32() );
 }
 
 void MessageParser::parse( const string & buf )
