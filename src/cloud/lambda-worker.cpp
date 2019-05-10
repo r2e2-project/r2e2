@@ -714,6 +714,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                 packet.retries = 0;
             }
 
+            packet.incrementAttempts();
             packet.retransmission = true;
             rayPackets.push_back(move(packet));
         }
@@ -752,7 +753,7 @@ ResultType LambdaWorker::handleUdpSend() {
     RayPacket& packet = rayPackets.front();
 
     /* peer to send the packet to */
-    sendUdpPacket(packet.destination, packet.data);
+    sendUdpPacket(packet.destination, packet.data());
 
     /* do the necessary logging */
     if (packet.retransmission) {

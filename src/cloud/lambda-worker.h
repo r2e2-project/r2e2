@@ -66,7 +66,7 @@ class LambdaWorker {
         WorkerId destinationId;
         std::string data;
         bool ackPacket;
-        std::vector<uint64_t> trackedSeqNos {};
+        std::vector<uint64_t> trackedSeqNos{};
 
         ServicePacket(const Address& addr, const WorkerId destId,
                       std::string&& data, const bool ackPacket = false)
@@ -81,7 +81,6 @@ class LambdaWorker {
         WorkerId destinationId;
         TreeletId targetTreelet;
         size_t rayCount;
-        std::string data;
 
         bool retransmission{false};
         bool reliable{false};
@@ -91,6 +90,8 @@ class LambdaWorker {
 
         std::vector<std::unique_ptr<RayState>> trackedRays;
 
+        std::string& data() { return data_; }
+
         RayPacket(const Address& addr, const WorkerId destId,
                   const TreeletId targetTreelet, const size_t rayCount,
                   std::string&& data, const bool reliable = false,
@@ -99,10 +100,25 @@ class LambdaWorker {
               destinationId(destId),
               targetTreelet(targetTreelet),
               rayCount(rayCount),
-              data(std::move(data)),
+              data_(std::move(data)),
               reliable(reliable),
               sequenceNumber(sequenceNumber),
               tracked(tracked) {}
+
+        void incrementAttempts() {
+            if (data_.length() < 2) return;
+
+            uint16_t attempts;
+            memcpy(&attempts, data_.data(), sizeof(uint16_t));
+            attempts = be16toh(attempts);
+            attempts++;
+            attempts = htobe16(attempts);
+            memcpy(&data_[0], reinterpret_cast<const char*>(&attempts),
+                   sizeof(attempts));
+        }
+
+      private:
+        mutable std::string data_;
     };
 
     enum class RayAction {
