@@ -103,7 +103,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     if (trackPackets) {
         packetsLogOstream.open(packetsLogName, ios::out | ios::trunc);
-        packetsLogOstream << "workerID,otherPartyID,seqNo,timestamp,action"
+        packetsLogOstream << "sourceID,destinationID,seqNo,timestamp,action"
                           << endl;
     }
 
@@ -249,13 +249,27 @@ void LambdaWorker::logPacket(const uint64_t sequenceNumber,
                              const WorkerId otherParty) {
     if (!trackPackets) return;
 
-    // clang-format off
-    packetsLogOstream << *workerId << ','
-                      << otherParty << ','
-                      << sequenceNumber << ','
+    switch (action) {
+    case PacketAction::Queued:
+    case PacketAction::Sent:
+    case PacketAction::AckReceived:
+        packetsLogOstream << *workerId << ',' << otherParty << ',';
+        break;
+
+    case PacketAction::Received:
+    case PacketAction::Acked:
+        packetsLogOstream << otherParty << ',' << *workerId << ',';
+        break;
+
+    default:
+        throw runtime_error("invalid packet action");
+    }
+
+    packetsLogOstream << sequenceNumber << ','
                       << duration_cast<microseconds>(
-                            rays_clock::now().time_since_epoch()).count() << ',';
-    // clang-format on
+                             rays_clock::now().time_since_epoch())
+                             .count()
+                      << ',';
 
     // clang-format off
     switch (action) {
