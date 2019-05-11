@@ -103,8 +103,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     if (trackPackets) {
         packetsLogOstream.open(packetsLogName, ios::out | ios::trunc);
-        packetsLogOstream << "sourceID,destinationID,seqNo,timestamp,action"
-                          << endl;
+        packetsLogOstream
+            << "sourceID,destinationID,seqNo,attempt,timestamp,action" << endl;
     }
 
     PbrtOptions.nThreads = 1;
@@ -245,7 +245,7 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
 }
 
 void LambdaWorker::logPacket(const uint64_t sequenceNumber,
-                             const PacketAction action,
+                             const uint16_t attempt, const PacketAction action,
                              const WorkerId otherParty) {
     if (!trackPackets) return;
 
@@ -265,7 +265,7 @@ void LambdaWorker::logPacket(const uint64_t sequenceNumber,
         throw runtime_error("invalid packet action");
     }
 
-    packetsLogOstream << sequenceNumber << ','
+    packetsLogOstream << sequenceNumber << ',' << attempt << ','
                       << duration_cast<microseconds>(
                              rays_clock::now().time_since_epoch())
                              .count()
@@ -497,7 +497,7 @@ ResultType LambdaWorker::handleOutQueue() {
                 tracked};
 
             if (tracked) {
-                logPacket(peerSeqNo, PacketAction::Queued, peer.id);
+                logPacket(peerSeqNo, 0, PacketAction::Queued, peer.id);
             }
 
             rayPacket.trackedRays = move(trackedRays);
@@ -666,14 +666,16 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         auto& received = receivedKv.second;
         string ack;
         const auto destId = addressToWorker[receivedKv.first];
-        vector<uint64_t> trackedSeqNos;
+        vector<pair<uint64_t, uint16_t>> trackedSeqNos;
 
         for (size_t i = 0; i < received.size(); i++) {
-            ack += put_field(received[i].first);
-            ack += put_field(received[i].second);
+            ack += put_field(get<0>(received[i]));
+            ack += put_field(get<1>(received[i]));
+            ack += put_field(get<2>(received[i]));
 
-            if (received[i].second) {
-                trackedSeqNos.push_back(received[i].first);
+            if (get<1>(received[i])) {
+                trackedSeqNos.emplace_back(get<0>(received[i]),
+                                           get<2>(received[i]));
             }
 
             if (ack.length() >= 1'400 or i == received.size() - 1) {
@@ -699,9 +701,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         auto& thisReceivedAcks = receivedAcks[packet.destination];
 
         if (!thisReceivedAcks.contains(packet.sequenceNumber)) {
-            packet.retries++;
-
-            if (false && packet.retries > 1) {
+            if (false && packet.attempt > 1) {
                 /* sequenceNumbers[packet.destination]-- */;
 
                 const auto& candidates = treeletToWorker[packet.targetTreelet];
@@ -711,7 +711,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                 packet.destination = peer.address;
                 packet.destinationId = peer.id;
                 packet.sequenceNumber = sequenceNumbers[packet.destination]++;
-                packet.retries = 0;
+                packet.attempt = 0;
             }
 
             packet.incrementAttempts();
@@ -741,7 +741,8 @@ ResultType LambdaWorker::handleUdpSend() {
 
         if (datagram.ackPacket && !datagram.trackedSeqNos.empty()) {
             for (const auto seqNo : datagram.trackedSeqNos) {
-                logPacket(seqNo, PacketAction::Acked, datagram.destinationId);
+                logPacket(seqNo.first, seqNo.second, PacketAction::Acked,
+                          datagram.destinationId);
             }
         }
 
@@ -768,7 +769,7 @@ ResultType LambdaWorker::handleUdpSend() {
     }
 
     if (trackPackets && packet.tracked) {
-        logPacket(packet.sequenceNumber, PacketAction::Sent,
+        logPacket(packet.sequenceNumber, packet.attempt, PacketAction::Sent,
                   packet.destinationId);
     }
 
@@ -800,13 +801,14 @@ ResultType LambdaWorker::handleUdpReceive() {
 
         if (it->reliable()) {
             const auto seqNo = it->sequence_number();
-            toBeAcked[datagram.first].emplace_back(seqNo, it->tracked());
+            toBeAcked[datagram.first].emplace_back(seqNo, it->tracked(),
+                                                   it->attempt());
 
             auto& received = receivedPacketSeqNos[datagram.first];
 
             if (it->tracked()) {
-                logPacket(it->sequence_number(), PacketAction::Received,
-                          it->sender_id());
+                logPacket(it->sequence_number(), it->attempt(),
+                          PacketAction::Received, it->sender_id());
             }
 
             if (received.contains(seqNo)) {
@@ -829,8 +831,11 @@ ResultType LambdaWorker::handleUdpReceive() {
                 const bool tracked = chunk.octet();
                 chunk = chunk(1);
 
+                const uint16_t attempt = chunk.be16();
+                chunk = chunk(2);
+
                 if (tracked) {
-                    logPacket(seqNo, PacketAction::AckReceived,
+                    logPacket(seqNo, attempt, PacketAction::AckReceived,
                               it->sender_id());
                 }
             }

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <random>
 #include <string>
+#include <tuple>
 
 #include "cloud/bvh.h"
 #include "cloud/lambda-master.h"
@@ -66,7 +67,7 @@ class LambdaWorker {
         WorkerId destinationId;
         std::string data;
         bool ackPacket;
-        std::vector<uint64_t> trackedSeqNos{};
+        std::vector<std::pair<uint64_t, uint16_t>> trackedSeqNos{};
 
         ServicePacket(const Address& addr, const WorkerId destId,
                       std::string&& data, const bool ackPacket = false)
@@ -86,7 +87,7 @@ class LambdaWorker {
         bool reliable{false};
         bool tracked{false};
         uint64_t sequenceNumber;
-        size_t retries{0};
+        size_t attempt{0};
 
         std::vector<std::unique_ptr<RayState>> trackedRays;
 
@@ -108,13 +109,9 @@ class LambdaWorker {
         void incrementAttempts() {
             if (data_.length() < 2) return;
 
-            uint16_t attempts;
-            memcpy(&attempts, data_.data(), sizeof(uint16_t));
-            attempts = be16toh(attempts);
-            attempts++;
-            attempts = htobe16(attempts);
-            memcpy(&data_[0], reinterpret_cast<const char*>(&attempts),
-                   sizeof(attempts));
+            attempt++;
+            const uint16_t val = htobe16(attempt);
+            memcpy(&data_[0], reinterpret_cast<const char*>(&val), sizeof(val));
         }
 
       private:
@@ -168,8 +165,8 @@ class LambdaWorker {
     void logRayAction(const RayState& state, const RayAction action,
                       const WorkerId otherParty = -1);
 
-    void logPacket(const uint64_t sequenceNumber, const PacketAction action,
-                   const WorkerId otherParty);
+    void logPacket(const uint64_t sequenceNumber, const uint16_t attempt,
+                   const PacketAction action, const WorkerId otherParty);
 
     /* Logging & Diagnostics */
     const std::string logBase{"pbrt-worker"};
@@ -222,7 +219,8 @@ class LambdaWorker {
 
     /* incoming rays */
     std::map<Address, SeqNoSet> receivedPacketSeqNos{};
-    std::map<Address, std::vector<std::pair<uint64_t, bool>>> toBeAcked{};
+    std::map<Address, std::vector<std::tuple<uint64_t, bool, uint16_t>>>
+        toBeAcked{};
 
     /* Scene Data */
     const uint8_t maxDepth{5};
