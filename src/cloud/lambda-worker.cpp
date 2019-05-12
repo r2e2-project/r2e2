@@ -103,8 +103,9 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     if (trackPackets) {
         packetsLogOstream.open(packetsLogName, ios::out | ios::trunc);
-        packetsLogOstream
-            << "sourceID,destinationID,seqNo,attempt,timestamp,action" << endl;
+        packetsLogOstream << "sourceID,destinationID,seqNo,attempt,size,"
+                             "rayCount,timestamp,action"
+                          << endl;
     }
 
     PbrtOptions.nThreads = 1;
@@ -246,7 +247,8 @@ Message LambdaWorker::createConnectionResponse(const Worker& peer) {
 
 void LambdaWorker::logPacket(const uint64_t sequenceNumber,
                              const uint16_t attempt, const PacketAction action,
-                             const WorkerId otherParty) {
+                             const WorkerId otherParty, const size_t packetSize,
+                             const size_t numRays) {
     if (!trackPackets) return;
 
     switch (action) {
@@ -265,7 +267,8 @@ void LambdaWorker::logPacket(const uint64_t sequenceNumber,
         throw runtime_error("invalid packet action");
     }
 
-    packetsLogOstream << sequenceNumber << ',' << attempt << ','
+    packetsLogOstream << sequenceNumber << ',' << attempt << ',' << packetSize
+                      << ',' << numRays << ','
                       << duration_cast<microseconds>(
                              rays_clock::now().time_since_epoch())
                              .count()
@@ -497,7 +500,8 @@ ResultType LambdaWorker::handleOutQueue() {
                 tracked};
 
             if (tracked) {
-                logPacket(peerSeqNo, 0, PacketAction::Queued, peer.id);
+                logPacket(peerSeqNo, 0, PacketAction::Queued, peer.id,
+                          rayPacket.data().length(), rayCount);
             }
 
             rayPacket.trackedRays = move(trackedRays);
@@ -742,7 +746,7 @@ ResultType LambdaWorker::handleUdpSend() {
         if (datagram.ackPacket && !datagram.trackedSeqNos.empty()) {
             for (const auto seqNo : datagram.trackedSeqNos) {
                 logPacket(seqNo.first, seqNo.second, PacketAction::Acked,
-                          datagram.destinationId);
+                          datagram.destinationId, datagram.data.length());
             }
         }
 
@@ -770,7 +774,8 @@ ResultType LambdaWorker::handleUdpSend() {
 
     if (trackPackets && packet.tracked) {
         logPacket(packet.sequenceNumber, packet.attempt, PacketAction::Sent,
-                  packet.destinationId);
+                  packet.destinationId, packet.data().length(),
+                  packet.rayCount);
     }
 
     if (packet.reliable) {
@@ -808,7 +813,8 @@ ResultType LambdaWorker::handleUdpReceive() {
 
             if (it->tracked()) {
                 logPacket(it->sequence_number(), it->attempt(),
-                          PacketAction::Received, it->sender_id());
+                          PacketAction::Received, it->sender_id(),
+                          it->total_length());
             }
 
             if (received.contains(seqNo)) {
@@ -836,7 +842,7 @@ ResultType LambdaWorker::handleUdpReceive() {
 
                 if (tracked) {
                     logPacket(seqNo, attempt, PacketAction::AckReceived,
-                              it->sender_id());
+                              it->sender_id(), 0u);
                 }
             }
 

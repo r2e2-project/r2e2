@@ -85,6 +85,8 @@ namespace meow {
     uint32_t payload_length() const { return payload_length_; }
     const std::string & payload() const { return payload_; }
 
+    size_t total_length() const { return 25 + payload_length(); }
+
     std::string str() const;
 
     static std::string str( const uint64_t sender_id,

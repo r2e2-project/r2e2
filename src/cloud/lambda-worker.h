@@ -166,7 +166,8 @@ class LambdaWorker {
                       const WorkerId otherParty = -1);
 
     void logPacket(const uint64_t sequenceNumber, const uint16_t attempt,
-                   const PacketAction action, const WorkerId otherParty);
+                   const PacketAction action, const WorkerId otherParty,
+                   const size_t packetSize, const size_t numRays = 0);
 
     /* Logging & Diagnostics */
     const std::string logBase{"pbrt-worker"};

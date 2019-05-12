@@ -72,7 +72,7 @@ std::string Message::str( const uint64_t sender_id,
 
 uint32_t Message::expected_length( const Chunk & chunk )
 {
-  return 25 + ( ( chunk.size() < 25 ) ? 0 : chunk( 18, 4 ).be32() );
+  return 25 + ( ( chunk.size() < 25 ) ? 0 : chunk( 20, 4 ).be32() );
 }
 
 void MessageParser::parse( const string & buf )
