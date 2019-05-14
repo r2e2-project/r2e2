@@ -47,7 +47,7 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
-constexpr size_t UDP_MTU_BYTES{1'400};
+constexpr size_t UDP_MTU_BYTES{1'350};
 constexpr milliseconds PEER_CHECK_INTERVAL{250};
 constexpr milliseconds HANDLE_ACKS_INTERVAL{50};
 constexpr milliseconds WORKER_STATS_INTERVAL{1'000};
@@ -440,7 +440,7 @@ ResultType LambdaWorker::handleOutQueue() {
 
         while (!outRays.empty() || !unpackedRayStr.empty()) {
             ostringstream oss;
-            size_t packetLen = 26;
+            size_t packetLen = 25;
             size_t rayCount = 0;
 
             vector<unique_ptr<RayState>> trackedRays;
@@ -449,6 +449,8 @@ ResultType LambdaWorker::handleOutQueue() {
                 protobuf::RecordWriter writer{&oss};
 
                 if (!unpackedRayStr.empty()) {
+                    rayCount++;
+                    packetLen = unpackedRayStr.length() + 4;
                     writer.write(unpackedRayStr);
 
                     if (unpackedRayPtr->trackRay) {
@@ -456,7 +458,6 @@ ResultType LambdaWorker::handleOutQueue() {
                     }
 
                     unpackedRayStr.clear();
-                    rayCount++;
                 }
 
                 while (packetLen < UDP_MTU_BYTES && !outRays.empty()) {
@@ -468,6 +469,7 @@ ResultType LambdaWorker::handleOutQueue() {
                     logRayAction(*ray, RayAction::Queued);
 
                     const size_t len = rayStr.length() + 4;
+
                     if (len + packetLen > UDP_MTU_BYTES) {
                         unpackedRayStr.swap(rayStr);
                         unpackedRayPtr = move(ray);
