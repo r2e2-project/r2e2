@@ -257,12 +257,13 @@ void LambdaWorker::logPacket(const uint64_t sequenceNumber,
     switch (action) {
     case PacketAction::Queued:
     case PacketAction::Sent:
-    case PacketAction::AckReceived:
+    case PacketAction::Acked:
+    case PacketAction::AckSent:
         packetsLogOstream << *workerId << ',' << otherParty << ',';
         break;
 
     case PacketAction::Received:
-    case PacketAction::Acked:
+    case PacketAction::AckReceived:
         packetsLogOstream << otherParty << ',' << *workerId << ',';
         break;
 
@@ -283,6 +284,7 @@ void LambdaWorker::logPacket(const uint64_t sequenceNumber,
     case PacketAction::Sent:        packetsLogOstream << "Sent";        break;
     case PacketAction::Received:    packetsLogOstream << "Received";    break;
     case PacketAction::Acked:       packetsLogOstream << "Acked";       break;
+    case PacketAction::AckSent:     packetsLogOstream << "AckSent";     break;
     case PacketAction::AckReceived: packetsLogOstream << "AckReceived"; break;
 
     default: throw runtime_error("invalid packet action");
@@ -677,25 +679,23 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         auto& received = receivedKv.second;
         string ack;
         const auto destId = addressToWorker[receivedKv.first];
-        vector<pair<uint64_t, uint16_t>> trackedSeqNos;
 
         for (size_t i = 0; i < received.size(); i++) {
             ack += put_field(get<0>(received[i]));
             ack += put_field(get<1>(received[i]));
             ack += put_field(get<2>(received[i]));
 
-            if (get<1>(received[i])) {
-                trackedSeqNos.emplace_back(get<0>(received[i]),
-                                           get<2>(received[i]));
-            }
-
-            const auto myAckId = ackId++;
-
             if (ack.length() >= UDP_MTU_BYTES or i == received.size() - 1) {
-                Message msg{*workerId, OpCode::Ack, move(ack), false, myAckId};
-                ServicePacket servicePacket{receivedKv.first, destId,
-                                            move(msg.str()), true, myAckId};
-                servicePacket.trackedSeqNos = move(trackedSeqNos);
+                const auto myAckId = ackId++;
+                const bool tracked = packetLogBD(randEngine);
+
+                Message msg(*workerId, OpCode::Ack, move(ack), false, myAckId,
+                            tracked);
+
+                ServicePacket servicePacket(receivedKv.first, destId,
+                                            move(msg.str()), true, myAckId,
+                                            tracked);
+
                 servicePackets.push_back(move(servicePacket));
 
                 ack = {};
@@ -752,11 +752,9 @@ ResultType LambdaWorker::handleUdpSend() {
         auto& datagram = servicePackets.front();
         sendUdpPacket(datagram.destination, datagram.data);
 
-        if (datagram.ackPacket && !datagram.trackedSeqNos.empty()) {
-            for (const auto seqNo : datagram.trackedSeqNos) {
-                logPacket(seqNo.first, seqNo.second, PacketAction::Acked,
-                          datagram.destinationId, datagram.data.length());
-            }
+        if (datagram.ackPacket && datagram.tracked) {
+            logPacket(datagram.ackId, 0, PacketAction::AckSent,
+                      datagram.destinationId, datagram.data.length());
         }
 
         servicePackets.pop_front();
@@ -838,6 +836,12 @@ ResultType LambdaWorker::handleUdpReceive() {
             Chunk chunk(it->payload());
             auto& thisReceivedAcks = receivedAcks[datagram.first];
 
+            if (it->tracked()) {
+                logPacket(it->sequence_number(), it->attempt(),
+                          PacketAction::AckReceived, it->sender_id(),
+                          it->total_length(), 0u);
+            }
+
             while (chunk.size()) {
                 const auto seqNo = chunk.be64();
                 thisReceivedAcks.insert(seqNo);
@@ -850,7 +854,7 @@ ResultType LambdaWorker::handleUdpReceive() {
                 chunk = chunk(2);
 
                 if (tracked) {
-                    logPacket(seqNo, attempt, PacketAction::AckReceived,
+                    logPacket(seqNo, attempt, PacketAction::Acked,
                               it->sender_id(), 0u);
                 }
             }

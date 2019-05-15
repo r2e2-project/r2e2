@@ -68,16 +68,17 @@ class LambdaWorker {
         std::string data;
         bool ackPacket;
         uint64_t ackId;
-        std::vector<std::pair<uint64_t, uint16_t>> trackedSeqNos{};
+        bool tracked;
 
         ServicePacket(const Address& addr, const WorkerId destId,
                       std::string&& data, const bool ackPacket = false,
-                      const uint64_t ackId = 0)
+                      const uint64_t ackId = 0, const bool tracked = false)
             : destination(addr),
               destinationId(destId),
               data(move(data)),
               ackPacket(ackPacket),
-              ackId(ackId) {}
+              ackId(ackId),
+              tracked(tracked) {}
     };
 
     struct RayPacket {
@@ -131,7 +132,14 @@ class LambdaWorker {
         Finished
     };
 
-    enum class PacketAction { Queued, Sent, Received, Acked, AckReceived };
+    enum class PacketAction {
+        Queued,
+        Sent,
+        Received,
+        AckSent,
+        AckReceived,
+        Acked
+    };
 
     bool processMessage(const meow::Message& message);
     void initializeScene();
