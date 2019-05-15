@@ -67,14 +67,17 @@ class LambdaWorker {
         WorkerId destinationId;
         std::string data;
         bool ackPacket;
+        uint64_t ackId;
         std::vector<std::pair<uint64_t, uint16_t>> trackedSeqNos{};
 
         ServicePacket(const Address& addr, const WorkerId destId,
-                      std::string&& data, const bool ackPacket = false)
+                      std::string&& data, const bool ackPacket = false,
+                      const uint64_t ackId = 0)
             : destination(addr),
               destinationId(destId),
               data(move(data)),
-              ackPacket(ackPacket) {}
+              ackPacket(ackPacket),
+              ackId(ackId) {}
     };
 
     struct RayPacket {
@@ -208,6 +211,7 @@ class LambdaWorker {
     const FinishedRayAction finishedRayAction;
 
     /* Sending rays to other nodes */
+    uint64_t ackId{0};
     UDPConnection udpConnection{true};
     std::deque<ServicePacket> servicePackets{};
 

@@ -689,10 +689,12 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                                            get<2>(received[i]));
             }
 
+            const auto myAckId = ackId++;
+
             if (ack.length() >= UDP_MTU_BYTES or i == received.size() - 1) {
-                Message msg{*workerId, OpCode::Ack, move(ack)};
+                Message msg{*workerId, OpCode::Ack, move(ack), false, myAckId};
                 ServicePacket servicePacket{receivedKv.first, destId,
-                                            move(msg.str()), true};
+                                            move(msg.str()), true, myAckId};
                 servicePacket.trackedSeqNos = move(trackedSeqNos);
                 servicePackets.push_back(move(servicePacket));
 
