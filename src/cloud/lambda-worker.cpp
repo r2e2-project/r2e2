@@ -50,6 +50,7 @@ using PollerResult = Poller::Result::Type;
 constexpr size_t UDP_MTU_BYTES{1'350};
 constexpr milliseconds PEER_CHECK_INTERVAL{250};
 constexpr milliseconds HANDLE_ACKS_INTERVAL{50};
+constexpr milliseconds HANDLE_OUT_QUEUE_INTERVAL{100};
 constexpr milliseconds WORKER_STATS_INTERVAL{1'000};
 constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr milliseconds KEEP_ALIVE_INTERVAL{40'000};
@@ -75,6 +76,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       peerTimer(PEER_CHECK_INTERVAL),
       workerStatsTimer(WORKER_STATS_INTERVAL),
       workerDiagnosticsTimer(WORKER_DIAGNOSTICS_INTERVAL),
+      outQueueTimer(HANDLE_OUT_QUEUE_INTERVAL),
       finishedPathsTimer(FINISHED_PATHS_INTERVAL),
       handleRayAcknowledgementsTimer(HANDLE_ACKS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
@@ -164,10 +166,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("ray queue failed"); }));
 
     /* send processed rays */
-    loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaWorker::handleOutQueue, this),
-        [this]() { return outQueueSize > 0; },
-        []() { throw runtime_error("out queue failed"); }));
+    loop.poller().add_action(
+        Poller::Action(outQueueTimer.fd, Direction::In,
+                       bind(&LambdaWorker::handleOutQueue, this),
+                       [this]() { return outQueueSize > 0; },
+                       []() { throw runtime_error("out queue failed"); }));
 
     /* send finished rays */
     /* FIXME we're throwing out finished rays, for now */
@@ -422,6 +425,8 @@ ResultType LambdaWorker::handleRayQueue() {
 
 ResultType LambdaWorker::handleOutQueue() {
     RECORD_INTERVAL("handleOutQueue");
+
+    outQueueTimer.reset();
 
     for (auto& q : outQueue) {
         if (q.second.empty()) continue;
@@ -684,7 +689,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                                            get<2>(received[i]));
             }
 
-            if (ack.length() >= 1'400 or i == received.size() - 1) {
+            if (ack.length() >= UDP_MTU_BYTES or i == received.size() - 1) {
                 Message msg{*workerId, OpCode::Ack, move(ack)};
                 ServicePacket servicePacket{receivedKv.first, destId,
                                             move(msg.str()), true};

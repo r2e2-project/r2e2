@@ -257,6 +257,7 @@ class LambdaWorker {
     TimerFD peerTimer;
     TimerFD workerStatsTimer;
     TimerFD workerDiagnosticsTimer;
+    TimerFD outQueueTimer;
     TimerFD finishedPathsTimer;
     TimerFD handleRayAcknowledgementsTimer;
 
