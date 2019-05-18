@@ -55,7 +55,7 @@ constexpr milliseconds WORKER_STATS_INTERVAL{1'000};
 constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr milliseconds KEEP_ALIVE_INTERVAL{40'000};
 constexpr milliseconds FINISHED_PATHS_INTERVAL{2'500};
-constexpr milliseconds PACKET_TIMEOUT{2'000};
+constexpr milliseconds PACKET_TIMEOUT{1'00};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
