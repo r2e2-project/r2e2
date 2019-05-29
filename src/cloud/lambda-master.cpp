@@ -688,7 +688,8 @@ void LambdaMaster::run() {
     /* request launching the lambdas */
     StatusBar::get();
 
-    constexpr size_t EXTRA_LAMBDAS = 100;
+    /* Ask for 10% more lambdas */
+    const size_t EXTRA_LAMBDAS = numberOfLambdas * 0.1;
 
     cerr << "Job ID: " << jobId << endl;
     cerr << "Launching " << numberOfLambdas << " (+" << EXTRA_LAMBDAS
