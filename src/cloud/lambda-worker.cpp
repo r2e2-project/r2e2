@@ -60,19 +60,12 @@ constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const uint16_t coordinatorPort,
-                           const string& storageUri, const bool sendReliably,
-                           const int samplesPerPixel,
-                           const FinishedRayAction finishedRayAction,
-                           const float rayActionsLogRate,
-                           const float packetsLogRate)
-    : rayActionsLogRate(rayActionsLogRate),
-      packetsLogRate(packetsLogRate),
-      sendReliably(sendReliably),
+                           const string& storageUri,
+                           const WorkerConfiguration& config)
+    : config(config),
       coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
       storageBackend(StorageBackend::create_backend(storageUri)),
-      finishedRayAction(finishedRayAction),
-      samplesPerPixel(samplesPerPixel),
       peerTimer(PEER_CHECK_INTERVAL),
       workerStatsTimer(WORKER_STATS_INTERVAL),
       workerDiagnosticsTimer(WORKER_DIAGNOSTICS_INTERVAL),
@@ -178,7 +171,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         dummyFD, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
         [this]() {
             // clang-format off
-            switch (this->finishedRayAction) {
+            switch (this->config.finishedRayAction) {
             case FinishedRayAction::Discard: return finishedQueue.size() > 1000;
             case FinishedRayAction::SendBack: return !finishedQueue.empty();
             default: return false;
@@ -504,8 +497,8 @@ ResultType LambdaWorker::handleOutQueue() {
                 treeletId,
                 rayCount,
                 Message::str(*workerId, OpCode::SendRays, oss.str(),
-                             sendReliably, peerSeqNo, tracked),
-                sendReliably,
+                             config.sendReliably, peerSeqNo, tracked),
+                config.sendReliably,
                 peerSeqNo,
                 tracked};
 
@@ -555,7 +548,7 @@ ResultType LambdaWorker::handleFinishedQueue() {
         return proto;
     };
 
-    switch (finishedRayAction) {
+    switch (config.finishedRayAction) {
     case FinishedRayAction::Discard:
         finishedQueue.clear();
         break;
@@ -930,7 +923,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
     const Float rayScale = 1 / sqrt((Float)samplesPerPixel);
 
     /* for ray tracking */
-    bernoulli_distribution bd{rayActionsLogRate};
+    bernoulli_distribution bd{config.rayActionsLogRate};
 
     for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
         for (const Point2i pixel : bounds) {
@@ -945,7 +938,8 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
             state.trackRay = trackRays ? bd(randEngine) : false;
             state.sample.id =
-                (pixel.x + pixel.y * sampleExtent.x) * samplesPerPixel + sample;
+                (pixel.x + pixel.y * sampleExtent.x) * config.samplesPerPixel +
+                sample;
             state.sample.num = sample;
             state.sample.pixel = pixel;
             state.sample.pFilm = cameraSample.pFilm;
@@ -1215,7 +1209,7 @@ void LambdaWorker::loadSampler() {
     auto reader = manager.GetReader(ObjectType::Sampler);
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);
-    sampler = sampler::from_protobuf(proto_sampler, samplesPerPixel);
+    sampler = sampler::from_protobuf(proto_sampler, config.samplesPerPixel);
 
     /* if (workerId.initialized()) {
         sampler = sampler->Clone(*workerId);
@@ -1302,6 +1296,7 @@ int main(int argc, char* argv[]) {
     uint16_t listenPort = 50000;
     string publicIp;
     string storageUri;
+
     bool sendReliably = false;
     int samplesPerPixel = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
@@ -1350,11 +1345,12 @@ int main(int argc, char* argv[]) {
     }
 
     unique_ptr<LambdaWorker> worker;
+    WorkerConfiguration config{sendReliably, samplesPerPixel, finishedRayAction,
+                               rayActionsLogRate, packetsLogRate};
 
     try {
-        worker = make_unique<LambdaWorker>(
-            publicIp, listenPort, storageUri, sendReliably, samplesPerPixel,
-            finishedRayAction, rayActionsLogRate, packetsLogRate);
+        worker =
+            make_unique<LambdaWorker>(publicIp, listenPort, storageUri, config);
         worker->run();
     } catch (const exception& e) {
         LOG(INFO) << argv[0] << ": " << e.what();

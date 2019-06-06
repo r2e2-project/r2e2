@@ -29,14 +29,20 @@
 
 namespace pbrt {
 
+struct WorkerConfiguration {
+    bool sendReliably;
+    int samplesPerPixel;
+    FinishedRayAction finishedRayAction;
+    float rayActionsLogRate;
+    float packetsLogRate;
+};
+
 class LambdaWorker {
   public:
     LambdaWorker(const std::string& coordinatorIP,
                  const uint16_t coordinatorPort,
-                 const std::string& storageBackendUri, const bool sendReliably,
-                 const int samplesPerPixel,
-                 const FinishedRayAction finishedRayAction,
-                 const float rayActionsLogRate, const float packetsLogRate);
+                 const std::string& storageBackendUri,
+                 const WorkerConfiguration& config);
 
     void run();
     void terminate() { terminated = true; }
@@ -180,6 +186,13 @@ class LambdaWorker {
                    const PacketAction action, const WorkerId otherParty,
                    const size_t packetSize, const size_t numRays = 0);
 
+
+    ////////////////////////////////////////////////////////////////////////////
+    // MEMBER VARIABLES                                                       //
+    ////////////////////////////////////////////////////////////////////////////
+
+    const WorkerConfiguration config;
+
     /* Logging & Diagnostics */
     const std::string logBase{"pbrt-worker"};
     const std::string infoLogName{logBase + ".INFO"};
@@ -190,18 +203,15 @@ class LambdaWorker {
     std::ofstream diagnosticsOstream{};
     std::ofstream rayActionsOstream{};
     std::ofstream packetsLogOstream{};
-    const float rayActionsLogRate;
-    const float packetsLogRate;
-    const bool trackRays{rayActionsLogRate > 0};
-    const bool trackPackets{packetsLogRate > 0};
+    const bool trackRays{config.rayActionsLogRate > 0};
+    const bool trackPackets{config.packetsLogRate > 0};
 
     std::mt19937 randEngine{std::random_device{}()};
-    std::bernoulli_distribution packetLogBD{packetsLogRate};
+    std::bernoulli_distribution packetLogBD{config.packetsLogRate};
 
     WorkerStats workerStats;
     WorkerDiagnostics lastDiagnostics;
 
-    const bool sendReliably;
     const Address coordinatorAddr;
     const UniqueDirectory workingDirectory;
     ExecutionLoop loop{};
@@ -214,9 +224,7 @@ class LambdaWorker {
     std::map<WorkerId, Worker> peers{};
     std::map<Address, WorkerId> addressToWorker{};
     int32_t mySeed;
-    bool peerRequested{false};
     std::string outputName;
-    const FinishedRayAction finishedRayAction;
 
     /* Sending rays to other nodes */
     uint64_t ackId{0};
@@ -238,7 +246,6 @@ class LambdaWorker {
     /* Scene Data */
     const uint8_t maxDepth{5};
     bool initialized{false};
-    int samplesPerPixel{0};
     std::vector<std::unique_ptr<Transform>> transformCache{};
     std::shared_ptr<Camera> camera{};
     std::unique_ptr<FilmTile> filmTile{};
