@@ -67,7 +67,8 @@ class UDPConnection {
     std::chrono::microseconds reference_reset_time_{1'000'000};
 
   public:
-    UDPConnection(const bool pacing = false) : pacing_(pacing) {
+    UDPConnection(const bool pacing = false, const uint64_t rate_mbps = 80)
+        : pacing_(pacing), rate_Mb_per_s_(rate_mbps) {
         socket_.set_blocking(false);
     }
 
