@@ -830,7 +830,7 @@ void LambdaMaster::aggregateQueueStats() {
 }
 
 void usage(const char *argv0, int exitCode) {
-    cerr << "Usage: " << argv0 << " [OPTIONS]" << endl
+    cerr << "Usage: " << argv0 << " [OPTION]... [TASK]" << endl
          << endl
          << "Options:" << endl
          << "  -s --scene-path PATH       path to scene dump" << endl
@@ -900,6 +900,7 @@ int main(int argc, char *argv[]) {
     float packetsLogRate = 0.0;
     string logsDirectory = "logs/";
     Optional<Bounds2i> cropWindow;
+    Task task = Task::RayTracing;
 
     int assignment = Assignment::Uniform;
     int samplesPerPixel = 0;
@@ -998,6 +999,17 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (optind < argc) {
+        const string taskStr{argv[optind++]};
+        if (taskStr == "raytrace") {
+            task = Task::RayTracing;
+        } else if (taskStr == "netbench") {
+            task = Task::NetworkTest;
+        } else {
+            usage(argv[0], EXIT_FAILURE);
+        }
+    }
+
     if (scene.empty() || listenPort == 0 || numLambdas < 0 ||
         samplesPerPixel < 0 || rayActionsLogRate < 0 ||
         rayActionsLogRate > 1.0 || packetsLogRate < 0 || packetsLogRate > 1.0 ||
@@ -1010,11 +1022,18 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {
-        assignment,         finishedRayAction, sendReliably,
-        samplesPerPixel,    collectDebugLogs,  collectDiagnostics,
-        collectWorkerStats, rayActionsLogRate, packetsLogRate,
-        logsDirectory,      cropWindow};
+    MasterConfiguration config = {task,
+                                  assignment,
+                                  finishedRayAction,
+                                  sendReliably,
+                                  samplesPerPixel,
+                                  collectDebugLogs,
+                                  collectDiagnostics,
+                                  collectWorkerStats,
+                                  rayActionsLogRate,
+                                  packetsLogRate,
+                                  logsDirectory,
+                                  cropWindow};
 
     try {
         master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,

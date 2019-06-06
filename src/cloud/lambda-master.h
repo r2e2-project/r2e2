@@ -39,9 +39,16 @@ struct Assignment {
     static constexpr int Uniform    = (1 << 3);
     // clang-format on
 };
+
 enum class FinishedRayAction { Discard, SendBack, Upload };
 
+enum class Task {
+  RayTracing,
+  NetworkTest,
+};
+
 struct MasterConfiguration {
+    Task task;
     int assignment; /* look at `struct Assignment` */
     FinishedRayAction finishedRayAction;
     bool sendReliably;
