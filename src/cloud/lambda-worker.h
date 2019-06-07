@@ -157,6 +157,21 @@ class LambdaWorker {
         Acked
     };
 
+    enum class Event {
+        RayQueue,
+        OutQueue,
+        FinishedQueue,
+        FinishedPaths,
+        Peers,
+        Messages,
+        NeededTreelets,
+        UdpSend,
+        UdpReceive,
+        RayAcks,
+        WorkerStats,
+        Diagnostics,
+    };
+
     bool processMessage(const meow::Message& message);
     void initializeScene();
 
@@ -218,6 +233,7 @@ class LambdaWorker {
     const Address coordinatorAddr;
     const UniqueDirectory workingDirectory;
     ExecutionLoop loop{};
+    std::map<Event, uint64_t> eventAction{};
     std::unique_ptr<StorageBackend> storageBackend;
     std::shared_ptr<TCPConnection> coordinatorConnection;
     meow::MessageParser messageParser{};

@@ -108,12 +108,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { LOG(INFO) << "Connection to coordinator failed."; },
         [this]() { this->terminate(); });
 
-    loop.poller().add_action(Poller::Action(
+    eventAction[Event::UdpReceive] = loop.poller().add_action(Poller::Action(
         udpConnection.socket(), Direction::In,
         bind(&LambdaWorker::handleUdpReceive, this), [this]() { return true; },
         []() { throw runtime_error("udp in failed"); }));
 
-    loop.poller().add_action(Poller::Action(
+    eventAction[Event::RayAcks] = loop.poller().add_action(Poller::Action(
         handleRayAcknowledgementsTimer.fd, Direction::In,
         bind(&LambdaWorker::handleRayAcknowledgements, this),
         [this]() {
@@ -123,7 +123,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         },
         []() { throw runtime_error("acks failed"); }));
 
-    loop.poller().add_action(Poller::Action(
+    eventAction[Event::UdpSend] = loop.poller().add_action(Poller::Action(
         udpConnection.socket(), Direction::Out,
         bind(&LambdaWorker::handleUdpSend, this),
         [this]() {
@@ -133,13 +133,13 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("udp out failed"); }));
 
     /* trace rays */
-    loop.poller().add_action(Poller::Action(
+    eventAction[Event::RayQueue] = loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleRayQueue, this),
         [this]() { return !rayQueue.empty(); },
         []() { throw runtime_error("ray queue failed"); }));
 
     /* send processed rays */
-    loop.poller().add_action(
+    eventAction[Event::OutQueue] = loop.poller().add_action(
         Poller::Action(outQueueTimer.fd, Direction::In,
                        bind(&LambdaWorker::handleOutQueue, this),
                        [this]() { return outQueueSize > 0; },
@@ -147,12 +147,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     /* send finished rays */
     /* FIXME we're throwing out finished rays, for now */
-    loop.poller().add_action(Poller::Action(
+    eventAction[Event::FinishedQueue] = loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
         [this]() {
             // clang-format off
             switch (this->config.finishedRayAction) {
-            case FinishedRayAction::Discard: return finishedQueue.size() > 1000;
+            case FinishedRayAction::Discard: return finishedQueue.size() > 5000;
             case FinishedRayAction::SendBack: return !finishedQueue.empty();
             default: return false;
             }
@@ -161,16 +161,28 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("finished queue failed"); }));
 
     /* handle peers */
-    loop.poller().add_action(Poller::Action(
+    eventAction[Event::Peers] = loop.poller().add_action(Poller::Action(
         peerTimer.fd, Direction::In, bind(&LambdaWorker::handlePeers, this),
         [this]() { return !peers.empty(); },
         []() { throw runtime_error("peers failed"); }));
 
     /* handle received messages */
-    loop.poller().add_action(Poller::Action(
+    eventAction[Event::Messages] = loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaWorker::handleMessages, this),
         [this]() { return !messageParser.empty(); },
         []() { throw runtime_error("messages failed"); }));
+
+    /* send updated stats */
+    eventAction[Event::UdpReceive] = loop.poller().add_action(Poller::Action(
+        workerStatsTimer.fd, Direction::In,
+        bind(&LambdaWorker::handleWorkerStats, this), [this]() { return true; },
+        []() { throw runtime_error("worker stats failed"); }));
+
+    /* record diagnostics */
+    eventAction[Event::Diagnostics] = loop.poller().add_action(Poller::Action(
+        workerDiagnosticsTimer.fd, Direction::In,
+        bind(&LambdaWorker::handleDiagnostics, this), [this]() { return true; },
+        []() { throw runtime_error("handle diagnostics failed"); }));
 
     /* request new peers for neighboring treelets */
     /* loop.poller().add_action(Poller::Action(
@@ -179,25 +191,13 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return !neededTreelets.empty(); },
         []() { throw runtime_error("treelet request failed"); })); */
 
-    /* send updated stats */
-    loop.poller().add_action(Poller::Action(
-        workerStatsTimer.fd, Direction::In,
-        bind(&LambdaWorker::handleWorkerStats, this), [this]() { return true; },
-        []() { throw runtime_error("worker stats failed"); }));
-
     /* send back finished paths */
     /* loop.poller().add_action(
         Poller::Action(finishedPathsTimer.fd, Direction::In,
                        bind(&LambdaWorker::handleFinishedPaths, this),
                        [this]() { return !finishedPathIds.empty(); },
-                       []() { throw runtime_error("finished paths failed"); }));
-     */
-
-    /* record diagnostics */
-    loop.poller().add_action(Poller::Action(
-        workerDiagnosticsTimer.fd, Direction::In,
-        bind(&LambdaWorker::handleDiagnostics, this), [this]() { return true; },
-        []() { throw runtime_error("handle diagnostics failed"); }));
+                       []() { throw runtime_error("finished paths failed");
+       }));*/
 
     coordinatorConnection->enqueue_write(
         Message::str(0, OpCode::Hey, safe_getenv_or(LOG_STREAM_ENVAR, "")));
