@@ -20,6 +20,8 @@ class Poller
 public:
   struct Action
   {
+    static uint64_t current_id;
+
     struct Result
     {
       enum class Type { Continue, Exit, Cancel, CancelAll } result;
@@ -30,6 +32,7 @@ public:
 
     typedef std::function<Result(void)> CallbackType;
 
+    uint64_t id { current_id++ };
     FileDescriptor & fd;
     enum PollDirection : short { In = POLLIN, Out = POLLOUT } direction;
     CallbackType callback;
@@ -71,7 +74,7 @@ public:
 
   Poller() {}
 
-  void add_action( Action action );
+  uint64_t add_action( Action action );
   Result poll( const int timeout_ms );
 
   /* remove all actions for file descriptors in `fd_nums` */

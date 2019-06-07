@@ -12,11 +12,14 @@
 using namespace std;
 using namespace PollerShortNames;
 
-void Poller::add_action( Poller::Action action )
+uint64_t Poller::Action::current_id = 0;
+
+uint64_t Poller::add_action( Poller::Action action )
 {
   /* the action won't be actually added until the next poll() function call.
      this allows us to call add_action inside the callback functions */
   action_add_queue_.push( action );
+  return action.id;
 }
 
 unsigned int Poller::Action::service_count( void ) const
