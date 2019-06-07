@@ -717,28 +717,11 @@ void LambdaMaster::run() {
         worker.connection->socket().close();
         worker.statsOstream.close();
 
-        if (config.collectDebugLogs) {
+        if (config.collectDebugLogs || config.collectDiagnostics ||
+            config.rayActionsLogRate || config.packetsLogRate) {
             getRequests.emplace_back(
                 logPrefix + to_string(worker.id) + ".INFO",
                 config.logsDirectory + "/" + to_string(worker.id) + ".INFO");
-        }
-
-        if (config.collectDiagnostics) {
-            getRequests.emplace_back(
-                logPrefix + to_string(worker.id) + ".DIAG",
-                config.logsDirectory + "/" + to_string(worker.id) + ".DIAG");
-        }
-
-        if (config.rayActionsLogRate) {
-            getRequests.emplace_back(
-                logPrefix + to_string(worker.id) + ".RAYS",
-                config.logsDirectory + "/" + to_string(worker.id) + ".RAYS");
-        }
-
-        if (config.packetsLogRate) {
-            getRequests.emplace_back(
-                logPrefix + to_string(worker.id) + ".PACKETS",
-                config.logsDirectory + "/" + to_string(worker.id) + ".PACKETS");
         }
     }
 

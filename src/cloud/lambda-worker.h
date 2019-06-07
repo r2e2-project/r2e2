@@ -197,13 +197,7 @@ class LambdaWorker {
     /* Logging & Diagnostics */
     const std::string logBase{"pbrt-worker"};
     const std::string infoLogName{logBase + ".INFO"};
-    const std::string diagnosticsName{logBase + ".DIAG"};
-    const std::string rayActionsName{logBase + ".RAYS"};
-    const std::string packetsLogName{logBase + ".PACKETS"};
     std::string logPrefix{"logs/"};
-    std::ofstream diagnosticsOstream{};
-    std::ofstream rayActionsOstream{};
-    std::ofstream packetsLogOstream{};
     const bool trackRays{config.rayActionsLogRate > 0};
     const bool trackPackets{config.packetsLogRate > 0};
 

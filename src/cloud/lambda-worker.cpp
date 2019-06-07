@@ -58,6 +58,8 @@ constexpr milliseconds FINISHED_PATHS_INTERVAL{2'500};
 constexpr milliseconds PACKET_TIMEOUT{100};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
+#define TLOG(tag) LOG(INFO) << "[" #tag "] "
+
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const uint16_t coordinatorPort,
                            const string& storageUri,
@@ -74,33 +76,26 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       handleRayAcknowledgementsTimer(HANDLE_ACKS_INTERVAL) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
 
-    LOG(INFO) << "WORKER UP";
-
     roost::chdir(workingDirectory.name());
 
     FLAGS_log_dir = ".";
+    FLAGS_log_prefix = false;
     google::InitGoogleLogging(logBase.c_str());
-    diagnosticsOstream.open(diagnosticsName, ios::out | ios::trunc);
 
-    diagnosticsOstream << "start "
-                       << duration_cast<microseconds>(
-                              workerDiagnostics.startTime.time_since_epoch())
-                              .count()
-                       << endl;
+    TLOG(DIAG) << "start "
+               << duration_cast<microseconds>(
+                      workerDiagnostics.startTime.time_since_epoch())
+                      .count();
 
     if (trackRays) {
-        rayActionsOstream.open(rayActionsName, ios::out | ios::trunc);
-        rayActionsOstream
+        TLOG(RAY)
             << "x,y,sample,bounce,hop,tick,shadowRay,workerID,otherPartyID,"
-               "treeletID,timestamp,size,action"
-            << endl;
+               "treeletID,timestamp,size,action";
     }
 
     if (trackPackets) {
-        packetsLogOstream.open(packetsLogName, ios::out | ios::trunc);
-        packetsLogOstream << "sourceID,destinationID,seqNo,attempt,size,"
-                             "rayCount,timestamp,action"
-                          << endl;
+        TLOG(PACKET) << "sourceID,destinationID,seqNo,attempt,size,"
+                        "rayCount,timestamp,action";
     }
 
     PbrtOptions.nThreads = 1;
@@ -248,84 +243,87 @@ void LambdaWorker::logPacket(const uint64_t sequenceNumber,
                              const size_t numRays) {
     if (!trackPackets) return;
 
+    ostringstream oss;
+
     switch (action) {
     case PacketAction::Queued:
     case PacketAction::Sent:
     case PacketAction::Acked:
     case PacketAction::AckSent:
-        packetsLogOstream << *workerId << ',' << otherParty << ',';
+        oss << *workerId << ',' << otherParty << ',';
         break;
 
     case PacketAction::Received:
     case PacketAction::AckReceived:
-        packetsLogOstream << otherParty << ',' << *workerId << ',';
+        oss << otherParty << ',' << *workerId << ',';
         break;
 
     default:
         throw runtime_error("invalid packet action");
     }
 
-    packetsLogOstream << sequenceNumber << ',' << attempt << ',' << packetSize
-                      << ',' << numRays << ','
-                      << duration_cast<microseconds>(
-                             rays_clock::now().time_since_epoch())
-                             .count()
-                      << ',';
+    oss << sequenceNumber << ',' << attempt << ',' << packetSize << ','
+        << numRays << ','
+        << duration_cast<microseconds>(rays_clock::now().time_since_epoch())
+               .count()
+        << ',';
 
     // clang-format off
     switch (action) {
-    case PacketAction::Queued:      packetsLogOstream << "Queued";      break;
-    case PacketAction::Sent:        packetsLogOstream << "Sent";        break;
-    case PacketAction::Received:    packetsLogOstream << "Received";    break;
-    case PacketAction::Acked:       packetsLogOstream << "Acked";       break;
-    case PacketAction::AckSent:     packetsLogOstream << "AckSent";     break;
-    case PacketAction::AckReceived: packetsLogOstream << "AckReceived"; break;
+    case PacketAction::Queued:      oss << "Queued";      break;
+    case PacketAction::Sent:        oss << "Sent";        break;
+    case PacketAction::Received:    oss << "Received";    break;
+    case PacketAction::Acked:       oss << "Acked";       break;
+    case PacketAction::AckSent:     oss << "AckSent";     break;
+    case PacketAction::AckReceived: oss << "AckReceived"; break;
 
     default: throw runtime_error("invalid packet action");
     }
     // clang-format on
 
-    packetsLogOstream << endl;
+    TLOG(PACKET) << oss.str();
 }
 
 void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                 const WorkerId otherParty) {
     if (!trackRays || !state.trackRay) return;
 
+    ostringstream oss;
+
     // clang-format off
     // x,y,sample,bounce,hop,tick,shadowRay,workerID,otherPartyID,treeletID,timestamp,size,action
-    rayActionsOstream << state.sample.pixel.x << ','
-                      << state.sample.pixel.y << ','
-                      << state.sample.num << ','
-                      << (maxDepth - state.remainingBounces) << ','
-                      << state.hop << ','
-                      << state.tick << ','
-                      << state.isShadowRay << ','
-                      << *workerId << ','
-                      << ((action == RayAction::Sent ||
-                           action == RayAction::Received) ? otherParty
-                                                          : *workerId) << ','
-                      << state.CurrentTreelet() << ','
-                      << duration_cast<microseconds>(
-                            rays_clock::now().time_since_epoch()).count() << ','
-                      << state.Size() << ',';
+    oss << state.sample.pixel.x << ','
+        << state.sample.pixel.y << ','
+        << state.sample.num << ','
+        << (maxDepth - state.remainingBounces) << ','
+        << state.hop << ','
+        << state.tick << ','
+        << state.isShadowRay << ','
+        << *workerId << ','
+        << ((action == RayAction::Sent ||
+             action == RayAction::Received) ? otherParty
+                                            : *workerId) << ','
+        << state.CurrentTreelet() << ','
+        << duration_cast<microseconds>(
+               rays_clock::now().time_since_epoch()).count() << ','
+        << state.Size() << ',';
     // clang-format on
 
     // clang-format off
     switch (action) {
-    case RayAction::Generated: rayActionsOstream << "Generated"; break;
-    case RayAction::Traced:    rayActionsOstream << "Traced";    break;
-    case RayAction::Queued:    rayActionsOstream << "Queued";    break;
-    case RayAction::Pending:   rayActionsOstream << "Pending";   break;
-    case RayAction::Sent:      rayActionsOstream << "Sent";      break;
-    case RayAction::Received:  rayActionsOstream << "Received";  break;
-    case RayAction::Finished:  rayActionsOstream << "Finished";  break;
+    case RayAction::Generated: oss << "Generated"; break;
+    case RayAction::Traced:    oss << "Traced";    break;
+    case RayAction::Queued:    oss << "Queued";    break;
+    case RayAction::Pending:   oss << "Pending";   break;
+    case RayAction::Sent:      oss << "Sent";      break;
+    case RayAction::Received:  oss << "Received";  break;
+    case RayAction::Finished:  oss << "Finished";  break;
 
     default: throw runtime_error("invalid ray action");
     }
     // clang-format on
 
-    rayActionsOstream << endl;
+    TLOG(RAY) << oss.str();
 }
 
 ResultType LambdaWorker::handleRayQueue() {
@@ -907,9 +905,8 @@ ResultType LambdaWorker::handleDiagnostics() {
         duration_cast<microseconds>(now() - workerDiagnostics.startTime)
             .count();
 
-    diagnosticsOstream << timestamp << " "
-                       << protoutil::to_json(to_protobuf(workerDiagnostics))
-                       << endl;
+    TLOG(DIAG) << timestamp << " "
+               << protoutil::to_json(to_protobuf(workerDiagnostics));
 
     workerDiagnostics.reset();
 
@@ -1251,23 +1248,9 @@ void LambdaWorker::uploadLogs() {
     if (!workerId.initialized()) return;
 
     google::FlushLogFiles(google::INFO);
-    diagnosticsOstream.close();
-    rayActionsOstream.close();
-    packetsLogOstream.close();
 
     vector<storage::PutRequest> putLogsRequest = {
-        {infoLogName, logPrefix + to_string(*workerId) + ".INFO"},
-        {diagnosticsName, logPrefix + to_string(*workerId) + ".DIAG"}};
-
-    if (trackRays) {
-        putLogsRequest.emplace_back(rayActionsName,
-                                    logPrefix + to_string(*workerId) + ".RAYS");
-    }
-
-    if (trackPackets) {
-        putLogsRequest.emplace_back(
-            packetsLogName, logPrefix + to_string(*workerId) + ".PACKETS");
-    }
+        {infoLogName, logPrefix + to_string(*workerId) + ".INFO"}};
 
     storageBackend->put(putLogsRequest);
 }
