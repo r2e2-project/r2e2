@@ -1280,6 +1280,7 @@ void usage(const char* argv0, int exitCode) {
          << "  -p --port PORT             port of coordinator" << endl
          << "  -s --storage-backend NAME  storage backend URI" << endl
          << "  -R --reliable-udp          send ray packets reliably" << endl
+         << "  -M --max-udp-rate RATE     maximum UDP rate (Mbps)" << endl
          << "  -S --samples N             number of samples per pixel" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
          << "  -P --log-packets RATE      log packets" << endl
@@ -1298,6 +1299,7 @@ int main(int argc, char* argv[]) {
     string storageUri;
 
     bool sendReliably = false;
+    uint64_t maxUdpRate = 80;
     int samplesPerPixel = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
     float rayActionsLogRate = 0.0;
@@ -1312,13 +1314,14 @@ int main(int argc, char* argv[]) {
         {"log-rays", required_argument, nullptr, 'L'},
         {"log-packets", required_argument, nullptr, 'P'},
         {"finished-ray", required_argument, nullptr, 'f'},
+        {"max-udp-rate", required_argument, nullptr, 'M'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
-        const int opt =
-            getopt_long(argc, argv, "p:i:s:S:f:L:P:hR", long_options, nullptr);
+        const int opt = getopt_long(argc, argv, "p:i:s:S:f:L:P:M:hR",
+                                    long_options, nullptr);
 
         if (opt == -1) break;
 
@@ -1328,6 +1331,7 @@ int main(int argc, char* argv[]) {
         case 'i': publicIp = optarg; break;
         case 's': storageUri = optarg; break;
         case 'R': sendReliably = true; break;
+        case 'M': maxUdpRate = stoull(optarg); break;
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'L': rayActionsLogRate = stof(optarg); break;
         case 'P': packetsLogRate = stof(optarg); break;
@@ -1340,12 +1344,13 @@ int main(int argc, char* argv[]) {
 
     if (listenPort == 0 || rayActionsLogRate < 0 || rayActionsLogRate > 1.0 ||
         packetsLogRate < 0 || packetsLogRate > 1.0 || publicIp.empty() ||
-        storageUri.empty()) {
+        storageUri.empty() || maxUdpRate == 0) {
         usage(argv[0], EXIT_FAILURE);
     }
 
     unique_ptr<LambdaWorker> worker;
-    WorkerConfiguration config{sendReliably, samplesPerPixel, finishedRayAction,
+    WorkerConfiguration config{sendReliably,      maxUdpRate,
+                               samplesPerPixel,   finishedRayAction,
                                rayActionsLogRate, packetsLogRate};
 
     try {

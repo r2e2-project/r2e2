@@ -31,6 +31,7 @@ namespace pbrt {
 
 struct WorkerConfiguration {
     bool sendReliably;
+    uint64_t maxUdpRate;
     int samplesPerPixel;
     FinishedRayAction finishedRayAction;
     float rayActionsLogRate;
@@ -228,7 +229,7 @@ class LambdaWorker {
 
     /* Sending rays to other nodes */
     uint64_t ackId{0};
-    UDPConnection udpConnection{true};
+    UDPConnection udpConnection{true, config.maxUdpRate};
     std::deque<ServicePacket> servicePackets{};
 
     /* outgoing rays */
