@@ -52,6 +52,7 @@ struct MasterConfiguration {
     int assignment; /* look at `struct Assignment` */
     FinishedRayAction finishedRayAction;
     bool sendReliably;
+    uint64_t maxUdpRate;
     int samplesPerPixel;
     bool collectDebugLogs;
     bool collectDiagnostics;

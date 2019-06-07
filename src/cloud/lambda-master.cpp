@@ -800,6 +800,7 @@ HTTPRequest LambdaMaster::generateRequest() {
     proto.set_storage_backend(storageBackendUri);
     proto.set_coordinator(publicAddress);
     proto.set_send_reliably(config.sendReliably);
+    proto.set_max_udp_rate(config.maxUdpRate);
     proto.set_samples_per_pixel(config.samplesPerPixel);
     proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
     proto.set_ray_actions_log_rate(config.rayActionsLogRate);
@@ -840,6 +841,8 @@ void usage(const char *argv0, int exitCode) {
          << "  -b --storage-backend NAME  storage backend URI" << endl
          << "  -l --lambdas N             how many lambdas to run" << endl
          << "  -R --reliable-udp          send ray packets reliably" << endl
+         << "  -M --max-udp-rate RATE     maximum UDP send rate for workers"
+         << endl
          << "  -g --debug-logs            collect worker debug logs" << endl
          << "  -w --worker-stats          dump worker stats" << endl
          << "  -d --diagnostics           collect worker diagnostics" << endl
@@ -893,6 +896,7 @@ int main(int argc, char *argv[]) {
     string storageBackendUri;
     string region{"us-west-2"};
     bool sendReliably = false;
+    uint64_t maxUdpRate = 80;
     bool collectWorkerStats = false;
     bool collectDiagnostics = false;
     bool collectDebugLogs = false;
@@ -916,6 +920,7 @@ int main(int argc, char *argv[]) {
         {"assignment", required_argument, nullptr, 'a'},
         {"finished-ray", required_argument, nullptr, 'f'},
         {"reliable-udp", no_argument, nullptr, 'R'},
+        {"max-udp-rate", required_argument, nullptr, 'M'},
         {"debug-logs", no_argument, nullptr, 'g'},
         {"worker-stats", no_argument, nullptr, 'w'},
         {"diagnostics", no_argument, nullptr, 'd'},
@@ -930,7 +935,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "s:p:i:r:b:l:whdD:a:S:f:L:c:P:Rg",
+            getopt_long(argc, argv, "s:p:i:r:b:l:whdD:a:S:f:L:c:P:M:Rg",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -940,6 +945,7 @@ int main(int argc, char *argv[]) {
         switch (opt) {
         // clang-format off
         case 'R': sendReliably = true; break;
+        case 'M': maxUdpRate = stoull(optarg); break;
         case 's': scene = optarg; break;
         case 'p': listenPort = stoi(optarg); break;
         case 'i': publicIp = optarg; break;
@@ -1026,6 +1032,7 @@ int main(int argc, char *argv[]) {
                                   assignment,
                                   finishedRayAction,
                                   sendReliably,
+                                  maxUdpRate,
                                   samplesPerPixel,
                                   collectDebugLogs,
                                   collectDiagnostics,

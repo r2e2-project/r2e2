@@ -40,6 +40,9 @@ def handler(event, context):
     if event['packetsLogRate']:
         command += ['--log-packets', str(event['packetsLogRate'])]
 
+    if event['maxUdpRate']:
+        command += ['--max-udp-rate', str(event['maxUdpRate'])]
+
     retcode = run_command(command)
     print("retcode={}".format(retcode))
 

@@ -229,10 +229,11 @@ message InvocationPayload {
     string storage_backend = 1;
     string coordinator = 2;
     bool send_reliably = 3;
-    int32 samples_per_pixel = 4;
-    uint32 finished_ray_action = 5;
-    float ray_actions_log_rate = 6;
-    float packets_log_rate = 7;
+    uint64 max_udp_rate = 4;
+    int32 samples_per_pixel = 5;
+    uint32 finished_ray_action = 6;
+    float ray_actions_log_rate = 7;
+    float packets_log_rate = 8;
 }
 
 message ObjectKey {
