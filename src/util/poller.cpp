@@ -137,3 +137,19 @@ void Poller::remove_actions( const set<int> & fd_nums )
     }
   }
 }
+
+void Poller::deactivate_actions( const set<uint64_t> & action_ids ) {
+  auto it_action = actions_.begin();
+  auto it_pollfd = pollfds_.begin();
+
+  while ( it_action != actions_.end() and it_pollfd != pollfds_.end() ) {
+    if ( action_ids.count( it_action->id ) ) {
+      it_action = actions_.erase( it_action );
+      it_pollfd = pollfds_.erase( it_pollfd );
+    }
+    else {
+      it_action++;
+      it_pollfd++;
+    }
+  }
+}
