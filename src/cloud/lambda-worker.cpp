@@ -48,14 +48,6 @@ using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
 constexpr size_t UDP_MTU_BYTES{1'350};
-constexpr milliseconds PEER_CHECK_INTERVAL{250};
-constexpr milliseconds HANDLE_ACKS_INTERVAL{50};
-constexpr milliseconds HANDLE_OUT_QUEUE_INTERVAL{100};
-constexpr milliseconds WORKER_STATS_INTERVAL{1'000};
-constexpr milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
-constexpr milliseconds KEEP_ALIVE_INTERVAL{40'000};
-constexpr milliseconds FINISHED_PATHS_INTERVAL{2'500};
-constexpr milliseconds PACKET_TIMEOUT{100};
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 #define TLOG(tag) LOG(INFO) << "[" #tag "] "
@@ -67,15 +59,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     : config(config),
       coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
-      storageBackend(StorageBackend::create_backend(storageUri)),
-      peerTimer(PEER_CHECK_INTERVAL),
-      workerStatsTimer(WORKER_STATS_INTERVAL),
-      workerDiagnosticsTimer(WORKER_DIAGNOSTICS_INTERVAL),
-      outQueueTimer(HANDLE_OUT_QUEUE_INTERVAL),
-      finishedPathsTimer(FINISHED_PATHS_INTERVAL),
-      handleRayAcknowledgementsTimer(HANDLE_ACKS_INTERVAL) {
+      storageBackend(StorageBackend::create_backend(storageUri)) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
-
     roost::chdir(workingDirectory.name());
 
     FLAGS_log_dir = ".";

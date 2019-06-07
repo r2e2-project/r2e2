@@ -29,6 +29,15 @@
 
 namespace pbrt {
 
+constexpr std::chrono::milliseconds PEER_CHECK_INTERVAL{250};
+constexpr std::chrono::milliseconds HANDLE_ACKS_INTERVAL{50};
+constexpr std::chrono::milliseconds OUT_QUEUE_INTERVAL{100};
+constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
+constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
+constexpr std::chrono::milliseconds KEEP_ALIVE_INTERVAL{40'000};
+constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
+constexpr std::chrono::milliseconds PACKET_TIMEOUT{100};
+
 struct WorkerConfiguration {
     bool sendReliably;
     uint64_t maxUdpRate;
@@ -187,7 +196,6 @@ class LambdaWorker {
                    const PacketAction action, const WorkerId otherParty,
                    const size_t packetSize, const size_t numRays = 0);
 
-
     ////////////////////////////////////////////////////////////////////////////
     // MEMBER VARIABLES                                                       //
     ////////////////////////////////////////////////////////////////////////////
@@ -268,12 +276,12 @@ class LambdaWorker {
     FileDescriptor dummyFD{STDOUT_FILENO};
 
     /* Timers */
-    TimerFD peerTimer;
-    TimerFD workerStatsTimer;
-    TimerFD workerDiagnosticsTimer;
-    TimerFD outQueueTimer;
-    TimerFD finishedPathsTimer;
-    TimerFD handleRayAcknowledgementsTimer;
+    TimerFD peerTimer{PEER_CHECK_INTERVAL};
+    TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
+    TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
+    TimerFD outQueueTimer{OUT_QUEUE_INTERVAL};
+    TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
+    TimerFD handleRayAcknowledgementsTimer{HANDLE_ACKS_INTERVAL};
 
     bool terminated{false};
 };
