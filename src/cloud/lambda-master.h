@@ -121,7 +121,7 @@ class LambdaMaster {
     Poller::Action::Result::Type handleWriteWorkerStats();
     Poller::Action::Result::Type handleStatusMessage();
     Poller::Action::Result::Type handleConnectAll();
-    Poller::Action::Result::Type handleGenerateRays();
+    Poller::Action::Result::Type handleJobStart();
 
     bool processMessage(const WorkerId workerId, const meow::Message &message);
     bool processWorkerRequest(const WorkerRequest &request);

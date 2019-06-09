@@ -30,6 +30,7 @@
 #include "net/lambda.h"
 #include "net/requests.h"
 #include "net/socket.h"
+#include "net/util.h"
 #include "util/exception.h"
 #include "util/path.h"
 #include "util/random.h"
@@ -247,7 +248,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         []() { throw runtime_error("connectAll failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaMaster::handleGenerateRays, this),
+        dummyFD, Direction::Out, bind(&LambdaMaster::handleJobStart, this),
         [this]() {
             return this->numberOfLambdas * this->numberOfLambdas ==
                    workerStats.queueStats.connected;
@@ -386,15 +387,32 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
     });
 }
 
-ResultType LambdaMaster::handleGenerateRays() {
-    for (auto &workerkv : workers) {
-        auto &worker = workerkv.second;
-        if (worker.tile.initialized()) {
-            protobuf::GenerateRays proto;
-            *proto.mutable_crop_window() = to_protobuf(*worker.tile);
-            const string genRaysStr = Message::str(0, OpCode::GenerateRays,
-                                                   protoutil::to_string(proto));
-            worker.connection->enqueue_write(genRaysStr);
+ResultType LambdaMaster::handleJobStart() {
+    switch (config.task) {
+    case Task::RayTracing:
+        for (auto &workerkv : workers) {
+            auto &worker = workerkv.second;
+            if (worker.tile.initialized()) {
+                protobuf::GenerateRays proto;
+                *proto.mutable_crop_window() = to_protobuf(*worker.tile);
+                const string genRaysStr = Message::str(
+                    0, OpCode::GenerateRays, protoutil::to_string(proto));
+                worker.connection->enqueue_write(genRaysStr);
+            }
+        }
+
+        break;
+
+    case Task::NetworkTest:
+        for (auto &workerkv : workers) {
+            auto &worker = workerkv.second;
+            const bool isSender = worker.id % 2;
+            const uint32_t destination =
+                isSender ? (numberOfLambdas + 1 - worker.id) : 0;
+            const uint32_t duration = 10;
+            worker.connection->enqueue_write(
+                Message::str(0, OpCode::StartBenchmark,
+                             put_field(destination) + put_field(duration)));
         }
     }
 

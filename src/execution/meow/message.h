@@ -31,6 +31,7 @@ namespace meow {
       SendRays,
       FinishedRays,
       FinishedPaths,
+      StartBenchmark,
       Bye,
 
       COUNT
@@ -53,6 +54,7 @@ namespace meow {
         "SendRays",
         "FinishedRays",
         "FinishedPaths",
+        "StartBenchmark",
         "Bye"};
 
   private:

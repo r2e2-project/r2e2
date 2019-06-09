@@ -88,7 +88,6 @@ class UDPConnection {
         packet_queue_.emplace(addr, move(data));
     }
 
-  private:
     void reset_reference();
 };
 

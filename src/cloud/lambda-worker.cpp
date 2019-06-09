@@ -203,6 +203,74 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         Message::str(0, OpCode::Hey, safe_getenv_or(LOG_STREAM_ENVAR, "")));
 }
 
+void LambdaWorker::initBenchmark(const uint32_t duration,
+                                 const uint32_t destination) {
+    /* (1) disable all unnecessary actions */
+    set<uint64_t> toDeactivate{
+        eventAction[Event::RayQueue],       eventAction[Event::OutQueue],
+        eventAction[Event::FinishedQueue],  eventAction[Event::Peers],
+        eventAction[Event::NeededTreelets], eventAction[Event::UdpSend],
+        eventAction[Event::UdpReceive],     eventAction[Event::RayAcks],
+        eventAction[Event::Diagnostics]};
+
+    benchmarkMode = true;
+    loop.poller().deactivate_actions(toDeactivate);
+    udpConnection.reset_reference();
+
+    /* (2) set up new udpReceive and udpSend actions */
+    eventAction[Event::UdpReceive] = loop.poller().add_action(Poller::Action(
+        udpConnection.socket(), Direction::In,
+        [this]() {
+            auto datagram = udpConnection.socket().recvfrom();
+            benchmarkData.bytesReceived += datagram.second.length();
+            benchmarkData.packetsReceived++;
+
+            return ResultType::Continue;
+        },
+        [this]() { return true; },
+        []() { throw runtime_error("udp in failed"); }));
+
+    if (destination) {
+        const Address address = peers.at(destination).address;
+
+        eventAction[Event::UdpSend] = loop.poller().add_action(Poller::Action(
+            udpConnection.socket(), Direction::Out,
+            [this, address]() {
+                const static string packet =
+                    Message::str(*workerId, OpCode::Ping, string(1300, 'x'));
+                udpConnection.socket().sendto(address, packet);
+                udpConnection.record_send(packet.length());
+
+                benchmarkData.bytesSent += packet.length();
+                benchmarkData.packetsSent++;
+
+                return ResultType::Continue;
+            },
+            [this]() { return udpConnection.within_pace(); },
+            []() { throw runtime_error("udp out failed"); }));
+    }
+
+    benchmarkTimer = make_unique<TimerFD>(seconds{duration});
+
+    loop.poller().add_action(Poller::Action(
+        benchmarkTimer->fd, Direction::In,
+        [this, destination]() {
+            benchmarkTimer->reset();
+            benchmarkData.end = probe_clock::now();
+
+            set<uint64_t> toDeactivate{eventAction[Event::UdpReceive]};
+            if (destination) toDeactivate.insert(eventAction[Event::UdpSend]);
+            loop.poller().deactivate_actions(toDeactivate);
+            benchmarkMode = false;
+
+            return ResultType::CancelAll;
+        },
+        [this]() { return true; },
+        []() { throw runtime_error("benchmark timer failed"); }));
+
+    benchmarkData.start = probe_clock::now();
+}
+
 Message LambdaWorker::createConnectionRequest(const Worker& peer) {
     protobuf::ConnectRequest proto;
     proto.set_worker_id(*workerId);
@@ -1024,7 +1092,6 @@ bool LambdaWorker::processMessage(const Message& message) {
     case OpCode::Ping: {
         /* Message pong{OpCode::Pong, ""};
         coordinatorConnection->enqueue_write(pong.str()); */
-        LOG(INFO) << "PING " << Chunk(message.payload()).be64();
         break;
     }
 
@@ -1146,6 +1213,14 @@ bool LambdaWorker::processMessage(const Message& message) {
         terminate();
         break;
 
+    case OpCode::StartBenchmark: {
+        Chunk c{message.payload()};
+        const uint32_t destination = c.be32();
+        const uint32_t duration = c(4).be32();
+        initBenchmark(duration, destination);
+        break;
+    }
+
     default:
         throw runtime_error("unhandled message opcode");
     }
@@ -1231,6 +1306,21 @@ void LambdaWorker::initializeScene() {
 
 void LambdaWorker::uploadLogs() {
     if (!workerId.initialized()) return;
+
+    TLOG(BENCH) << "start "
+                << duration_cast<milliseconds>(
+                       benchmarkData.start.time_since_epoch())
+                       .count();
+
+    TLOG(BENCH) << "end "
+                << duration_cast<milliseconds>(
+                       benchmarkData.end.time_since_epoch())
+                       .count();
+
+    TLOG(BENCH) << "stats " << benchmarkData.bytesSent << " "
+                << benchmarkData.bytesReceived << " "
+                << benchmarkData.packetsSent << " "
+                << benchmarkData.packetsReceived;
 
     google::FlushLogFiles(google::INFO);
 

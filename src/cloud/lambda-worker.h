@@ -211,6 +211,8 @@ class LambdaWorker {
                    const PacketAction action, const WorkerId otherParty,
                    const size_t packetSize, const size_t numRays = 0);
 
+    void initBenchmark(const uint32_t duration, const uint32_t destination = 0);
+
     ////////////////////////////////////////////////////////////////////////////
     // MEMBER VARIABLES                                                       //
     ////////////////////////////////////////////////////////////////////////////
@@ -300,6 +302,24 @@ class LambdaWorker {
     TimerFD handleRayAcknowledgementsTimer{HANDLE_ACKS_INTERVAL};
 
     bool terminated{false};
+
+    ////////////////////////////////////////////////////////////////////////////
+    // BENCHMARKING                                                           //
+    ////////////////////////////////////////////////////////////////////////////
+
+    using probe_clock = std::chrono::system_clock;
+
+    struct BenchmarkData {
+        probe_clock::time_point start;
+        probe_clock::time_point end;
+        size_t bytesSent{0};
+        size_t bytesReceived{0};
+        size_t packetsSent{0};
+        size_t packetsReceived{0};
+    } benchmarkData;
+
+    bool benchmarkMode{false};
+    std::unique_ptr<TimerFD> benchmarkTimer {nullptr};
 };
 
 }  // namespace pbrt
