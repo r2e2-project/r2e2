@@ -409,7 +409,7 @@ ResultType LambdaMaster::handleJobStart() {
             const bool isSender = worker.id % 2;
             const uint32_t destination =
                 isSender ? (numberOfLambdas + 1 - worker.id) : 0;
-            const uint32_t duration = 10;
+            const uint32_t duration = 30;
             worker.connection->enqueue_write(
                 Message::str(0, OpCode::StartBenchmark,
                              put_field(destination) + put_field(duration)));
