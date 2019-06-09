@@ -1239,12 +1239,12 @@ void LambdaWorker::run() {
 
         // If this connection is not within pace, it requests a timeout when it
         // would be, so that we can re-poll and schedule it.
-        const int64_t millis_ahead_of_pace =
-            udpConnection.micros_ahead_of_pace() / 1000;
-        const int conn_timeout_ms =
-            (millis_ahead_of_pace <= 0) ? -1 : millis_ahead_of_pace;
+        const int64_t ahead_us = udpConnection.micros_ahead_of_pace();
+        int64_t ahead_ms = ahead_us / 1000;
+        if (ahead_us != 0 && ahead_ms == 0) ahead_ms = 1;
 
-        min_timeout_ms = min_neg_infinity(min_timeout_ms, conn_timeout_ms);
+        const int timeout_ms = udpConnection.within_pace() ? -1 : ahead_ms;
+        min_timeout_ms = min_neg_infinity(min_timeout_ms, timeout_ms);
 
         auto res = loop.loop_once(min_timeout_ms).result;
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
@@ -1413,7 +1413,7 @@ int main(int argc, char* argv[]) {
             make_unique<LambdaWorker>(publicIp, listenPort, storageUri, config);
         worker->run();
     } catch (const exception& e) {
-        LOG(INFO) << argv[0] << ": " << e.what();
+        cerr << argv[0] << ": " << e.what() << endl;
         exit_status = EXIT_FAILURE;
     }
 
