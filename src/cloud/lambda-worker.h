@@ -318,7 +318,6 @@ class LambdaWorker {
         size_t packetsReceived{0};
     } benchmarkData;
 
-    bool benchmarkMode{false};
     std::unique_ptr<TimerFD> benchmarkTimer {nullptr};
 };
 

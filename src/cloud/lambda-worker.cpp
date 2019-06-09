@@ -173,7 +173,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("messages failed"); }));
 
     /* send updated stats */
-    eventAction[Event::UdpReceive] = loop.poller().add_action(Poller::Action(
+    eventAction[Event::WorkerStats] = loop.poller().add_action(Poller::Action(
         workerStatsTimer.fd, Direction::In,
         bind(&LambdaWorker::handleWorkerStats, this), [this]() { return true; },
         []() { throw runtime_error("worker stats failed"); }));
@@ -211,9 +211,8 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
         eventAction[Event::FinishedQueue],  eventAction[Event::Peers],
         eventAction[Event::NeededTreelets], eventAction[Event::UdpSend],
         eventAction[Event::UdpReceive],     eventAction[Event::RayAcks],
-        eventAction[Event::Diagnostics]};
+        eventAction[Event::Diagnostics],    eventAction[Event::WorkerStats]};
 
-    benchmarkMode = true;
     loop.poller().deactivate_actions(toDeactivate);
     udpConnection.reset_reference();
 
@@ -224,7 +223,6 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
             auto datagram = udpConnection.socket().recvfrom();
             benchmarkData.bytesReceived += datagram.second.length();
             benchmarkData.packetsReceived++;
-
             return ResultType::Continue;
         },
         [this]() { return true; },
@@ -261,7 +259,6 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
             set<uint64_t> toDeactivate{eventAction[Event::UdpReceive]};
             if (destination) toDeactivate.insert(eventAction[Event::UdpSend]);
             loop.poller().deactivate_actions(toDeactivate);
-            benchmarkMode = false;
 
             return ResultType::CancelAll;
         },
