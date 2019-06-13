@@ -388,6 +388,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 }
 
 ResultType LambdaMaster::handleJobStart() {
+    set<uint32_t> paired{0};
+
     switch (config.task) {
     case Task::RayTracing:
         for (auto &workerkv : workers) {
@@ -404,16 +406,31 @@ ResultType LambdaMaster::handleJobStart() {
         break;
 
     case Task::NetworkTest:
+        cerr << "Starting benchmarks... ";
+        srand(time(nullptr));
+
         for (auto &workerkv : workers) {
             auto &worker = workerkv.second;
+
+            LOG(INFO) << "[WORKER] " << worker.id << ","
+                      << worker.udpAddress->str();
+
             const bool isSender = worker.id % 2;
-            const uint32_t destination =
-                isSender ? (numberOfLambdas + 1 - worker.id) : 0;
+            uint32_t destination = 0;
+
+            while (isSender && (destination % 2 || paired.count(destination))) {
+                destination = rand() % numberOfLambdas + 1;
+            }
+
+            paired.insert(destination);
+
             const uint32_t duration = 30;
             worker.connection->enqueue_write(
                 Message::str(0, OpCode::StartBenchmark,
                              put_field(destination) + put_field(duration)));
         }
+
+        cerr << "done." << endl;
     }
 
     return ResultType::Cancel;
