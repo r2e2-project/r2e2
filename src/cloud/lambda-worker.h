@@ -170,6 +170,7 @@ class LambdaWorker {
         RayAcks,
         WorkerStats,
         Diagnostics,
+        NetStats,
     };
 
     bool processMessage(const meow::Message& message);
@@ -309,16 +310,29 @@ class LambdaWorker {
 
     using probe_clock = std::chrono::system_clock;
 
-    struct BenchmarkData {
-        probe_clock::time_point start;
-        probe_clock::time_point end;
+    struct NetStats {
+        probe_clock::time_point timestamp{};
+
         size_t bytesSent{0};
         size_t bytesReceived{0};
         size_t packetsSent{0};
         size_t packetsReceived{0};
+
+        void merge(const NetStats& other);
+    };
+
+    struct BenchmarkData {
+        probe_clock::time_point start{};
+        probe_clock::time_point end{};
+
+        NetStats stats{};
+        NetStats checkpoint{};
+
+        std::vector<NetStats> checkpoints{};
     } benchmarkData;
 
-    std::unique_ptr<TimerFD> benchmarkTimer {nullptr};
+    std::unique_ptr<TimerFD> benchmarkTimer{nullptr};
+    std::unique_ptr<TimerFD> checkpointTimer{nullptr};
 };
 
 }  // namespace pbrt

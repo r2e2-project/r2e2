@@ -203,6 +203,13 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         Message::str(0, OpCode::Hey, safe_getenv_or(LOG_STREAM_ENVAR, "")));
 }
 
+void LambdaWorker::NetStats::merge(const NetStats& other) {
+    bytesSent += other.bytesSent;
+    bytesReceived += other.bytesReceived;
+    packetsSent += other.packetsSent;
+    packetsReceived += other.packetsReceived;
+}
+
 void LambdaWorker::initBenchmark(const uint32_t duration,
                                  const uint32_t destination) {
     /* (1) disable all unnecessary actions */
@@ -221,8 +228,8 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
         udpConnection.socket(), Direction::In,
         [this]() {
             auto datagram = udpConnection.socket().recvfrom();
-            benchmarkData.bytesReceived += datagram.second.length();
-            benchmarkData.packetsReceived++;
+            benchmarkData.checkpoint.bytesReceived += datagram.second.length();
+            benchmarkData.checkpoint.packetsReceived++;
             return ResultType::Continue;
         },
         [this]() { return true; },
@@ -239,8 +246,8 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
                 udpConnection.socket().sendto(address, packet);
                 udpConnection.record_send(packet.length());
 
-                benchmarkData.bytesSent += packet.length();
-                benchmarkData.packetsSent++;
+                benchmarkData.checkpoint.bytesSent += packet.length();
+                benchmarkData.checkpoint.packetsSent++;
 
                 return ResultType::Continue;
             },
@@ -249,6 +256,7 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
     }
 
     benchmarkTimer = make_unique<TimerFD>(seconds{duration});
+    checkpointTimer = make_unique<TimerFD>(seconds{1});
 
     loop.poller().add_action(Poller::Action(
         benchmarkTimer->fd, Direction::In,
@@ -256,7 +264,9 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
             benchmarkTimer->reset();
             benchmarkData.end = probe_clock::now();
 
-            set<uint64_t> toDeactivate{eventAction[Event::UdpReceive]};
+            set<uint64_t> toDeactivate{eventAction[Event::UdpReceive],
+                                       eventAction[Event::NetStats]};
+
             if (destination) toDeactivate.insert(eventAction[Event::UdpSend]);
             loop.poller().deactivate_actions(toDeactivate);
 
@@ -265,7 +275,22 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
         [this]() { return true; },
         []() { throw runtime_error("benchmark timer failed"); }));
 
+    eventAction[Event::NetStats] = loop.poller().add_action(Poller::Action(
+        checkpointTimer->fd, Direction::In,
+        [this]() {
+            checkpointTimer->reset();
+            benchmarkData.checkpoint.timestamp = probe_clock::now();
+            benchmarkData.checkpoints.push_back(benchmarkData.checkpoint);
+            benchmarkData.stats.merge(benchmarkData.checkpoint);
+            benchmarkData.checkpoint = {};
+
+            return ResultType::Continue;
+        },
+        [this]() { return true; },
+        []() { throw runtime_error("net stats failed"); }));
+
     benchmarkData.start = probe_clock::now();
+    benchmarkData.checkpoint.timestamp = benchmarkData.start;
 }
 
 Message LambdaWorker::createConnectionRequest(const Worker& peer) {
@@ -1304,6 +1329,8 @@ void LambdaWorker::initializeScene() {
 void LambdaWorker::uploadLogs() {
     if (!workerId.initialized()) return;
 
+    benchmarkData.stats.merge(benchmarkData.checkpoint);
+
     TLOG(BENCH) << "start "
                 << duration_cast<milliseconds>(
                        benchmarkData.start.time_since_epoch())
@@ -1314,10 +1341,19 @@ void LambdaWorker::uploadLogs() {
                        benchmarkData.end.time_since_epoch())
                        .count();
 
-    TLOG(BENCH) << "stats " << benchmarkData.bytesSent << " "
-                << benchmarkData.bytesReceived << " "
-                << benchmarkData.packetsSent << " "
-                << benchmarkData.packetsReceived;
+    for (const auto& item : benchmarkData.checkpoints) {
+        TLOG(BENCH) << "checkpoint "
+                    << duration_cast<milliseconds>(
+                           item.timestamp.time_since_epoch())
+                           .count()
+                    << " " << item.bytesSent << " " << item.bytesReceived << " "
+                    << item.packetsSent << " " << item.packetsReceived;
+    }
+
+    TLOG(BENCH) << "stats " << benchmarkData.stats.bytesSent << " "
+                << benchmarkData.stats.bytesReceived << " "
+                << benchmarkData.stats.packetsSent << " "
+                << benchmarkData.stats.packetsReceived;
 
     google::FlushLogFiles(google::INFO);
 

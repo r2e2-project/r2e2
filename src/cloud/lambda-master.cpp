@@ -405,9 +405,23 @@ ResultType LambdaMaster::handleJobStart() {
 
         break;
 
-    case Task::NetworkTest:
+    case Task::NetworkTest: {
         cerr << "Starting benchmarks... ";
-        srand(time(nullptr));
+
+        /* assign pairs randomly */
+        mt19937 g{random_device()()};
+
+        vector<uint32_t> workerPairs(numberOfLambdas);
+        vector<uint32_t> sendToReceiver(numberOfLambdas / 2);
+        iota(sendToReceiver.begin(), sendToReceiver.end(), 0);
+        shuffle(sendToReceiver.begin(), sendToReceiver.end(), g);
+
+        for (size_t i = 0; i < numberOfLambdas / 2; i++) {
+            const size_t sender = 2 * i;
+            const size_t receiver = 2 * sendToReceiver[i] + 1;
+            workerPairs[sender] = receiver;
+            workerPairs[receiver] = sender;
+        }
 
         for (auto &workerkv : workers) {
             auto &worker = workerkv.second;
@@ -415,22 +429,16 @@ ResultType LambdaMaster::handleJobStart() {
             LOG(INFO) << "[WORKER] " << worker.id << ","
                       << worker.udpAddress->str();
 
-            const bool isSender = worker.id % 2;
-            uint32_t destination = 0;
-
-            while (isSender && (destination % 2 || paired.count(destination))) {
-                destination = rand() % numberOfLambdas + 1;
-            }
-
-            paired.insert(destination);
-
+            const uint32_t destination = workerPairs[worker.id - 1] + 1;
             const uint32_t duration = 30;
+
             worker.connection->enqueue_write(
                 Message::str(0, OpCode::StartBenchmark,
                              put_field(destination) + put_field(duration)));
         }
 
         cerr << "done." << endl;
+    }
     }
 
     return ResultType::Cancel;
