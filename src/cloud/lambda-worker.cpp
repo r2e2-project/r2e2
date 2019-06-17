@@ -211,7 +211,8 @@ void LambdaWorker::NetStats::merge(const NetStats& other) {
 }
 
 void LambdaWorker::initBenchmark(const uint32_t duration,
-                                 const uint32_t destination) {
+                                 const uint32_t destination,
+                                 const uint32_t rate) {
     /* (1) disable all unnecessary actions */
     set<uint64_t> toDeactivate{
         eventAction[Event::RayQueue],       eventAction[Event::OutQueue],
@@ -222,6 +223,10 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
 
     loop.poller().deactivate_actions(toDeactivate);
     udpConnection.reset_reference();
+
+    if (rate) {
+        udpConnection.set_rate(rate);
+    }
 
     /* (2) set up new udpReceive and udpSend actions */
     eventAction[Event::UdpReceive] = loop.poller().add_action(Poller::Action(
@@ -1239,7 +1244,8 @@ bool LambdaWorker::processMessage(const Message& message) {
         Chunk c{message.payload()};
         const uint32_t destination = c.be32();
         const uint32_t duration = c(4).be32();
-        initBenchmark(duration, destination);
+        const uint32_t rate = c(8).be32();
+        initBenchmark(duration, destination, rate);
         break;
     }
 

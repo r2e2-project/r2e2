@@ -212,7 +212,8 @@ class LambdaWorker {
                    const PacketAction action, const WorkerId otherParty,
                    const size_t packetSize, const size_t numRays = 0);
 
-    void initBenchmark(const uint32_t duration, const uint32_t destination = 0);
+    void initBenchmark(const uint32_t duration, const uint32_t destination,
+                       const uint32_t rate);
 
     ////////////////////////////////////////////////////////////////////////////
     // MEMBER VARIABLES                                                       //

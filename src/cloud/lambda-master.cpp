@@ -431,10 +431,12 @@ ResultType LambdaMaster::handleJobStart() {
 
             const uint32_t destination = workerPairs[worker.id - 1] + 1;
             const uint32_t duration = 30;
+            const uint32_t rate = (worker.id % 2) ? 0 : 1;
 
             worker.connection->enqueue_write(
                 Message::str(0, OpCode::StartBenchmark,
-                             put_field(destination) + put_field(duration)));
+                             put_field(destination) + put_field(duration) +
+                                 put_field(rate)));
         }
 
         cerr << "done." << endl;

@@ -88,6 +88,7 @@ class UDPConnection {
         packet_queue_.emplace(addr, move(data));
     }
 
+    void set_rate(const uint64_t rate) { rate_Mb_per_s_ = rate; }
     void reset_reference();
 };
 
