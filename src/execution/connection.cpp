@@ -12,7 +12,7 @@ int64_t UDPConnection::micros_ahead_of_pace() const {
     const int64_t elapsed_micros =
         duration_cast<microseconds>(now - rate_reference_pt_).count();
     const int64_t elapsed_micros_if_at_pace =
-        bits_since_reference_ / rate_Mb_per_s_;
+        (bits_since_reference_ / (1e6 * rate_bps_));
     return elapsed_micros_if_at_pace - elapsed_micros;
 }
 
