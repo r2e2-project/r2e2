@@ -60,16 +60,15 @@ class UDPConnection {
 
     /* pacing */
     bool pacing_{false};
-    uint64_t rate_bps_{80};
+    uint64_t rate_Mb_per_s_{80};
     uint64_t bits_since_reference_{0};
     std::chrono::steady_clock::time_point rate_reference_pt_{
         std::chrono::steady_clock::now()};
     std::chrono::microseconds reference_reset_time_{1'000'000};
 
   public:
-    UDPConnection(const bool pacing = false,
-                  const uint64_t rate_bps = 80'000'000)
-        : pacing_(pacing), rate_bps_(rate_bps) {
+    UDPConnection(const bool pacing = false, const uint64_t rate_mbps = 80)
+        : pacing_(pacing), rate_Mb_per_s_(rate_mbps) {
         socket_.set_blocking(false);
     }
 
@@ -89,7 +88,7 @@ class UDPConnection {
         packet_queue_.emplace(addr, move(data));
     }
 
-    void set_rate(const uint64_t rate) { rate_bps_ = rate; }
+    void set_rate(const uint64_t rate) { rate_Mb_per_s_ = rate; }
     void reset_reference();
 };
 
