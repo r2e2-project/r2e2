@@ -18,6 +18,11 @@ struct TreeletNode;
 
 class CloudBVH : public Aggregate {
   public:
+    struct TreeletInfo {
+        std::set<uint32_t> children{};
+        std::set<uint32_t> instances{};
+    };
+
     CloudBVH(const uint32_t bvh_root = 0);
     ~CloudBVH() {}
 
@@ -30,6 +35,11 @@ class CloudBVH : public Aggregate {
 
     void Trace(RayState &rayState);
     bool Intersect(RayState &rayState, SurfaceInteraction *isect) const;
+
+    const TreeletInfo &GetInfo(const uint32_t treelet_id) {
+        loadTreelet(treelet_id);
+        return treelet_info_.at(treelet_id);
+    }
 
   private:
     enum Child { LEFT = 0, RIGHT = 1 };
@@ -68,6 +78,8 @@ class CloudBVH : public Aggregate {
     mutable std::map<uint32_t, std::shared_ptr<Material>> materials_;
 
     mutable std::shared_ptr<Material> default_material;
+
+    mutable std::map<uint32_t, TreeletInfo> treelet_info_;
 
     void loadTreelet(const uint32_t root_id) const;
     void clear() const;

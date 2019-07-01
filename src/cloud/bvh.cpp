@@ -55,6 +55,8 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
         return; /* this tree is already loaded */
     }
 
+    TreeletInfo &info = treelet_info_[root_id];
+
     vector<TreeletNode> nodes;
     auto reader = global::manager.GetReader(ObjectType::Treelet, root_id);
 
@@ -100,11 +102,15 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
         if (proto_node.left_ref()) {
             node.has[LEFT] = false;
             node.child[LEFT] = proto_node.left_ref();
+
+            info.children.insert(node.child[LEFT]);
         }
 
         if (proto_node.right_ref()) {
             node.has[RIGHT] = false;
             node.child[RIGHT] = proto_node.right_ref();
+
+            info.children.insert(node.child[RIGHT]);
         }
 
         if (proto_node.transformed_primitives_size()) {
@@ -139,6 +145,8 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
                     move(make_unique<TransformedPrimitive>(
                         bvh_instances_[proto_tp.root_ref()],
                         primitive_to_world)));
+
+                info.instances.insert(proto_tp.root_ref());
             }
         } else if (proto_node.triangles_size()) {
             node.leaf = true;

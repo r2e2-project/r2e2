@@ -616,6 +616,15 @@ ENDIF()
 
 TARGET_LINK_LIBRARIES ( pbrt_lambda_worker ${ALL_PBRT_LIBS} dl z unwind lzma -static -Wl,-allow-multiple-definition ${STRIP_SYMBOLS} -Wl,--whole-archive -lpthread -Wl,--no-whole-archive)
 
+
+# pbrt-treelet-info
+ADD_EXECUTABLE ( pbrt_treelet_info src/cloud/treelet-info.cpp )
+ADD_SANITIZERS ( pbrt_treelet_info )
+
+SET_TARGET_PROPERTIES ( pbrt_treelet_info PROPERTIES OUTPUT_NAME "pbrt-treelet-info" )
+TARGET_COMPILE_FEATURES ( pbrt_treelet_info PRIVATE ${PBRT_CXX11_FEATURES} )
+TARGET_LINK_LIBRARIES ( pbrt_treelet_info ${ALL_PBRT_LIBS} )
+
 # pbrt-lambda-master
 ADD_EXECUTABLE ( pbrt_lambda_aggregate src/cloud/lambda-aggregate.cpp )
 ADD_SANITIZERS ( pbrt_lambda_aggregate )
