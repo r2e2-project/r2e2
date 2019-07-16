@@ -514,44 +514,28 @@ ResultType LambdaWorker::handleOutQueue() {
 
         auto& peerSeqNo = sequenceNumbers[peer.address];
 
-        string unpackedRayStr;
-        RayStatePtr unpackedRayPtr;
-
-        while (!outRays.empty() || !unpackedRayStr.empty()) {
-            ostringstream oss;
+        while (!outRays.empty()) {
             size_t packetLen = 25;
             size_t rayCount = 0;
+            string currentPacketStr;
+            currentPacketStr.resize(UDP_MTU_BYTES);
 
             vector<unique_ptr<RayState>> trackedRays;
 
             {
-                protobuf::RecordWriter writer{&oss};
-
-                if (!unpackedRayStr.empty()) {
-                    rayCount++;
-                    packetLen = unpackedRayStr.length() + 4;
-                    writer.write(unpackedRayStr);
-
-                    if (unpackedRayPtr->trackRay) {
-                        trackedRays.push_back(move(unpackedRayPtr));
-                    }
-
-                    unpackedRayStr.clear();
-                }
-
                 while (packetLen < UDP_MTU_BYTES && !outRays.empty()) {
                     RayStatePtr ray = move(outRays.front());
                     outRays.pop_front();
                     outQueueSize--;
 
-                    string rayStr = RayState::serialize(ray);
+                    size_t bytesWritten = RayState::serialize_into_str(
+                        currentPacketStr, ray, packetLen,
+                        UDP_MTU_BYTES - packetLen);
                     logRayAction(*ray, RayAction::Queued);
+                    const size_t len = bytesWritten + 4;
 
-                    const size_t len = rayStr.length() + 4;
-
-                    if (len + packetLen > UDP_MTU_BYTES) {
-                        unpackedRayStr.swap(rayStr);
-                        unpackedRayPtr = move(ray);
+                    if (bytesWritten == 0) {
+                        outRays.push_front(move(ray));
                         break;
                     }
 
@@ -560,25 +544,24 @@ ResultType LambdaWorker::handleOutQueue() {
                     }
 
                     packetLen += len;
-                    writer.write(rayStr);
                     rayCount++;
                 }
             }
 
-            oss.flush();
-
             const bool tracked = packetLogBD(randEngine);
+            currentPacketStr.resize(packetLen);
+            Message::str(currentPacketStr, *workerId, OpCode::SendRays,
+                         packetLen - 25, config.sendReliably, peerSeqNo,
+                         tracked);
 
-            RayPacket rayPacket{
-                peer.address,
-                peer.id,
-                treeletId,
-                rayCount,
-                Message::str(*workerId, OpCode::SendRays, oss.str(),
-                             config.sendReliably, peerSeqNo, tracked),
-                config.sendReliably,
-                peerSeqNo,
-                tracked};
+            RayPacket rayPacket{peer.address,
+                                peer.id,
+                                treeletId,
+                                rayCount,
+                                move(currentPacketStr),
+                                config.sendReliably,
+                                peerSeqNo,
+                                tracked};
 
             if (tracked) {
                 logPacket(peerSeqNo, 0, PacketAction::Queued, peer.id,
@@ -1082,8 +1065,8 @@ RayStatePtr LambdaWorker::popRayQueue() {
 }
 
 bool LambdaWorker::processMessage(const Message& message) {
-    /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
-         << "]\n"; */
+    cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
+         << "]" << endl;
 
     auto handleConnectTo = [this](const protobuf::ConnectTo& proto) {
         if (peers.count(proto.worker_id()) == 0 &&

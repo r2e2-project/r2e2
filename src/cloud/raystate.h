@@ -73,6 +73,9 @@ struct RayState {
     size_t Size() const;
     static std::string serialize(const RayStatePtr &, const bool = true);
     static RayStatePtr deserialize(const std::string &, const bool = true);
+    static size_t serialize_into_str(std::string &, const RayStatePtr &,
+                                     const size_t, const size_t,
+                                     const bool = true);
 };
 
 }  // namespace pbrt
