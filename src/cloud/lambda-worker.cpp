@@ -1063,6 +1063,7 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
         const string filePath = id.to_string();
         requests.emplace_back(filePath, filePath);
     }
+
     storageBackend->get(requests);
 }
 

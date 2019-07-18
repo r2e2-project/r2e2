@@ -26,6 +26,7 @@ enum class ObjectType {
     Manifest,
     Texture,
     TreeletInfo,
+    StaticAssignment,
     COUNT
 };
 

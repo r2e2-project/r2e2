@@ -59,42 +59,55 @@ shared_ptr<Sampler> loadSampler(const int samplesPerPixel) {
     return sampler::from_protobuf(proto_sampler, samplesPerPixel);
 }
 
-void LambdaMaster::loadStaticAssignment(const uint32_t numWorkers,
-                                        const bool zeroOnAll) {
-    vector<double> tempProbs = global::manager.getTreeletProbs();
+void LambdaMaster::loadStaticAssignment(const uint32_t assignmentId,
+                                        const uint32_t numWorkers) {
+    ifstream fin{global::manager.getScenePath() + "/" +
+                 global::manager.getFileName(ObjectType::StaticAssignment,
+                                             assignmentId)};
 
-    if (tempProbs.size() == 0) {
-        return;
+    if (!fin.good()) {
+        throw runtime_error("Static assignment file was not found");
+    }
+
+    vector<vector<TreeletId>> groups;
+    vector<double> probs;
+    size_t groupCount = 0;
+
+    fin >> groupCount;
+
+    groups.resize(groupCount);
+    probs.resize(groupCount);
+
+    for (size_t i = 0; i < groupCount; i++) {
+        size_t groupSize = 0;
+        fin >> probs[i] >> groupSize;
+
+        auto &group = groups[i];
+        group.resize(groupSize);
+
+        for (size_t j = 0; j < groupSize; j++) {
+            fin >> group[j];
+        }
     }
 
     Allocator allocator;
 
-    map<TreeletId, double> probs;
+    map<TreeletId, double> probsMap;
 
-    if (zeroOnAll) {
-        probs[0] = 0;
+    for (size_t gid = 0; gid < probs.size(); gid++) {
+        probsMap.emplace(gid, probs[gid]);
+        allocator.addTreelet(gid);
     }
 
-    for (size_t tid = zeroOnAll ? 1 : 0; tid < tempProbs.size(); tid++) {
-        probs.emplace(tid, tempProbs[tid]);
-        allocator.addTreelet(tid);
-    }
-
-    struct WorkerData {
-        uint64_t freeSpace = 200 * 1024 * 1024; /* 200 MB */
-        double p = 0.0;
-    };
-
-    allocator.setTargetWeights(map<TreeletId, double>{probs});
-
-    vector<WorkerData> workerData(numWorkers);
+    allocator.setTargetWeights(move(probsMap));
 
     for (size_t wid = 0; wid < numWorkers; wid++) {
-        auto &worker = workerData[wid];
-        TreeletId tid = allocator.allocate(wid);
-        worker.freeSpace -= treeletTotalSizes[tid];
-        worker.p += probs[tid];
-        staticAssignments[wid].push_back(tid);
+        const auto gid = allocator.allocate(wid);
+
+        auto &workerAssignments = staticAssignments[wid];
+        for (const auto t : groups[gid]) {
+            workerAssignments.push_back(t);
+        }
     }
 
     if (allocator.anyUnassignedTreelets()) {
@@ -181,9 +194,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         }
     }
 
-    if (config.assignment & (Assignment::Static | Assignment::StaticZero)) {
-        loadStaticAssignment(numberOfLambdas,
-                             config.assignment & Assignment::StaticZero);
+    if (config.assignment & Assignment::Static) {
+        loadStaticAssignment(0, numberOfLambdas);
     }
 
     udpConnection = loop.make_udp_connection(
@@ -277,6 +289,22 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             return false;
         }
 
+        auto failure_handler = [this, ID = currentWorkerId]() {
+            const auto &worker = workers.at(ID);
+
+            ostringstream message;
+            message << "worker died: " << ID;
+
+            if (!worker.aws.logStream.empty()) {
+                message << " (" << worker.aws.logStream << ")";
+            }
+
+            LOG(INFO) << "dead worker stats: "
+                      << protoutil::to_json(to_protobuf(worker.stats));
+
+            throw runtime_error(message.str());
+        };
+
         auto messageParser = make_shared<MessageParser>();
         auto connection = loop.add_connection<TCPSocket>(
             move(socket),
@@ -292,22 +320,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 
                 return true;
             },
-            []() { throw runtime_error("error occured"); },
-            [this, ID = currentWorkerId]() {
-                const auto &worker = workers.at(ID);
-
-                ostringstream errorMessage;
-                errorMessage << "worker died: " << ID;
-
-                if (!worker.aws.logStream.empty()) {
-                    errorMessage << " (" << worker.aws.logStream << ")";
-                }
-
-                LOG(INFO) << "dead worker stats: "
-                          << protoutil::to_json(to_protobuf(worker.stats));
-
-                throw runtime_error(errorMessage.str());
-            });
+            failure_handler, failure_handler);
 
         auto workerIt =
             workers
@@ -331,19 +344,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             assignTreelet(worker, (worker.id - 1) % treeletIds.size());
         };
 
-        auto doStaticAssign = [this](Worker &worker, const bool zeroOnAll,
-                                     const bool uniform) {
-            if (zeroOnAll) {
-                assignTreelet(worker, 0);
-            }
-
-            if (uniform) {
-                const TreeletId t = (worker.id - 1) % (treeletIds.size() -
-                                                       (zeroOnAll ? 1 : 0)) +
-                                    (zeroOnAll ? 1 : 0);
-                assignTreelet(worker, t);
-            }
-
+        auto doStaticAssign = [this](Worker &worker) {
             for (const auto t : staticAssignments[worker.id - 1]) {
                 assignTreelet(worker, t);
             }
@@ -370,10 +371,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         /* assign treelet to worker based on most in-demand treelets */
         const auto assignment = this->config.assignment;
 
-        if (assignment & (Assignment::Static | Assignment::StaticZero)) {
-            doStaticAssign(workerIt->second,
-                           this->config.assignment & Assignment::StaticZero,
-                           this->config.assignment & Assignment::Uniform);
+        if (assignment & Assignment::Static) {
+            doStaticAssign(workerIt->second);
         } else if (assignment & Assignment::Uniform) {
             doUniformAssign(workerIt->second);
         } else if (assignment & Assignment::All) {
@@ -883,8 +882,6 @@ void usage(const char *argv0, int exitCode) {
          << "                               - uniform (default)" << endl
          << "                               - static" << endl
          << "                               - static+uniform" << endl
-         << "                               - static0" << endl
-         << "                               - static0+uniform" << endl
          << "                               - all" << endl
          << "  -f --finished-ray ACTION   what to do with finished rays" << endl
          << "                               - discard (default)" << endl
@@ -993,12 +990,8 @@ int main(int argc, char *argv[]) {
         case 'a':
             if (strcmp(optarg, "static") == 0) {
                 assignment = Assignment::Static;
-            } else if (strcmp(optarg, "static0") == 0) {
-                assignment = Assignment::StaticZero;
             } else if (strcmp(optarg, "static+uniform") == 0) {
                 assignment = Assignment::Static | Assignment::Uniform;
-            } else if (strcmp(optarg, "static0+uniform") == 0) {
-                assignment = Assignment::StaticZero | Assignment::Uniform;
             } else if (strcmp(optarg, "uniform") == 0) {
                 assignment = Assignment::Uniform;
             } else if (strcmp(optarg, "all") == 0) {

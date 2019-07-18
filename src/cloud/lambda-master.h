@@ -35,16 +35,15 @@ struct Assignment {
     // clang-format off
     static constexpr int All        = (1 << 0);
     static constexpr int Static     = (1 << 1);
-    static constexpr int StaticZero = (1 << 2);
-    static constexpr int Uniform    = (1 << 3);
+    static constexpr int Uniform    = (1 << 2);
     // clang-format on
 };
 
 enum class FinishedRayAction { Discard, SendBack, Upload };
 
 enum class Task {
-  RayTracing,
-  NetworkTest,
+    RayTracing,
+    NetworkTest,
 };
 
 struct MasterConfiguration {
@@ -202,7 +201,9 @@ class LambdaMaster {
     size_t diagnosticsReceived{0};
 
     /* Static Assignments */
-    void loadStaticAssignment(const uint32_t numWorkers, const bool zeroOnAll);
+    void loadStaticAssignment(const uint32_t assignmentId,
+                              const uint32_t numWorkers);
+
     std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
 
     const MasterConfiguration config;
