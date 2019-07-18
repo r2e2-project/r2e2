@@ -17,24 +17,16 @@ using namespace pbrt;
 void usage(const char *argv0) { cerr << argv0 << " OP SCENE-PATH NUM" << endl; }
 
 void generateReport(const roost::path &scenePath,
-                    const map<uint32_t, CloudBVH::TreeletInfo> &treeletInfo) {
-    auto filename = [](const uint32_t tId) { return "T" + to_string(tId); };
-
-    map<uint32_t, size_t> treeletSizes;
-
-    for (const auto &item : treeletInfo) {
-        const auto id = item.first;
-        const auto &info = item.second;
-
-        treeletSizes[id] = roost::file_size(scenePath / filename(id));
-    }
+                    const map<uint32_t, CloudBVH::TreeletInfo> &treeletInfo,
+                    const map<uint32_t, size_t> &treeletSize) {
+    map<uint32_t, size_t> totalSize = treeletSize;
 
     for (const auto &item : treeletInfo) {
         const auto id = item.first;
         const auto &info = item.second;
 
         for (const auto t : info.instances) {
-            treeletSizes[id] += treeletSizes[t];
+            totalSize[id] += treeletSize.at(t);
         }
     }
 
@@ -46,11 +38,33 @@ void generateReport(const roost::path &scenePath,
         toVisit.pop();
 
         cout << "T" << c << " = " << fixed << setprecision(2)
-             << (1.0 * treeletSizes[c] / (1 << 20)) << " MiB" << endl;
+             << (1.0 * totalSize[c] / (1 << 20)) << " MiB" << endl;
 
         for (const auto t : treeletInfo.at(c).children) {
             toVisit.push(t);
         }
+    }
+}
+
+void printTreeletInfo(const map<uint32_t, CloudBVH::TreeletInfo> &treeletInfo,
+                      const map<uint32_t, size_t> &treeletSize) {
+    for (const auto &item : treeletInfo) {
+        const auto id = item.first;
+        const auto &info = item.second;
+
+        cout << "TREELET " << id << " " << treeletSize.at(id) << endl;
+
+        cout << "CHILD";
+        for (const auto t : info.children) {
+            cout << " " << t;
+        }
+        cout << endl;
+
+        cout << "INSTANCE";
+        for (const auto t : info.instances) {
+            cout << " " << t;
+        }
+        cout << endl;
     }
 }
 
@@ -91,21 +105,26 @@ int main(int argc, char const *argv[]) {
         PbrtOptions.nThreads = 1;
 
         const string operation{argv[1]};
-        const string scenePath{argv[2]};
+        const roost::path scenePath{argv[2]};
         const uint32_t treeletCount = stoul(argv[3]);
-        global::manager.init(scenePath);
+        global::manager.init(scenePath.string());
 
+        auto filename = [](const uint32_t tId) { return "T" + to_string(tId); };
         map<uint32_t, CloudBVH::TreeletInfo> treeletInfo;
+        map<uint32_t, size_t> treeletSize;
 
         for (size_t i = 0; i < treeletCount; i++) {
             CloudBVH bvh{};
             treeletInfo[i] = bvh.GetInfo(i);
+            treeletSize[i] = roost::file_size(scenePath / filename(i));
         }
 
         if (operation == "report") {
-            generateReport(scenePath, treeletInfo);
+            generateReport(scenePath, treeletInfo, treeletSize);
         } else if (operation == "graph") {
             generateGraph(treeletInfo);
+        } else if (operation == "info") {
+            printTreeletInfo(treeletInfo, treeletSize);
         }
 
     } catch (const exception &e) {
