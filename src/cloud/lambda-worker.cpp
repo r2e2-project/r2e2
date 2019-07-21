@@ -1065,8 +1065,8 @@ RayStatePtr LambdaWorker::popRayQueue() {
 }
 
 bool LambdaWorker::processMessage(const Message& message) {
-    cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
-         << "]" << endl;
+    /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
+         << "]" << endl; */
 
     auto handleConnectTo = [this](const protobuf::ConnectTo& proto) {
         if (peers.count(proto.worker_id()) == 0 &&
