@@ -4,6 +4,7 @@
 #define PBRT_NET_SOCKET_H
 
 #include <functional>
+#include <sys/uio.h>
 
 #include "address.h"
 #include "util/file_descriptor.h"
@@ -57,6 +58,10 @@ public:
 
     /* send datagram to specified address */
     void sendto( const Address & peer, const std::string & payload );
+
+    /* sendmsg */
+    void sendmsg( const Address & peer, const iovec * iov,
+                  const size_t iovcnt );
 
     /* send datagram to connected address */
     void send( const std::string & payload );

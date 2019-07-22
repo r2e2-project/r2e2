@@ -108,6 +108,23 @@ void UDPSocket::sendto( const Address & destination, const string & payload )
     }
 }
 
+void UDPSocket::sendmsg( const Address & peer, const iovec * iov,
+                         const size_t iovcnt )
+{
+    struct msghdr message_header = {
+        .msg_name = ( void * )&peer.to_sockaddr(),
+        .msg_namelen = peer.size(),
+        .msg_iov = ( struct iovec * )iov,
+        .msg_iovlen = iovcnt,
+        .msg_control = nullptr,
+        .msg_controllen = 0,
+        .msg_flags = 0
+    };
+
+    CheckSystemCall( "sendmsg", ::sendmsg( fd_num(), &message_header, 0 ) );
+    register_write();
+}
+
 /* send datagram to connected address */
 void UDPSocket::send( const string & payload )
 {
