@@ -285,6 +285,7 @@ message RayStats {
     uint64 demanded_rays = 6;
     uint64 sending_rays = 7;
     uint64 pending_rays = 8;
+    uint64 finished_rays = 9;
 }
 
 message QueueStats {

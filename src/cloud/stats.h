@@ -41,6 +41,9 @@ struct RayStats {
        which worker to send them to */
     uint64_t pendingRays{0};
 
+    /* rays that are finished processing */
+    uint64_t finishedRays{0};
+
     void reset();
     void merge(const RayStats& other);
 };
@@ -73,6 +76,7 @@ struct WorkerStats {
     uint64_t processedRays() const { return aggregateStats.processedRays; }
     uint64_t sendingRays() const { return aggregateStats.sendingRays; }
     uint64_t pendingRays() const { return aggregateStats.pendingRays; }
+    uint64_t finishedRays() const { return aggregateStats.finishedRays; }
 
     void recordFinishedPath();
     void recordSentRay(const RayState& ray);
@@ -83,6 +87,7 @@ struct WorkerStats {
     void recordDemandedRay(const RayState& ray);
     void recordSendingRay(const RayState& ray);
     void recordPendingRay(const RayState& ray);
+    void recordFinishedRay(const RayState& ray);
 
     void recordSentRays(const uint32_t treeletId, const size_t count);
     void recordResentRays(const uint32_t treeletId, const size_t count);

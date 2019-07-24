@@ -20,6 +20,7 @@ void RayStats::reset() {
     demandedRays = 0;
     sendingRays = 0;
     pendingRays = 0;
+    finishedRays = 0;
 }
 
 void RayStats::merge(const RayStats& other) {
@@ -31,6 +32,7 @@ void RayStats::merge(const RayStats& other) {
     demandedRays += other.demandedRays;
     sendingRays += other.sendingRays;
     pendingRays += other.pendingRays;
+    finishedRays += other.finishedRays;
 }
 
 #define INCREMENT_FIELD(name__)                                           \
@@ -72,6 +74,10 @@ void WorkerStats::recordSendingRay(const RayState& ray) {
 
 void WorkerStats::recordPendingRay(const RayState& ray) {
     INCREMENT_FIELD(pendingRays);
+}
+
+void WorkerStats::recordFinishedRay(const RayState& ray) {
+    INCREMENT_FIELD(finishedRays);
 }
 
 void WorkerStats::recordSentRays(const uint32_t treeletId, const size_t count) {
