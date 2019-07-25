@@ -55,6 +55,8 @@ class Message {
         "StartBenchmark",
         "Bye"};
 
+    constexpr static size_t HEADER_LENGTH = 25;
+
   private:
     uint16_t attempt_{0};
     bool tracked_{false};
@@ -82,11 +84,11 @@ class Message {
     uint32_t payload_length() const { return payload_length_; }
     const std::string& payload() const { return payload_; }
 
-    size_t total_length() const { return 25 + payload_length(); }
+    size_t total_length() const { return HEADER_LENGTH + payload_length(); }
 
     std::string str() const;
 
-    static void str(std::string& message_str, const uint64_t sender_id,
+    static void str(char* message_str, const uint64_t sender_id,
                     const OpCode opcode, const size_t payloadLength,
                     const bool reliable = false,
                     const uint64_t sequence_number = 0,

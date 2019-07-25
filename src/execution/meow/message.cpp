@@ -48,7 +48,7 @@ string Message::str() const {
                         sequence_number_, tracked_);
 }
 
-void Message::str(std::string& message_str, const uint64_t sender_id,
+void Message::str(char* message_str, const uint64_t sender_id,
                   const OpCode opcode, const size_t payloadLength,
                   const bool reliable, const uint64_t sequence_number,
                   const bool tracked) {
