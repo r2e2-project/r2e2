@@ -58,6 +58,12 @@ struct RayState {
     uint8_t toVisitHead{0};
     TreeletNode toVisit[64];
 
+    /* RayState is serialized up until this point, and the serialized data
+       will be stored below */
+
+    size_t serializedSize{0};
+    char serialized[1400];
+
     bool toVisitEmpty() const { return toVisitHead == 0; }
     const TreeletNode &toVisitTop() const { return toVisit[toVisitHead - 1]; }
     void toVisitPush(TreeletNode &&t) { toVisit[toVisitHead++] = std::move(t); }
@@ -71,11 +77,10 @@ struct RayState {
 
     /* serialization */
     size_t Size() const;
-    static std::string serialize(const RayStatePtr &, const bool = true);
-    static RayStatePtr deserialize(const std::string &, const bool = true);
-    static size_t serialize_into_str(std::string &, const RayStatePtr &,
-                                     const size_t, const size_t,
-                                     const bool = true);
+    size_t SerializedSize() const { return serializedSize; }
+    size_t Serialize(const bool compress = true);
+    void Deserialize(const char *data, const size_t len,
+                     const bool decompress = true);
 };
 
 }  // namespace pbrt
