@@ -16,7 +16,7 @@ struct RayState;
 using RayStatePtr = std::unique_ptr<RayState>;
 
 struct RayState {
-    struct TreeletNode {
+    struct __attribute__((packed)) TreeletNode {
         uint32_t treelet{0};
         uint32_t node{0};
         uint8_t primitive{0};
