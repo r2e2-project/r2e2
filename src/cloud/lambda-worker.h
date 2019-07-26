@@ -112,7 +112,7 @@ class LambdaWorker {
         char header[meow::Message::HEADER_LENGTH];
         std::deque<std::unique_ptr<RayState>> rays;
 
-        struct iovec iov[10] = {{.iov_base = header, .iov_len = 25}};
+        struct iovec iov[20] = {{.iov_base = header, .iov_len = 25}};
         size_t iovCount{1};
 
         RayPacket(const Address& addr, const WorkerId destId,
@@ -185,7 +185,6 @@ class LambdaWorker {
     void loadFakeScene();
 
     Poller::Action::Result::Type handleRayQueue();
-    Poller::Action::Result::Type handleOutQueue();
     Poller::Action::Result::Type handleFinishedQueue();
     Poller::Action::Result::Type handleFinishedPaths();
     Poller::Action::Result::Type handlePeers();

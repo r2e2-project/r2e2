@@ -56,7 +56,6 @@ size_t RayState::Serialize(const bool compress) {
             throw runtime_error("ray compression failed");
         }
     } else {
-        len = size;
         memcpy(serialized + 4, reinterpret_cast<char *>(this), size);
     }
 

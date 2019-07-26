@@ -123,14 +123,15 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         },
         []() { throw runtime_error("acks failed"); }));
 
-    eventAction[Event::UdpSend] = loop.poller().add_action(Poller::Action(
-        udpConnection.socket(), Direction::Out,
-        bind(&LambdaWorker::handleUdpSend, this),
-        [this]() {
-            return (!servicePackets.empty() || !rayPackets.empty()) &&
-                   udpConnection.within_pace();
-        },
-        []() { throw runtime_error("udp out failed"); }));
+    eventAction[Event::UdpSend] = loop.poller().add_action(
+        Poller::Action(udpConnection.socket(), Direction::Out,
+                       bind(&LambdaWorker::handleUdpSend, this),
+                       [this]() {
+                           return udpConnection.within_pace() &&
+                                  (!servicePackets.empty() ||
+                                   !rayPackets.empty() || outQueueSize > 0);
+                       },
+                       []() { throw runtime_error("udp out failed"); }));
 
     /* trace rays */
     eventAction[Event::RayQueue] = loop.poller().add_action(Poller::Action(
@@ -987,6 +988,8 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             if (treeletIds.count(nextTreelet)) {
                 pushRayQueue(move(statePtr));
             } else {
+                statePtr->Serialize();
+
                 if (treeletToWorker.count(nextTreelet)) {
                     workerStats.recordSendingRay(state);
                     outQueue[nextTreelet].push_back(move(statePtr));
