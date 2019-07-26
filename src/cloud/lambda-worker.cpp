@@ -756,9 +756,13 @@ ResultType LambdaWorker::handleUdpSend() {
 
         packet.length = Message::HEADER_LENGTH;
 
-        while (queue.size() > 0) {
+        while (!queue.empty()) {
             auto& ray = queue.front();
             const auto size = ray->SerializedSize();
+
+            if (size == 0) {
+                throw runtime_error("ray is not serialized");
+            }
 
             if (size + packet.length > UDP_MTU_BYTES) break;
 
