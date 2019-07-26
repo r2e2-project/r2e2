@@ -773,8 +773,8 @@ ResultType LambdaWorker::handleUdpSend() {
             outQueueSize--;
         }
 
-        if (queue.size() == 0) {
-            outQueue.erase(treeletId);
+        if (queue.empty()) {
+            outQueue.erase(kvIt);
         }
 
         /* (4) fix the header */
@@ -1181,16 +1181,16 @@ bool LambdaWorker::processMessage(const Message& message) {
 
     case OpCode::SendRays: {
         const char* data = message.payload().data();
+        const uint32_t dataLen = message.payload().length();
         uint32_t offset = 0;
-        uint32_t length = message.payload().length();
 
-        while (offset < length) {
-            length = *reinterpret_cast<const uint32_t*>(data + offset);
+        while (offset < dataLen) {
+            const auto len = *reinterpret_cast<const uint32_t*>(data + offset);
             offset += 4;
 
             RayStatePtr ray = make_unique<RayState>();
-            ray->Deserialize(data + offset, length);
-            offset += length;
+            ray->Deserialize(data + offset, len);
+            offset += len;
 
             ray->hop++;
             workerStats.recordReceivedRay(*ray);
