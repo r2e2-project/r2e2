@@ -112,9 +112,6 @@ class LambdaWorker {
         char header[meow::Message::HEADER_LENGTH];
         std::deque<std::unique_ptr<RayState>> rays;
 
-        struct iovec iov[20] = {{.iov_base = header, .iov_len = 25}};
-        size_t iovCount{1};
-
         RayPacket(const Address& addr, const WorkerId destId,
                   const TreeletId targetTreelet, const bool reliable = false,
                   const uint64_t sequenceNumber = 0, const bool tracked = false)
@@ -128,8 +125,8 @@ class LambdaWorker {
         void addRay(RayStatePtr&& ray) {
             assert(iovCount < sizeof(iov) / (sizeof struct iovec));
 
-            iov[iovCount++] = {.iov_base = ray->serialized,
-                               .iov_len = ray->serializedSize};
+            iov_[iovCount_++] = {.iov_base = ray->serialized,
+                                 .iov_len = ray->serializedSize};
 
             rays.push_back(std::move(ray));
         }
@@ -139,6 +136,17 @@ class LambdaWorker {
             const uint16_t val = htobe16(attempt);
             memcpy(header, reinterpret_cast<const char*>(&val), sizeof(val));
         }
+
+        struct iovec* iov() {
+            iov_[0].iov_base = header;
+            return iov_;
+        }
+
+        size_t iovCount() const { return iovCount_; }
+
+      private:
+        struct iovec iov_[20] = {{.iov_base = nullptr, .iov_len = 25}};
+        size_t iovCount_{1};
     };
 
     enum class RayAction {

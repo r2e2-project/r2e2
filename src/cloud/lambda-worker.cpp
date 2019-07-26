@@ -791,8 +791,8 @@ ResultType LambdaWorker::handleUdpSend() {
     /* peer to send the packet to */
     udpConnection.bytes_sent += packet.length;
     udpConnection.record_send(packet.length);
-    udpConnection.socket().sendmsg(packet.destination, packet.iov,
-                                   packet.iovCount);
+    udpConnection.socket().sendmsg(packet.destination, packet.iov(),
+                                   packet.iovCount());
 
     /* do the necessary logging */
     if (packet.retransmission) {
