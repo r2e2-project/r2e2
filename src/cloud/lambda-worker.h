@@ -101,41 +101,44 @@ class LambdaWorker {
         Address destination;
         WorkerId destinationId;
         TreeletId targetTreelet;
-        size_t rayCount;
 
         bool retransmission{false};
         bool reliable{false};
         bool tracked{false};
         uint64_t sequenceNumber;
         size_t attempt{0};
+        size_t length{0};
 
-        std::vector<std::unique_ptr<RayState>> trackedRays;
+        char header[meow::Message::HEADER_LENGTH];
+        std::deque<std::unique_ptr<RayState>> rays;
 
-        std::string& data() { return data_; }
+        struct iovec iov[10] = {{.iov_base = header, .iov_len = 25}};
+        size_t iovCount{1};
 
         RayPacket(const Address& addr, const WorkerId destId,
-                  const TreeletId targetTreelet, const size_t rayCount,
-                  std::string&& data, const bool reliable = false,
+                  const TreeletId targetTreelet, const bool reliable = false,
                   const uint64_t sequenceNumber = 0, const bool tracked = false)
             : destination(addr),
               destinationId(destId),
               targetTreelet(targetTreelet),
-              rayCount(rayCount),
-              data_(std::move(data)),
               reliable(reliable),
               sequenceNumber(sequenceNumber),
               tracked(tracked) {}
 
-        void incrementAttempts() {
-            if (data_.length() < 2) return;
+        void addRay(RayStatePtr&& ray) {
+            assert(iovCount < sizeof(iov) / (sizeof struct iovec));
 
-            attempt++;
-            const uint16_t val = htobe16(attempt);
-            memcpy(&data_[0], reinterpret_cast<const char*>(&val), sizeof(val));
+            iov[iovCount++] = {.iov_base = ray->serialized,
+                               .iov_len = ray->serializedSize};
+
+            rays.push_back(std::move(ray));
         }
 
-      private:
-        mutable std::string data_;
+        void incrementAttempts() {
+            attempt++;
+            const uint16_t val = htobe16(attempt);
+            memcpy(header, reinterpret_cast<const char*>(&val), sizeof(val));
+        }
     };
 
     enum class RayAction {

@@ -138,13 +138,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return !rayQueue.empty(); },
         []() { throw runtime_error("ray queue failed"); }));
 
-    /* send processed rays */
-    eventAction[Event::OutQueue] = loop.poller().add_action(
-        Poller::Action(outQueueTimer.fd, Direction::In,
-                       bind(&LambdaWorker::handleOutQueue, this),
-                       [this]() { return outQueueSize > 0; },
-                       []() { throw runtime_error("out queue failed"); }));
-
     /* send finished rays */
     /* FIXME we're throwing out finished rays, for now */
     eventAction[Event::FinishedQueue] = loop.poller().add_action(Poller::Action(
@@ -480,6 +473,8 @@ ResultType LambdaWorker::handleRayQueue() {
         if (treeletIds.count(nextTreelet)) {
             pushRayQueue(move(ray));
         } else {
+            ray->Serialize();
+
             if (treeletToWorker.count(nextTreelet)) {
                 workerStats.recordSendingRay(*ray);
                 outQueue[nextTreelet].push_back(move(ray));
@@ -491,87 +486,6 @@ ResultType LambdaWorker::handleRayQueue() {
                 pendingQueue[nextTreelet].push_back(move(ray));
                 pendingQueueSize++;
             }
-        }
-    }
-
-    return ResultType::Continue;
-}
-
-ResultType LambdaWorker::handleOutQueue() {
-    RECORD_INTERVAL("handleOutQueue");
-
-    outQueueTimer.reset();
-
-    for (auto& q : outQueue) {
-        if (q.second.empty()) continue;
-
-        const auto treeletId = q.first;
-        auto& outRays = q.second;
-
-        const auto& candidates = treeletToWorker[treeletId];
-        const auto& peer =
-            peers.at(*random::sample(candidates.begin(), candidates.end()));
-
-        auto& peerSeqNo = sequenceNumbers[peer.address];
-
-        while (!outRays.empty()) {
-            size_t packetLen = 25;
-            size_t rayCount = 0;
-            string currentPacketStr;
-            currentPacketStr.resize(UDP_MTU_BYTES);
-
-            vector<unique_ptr<RayState>> trackedRays;
-
-            {
-                while (packetLen < UDP_MTU_BYTES && !outRays.empty()) {
-                    RayStatePtr ray = move(outRays.front());
-                    outRays.pop_front();
-                    outQueueSize--;
-
-                    size_t bytesWritten = RayState::serialize_into_str(
-                        currentPacketStr, ray, packetLen,
-                        UDP_MTU_BYTES - packetLen);
-                    logRayAction(*ray, RayAction::Queued);
-                    const size_t len = bytesWritten + 4;
-
-                    if (bytesWritten == 0) {
-                        outRays.push_front(move(ray));
-                        break;
-                    }
-
-                    if (ray->trackRay) {
-                        trackedRays.push_back(move(ray));
-                    }
-
-                    packetLen += len;
-                    rayCount++;
-                }
-            }
-
-            const bool tracked = packetLogBD(randEngine);
-            currentPacketStr.resize(packetLen);
-            Message::str(currentPacketStr, *workerId, OpCode::SendRays,
-                         packetLen - 25, config.sendReliably, peerSeqNo,
-                         tracked);
-
-            RayPacket rayPacket{peer.address,
-                                peer.id,
-                                treeletId,
-                                rayCount,
-                                move(currentPacketStr),
-                                config.sendReliably,
-                                peerSeqNo,
-                                tracked};
-
-            if (tracked) {
-                logPacket(peerSeqNo, 0, PacketAction::Queued, peer.id,
-                          rayPacket.data().length(), rayCount);
-            }
-
-            rayPacket.trackedRays = move(trackedRays);
-            rayPackets.emplace_back(move(rayPacket));
-
-            peerSeqNo++;
         }
     }
 
@@ -817,27 +731,83 @@ ResultType LambdaWorker::handleUdpSend() {
     }
 
     /* packet to send */
+    if (rayPackets.empty()) {
+        /* let's create a ray packet */
+
+        /* (1) pick a treelet */
+        auto kvIt = outQueue.begin();
+        const auto treeletId = kvIt->first;
+        auto& queue = kvIt->second;
+
+        /* (2) pick a worker to send to */
+        const auto& candidates = treeletToWorker[treeletId];
+        const auto& peer =
+            peers.at(*random::sample(candidates.begin(), candidates.end()));
+        auto& peerSeqNo = sequenceNumbers[peer.address];
+
+        /* (3) collect the rays to fill a packet */
+        const bool tracked = packetLogBD(randEngine);
+
+        rayPackets.emplace_back(peer.address, peer.id, treeletId,
+                                config.sendReliably, peerSeqNo, tracked);
+
+        auto& packet = rayPackets.back();
+
+        packet.length = Message::HEADER_LENGTH;
+
+        while (queue.size() > 0) {
+            auto& ray = queue.front();
+            const auto size = ray->SerializedSize();
+
+            if (size + packet.length > UDP_MTU_BYTES) break;
+
+            packet.length += size;
+            packet.addRay(move(ray));
+
+            queue.pop_front();
+            outQueueSize--;
+        }
+
+        if (queue.size() == 0) {
+            outQueue.erase(treeletId);
+        }
+
+        /* (4) fix the header */
+        Message::str(packet.header, *workerId, OpCode::SendRays,
+                     packet.length - Message::HEADER_LENGTH,
+                     config.sendReliably, peerSeqNo, tracked);
+
+        if (tracked) {
+            logPacket(peerSeqNo, 0, PacketAction::Queued, peer.id,
+                      packet.length, packet.rays.size());
+        }
+
+        peerSeqNo++;
+    }
+
     RayPacket& packet = rayPackets.front();
 
     /* peer to send the packet to */
-    sendUdpPacket(packet.destination, packet.data());
+    udpConnection.bytes_sent += packet.length;
+    udpConnection.record_send(packet.length);
+    udpConnection.socket().sendmsg(packet.destination, packet.iov,
+                                   packet.iovCount);
 
     /* do the necessary logging */
     if (packet.retransmission) {
-        workerStats.recordResentRays(packet.targetTreelet, packet.rayCount);
+        workerStats.recordResentRays(packet.targetTreelet, packet.rays.size());
     } else {
-        workerStats.recordSentRays(packet.targetTreelet, packet.rayCount);
+        workerStats.recordSentRays(packet.targetTreelet, packet.rays.size());
     }
 
-    for (auto& rayPtr : packet.trackedRays) {
+    for (auto& rayPtr : packet.rays) {
         logRayAction(*rayPtr, RayAction::Sent, packet.destinationId);
         rayPtr->tick++;
     }
 
     if (trackPackets && packet.tracked) {
         logPacket(packet.sequenceNumber, packet.attempt, PacketAction::Sent,
-                  packet.destinationId, packet.data().length(),
-                  packet.rayCount);
+                  packet.destinationId, packet.length, packet.rays.size());
     }
 
     if (packet.reliable) {
@@ -1203,18 +1173,23 @@ bool LambdaWorker::processMessage(const Message& message) {
     }
 
     case OpCode::SendRays: {
-        protobuf::RecordReader reader{istringstream{message.payload()}};
+        const char* data = message.payload().data();
+        uint32_t offset = 0;
+        uint32_t length = message.payload().length();
 
-        while (!reader.eof()) {
-            string rayStr;
-            if (reader.read(&rayStr)) {
-                RayStatePtr ray = RayState::deserialize(rayStr);
-                ray->hop++;
-                workerStats.recordReceivedRay(*ray);
-                logRayAction(*ray, RayAction::Received, message.sender_id());
-                ray->tick = 0;
-                pushRayQueue(move(ray));
-            }
+        while (offset < length) {
+            length = *reinterpret_cast<const uint32_t*>(data + offset);
+            offset += 4;
+
+            RayStatePtr ray = make_unique<RayState>();
+            ray->Deserialize(data + offset, length);
+            offset += length;
+
+            ray->hop++;
+            workerStats.recordReceivedRay(*ray);
+            logRayAction(*ray, RayAction::Received, message.sender_id());
+            ray->tick = 0;
+            pushRayQueue(move(ray));
         }
 
         break;
