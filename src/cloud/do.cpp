@@ -76,7 +76,9 @@ int main(int argc, char const *argv[]) {
             while (!reader.eof()) {
                 string rayStr;
                 if (reader.read(&rayStr)) {
-                    rayStates.push_back(RayState::deserialize(rayStr));
+                    auto rayStatePtr = make_unique<RayState>();
+                    rayStatePtr->Deserialize(rayStr.data(), rayStr.length());
+                    rayStates.push_back(move(rayStatePtr));
                 }
             }
         }
@@ -125,7 +127,8 @@ int main(int argc, char const *argv[]) {
         {
             protobuf::RecordWriter writer{outputPath};
             for (auto &rayState : outputRays) {
-                writer.write(RayState::serialize(rayState));
+                const auto len = rayState->Serialize();
+                writer.write(rayState->serialized, len);
             }
         }
 
@@ -133,7 +136,8 @@ int main(int argc, char const *argv[]) {
         {
             protobuf::RecordWriter writer{finishedPath};
             for (auto &finished : finishedRays) {
-                writer.write(RayState::serialize(finished));
+                const auto len = finished->Serialize();
+                writer.write(finished->serialized, len);
             }
         }
 

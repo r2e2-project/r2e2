@@ -84,7 +84,8 @@ int main(int argc, char const *argv[]) {
                 state.ray.ScaleDifferentials(rayScale);
                 state.StartTrace();
 
-                rayWriter.write(RayState::serialize(statePtr));
+                const auto len = statePtr->Serialize();
+                rayWriter.write(statePtr->serialized, len);
                 sampleWriter.write(to_protobuf(sampleData));
             } while (sampler->StartNextSample());
         }

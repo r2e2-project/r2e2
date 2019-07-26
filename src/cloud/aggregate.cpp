@@ -57,13 +57,14 @@ int main(int argc, char const *argv[]) {
         for (string line; getline(cin, line);) {
             protobuf::RecordReader finishedReader{line};
 
-            while(!finishedReader.eof()) {
+            while (!finishedReader.eof()) {
                 ++finishedRayCount;
 
                 string rayStr;
                 finishedReader.read(&rayStr);
-                auto rayStatePtr = RayState::deserialize(rayStr);
-                auto & rayState = *rayStatePtr;
+                RayStatePtr rayStatePtr = make_unique<RayState>();
+                auto &rayState = *rayStatePtr;
+                rayState.Deserialize(rayStr.data(), rayStr.length());
 
                 Spectrum L{rayState.Ld * rayState.beta};
 
