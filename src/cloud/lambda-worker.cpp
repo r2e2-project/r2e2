@@ -477,6 +477,7 @@ ResultType LambdaWorker::handleRayQueue() {
             ray->Serialize();
 
             if (treeletToWorker.count(nextTreelet)) {
+                logRayAction(*ray, RayAction::Queued);
                 workerStats.recordSendingRay(*ray);
                 outQueue[nextTreelet].push_back(move(ray));
                 outQueueSize++;
@@ -995,10 +996,12 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
                 statePtr->Serialize();
 
                 if (treeletToWorker.count(nextTreelet)) {
+                    logRayAction(state, RayAction::Queued);
                     workerStats.recordSendingRay(state);
                     outQueue[nextTreelet].push_back(move(statePtr));
                     outQueueSize++;
                 } else {
+                    logRayAction(state, RayAction::Pending);
                     workerStats.recordPendingRay(state);
                     neededTreelets.insert(nextTreelet);
                     pendingQueue[nextTreelet].push_back(move(statePtr));
