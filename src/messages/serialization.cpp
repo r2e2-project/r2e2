@@ -34,6 +34,11 @@ void RecordWriter::write(const string& string) {
     coded_output_.WriteRaw(string.data(), string.length());
 }
 
+void RecordWriter::write(const char* data, const uint32_t len) {
+    coded_output_.WriteLittleEndian32(len);
+    coded_output_.WriteRaw(data, len);
+}
+
 void RecordWriter::write(const uint32_t& integer) {
     coded_output_.WriteLittleEndian32(4);
     coded_output_.WriteLittleEndian32(integer);
@@ -71,6 +76,27 @@ bool RecordReader::read(std::string* string) {
     }
 
     if (coded_input_.ReadString(string, next_size_)) {
+      eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
+      return true;
+    }
+
+    eof_ = true;
+    return false;
+}
+
+bool RecordReader::read(char* data, const uint32_t max_len)  {
+    if (eof_) { throw std::runtime_error("RecordReader: end of file reached"); }
+
+    if (next_size_ == 0) {
+        eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
+        return false;
+    }
+
+    if (coded_input_.ReadRaw(data, min(max_len, next_size_))) {
+      if (max_len < next_size_) {
+        coded_input_.Skip(next_size_ - max_len);
+      }
+
       eof_ = not coded_input_.ReadLittleEndian32(&next_size_);
       return true;
     }

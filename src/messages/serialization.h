@@ -28,6 +28,7 @@ public:
     void write(const ProtobufType & proto);
 
     void write(const std::string & string);
+    void write(const char* data, const uint32_t len);
 
     void write(const uint32_t& integer);
     void write(const uint64_t& integer);
@@ -54,6 +55,7 @@ public:
     bool read(ProtobufType * record);
 
     bool read(std::string* string);
+    bool read(char* data, const uint32_t max_len);
 
     bool read(uint32_t* integer);
     bool read(uint64_t* integer);
