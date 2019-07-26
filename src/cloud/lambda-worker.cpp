@@ -209,11 +209,11 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
                                  const uint32_t rate) {
     /* (1) disable all unnecessary actions */
     set<uint64_t> toDeactivate{
-        eventAction[Event::RayQueue],       eventAction[Event::OutQueue],
-        eventAction[Event::FinishedQueue],  eventAction[Event::Peers],
-        eventAction[Event::NeededTreelets], eventAction[Event::UdpSend],
-        eventAction[Event::UdpReceive],     eventAction[Event::RayAcks],
-        eventAction[Event::Diagnostics],    eventAction[Event::WorkerStats]};
+        eventAction[Event::RayQueue],   eventAction[Event::FinishedQueue],
+        eventAction[Event::Peers],      eventAction[Event::NeededTreelets],
+        eventAction[Event::UdpSend],    eventAction[Event::UdpReceive],
+        eventAction[Event::RayAcks],    eventAction[Event::Diagnostics],
+        eventAction[Event::WorkerStats]};
 
     loop.poller().deactivate_actions(toDeactivate);
     udpConnection.reset_reference();
