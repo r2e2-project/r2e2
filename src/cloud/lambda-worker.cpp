@@ -118,7 +118,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         bind(&LambdaWorker::handleRayAcknowledgements, this),
         [this]() {
             return !toBeAcked.empty() ||
-                   (!receivedAcks.empty() && !outstandingRayPackets.empty() &&
+                   (!outstandingRayPackets.empty() &&
                     outstandingRayPackets.front().first <= packet_clock::now());
         },
         []() { throw runtime_error("acks failed"); }));
@@ -679,7 +679,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
     // retransmit outstanding packets
     const auto now = packet_clock::now();
 
-    while (!receivedAcks.empty() && !outstandingRayPackets.empty() &&
+    while (!outstandingRayPackets.empty() &&
            outstandingRayPackets.front().first <= now) {
         auto& packet = outstandingRayPackets.front().second;
         auto& thisReceivedAcks = receivedAcks[packet.destination];
