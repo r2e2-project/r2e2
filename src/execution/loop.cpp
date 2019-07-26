@@ -411,6 +411,7 @@ Poller::Action::Result ExecutionLoop::handle_signal(
         throw runtime_error("interrupted by signal");
 
     case SIGINT:
+        cerr << endl;
         return ResultType::Exit;
 
     default:
