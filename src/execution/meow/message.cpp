@@ -16,7 +16,7 @@ constexpr char const*
     Message::OPCODE_NAMES[to_underlying(Message::OpCode::COUNT)];
 
 Message::Message(const Chunk& chunk) {
-    if (chunk.size() < 25) {
+    if (chunk.size() < HEADER_LENGTH) {
         throw out_of_range("incomplete header");
     }
 
@@ -82,7 +82,8 @@ std::string Message::str(const uint64_t sender_id, const OpCode opcode,
 }
 
 uint32_t Message::expected_length(const Chunk& chunk) {
-    return 25 + ((chunk.size() < 25) ? 0 : chunk(20, 4).be32());
+    return HEADER_LENGTH +
+           ((chunk.size() < HEADER_LENGTH) ? 0 : chunk(20, 4).be32());
 }
 
 void MessageParser::parse(const string& buf) {
