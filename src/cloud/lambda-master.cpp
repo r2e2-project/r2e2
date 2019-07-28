@@ -233,7 +233,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         []() { throw runtime_error("udp connection error"); },
         []() { throw runtime_error("udp connection died"); });
 
-    udpConnection->socket().bind({"0.0.0.0", listenPort});
+    udpConnection->bind({"0.0.0.0", listenPort});
 
     const Vector2i sampleExtent = sampleBounds.Diagonal();
     const int tileSize = getTileSize(sampleBounds, numberOfLambdas);

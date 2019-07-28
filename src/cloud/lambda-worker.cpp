@@ -109,7 +109,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { this->terminate(); });
 
     eventAction[Event::UdpReceive] = loop.poller().add_action(Poller::Action(
-        udpConnection.socket(), Direction::In,
+        udpConnection, Direction::In,
         bind(&LambdaWorker::handleUdpReceive, this), [this]() { return true; },
         []() { throw runtime_error("udp in failed"); }));
 
@@ -124,10 +124,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("acks failed"); }));
 
     eventAction[Event::UdpSend] = loop.poller().add_action(
-        Poller::Action(udpConnection.socket(), Direction::Out,
+        Poller::Action(udpConnection, Direction::Out,
                        bind(&LambdaWorker::handleUdpSend, this),
                        [this]() {
-                           return udpConnection.within_pace() &&
+                           return udpConnection.rate_limiter.within_pace() &&
                                   (!servicePackets.empty() ||
                                    !rayPackets.empty() || outQueueSize > 0);
                        },
@@ -216,17 +216,17 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
         eventAction[Event::WorkerStats]};
 
     loop.poller().deactivate_actions(toDeactivate);
-    udpConnection.reset_reference();
+    udpConnection.rate_limiter.reset_reference();
 
     if (rate) {
-        udpConnection.set_rate(rate);
+        udpConnection.rate_limiter.set_rate(rate);
     }
 
     /* (2) set up new udpReceive and udpSend actions */
     eventAction[Event::UdpReceive] = loop.poller().add_action(Poller::Action(
-        udpConnection.socket(), Direction::In,
+        udpConnection, Direction::In,
         [this]() {
-            auto datagram = udpConnection.socket().recvfrom();
+            auto datagram = udpConnection.recvfrom();
             benchmarkData.checkpoint.bytesReceived += datagram.second.length();
             benchmarkData.checkpoint.packetsReceived++;
             return ResultType::Continue;
@@ -238,19 +238,18 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
         const Address address = peers.at(destination).address;
 
         eventAction[Event::UdpSend] = loop.poller().add_action(Poller::Action(
-            udpConnection.socket(), Direction::Out,
+            udpConnection, Direction::Out,
             [this, address]() {
                 const static string packet =
                     Message::str(*workerId, OpCode::Ping, string(1300, 'x'));
-                udpConnection.socket().sendto(address, packet);
-                udpConnection.record_send(packet.length());
+                udpConnection.sendto(address, packet);
 
                 benchmarkData.checkpoint.bytesSent += packet.length();
                 benchmarkData.checkpoint.packetsSent++;
 
                 return ResultType::Continue;
             },
-            [this]() { return udpConnection.within_pace(); },
+            [this]() { return udpConnection.rate_limiter.within_pace(); },
             []() { throw runtime_error("udp out failed"); }));
     }
 
@@ -712,16 +711,9 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
 ResultType LambdaWorker::handleUdpSend() {
     RECORD_INTERVAL("sendUDP");
 
-    /* we always send service packets first */
-    auto sendUdpPacket = [this](const Address& peer, const string& payload) {
-        udpConnection.bytes_sent += payload.length();
-        udpConnection.socket().sendto(peer, payload);
-        udpConnection.record_send(payload.length());
-    };
-
     if (!servicePackets.empty()) {
         auto& datagram = servicePackets.front();
-        sendUdpPacket(datagram.destination, datagram.data);
+        udpConnection.sendto(datagram.destination, datagram.data);
 
         if (datagram.ackPacket && datagram.tracked) {
             logPacket(datagram.ackId, 0, PacketAction::AckSent,
@@ -792,12 +784,8 @@ ResultType LambdaWorker::handleUdpSend() {
     }
 
     RayPacket& packet = rayPackets.front();
-
-    /* peer to send the packet to */
-    udpConnection.bytes_sent += packet.length;
-    udpConnection.record_send(packet.length);
-    udpConnection.socket().sendmsg(packet.destination, packet.iov(),
-                                   packet.iovCount());
+    udpConnection.sendmsg(packet.destination, packet.iov(),
+                                   packet.iovCount(), packet.length);
 
     /* do the necessary logging */
     if (packet.retransmission) {
@@ -828,9 +816,8 @@ ResultType LambdaWorker::handleUdpSend() {
 ResultType LambdaWorker::handleUdpReceive() {
     RECORD_INTERVAL("receiveUDP");
 
-    auto datagram = udpConnection.socket().recvfrom();
+    auto datagram = udpConnection.recvfrom();
     auto& data = datagram.second;
-    udpConnection.bytes_received += data.length();
 
     messageParser.parse(data);
     auto& messages = messageParser.completed_messages();
@@ -1239,11 +1226,15 @@ void LambdaWorker::run() {
 
         // If this connection is not within pace, it requests a timeout when it
         // would be, so that we can re-poll and schedule it.
-        const int64_t ahead_us = udpConnection.micros_ahead_of_pace();
+        const int64_t ahead_us =
+            udpConnection.rate_limiter.micros_ahead_of_pace();
+
         int64_t ahead_ms = ahead_us / 1000;
         if (ahead_us != 0 && ahead_ms == 0) ahead_ms = 1;
 
-        const int timeout_ms = udpConnection.within_pace() ? -1 : ahead_ms;
+        const int timeout_ms =
+            udpConnection.rate_limiter.within_pace() ? -1 : ahead_ms;
+
         min_timeout_ms = min_neg_infinity(min_timeout_ms, timeout_ms);
 
         auto res = loop.loop_once(min_timeout_ms).result;

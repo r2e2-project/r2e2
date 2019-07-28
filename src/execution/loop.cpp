@@ -225,12 +225,11 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
     };
 
     poller_.add_action(Poller::Action(
-        connection->socket_, Direction::In,
+        *connection, Direction::In,
         [connection, data_callback{move(data_callback)},
          close_callback{move(real_close_callback)}]() {
-            auto datagram = connection->socket_.recvfrom();
+            auto datagram = connection->recvfrom();
             auto &data = datagram.second;
-            connection->bytes_received += data.length();
 
             if (not data_callback(connection, move(datagram.first),
                                   move(data))) {
@@ -243,11 +242,10 @@ shared_ptr<UDPConnection> ExecutionLoop::make_udp_connection(
         [connection]() { return true; }, fderror_callback));
 
     poller_.add_action(Poller::Action(
-        connection->socket_, Direction::Out,
+        *connection, Direction::Out,
         [connection]() {
             auto &datagram = connection->packet_queue_.front();
-            connection->bytes_sent += datagram.second.length();
-            connection->socket_.sendto(datagram.first, datagram.second);
+            connection->sendto(datagram.first, datagram.second);
             connection->packet_queue_.pop();
             return ResultType::Continue;
         },
