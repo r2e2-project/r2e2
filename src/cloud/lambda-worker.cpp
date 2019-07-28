@@ -823,22 +823,23 @@ ResultType LambdaWorker::handleUdpReceive() {
 
     auto it = messages.end();
     while (it != messages.begin()) {
+        auto& message = *it;
         it--;
 
-        if (it->is_read()) break;
-        it->set_read();
+        if (message.is_read()) break;
+        message.set_read();
 
-        if (it->reliable()) {
-            const auto seqNo = it->sequence_number();
-            toBeAcked[datagram.first].emplace_back(seqNo, it->tracked(),
-                                                   it->attempt());
+        if (message.reliable()) {
+            const auto seqNo = message.sequence_number();
+            toBeAcked[datagram.first].emplace_back(seqNo, message.tracked(),
+                                                   message.attempt());
 
             auto& received = receivedPacketSeqNos[datagram.first];
 
-            if (it->tracked()) {
-                logPacket(it->sequence_number(), it->attempt(),
-                          PacketAction::Received, it->sender_id(),
-                          it->total_length());
+            if (message.tracked()) {
+                logPacket(message.sequence_number(), message.attempt(),
+                          PacketAction::Received, message.sender_id(),
+                          message.total_length());
             }
 
             if (received.contains(seqNo)) {
@@ -849,14 +850,14 @@ ResultType LambdaWorker::handleUdpReceive() {
             }
         }
 
-        if (it->opcode() == OpCode::Ack) {
-            Chunk chunk(it->payload());
+        if (message.opcode() == OpCode::Ack) {
+            Chunk chunk(message.payload());
             auto& thisReceivedAcks = receivedAcks[datagram.first];
 
-            if (it->tracked()) {
-                logPacket(it->sequence_number(), it->attempt(),
-                          PacketAction::AckReceived, it->sender_id(),
-                          it->total_length(), 0u);
+            if (message.tracked()) {
+                logPacket(message.sequence_number(), message.attempt(),
+                          PacketAction::AckReceived, message.sender_id(),
+                          message.total_length(), 0u);
             }
 
             while (chunk.size()) {
@@ -872,11 +873,15 @@ ResultType LambdaWorker::handleUdpReceive() {
 
                 if (tracked) {
                     logPacket(seqNo, attempt, PacketAction::Acked,
-                              it->sender_id(), 0u);
+                              message.sender_id(), 0u);
                 }
             }
 
             it = messages.erase(it);
+        }
+
+        if (message.opcode() == OpCode::SendRays) {
+            activeSenders[message.sender_id()] = packet_clock::now();
         }
     }
 

@@ -257,6 +257,8 @@ class LambdaWorker {
     int32_t mySeed;
     std::string outputName;
 
+    std::map<WorkerId, packet_clock::time_point> activeSenders;
+
     /* Sending rays to other nodes */
     uint64_t ackId{0};
     UDPConnection udpConnection{true, config.maxUdpRate};
