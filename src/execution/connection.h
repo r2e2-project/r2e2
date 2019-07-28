@@ -37,12 +37,7 @@ class Connection {
     Connection& operator=(const Connection&) = delete;
     Connection(const Connection&) = delete;
 
-    ~Connection() {
-        if (write_buffer_.size()) {
-            /* std::cerr << "Connection destroyed with data left in write
-             * buffer" << std::endl; */
-        }
-    }
+    ~Connection() {}
 
     void enqueue_write(const std::string& str) { write_buffer_.append(str); }
     SocketType& socket() { return socket_; }
@@ -51,7 +46,7 @@ class Connection {
     size_t bytes_received{0};
 };
 
-class RateLimiter {
+class Pacer {
   private:
     uint64_t rate_Mbps_{80};
     uint64_t bits_since_reference_{0};
@@ -62,7 +57,7 @@ class RateLimiter {
     bool enabled_;
 
   public:
-    RateLimiter(const bool enabled, const uint64_t rate_mbps)
+    Pacer(const bool enabled, const uint64_t rate_mbps)
         : enabled_(enabled), rate_Mbps_(rate_mbps) {}
 
     int64_t micros_ahead_of_pace() const;
@@ -72,7 +67,7 @@ class RateLimiter {
     void record_send(const size_t data_len);
 };
 
-class UDPConnection : public UDPSocket {
+class UDPConnection : public Pacer, public UDPSocket {
     friend class ExecutionLoop;
 
   private:
@@ -80,7 +75,7 @@ class UDPConnection : public UDPSocket {
 
   public:
     UDPConnection(const bool pacing = false, const uint64_t rate_mbps = 80)
-        : UDPSocket(), rate_limiter(pacing, rate_mbps) {
+        : Pacer(pacing, rate_mbps), UDPSocket() {
         set_blocking(false);
     }
 
@@ -94,7 +89,6 @@ class UDPConnection : public UDPSocket {
     void sendmsg(const Address& peer, const iovec* iov, const size_t iovcnt,
                  const size_t total_length);
 
-    RateLimiter rate_limiter;
     size_t bytes_sent{0};
     size_t bytes_received{0};
 };

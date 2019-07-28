@@ -123,15 +123,14 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         },
         []() { throw runtime_error("acks failed"); }));
 
-    eventAction[Event::UdpSend] = loop.poller().add_action(
-        Poller::Action(udpConnection, Direction::Out,
-                       bind(&LambdaWorker::handleUdpSend, this),
-                       [this]() {
-                           return udpConnection.rate_limiter.within_pace() &&
-                                  (!servicePackets.empty() ||
-                                   !rayPackets.empty() || outQueueSize > 0);
-                       },
-                       []() { throw runtime_error("udp out failed"); }));
+    eventAction[Event::UdpSend] = loop.poller().add_action(Poller::Action(
+        udpConnection, Direction::Out, bind(&LambdaWorker::handleUdpSend, this),
+        [this]() {
+            return udpConnection.within_pace() &&
+                   (!servicePackets.empty() || !rayPackets.empty() ||
+                    outQueueSize > 0);
+        },
+        []() { throw runtime_error("udp out failed"); }));
 
     /* trace rays */
     eventAction[Event::RayQueue] = loop.poller().add_action(Poller::Action(
@@ -216,10 +215,10 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
         eventAction[Event::WorkerStats]};
 
     loop.poller().deactivate_actions(toDeactivate);
-    udpConnection.rate_limiter.reset_reference();
+    udpConnection.reset_reference();
 
     if (rate) {
-        udpConnection.rate_limiter.set_rate(rate);
+        udpConnection.set_rate(rate);
     }
 
     /* (2) set up new udpReceive and udpSend actions */
@@ -249,7 +248,7 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
 
                 return ResultType::Continue;
             },
-            [this]() { return udpConnection.rate_limiter.within_pace(); },
+            [this]() { return udpConnection.within_pace(); },
             []() { throw runtime_error("udp out failed"); }));
     }
 
@@ -784,8 +783,8 @@ ResultType LambdaWorker::handleUdpSend() {
     }
 
     RayPacket& packet = rayPackets.front();
-    udpConnection.sendmsg(packet.destination, packet.iov(),
-                                   packet.iovCount(), packet.length);
+    udpConnection.sendmsg(packet.destination, packet.iov(), packet.iovCount(),
+                          packet.length);
 
     /* do the necessary logging */
     if (packet.retransmission) {
@@ -1226,14 +1225,12 @@ void LambdaWorker::run() {
 
         // If this connection is not within pace, it requests a timeout when it
         // would be, so that we can re-poll and schedule it.
-        const int64_t ahead_us =
-            udpConnection.rate_limiter.micros_ahead_of_pace();
+        const int64_t ahead_us = udpConnection.micros_ahead_of_pace();
 
         int64_t ahead_ms = ahead_us / 1000;
         if (ahead_us != 0 && ahead_ms == 0) ahead_ms = 1;
 
-        const int timeout_ms =
-            udpConnection.rate_limiter.within_pace() ? -1 : ahead_ms;
+        const int timeout_ms = udpConnection.within_pace() ? -1 : ahead_ms;
 
         min_timeout_ms = min_neg_infinity(min_timeout_ms, timeout_ms);
 
