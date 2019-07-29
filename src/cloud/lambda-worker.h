@@ -36,6 +36,9 @@ constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr std::chrono::milliseconds KEEP_ALIVE_INTERVAL{40'000};
 constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
 constexpr std::chrono::milliseconds PACKET_TIMEOUT{100};
+constexpr std::chrono::milliseconds INACTIVITY_THRESHOLD{100};
+
+constexpr uint64_t DEFAULT_SEND_RATE{40};
 
 struct WorkerConfiguration {
     bool sendReliably;
@@ -70,6 +73,8 @@ class LambdaWorker {
         packet_clock::time_point nextKeepAlive{};
         int32_t seed{0};
         uint32_t tries{0};
+
+        Pacer pacer{true, DEFAULT_SEND_RATE};
 
         std::set<TreeletId> treelets{};
 
@@ -257,7 +262,7 @@ class LambdaWorker {
     int32_t mySeed;
     std::string outputName;
 
-    std::map<WorkerId, packet_clock::time_point> activeSenders;
+    std::map<WorkerId, packet_clock::time_point> activeSenders{};
 
     /* Sending rays to other nodes */
     uint64_t ackId{0};

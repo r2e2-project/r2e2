@@ -643,11 +643,21 @@ ResultType LambdaWorker::handleNeededTreelets() {
 ResultType LambdaWorker::handleRayAcknowledgements() {
     handleRayAcknowledgementsTimer.reset();
 
+    /* count the number of active senders to this worker */
+    const auto activeSendersCount = max<uint32_t>(
+        1, count_if(activeSenders.begin(), activeSenders.end(),
+                    [now = packet_clock::now()](const auto& x) {
+                        return (now - x.second) <= INACTIVITY_THRESHOLD;
+                    }));
+
+    const uint32_t trafficShare =
+        max(1ul, config.maxUdpRate / activeSendersCount);
+
     // sending acknowledgements
     for (auto& receivedKv : toBeAcked) {
         auto& received = receivedKv.second;
-        string ack;
         const auto destId = addressToWorker[receivedKv.first];
+        string ack = put_field(trafficShare);
 
         for (size_t i = 0; i < received.size(); i++) {
             ack += put_field(get<0>(received[i]));
@@ -661,13 +671,11 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                 Message msg(*workerId, OpCode::Ack, move(ack), false, myAckId,
                             tracked);
 
-                ServicePacket servicePacket(receivedKv.first, destId,
+                servicePackets.emplace_back(receivedKv.first, destId,
                                             move(msg.str()), true, myAckId,
                                             tracked);
 
-                servicePackets.push_back(move(servicePacket));
-
-                ack = {};
+                ack = put_field(trafficShare);
             }
         }
     }
@@ -823,8 +831,8 @@ ResultType LambdaWorker::handleUdpReceive() {
 
     auto it = messages.end();
     while (it != messages.begin()) {
-        auto& message = *it;
         it--;
+        auto& message = *it;
 
         if (message.is_read()) break;
         message.set_read();
@@ -854,6 +862,9 @@ ResultType LambdaWorker::handleUdpReceive() {
             Chunk chunk(message.payload());
             auto& thisReceivedAcks = receivedAcks[datagram.first];
 
+            peers.at(message.sender_id()).pacer.set_rate(chunk.be32());
+            chunk = chunk(4);
+
             if (message.tracked()) {
                 logPacket(message.sequence_number(), message.attempt(),
                           PacketAction::AckReceived, message.sender_id(),
@@ -878,9 +889,7 @@ ResultType LambdaWorker::handleUdpReceive() {
             }
 
             it = messages.erase(it);
-        }
-
-        if (message.opcode() == OpCode::SendRays) {
+        } else if (message.opcode() == OpCode::SendRays) {
             activeSenders[message.sender_id()] = packet_clock::now();
         }
     }
