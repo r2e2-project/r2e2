@@ -734,28 +734,85 @@ ResultType LambdaWorker::handleUdpSend() {
         return ResultType::Continue;
     }
 
-    /* packet to send */
-    if (rayPackets.empty()) {
-        /* let's create a ray packet */
+    auto sendRayPacket = [this](RayPacket&& packet) {
+        udpConnection.sendmsg(packet.destination, packet.iov(),
+                              packet.iovCount(), packet.length);
 
+        /* do the necessary logging */
+        if (packet.retransmission) {
+            workerStats.recordResentRays(packet.targetTreelet,
+                                         packet.rays.size());
+        } else {
+            workerStats.recordSentRays(packet.targetTreelet,
+                                       packet.rays.size());
+        }
+
+        for (auto& rayPtr : packet.rays) {
+            logRayAction(*rayPtr, RayAction::Sent, packet.destinationId);
+            rayPtr->tick++;
+        }
+
+        if (trackPackets && packet.tracked) {
+            logPacket(packet.sequenceNumber, packet.attempt, PacketAction::Sent,
+                      packet.destinationId, packet.length, packet.rays.size());
+        }
+
+        if (packet.reliable) {
+            outstandingRayPackets.emplace_back(
+                packet_clock::now() + PACKET_TIMEOUT, move(packet));
+        }
+    };
+
+    for (auto it = rayPackets.begin(); it != rayPackets.end(); it++) {
+        RayPacket& packet = *it;
+        auto& peer = peers.at(packet.destinationId);
+        if (peer.pacer.within_pace()) {
+            sendRayPacket(move(packet));
+            rayPackets.erase(it);
+            return ResultType::Continue;
+        }
+    }
+
+    vector<TreeletId> myTreelets;
+    myTreelets.reserve(outQueue.size());
+
+    for (const auto& kv : outQueue) {
+        myTreelets.push_back(kv.first);
+    }
+
+    random_shuffle(myTreelets.begin(), myTreelets.end());
+
+    for (const auto& treeletId : myTreelets) {
         /* (1) pick a treelet randomly */
-        auto kvIt = random::sample(outQueue.begin(), outQueue.end());
-        const auto treeletId = kvIt->first;
-        auto& queue = kvIt->second;
+        auto& queue = outQueue[treeletId];
 
         /* (2) pick a worker to send to */
-        const auto& candidates = treeletToWorker[treeletId];
-        const auto& peer =
-            peers.at(*random::sample(candidates.begin(), candidates.end()));
+        WorkerId peerId;
+
+        if (workerForTreelet.count(treeletId) &&
+            workerForTreelet[treeletId].second <= packet_clock::now()) {
+            peerId = workerForTreelet[treeletId].first;
+        } else {
+            const auto& candidates = treeletToWorker[treeletId];
+            peerId = *random::sample(candidates.begin(), candidates.end());
+            workerForTreelet[treeletId].first = peerId;
+            workerForTreelet[treeletId].second =
+                packet_clock::now() + TREELET_PEER_TIMEOUT;
+        }
+
+        auto& peer = peers.at(peerId);
+
+        if (!peer.pacer.within_pace()) {
+            continue;
+        }
+
         auto& peerSeqNo = sequenceNumbers[peer.address];
 
         /* (3) collect the rays to fill a packet */
         const bool tracked = packetLogBD(randEngine);
 
-        rayPackets.emplace_back(peer.address, peer.id, treeletId,
-                                config.sendReliably, peerSeqNo, tracked);
-
-        auto& packet = rayPackets.back();
+        RayPacket packet(peer.address, peer.id, treeletId, config.sendReliably,
+                         peerSeqNo, tracked);
 
         packet.length = Message::HEADER_LENGTH;
 
@@ -777,7 +834,7 @@ ResultType LambdaWorker::handleUdpSend() {
         }
 
         if (queue.empty()) {
-            outQueue.erase(kvIt);
+            outQueue.erase(treeletId);
         }
 
         /* (4) fix the header */
@@ -791,35 +848,11 @@ ResultType LambdaWorker::handleUdpSend() {
         }
 
         peerSeqNo++;
+
+        sendRayPacket(move(packet));
+        break;
     }
 
-    RayPacket& packet = rayPackets.front();
-    udpConnection.sendmsg(packet.destination, packet.iov(), packet.iovCount(),
-                          packet.length);
-
-    /* do the necessary logging */
-    if (packet.retransmission) {
-        workerStats.recordResentRays(packet.targetTreelet, packet.rays.size());
-    } else {
-        workerStats.recordSentRays(packet.targetTreelet, packet.rays.size());
-    }
-
-    for (auto& rayPtr : packet.rays) {
-        logRayAction(*rayPtr, RayAction::Sent, packet.destinationId);
-        rayPtr->tick++;
-    }
-
-    if (trackPackets && packet.tracked) {
-        logPacket(packet.sequenceNumber, packet.attempt, PacketAction::Sent,
-                  packet.destinationId, packet.length, packet.rays.size());
-    }
-
-    if (packet.reliable) {
-        outstandingRayPackets.emplace_back(packet_clock::now() + PACKET_TIMEOUT,
-                                           move(packet));
-    }
-
-    rayPackets.pop_front();
     return ResultType::Continue;
 }
 
