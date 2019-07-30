@@ -389,6 +389,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
 ResultType LambdaMaster::handleJobStart() {
     set<uint32_t> paired{0};
 
+    generationStart = now();
+
     switch (config.task) {
     case Task::RayTracing:
         for (auto &workerkv : workers) {
@@ -488,6 +490,10 @@ ResultType LambdaMaster::handleStatusMessage() {
     const auto elapsedTime = now() - startTime;
     const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
 
+    const auto rayThroughput =
+        1.0 * workerStats.finishedRays() / numberOfLambdas /
+        duration_cast<seconds>(lastFinishedRay - generationStart).count();
+
     LOG(INFO) << "QUEUES " << setfill('0') << setw(6)
               << duration_cast<milliseconds>(elapsedTime).count()
               << " ray: " << workerStats.queueStats.ray
@@ -523,8 +529,9 @@ ResultType LambdaMaster::handleStatusMessage() {
         << percentage(workerStats.resentRays(), workerStats.sentRays()) << "%) "
         << BG_LIGHT_GREEN << " \u21c4 " << workerStats.queueStats.connected
         << " (" << workerStats.queueStats.connecting << ") " << BG_DARK_GREEN
-        << " " << setfill('0') << setw(2) << (elapsedSeconds / 60) << ":"
-        << setw(2) << (elapsedSeconds % 60) << " ";
+        << " T " << rayThroughput << " " << BG_LIGHT_GREEN << " "
+        << setfill('0') << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
+        << (elapsedSeconds % 60) << " " << BG_DARK_GREEN;
 
     StatusBar::set_text(oss.str());
 
@@ -669,6 +676,10 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         protoutil::from_string(message.payload(), proto);
         auto stats = from_protobuf(proto);
 
+        if (stats.finishedRays() != 0) {
+            lastFinishedRay = now();
+        }
+
         /* merge into global worker stats */
         workerStats.merge(stats);
 
@@ -768,6 +779,11 @@ void LambdaMaster::run() {
                 config.logsDirectory + "/" + to_string(worker.id) + ".INFO");
         }
     }
+
+    cerr << "Average ray throughput: "
+         << (1.0 * workerStats.finishedRays() / numberOfLambdas /
+             duration_cast<seconds>(lastFinishedRay - generationStart).count())
+         << " rays/core/s" << endl;
 
     if (!getRequests.empty()) {
         cerr << "\nDownloading " << getRequests.size() << " log file(s)... ";

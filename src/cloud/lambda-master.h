@@ -195,6 +195,9 @@ class LambdaMaster {
 
     const timepoint_t startTime{now()};
 
+    timepoint_t generationStart{};
+    timepoint_t lastFinishedRay{};
+
     /* Worker stats */
     WorkerStats workerStats;
     size_t initializedWorkers{0};
