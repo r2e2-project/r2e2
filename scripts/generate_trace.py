@@ -1253,16 +1253,8 @@ def main():
     print('Reading diagnostics from {:s}...'.format(args.diagnostics_directory), end='')
     diagnostics = Stats(args.diagnostics_directory)
     print()
-    diagnostics.write_csv('test.csv')
+    diagnostics.write_csv('data.csv')
     print('Done reading diagnostics.')
-    if False:
-        path = write_trace(stats, args.trace_path)
-        print('Wrote trace to {:s}.'.format(path))
-    if True:
-        path = args.graph_path
-        plot_metrics(diagnostics, path)
-        print('Wrote graphs to {:s}.'.format(path))
-
 
 if __name__ == "__main__":
     main()
