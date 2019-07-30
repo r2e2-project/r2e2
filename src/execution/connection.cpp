@@ -50,6 +50,18 @@ void UDPConnection::sendto(const Address& peer, const string& payload) {
 }
 
 void UDPConnection::sendmsg(const Address& peer, const iovec* iov,
+                            const size_t iovcnt) {
+    size_t total_length = 0;
+    for (size_t i = 0; i < iovcnt; i++) {
+        total_length += iov[i].iov_len;
+    }
+
+    record_send(total_length);
+    bytes_sent += total_length;
+    UDPSocket::sendmsg(peer, iov, iovcnt);
+}
+
+void UDPConnection::sendmsg(const Address& peer, const iovec* iov,
                             const size_t iovcnt, const size_t total_length) {
     record_send(total_length);
     bytes_sent += total_length;

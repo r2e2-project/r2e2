@@ -86,6 +86,7 @@ class UDPConnection : public Pacer, public UDPSocket {
     std::pair<Address, std::string> recvfrom(void);
     void send(const std::string& payload);
     void sendto(const Address& peer, const std::string& payload);
+    void sendmsg(const Address& peer, const iovec* iov, const size_t iovcnt);
     void sendmsg(const Address& peer, const iovec* iov, const size_t iovcnt,
                  const size_t total_length);
 
