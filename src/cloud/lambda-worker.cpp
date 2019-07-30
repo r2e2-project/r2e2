@@ -735,8 +735,8 @@ ResultType LambdaWorker::handleUdpSend() {
     if (rayPackets.empty()) {
         /* let's create a ray packet */
 
-        /* (1) pick a treelet */
-        auto kvIt = outQueue.begin();
+        /* (1) pick a treelet randomly */
+        auto kvIt = random::sample(outQueue.begin(), outQueue.end());
         const auto treeletId = kvIt->first;
         auto& queue = kvIt->second;
 
