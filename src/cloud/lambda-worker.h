@@ -36,10 +36,10 @@ constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr std::chrono::milliseconds KEEP_ALIVE_INTERVAL{40'000};
 constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
 constexpr std::chrono::milliseconds PACKET_TIMEOUT{100};
-constexpr std::chrono::milliseconds INACTIVITY_THRESHOLD{100};
-constexpr std::chrono::milliseconds TREELET_PEER_TIMEOUT{100};
+constexpr std::chrono::milliseconds INACTIVITY_THRESHOLD{20};
+constexpr std::chrono::milliseconds TREELET_PEER_TIMEOUT{500};
 
-constexpr uint64_t DEFAULT_SEND_RATE{5};
+constexpr uint64_t DEFAULT_SEND_RATE{10};
 
 struct WorkerConfiguration {
     bool sendReliably;

@@ -734,7 +734,9 @@ ResultType LambdaWorker::handleUdpSend() {
         return ResultType::Continue;
     }
 
-    auto sendRayPacket = [this](RayPacket&& packet) {
+    auto sendRayPacket = [this](Worker& peer, RayPacket&& packet) {
+        peer.pacer.record_send(packet.length);
+
         udpConnection.sendmsg(packet.destination, packet.iov(),
                               packet.iovCount(), packet.length);
 
@@ -767,7 +769,7 @@ ResultType LambdaWorker::handleUdpSend() {
         RayPacket& packet = *it;
         auto& peer = peers.at(packet.destinationId);
         if (peer.pacer.within_pace()) {
-            sendRayPacket(move(packet));
+            sendRayPacket(peer, move(packet));
             rayPackets.erase(it);
             return ResultType::Continue;
         }
@@ -790,7 +792,7 @@ ResultType LambdaWorker::handleUdpSend() {
         WorkerId peerId;
 
         if (workerForTreelet.count(treeletId) &&
-            workerForTreelet[treeletId].second <= packet_clock::now()) {
+            workerForTreelet[treeletId].second >= packet_clock::now()) {
             peerId = workerForTreelet[treeletId].first;
         } else {
             const auto& candidates = treeletToWorker[treeletId];
@@ -849,7 +851,7 @@ ResultType LambdaWorker::handleUdpSend() {
 
         peerSeqNo++;
 
-        sendRayPacket(move(packet));
+        sendRayPacket(peer, move(packet));
         break;
     }
 
