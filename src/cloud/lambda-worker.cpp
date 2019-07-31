@@ -950,7 +950,7 @@ ResultType LambdaWorker::handleWorkerStats() {
         });
     qStats.connected = peers.size() - qStats.connecting;
     qStats.outstandingUdp = outstandingRayPackets.size();
-    qStats.queuedUdp = rayPackets.size();
+    qStats.queuedUdp = rayPackets.size() + servicePackets.size();
 
     auto proto = to_protobuf(workerStats);
 
