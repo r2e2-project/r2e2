@@ -754,14 +754,6 @@ ResultType LambdaWorker::handleUdpSend() {
                               packet.iovCount(), packet.length);
 
         /* do the necessary logging */
-        if (packet.retransmission) {
-            workerStats.recordResentRays(packet.targetTreelet,
-                                         packet.rays.size());
-        } else {
-            workerStats.recordSentRays(packet.targetTreelet,
-                                       packet.rays.size());
-        }
-
         for (auto& rayPtr : packet.rays) {
             logRayAction(*rayPtr, RayAction::Sent, packet.destinationId);
             rayPtr->tick++;
@@ -1257,7 +1249,6 @@ bool LambdaWorker::processMessage(const Message& message) {
             offset += len;
 
             ray->hop++;
-            workerStats.recordReceivedRay(*ray);
             logRayAction(*ray, RayAction::Received, message.sender_id());
             ray->tick = 0;
             pushRayQueue(move(ray));

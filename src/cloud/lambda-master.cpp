@@ -518,20 +518,12 @@ ResultType LambdaMaster::handleStatusMessage() {
         << setprecision(2)
         << percentage(workerStats.finishedPaths(), totalPaths) << "%] "
         << BG_LIGHT_GREEN << " \u03bb " << workers.size() << " ("
-        << initializedWorkers << ") " << BG_DARK_GREEN << " \u2191 "
-        << format_num(workerStats.sentRays()) << " " << BG_LIGHT_GREEN
-        << " \u2193 " << format_num(workerStats.receivedRays()) << " (" << fixed
-        << setprecision(2)
-        << percentage(workerStats.receivedRays(), workerStats.sentRays())
-        << "%) " << BG_DARK_GREEN << " \u21bb "
-        << format_num(workerStats.resentRays()) << " (" << fixed
-        << setprecision(2)
-        << percentage(workerStats.resentRays(), workerStats.sentRays()) << "%) "
-        << BG_LIGHT_GREEN << " \u21c4 " << workerStats.queueStats.connected
-        << " (" << workerStats.queueStats.connecting << ") " << BG_DARK_GREEN
-        << " T " << rayThroughput << " " << BG_LIGHT_GREEN << " "
-        << setfill('0') << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
-        << (elapsedSeconds % 60) << " " << BG_DARK_GREEN;
+        << initializedWorkers << ") " << BG_DARK_GREEN << " \u21c4 "
+        << workerStats.queueStats.connected << " ("
+        << workerStats.queueStats.connecting << ") " << BG_LIGHT_GREEN << " T "
+        << rayThroughput << " " << BG_DARK_GREEN << " " << setfill('0')
+        << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
+        << (elapsedSeconds % 60) << " " << BG_LIGHT_GREEN;
 
     StatusBar::set_text(oss.str());
 
