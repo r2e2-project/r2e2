@@ -714,6 +714,9 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         auto& packet = outstandingRayPackets.front().second;
         auto& thisReceivedAcks = receivedAcks[packet.destination];
 
+        workerStats.netStats.rtt +=
+            duration_cast<milliseconds>(now - packet.sentAt);
+
         if (!thisReceivedAcks.contains(packet.sequenceNumber)) {
             packet.incrementAttempts();
             packet.retransmission = true;
@@ -752,6 +755,9 @@ ResultType LambdaWorker::handleUdpSend() {
 
         udpConnection.sendmsg(packet.destination, packet.iov(),
                               packet.iovCount(), packet.length);
+
+        packet.sentAt = packet_clock::now();
+        workerStats.netStats.packetsSent++;
 
         /* do the necessary logging */
         for (auto& rayPtr : packet.rays) {

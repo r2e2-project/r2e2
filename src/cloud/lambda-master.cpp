@@ -494,15 +494,8 @@ ResultType LambdaMaster::handleStatusMessage() {
         1.0 * workerStats.finishedRays() / numberOfLambdas /
         duration_cast<seconds>(lastFinishedRay - generationStart).count();
 
-    LOG(INFO) << "QUEUES " << setfill('0') << setw(6)
-              << duration_cast<milliseconds>(elapsedTime).count()
-              << " ray: " << workerStats.queueStats.ray
-              << " / finished: " << workerStats.queueStats.finished
-              << " / pending: " << workerStats.queueStats.pending
-              << " / out: " << workerStats.queueStats.out
-              << " / connecting: " << workerStats.queueStats.connecting
-              << " / connected: " << workerStats.queueStats.connected
-              << " / outstanding: " << workerStats.queueStats.outstandingUdp;
+    const float rtt = 1.0 * workerStats.netStats.rtt.count() /
+                      workerStats.netStats.packetsSent;
 
     auto percentage = [](const int n, const int total) -> double {
         return total ? (((int)(100 * (100.0 * n / total))) / 100.0) : 0.0;
@@ -521,9 +514,10 @@ ResultType LambdaMaster::handleStatusMessage() {
         << initializedWorkers << ") " << BG_DARK_GREEN << " \u21c4 "
         << workerStats.queueStats.connected << " ("
         << workerStats.queueStats.connecting << ") " << BG_LIGHT_GREEN << " T "
-        << rayThroughput << " " << BG_DARK_GREEN << " " << setfill('0')
-        << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
-        << (elapsedSeconds % 60) << " " << BG_LIGHT_GREEN;
+        << rayThroughput << " " << BG_DARK_GREEN << " \u21ba "
+        << setprecision(2) << rtt << " ms " << BG_LIGHT_GREEN << " "
+        << setfill('0') << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
+        << (elapsedSeconds % 60) << " " << BG_DARK_GREEN;
 
     StatusBar::set_text(oss.str());
 
@@ -871,6 +865,9 @@ void LambdaMaster::aggregateQueueStats() {
         workerStats.queueStats.connected += worker.stats.queueStats.connected;
         workerStats.queueStats.outstandingUdp +=
             worker.stats.queueStats.outstandingUdp;
+
+        workerStats.netStats.rtt += worker.stats.netStats.rtt;
+        workerStats.netStats.packetsSent += worker.stats.netStats.packetsSent;
     }
 }
 

@@ -125,6 +125,8 @@ class LambdaWorker {
         char header[meow::Message::HEADER_LENGTH];
         std::deque<std::unique_ptr<RayState>> rays;
 
+        packet_clock::time_point sentAt;
+
         RayPacket(const Address& addr, const WorkerId destId,
                   const TreeletId targetTreelet, const bool reliable = false,
                   const uint64_t sequenceNumber = 0, const bool tracked = false)
