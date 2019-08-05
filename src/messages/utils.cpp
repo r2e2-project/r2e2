@@ -283,7 +283,7 @@ protobuf::QueueStats to_protobuf(const QueueStats& stats) {
 protobuf::NetStats to_protobuf(const NetStats &stats) {
     protobuf::NetStats proto;
     proto.set_packets_sent(stats.packetsSent);
-    proto.set_rtt(stats.rtt);
+    proto.set_rtt(stats.rtt.count());
     return proto;
 }
 
@@ -860,7 +860,7 @@ QueueStats from_protobuf(const protobuf::QueueStats& proto) {
 NetStats from_protobuf(const protobuf::NetStats &proto) {
     NetStats stats;
     stats.packetsSent = proto.packets_sent();
-    stats.rtt = proto.rtt();
+    stats.rtt = chrono::milliseconds{proto.rtt()};
     return stats;
 }
 

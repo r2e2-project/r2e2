@@ -301,7 +301,7 @@ message QueueStats {
 
 message NetStats {
     uint64 packets_sent = 1;
-    float rtt = 2;
+    int64 rtt = 2;
 }
 
 message ObjectRayStats {

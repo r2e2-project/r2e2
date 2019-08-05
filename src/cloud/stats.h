@@ -54,7 +54,7 @@ struct QueueStats {
 
 struct NetStats {
     uint64_t packetsSent{0};
-    float rtt{0.f};
+    std::chrono::milliseconds rtt{0};
 };
 
 struct WorkerStats {
