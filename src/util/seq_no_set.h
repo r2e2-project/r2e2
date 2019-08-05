@@ -22,6 +22,9 @@ class SeqNoSet {
     uint64_t size() const;
     uint64_t numberOfItemsInMemory() const;
 
+    const std::set<uint64_t>& set() { return set_; }
+    uint64_t smallest_not_in_set() { return smallest_not_in_set_; }
+
   private:
     std::set<uint64_t> set_;
     uint64_t smallest_not_in_set_;
