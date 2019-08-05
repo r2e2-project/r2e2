@@ -67,14 +67,16 @@ void WorkerStats::recordFinishedRay(const RayState& ray) {
 void WorkerStats::reset() {
     _finishedPaths = 0;
     aggregateStats.reset();
-    queueStats = {};
     objectStats.clear();
+    queueStats = {};
+    netStats = {};
 }
 
 void WorkerStats::merge(const WorkerStats& other) {
     _finishedPaths += other._finishedPaths;
     aggregateStats.merge(other.aggregateStats);
     queueStats = other.queueStats;
+    netStats = other.netStats;
     for (const auto& kv : other.objectStats) {
         objectStats[kv.first].merge(kv.second);
     }

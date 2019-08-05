@@ -52,12 +52,19 @@ struct QueueStats {
     uint64_t queuedUdp{0};
 };
 
+struct NetStats {
+    uint64_t packetsSent{0};
+    float rtt{0.f};
+};
+
 struct WorkerStats {
     /* required stats */
     uint64_t _finishedPaths{0};
     RayStats aggregateStats;
-    QueueStats queueStats;
     std::map<ObjectKey, RayStats> objectStats;
+
+    QueueStats queueStats;
+    NetStats netStats;
 
     const timepoint_t startTime{now()};
 

@@ -299,6 +299,11 @@ message QueueStats {
     uint64 queued_udp = 8;
 }
 
+message NetStats {
+    uint64 packets_sent = 1;
+    float rtt = 2;
+}
+
 message ObjectRayStats {
     ObjectKey id = 1;
     RayStats stats = 2;
@@ -333,9 +338,10 @@ message WorkerStats {
     uint64 finished_paths = 1;
     RayStats aggregate_stats = 2;
     QueueStats queue_stats = 3;
-    repeated ObjectRayStats object_stats = 4;
-    uint64 worker_start_us = 5;
-    uint64 timestamp_us = 6;
+    NetStats net_stats = 4;
+    repeated ObjectRayStats object_stats = 5;
+    uint64 worker_start_us = 6;
+    uint64 timestamp_us = 7;
 }
 
 message WorkerDiagnostics {
