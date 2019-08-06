@@ -4,8 +4,6 @@ using namespace std;
 
 namespace pbrt {
 
-SeqNoSet::SeqNoSet() : set_{}, smallest_not_in_set_{0} {}
-
 bool SeqNoSet::contains(const uint64_t value) const {
     if (value < smallest_not_in_set_) {
         return true;
@@ -21,8 +19,10 @@ void SeqNoSet::insert(const uint64_t value) {
         return;
     } else if (value == smallest_not_in_set_) {
         auto it_to_smallest = set_.begin();
+        auto it_to_end = set_.end();
         smallest_not_in_set_ += 1;
-        while (*it_to_smallest == smallest_not_in_set_) {
+        while (it_to_smallest != set_.end() &&
+               *it_to_smallest == smallest_not_in_set_) {
             it_to_smallest = set_.erase(it_to_smallest);
             smallest_not_in_set_ += 1;
         }
@@ -39,7 +39,12 @@ void SeqNoSet::insertAllBelow(const uint64_t value) {
     } else {
         smallest_not_in_set_ = value;
         auto it_to_smallest = set_.begin();
-        while (*it_to_smallest < value) {
+        while (it_to_smallest != set_.end() &&
+               *it_to_smallest <= smallest_not_in_set_) {
+            if (*it_to_smallest == smallest_not_in_set_) {
+                smallest_not_in_set_++;
+            }
+
             it_to_smallest = set_.erase(it_to_smallest);
         }
     }

@@ -16,7 +16,6 @@ class SeqNoSet {
     /**
      * Creates an empty set
      */
-    SeqNoSet();
     bool contains(const uint64_t value) const;
     void insert(const uint64_t value);
     uint64_t size() const;
@@ -28,8 +27,8 @@ class SeqNoSet {
     uint64_t smallest_not_in_set() { return smallest_not_in_set_; }
 
   private:
-    std::set<uint64_t> set_;
-    uint64_t smallest_not_in_set_;
+    std::set<uint64_t> set_{};
+    uint64_t smallest_not_in_set_{0};
 };
 
 }  // namespace pbrt
