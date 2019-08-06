@@ -17,10 +17,12 @@ class SeqNoSet {
      * Creates an empty set
      */
     SeqNoSet();
-    bool contains(uint64_t value) const;
-    void insert(uint64_t value);
+    bool contains(const uint64_t value) const;
+    void insert(const uint64_t value);
     uint64_t size() const;
     uint64_t numberOfItemsInMemory() const;
+
+    void insertAllBelow(const uint64_t value);
 
     const std::set<uint64_t>& set() { return set_; }
     uint64_t smallest_not_in_set() { return smallest_not_in_set_; }

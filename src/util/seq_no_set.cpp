@@ -6,7 +6,7 @@ namespace pbrt {
 
 SeqNoSet::SeqNoSet() : set_{}, smallest_not_in_set_{0} {}
 
-bool SeqNoSet::contains(uint64_t value) const {
+bool SeqNoSet::contains(const uint64_t value) const {
     if (value < smallest_not_in_set_) {
         return true;
     } else if (value == smallest_not_in_set_) {
@@ -16,7 +16,7 @@ bool SeqNoSet::contains(uint64_t value) const {
     }
 }
 
-void SeqNoSet::insert(uint64_t value) {
+void SeqNoSet::insert(const uint64_t value) {
     if (value < smallest_not_in_set_) {
         return;
     } else if (value == smallest_not_in_set_) {
@@ -28,6 +28,20 @@ void SeqNoSet::insert(uint64_t value) {
         }
     } else {
         set_.insert(value);
+    }
+}
+
+void SeqNoSet::insertAllBelow(const uint64_t value) {
+    if (value == 0) {
+        return;
+    } else if (value < smallest_not_in_set_) {
+        return;
+    } else {
+        smallest_not_in_set_ = value;
+        auto it_to_smallest = set_.begin();
+        while (*it_to_smallest < value) {
+            it_to_smallest = set_.erase(it_to_smallest);
+        }
     }
 }
 
