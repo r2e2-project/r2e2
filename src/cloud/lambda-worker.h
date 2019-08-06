@@ -296,9 +296,9 @@ class LambdaWorker {
     std::map<Address, uint64_t> sequenceNumbers{};
 
     /* incoming rays */
+    uint32_t trafficShare{1};
     std::map<Address, SeqNoSet> receivedPacketSeqNos{};
-    std::map<Address, std::vector<std::tuple<uint64_t, bool, uint16_t>>>
-        toBeAcked{};
+    std::map<Address, size_t> toBeAcked{};
 
     /* Scene Data */
     const uint8_t maxDepth{5};

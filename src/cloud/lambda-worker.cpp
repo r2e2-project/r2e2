@@ -674,39 +674,9 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                         return (now - x.second) <= INACTIVITY_THRESHOLD;
                     }));
 
-    const uint32_t trafficShare =
-        max(1ul, config.maxUdpRate / activeSendersCount);
+    trafficShare = max(1ul, config.maxUdpRate / activeSendersCount);
 
-    // sending acknowledgements
-    for (auto& receivedKv : toBeAcked) {
-        auto& received = receivedKv.second;
-        const auto destId = addressToWorker[receivedKv.first];
-        string ack = put_field(trafficShare);
-
-        for (size_t i = 0; i < received.size(); i++) {
-            ack += put_field(get<0>(received[i]));
-            ack += put_field(get<1>(received[i]));
-            ack += put_field(get<2>(received[i]));
-
-            if (ack.length() >= UDP_MTU_BYTES or i == received.size() - 1) {
-                const auto myAckId = ackId++;
-                const bool tracked = packetLogBD(randEngine);
-
-                Message msg(*workerId, OpCode::Ack, move(ack), false, myAckId,
-                            tracked);
-
-                servicePackets.emplace_back(receivedKv.first, destId,
-                                            move(msg.str()), true, myAckId,
-                                            tracked);
-
-                ack = put_field(trafficShare);
-            }
-        }
-    }
-
-    toBeAcked.clear();
-
-    // retransmit outstanding packets
+    // re-queue timed-out packets
     const auto now = packet_clock::now();
 
     while (!outstandingRayPackets.empty() &&
@@ -748,6 +718,35 @@ ResultType LambdaWorker::handleUdpSend() {
 
         servicePackets.pop_front();
         return ResultType::Continue;
+    }
+
+    /* Do we have anything to ack? */
+    if (!toBeAcked.empty()) {
+        for (auto it = toBeAcked.begin(); it != toBeAcked.end(); it++) {
+            if (it->second > 1) {
+                const Address& addr = it->first;
+                auto& receivedSeqNos = receivedPacketSeqNos[addr];
+
+                /* Let's construct the ack message for this worker */
+                string msg{};
+                msg += put_field(trafficShare);
+                msg += put_field(receivedSeqNos.smallest_not_in_set());
+
+                for (auto sIt = receivedSeqNos.set().cbegin();
+                     sIt != receivedSeqNos.set().cend() &&
+                     msg.length() < UDP_MTU_BYTES;
+                     sIt++) {
+                    msg += put_field(*sIt);
+                }
+
+                udpConnection.sendto(
+                    addr, Message::str(*workerId, OpCode::Ack, move(msg), false,
+                                       ackId++, false));
+
+                toBeAcked.erase(it);
+                return ResultType::Continue;
+            }
+        }
     }
 
     auto sendRayPacket = [this](Worker& peer, RayPacket&& packet) {
@@ -888,8 +887,7 @@ ResultType LambdaWorker::handleUdpReceive() {
 
         if (message.reliable()) {
             const auto seqNo = message.sequence_number();
-            toBeAcked[datagram.first].emplace_back(seqNo, message.tracked(),
-                                                   message.attempt());
+            toBeAcked[datagram.first]++;
 
             auto& received = receivedPacketSeqNos[datagram.first];
 
@@ -920,20 +918,15 @@ ResultType LambdaWorker::handleUdpReceive() {
                           message.total_length(), 0u);
             }
 
-            while (chunk.size()) {
-                const auto seqNo = chunk.be64();
-                thisReceivedAcks.insert(seqNo);
+            if (chunk.size() >= 8) {
+                const auto next = chunk.be64();
                 chunk = chunk(8);
 
-                const bool tracked = chunk.octet();
-                chunk = chunk(1);
+                thisReceivedAcks.insertAllBelow(next);
 
-                const uint16_t attempt = chunk.be16();
-                chunk = chunk(2);
-
-                if (tracked) {
-                    logPacket(seqNo, attempt, PacketAction::Acked,
-                              message.sender_id(), 0u);
+                while (chunk.size()) {
+                    thisReceivedAcks.insert(chunk.be64());
+                    chunk = chunk(8);
                 }
             }
 
