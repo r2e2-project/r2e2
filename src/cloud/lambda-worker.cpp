@@ -414,7 +414,7 @@ ResultType LambdaWorker::handleRayQueue() {
 
     deque<RayStatePtr> processedRays;
 
-    constexpr size_t MAX_RAYS = 20'000;
+    constexpr size_t MAX_RAYS = 3'000;
 
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayStatePtr rayPtr = popRayQueue();
@@ -732,7 +732,7 @@ ResultType LambdaWorker::handleUdpSend() {
 
     /* Do we have anything to ack? */
     if (doAck) {
-        uniform_int_distribution<> dis{0, toBeAcked.size() - 1};
+        uniform_int_distribution<size_t> dis{0, toBeAcked.size() - 1};
         const auto it = next(toBeAcked.begin(), dis(randEngine));
 
         if (it->second > 0) {
