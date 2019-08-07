@@ -127,8 +127,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         udpConnection, Direction::Out, bind(&LambdaWorker::handleUdpSend, this),
         [this]() {
             return udpConnection.within_pace() &&
-                   (!servicePackets.empty() || !rayPackets.empty() ||
-                    outQueueSize > 0);
+                   (!servicePackets.empty() || !toBeAcked.empty() ||
+                    !rayPackets.empty() || outQueueSize > 0);
         },
         []() { throw runtime_error("udp out failed"); }));
 
@@ -720,32 +720,43 @@ ResultType LambdaWorker::handleUdpSend() {
         return ResultType::Continue;
     }
 
+    bool doAck = false;
+
+    if (toBeAcked.empty()) {
+        doAck = false;
+    } else if (rayPackets.empty() && outQueueSize == 0) {
+        doAck = true;
+    } else {
+        doAck = coin(randEngine);
+    }
+
     /* Do we have anything to ack? */
-    if (!toBeAcked.empty()) {
-        for (auto it = toBeAcked.begin(); it != toBeAcked.end(); it++) {
-            if (it->second > 1) {
-                const Address& addr = it->first;
-                auto& receivedSeqNos = receivedPacketSeqNos[addr];
+    if (doAck) {
+        uniform_int_distribution<> dis{0, toBeAcked.size() - 1};
+        const auto it = next(toBeAcked.begin(), dis(randEngine));
 
-                /* Let's construct the ack message for this worker */
-                string msg{};
-                msg += put_field(trafficShare);
-                msg += put_field(receivedSeqNos.smallest_not_in_set());
+        if (it->second > 0) {
+            const Address& addr = it->first;
+            auto& receivedSeqNos = receivedPacketSeqNos[addr];
 
-                for (auto sIt = receivedSeqNos.set().cbegin();
-                     sIt != receivedSeqNos.set().cend() &&
-                     msg.length() < UDP_MTU_BYTES;
-                     sIt++) {
-                    msg += put_field(*sIt);
-                }
+            /* Let's construct the ack message for this worker */
+            string msg{};
+            msg += put_field(trafficShare);
+            msg += put_field(receivedSeqNos.smallest_not_in_set());
 
-                udpConnection.sendto(
-                    addr, Message::str(*workerId, OpCode::Ack, move(msg), false,
-                                       ackId++, false));
-
-                toBeAcked.erase(it);
-                return ResultType::Continue;
+            for (auto sIt = receivedSeqNos.set().cbegin();
+                 sIt != receivedSeqNos.set().cend() &&
+                 msg.length() < UDP_MTU_BYTES;
+                 sIt++) {
+                msg += put_field(*sIt);
             }
+
+            udpConnection.sendto(
+                addr, Message::str(*workerId, OpCode::Ack, move(msg), false,
+                                   ackId++, false));
+
+            toBeAcked.erase(it);
+            return ResultType::Continue;
         }
     }
 

@@ -256,6 +256,7 @@ class LambdaWorker {
 
     std::mt19937 randEngine{std::random_device{}()};
     std::bernoulli_distribution packetLogBD{config.packetsLogRate};
+    std::bernoulli_distribution coin{0.5};
 
     WorkerStats workerStats;
     WorkerDiagnostics lastDiagnostics;
