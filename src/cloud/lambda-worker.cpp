@@ -127,8 +127,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         udpConnection, Direction::Out, bind(&LambdaWorker::handleUdpSend, this),
         [this]() {
             return udpConnection.within_pace() &&
-                   (!servicePackets.empty() || !toBeAcked.empty() ||
-                    !rayPackets.empty() || outQueueSize > 0);
+                   (!servicePackets.empty() || !rayPackets.empty() ||
+                    outQueueSize > 0);
         },
         []() { throw runtime_error("udp out failed"); }));
 
@@ -674,7 +674,34 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                         return (now - x.second) <= INACTIVITY_THRESHOLD;
                     }));
 
-    trafficShare = max(1ul, config.maxUdpRate / activeSendersCount);
+    const uint32_t trafficShare =
+        max(1ul, config.maxUdpRate / activeSendersCount);
+
+    for (const auto& addr : toBeAcked) {
+        auto& receivedSeqNos = receivedPacketSeqNos[addr];
+
+        /* Let's construct the ack message for this worker */
+        string ack{};
+        ack += put_field(trafficShare);
+        ack += put_field(receivedSeqNos.smallest_not_in_set());
+
+        for (auto sIt = receivedSeqNos.set().cbegin();
+             sIt != receivedSeqNos.set().cend() && ack.length() < UDP_MTU_BYTES;
+             sIt++) {
+            ack += put_field(*sIt);
+        }
+
+        const bool tracked = packetLogBD(randEngine);
+        string message = Message::str(*workerId, OpCode::Ack, move(ack), false,
+                                      ackId, tracked);
+
+        servicePackets.emplace_back(addr, addressToWorker[addr], move(message),
+                                    true, ackId, tracked);
+
+        ackId++;
+    }
+
+    toBeAcked.clear();
 
     // re-queue timed-out packets
     const auto now = packet_clock::now();
@@ -710,54 +737,13 @@ ResultType LambdaWorker::handleUdpSend() {
     if (!servicePackets.empty()) {
         auto& datagram = servicePackets.front();
         udpConnection.sendto(datagram.destination, datagram.data);
-        servicePackets.pop_front();
-        return ResultType::Continue;
-    }
 
-    bool doAck = false;
-
-    if (toBeAcked.empty()) {
-        doAck = false;
-    } else if (rayPackets.empty() && outQueueSize == 0) {
-        doAck = true;
-    } else {
-        doAck = coin(randEngine);
-    }
-
-    /* Do we have anything to ack? */
-    if (doAck) {
-        uniform_int_distribution<size_t> dis{0, toBeAcked.size() - 1};
-        const auto it = next(toBeAcked.begin(), dis(randEngine));
-
-        if (it->second > 0) {
-            const Address& addr = it->first;
-            auto& receivedSeqNos = receivedPacketSeqNos[addr];
-
-            /* Let's construct the ack message for this worker */
-            string msg{};
-            msg += put_field(trafficShare);
-            msg += put_field(receivedSeqNos.smallest_not_in_set());
-
-            for (auto sIt = receivedSeqNos.set().cbegin();
-                 sIt != receivedSeqNos.set().cend() &&
-                 msg.length() < UDP_MTU_BYTES;
-                 sIt++) {
-                msg += put_field(*sIt);
-            }
-
-            if (packetLogBD(randEngine)) {
-                logPacket(ackId, 0, PacketAction::AckSent,
-                          addressToWorker[addr], msg.length());
-            }
-
-            udpConnection.sendto(
-                addr, Message::str(*workerId, OpCode::Ack, move(msg), false,
-                                   ackId, false));
-
-            ackId++;
-            toBeAcked.erase(it);
+        if (datagram.ackPacket && datagram.tracked) {
+            logPacket(datagram.ackId, 0, PacketAction::AckSent,
+                      datagram.destinationId, datagram.data.length());
         }
 
+        servicePackets.pop_front();
         return ResultType::Continue;
     }
 
@@ -899,7 +885,7 @@ ResultType LambdaWorker::handleUdpReceive() {
 
         if (message.reliable()) {
             const auto seqNo = message.sequence_number();
-            toBeAcked[datagram.first]++;
+            toBeAcked.insert(datagram.first);
 
             auto& received = receivedPacketSeqNos[datagram.first];
 
