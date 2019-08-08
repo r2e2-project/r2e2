@@ -710,12 +710,6 @@ ResultType LambdaWorker::handleUdpSend() {
     if (!servicePackets.empty()) {
         auto& datagram = servicePackets.front();
         udpConnection.sendto(datagram.destination, datagram.data);
-
-        if (datagram.ackPacket && datagram.tracked) {
-            logPacket(datagram.ackId, 0, PacketAction::AckSent,
-                      datagram.destinationId, datagram.data.length());
-        }
-
         servicePackets.pop_front();
         return ResultType::Continue;
     }
@@ -751,13 +745,20 @@ ResultType LambdaWorker::handleUdpSend() {
                 msg += put_field(*sIt);
             }
 
+            if (packetLogBD(randEngine)) {
+                logPacket(ackId, 0, PacketAction::AckSent,
+                          addressToWorker[addr], msg.length());
+            }
+
             udpConnection.sendto(
                 addr, Message::str(*workerId, OpCode::Ack, move(msg), false,
-                                   ackId++, false));
+                                   ackId, false));
 
+            ackId++;
             toBeAcked.erase(it);
-            return ResultType::Continue;
         }
+
+        return ResultType::Continue;
     }
 
     auto sendRayPacket = [this](Worker& peer, RayPacket&& packet) {
