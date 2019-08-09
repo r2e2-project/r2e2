@@ -30,12 +30,12 @@
 namespace pbrt {
 
 constexpr std::chrono::milliseconds PEER_CHECK_INTERVAL{250};
-constexpr std::chrono::milliseconds HANDLE_ACKS_INTERVAL{50};
+constexpr std::chrono::milliseconds HANDLE_ACKS_INTERVAL{10};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr std::chrono::milliseconds KEEP_ALIVE_INTERVAL{40'000};
 constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
-constexpr std::chrono::milliseconds PACKET_TIMEOUT{100};
+constexpr std::chrono::milliseconds PACKET_TIMEOUT{20};
 constexpr std::chrono::milliseconds INACTIVITY_THRESHOLD{50};
 constexpr std::chrono::milliseconds TREELET_PEER_TIMEOUT{200};
 constexpr std::chrono::milliseconds RECONNECTS_INTERVAL{2'000};
