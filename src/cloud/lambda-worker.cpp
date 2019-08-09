@@ -73,8 +73,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                       .count();
 
     if (trackRays) {
-        TLOG(RAY) << "x,y,sample,bounce,hop,shadowRay,workerID,otherPartyID,"
-                     "treeletID,timestamp,size,action";
+        TLOG(RAY) << "pathID,hop,shadowRay,workerID,otherPartyID,treeletID,"
+                     "outQueue,udpQueue,outstanding,timestamp,size,action";
     }
 
     if (trackPackets) {
@@ -368,11 +368,11 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
     ostringstream oss;
 
     // clang-format off
-    // x,y,sample,bounce,hop,shadowRay,workerID,otherPartyID,treeletID,timestamp,size,action
-    oss << state.sample.pixel.x << ','
-        << state.sample.pixel.y << ','
-        << state.sample.num << ','
-        << (maxDepth - state.remainingBounces) << ','
+
+    /* pathID,hop,shadowRay,workerID,otherPartyID,treeletID,outQueue,udpQueue,
+       outstanding,timestamp,size,action */
+
+    oss << state.sample.id << ','
         << state.hop << ','
         << state.isShadowRay << ','
         << *workerId << ','
@@ -380,6 +380,9 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
              action == RayAction::Received) ? otherParty
                                             : *workerId) << ','
         << state.CurrentTreelet() << ','
+        << outQueueSize << ','
+        << (servicePackets.size() + rayPackets.size()) << ','
+        << outstandingRayPackets.size() << ','
         << duration_cast<microseconds>(
                rays_clock::now().time_since_epoch()).count() << ','
         << state.Size() << ',';
