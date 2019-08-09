@@ -1147,6 +1147,16 @@ bool LambdaWorker::processMessage(const Message& message) {
         break;
     }
 
+    case OpCode::Reconnect: {
+        const auto target = stoull(message.payload());
+
+        if (peers.count(target)) {
+            peers.at(target).state = Worker::State::Connecting;
+        }
+
+        break;
+    }
+
     case OpCode::MultipleConnect: {
         protobuf::ConnectTo proto;
         protobuf::RecordReader reader{istringstream{message.payload()}};

@@ -671,6 +671,15 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         break;
     }
 
+    case OpCode::Reconnect: {
+        const auto sender = workerId;
+        const auto target = stoull(message.payload());
+        auto &worker = workers.at(workerId);
+        Message msg{0, OpCode::Reconnect, to_string(sender)};
+        worker.connection->enqueue_write(msg.str());
+        break;
+    }
+
     case OpCode::WorkerStats: {
         protobuf::WorkerStats proto;
         protoutil::from_string(message.payload(), proto);
