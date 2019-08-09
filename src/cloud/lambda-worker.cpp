@@ -722,7 +722,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
             packet.incrementAttempts();
             packet.retransmission = true;
 
-            if (packet.attempt % 4) {
+            if (packet.attempt % 6 == 0) {
                 reconnectRequests.insert(packet.destinationId);
             }
 
