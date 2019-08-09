@@ -177,6 +177,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         bind(&LambdaWorker::handleDiagnostics, this), [this]() { return true; },
         []() { throw runtime_error("handle diagnostics failed"); }));
 
+    loop.poller().add_action(Poller::Action(
+        reconnectTimer.fd, Direction::In,
+        bind(&LambdaWorker::handleReconnects, this),
+        [this]() { return !reconnectRequests.empty(); },
+        []() { throw runtime_error("reconnect failed"); }));
+
     /* request new peers for neighboring treelets */
     /* loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out,
@@ -643,6 +649,21 @@ ResultType LambdaWorker::handleNeededTreelets() {
     return ResultType::Continue;
 }
 
+ResultType LambdaWorker::handleReconnects() {
+    reconnectTimer.reset();
+
+    for (const auto dst : reconnectRequests) {
+        coordinatorConnection->enqueue_write(
+            Message::str(*workerId, OpCode::Reconnect, to_string(dst)));
+
+        peers.at(dst).reset();
+    }
+
+    reconnectRequests.clear();
+
+    return ResultType::Continue;
+}
+
 ResultType LambdaWorker::handleRayAcknowledgements() {
     handleRayAcknowledgementsTimer.reset();
 
@@ -694,21 +715,13 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         auto& thisReceivedAcks = receivedAcks[packet.destination];
 
         if (!thisReceivedAcks.contains(packet.sequenceNumber)) {
-            if (false && packet.attempt > 1) {
-                /* sequenceNumbers[packet.destination]-- */;
-
-                const auto& candidates = treeletToWorker[packet.targetTreelet];
-                const auto& peer = peers.at(
-                    *random::sample(candidates.begin(), candidates.end()));
-
-                packet.destination = peer.address;
-                packet.destinationId = peer.id;
-                packet.sequenceNumber = sequenceNumbers[packet.destination]++;
-                packet.attempt = 0;
-            }
-
             packet.incrementAttempts();
             packet.retransmission = true;
+
+            if (packet.attempt % 4) {
+                reconnectRequests.insert(packet.destinationId);
+            }
+
             rayPackets.push_back(move(packet));
         }
 
@@ -1151,7 +1164,7 @@ bool LambdaWorker::processMessage(const Message& message) {
         const auto target = stoull(message.payload());
 
         if (peers.count(target)) {
-            peers.at(target).state = Worker::State::Connecting;
+            peers.at(target).reset();
         }
 
         break;

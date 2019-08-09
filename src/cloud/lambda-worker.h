@@ -38,6 +38,7 @@ constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
 constexpr std::chrono::milliseconds PACKET_TIMEOUT{100};
 constexpr std::chrono::milliseconds INACTIVITY_THRESHOLD{50};
 constexpr std::chrono::milliseconds TREELET_PEER_TIMEOUT{200};
+constexpr std::chrono::milliseconds RECONNECTS_INTERVAL{2'000};
 
 constexpr uint64_t DEFAULT_SEND_RATE{1};
 
@@ -81,6 +82,13 @@ class LambdaWorker {
 
         Worker(const WorkerId id, Address&& addr)
             : id(id), address(std::move(addr)) {}
+
+        void reset() {
+            state = State::Connecting;
+            seed = 0;
+            tries = 0;
+            pacer = {true, DEFAULT_SEND_RATE};
+        }
     };
 
     struct ServicePacket {
@@ -210,6 +218,8 @@ class LambdaWorker {
     Poller::Action::Result::Type handleWorkerStats();
     Poller::Action::Result::Type handleDiagnostics();
 
+    Poller::Action::Result::Type handleReconnects();
+
     meow::Message createConnectionRequest(const Worker& peer);
     meow::Message createConnectionResponse(const Worker& peer);
 
@@ -262,6 +272,8 @@ class LambdaWorker {
     std::map<Address, WorkerId> addressToWorker{};
     int32_t mySeed;
     std::string outputName;
+
+    std::set<WorkerId> reconnectRequests;
 
     std::map<WorkerId, packet_clock::time_point>
         activeSenders{};  // used by the receiver
@@ -321,6 +333,7 @@ class LambdaWorker {
     TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
     TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
     TimerFD handleRayAcknowledgementsTimer{HANDLE_ACKS_INTERVAL};
+    TimerFD reconnectTimer{RECONNECTS_INTERVAL};
 
     bool terminated{false};
 
