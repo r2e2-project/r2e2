@@ -177,11 +177,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         bind(&LambdaWorker::handleDiagnostics, this), [this]() { return true; },
         []() { throw runtime_error("handle diagnostics failed"); }));
 
-    loop.poller().add_action(Poller::Action(
-        reconnectTimer.fd, Direction::In,
-        bind(&LambdaWorker::handleReconnects, this),
-        [this]() { return !reconnectRequests.empty(); },
-        []() { throw runtime_error("reconnect failed"); }));
+    loop.poller().add_action(
+        Poller::Action(reconnectTimer.fd, Direction::In,
+                       bind(&LambdaWorker::handleReconnects, this),
+                       [this]() { return !reconnectRequests.empty(); },
+                       []() { throw runtime_error("reconnect failed"); }));
 
     /* request new peers for neighboring treelets */
     /* loop.poller().add_action(Poller::Action(
@@ -698,7 +698,6 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         const bool tracked = packetLogBD(randEngine);
         string message = Message::str(*workerId, OpCode::Ack, move(ack), false,
                                       ackId, tracked);
-
         servicePackets.emplace_back(addr, addressToWorker[addr], move(message),
                                     true, ackId, tracked);
 
