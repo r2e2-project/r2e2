@@ -73,9 +73,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                       .count();
 
     if (trackRays) {
-        TLOG(RAY)
-            << "x,y,sample,bounce,hop,tick,shadowRay,workerID,otherPartyID,"
-               "treeletID,timestamp,size,action";
+        TLOG(RAY) << "x,y,sample,bounce,hop,shadowRay,workerID,otherPartyID,"
+                     "treeletID,timestamp,size,action";
     }
 
     if (trackPackets) {
@@ -366,18 +365,15 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                 const WorkerId otherParty) {
     if (!trackRays || !state.trackRay) return;
 
-    state.tick++;
-
     ostringstream oss;
 
     // clang-format off
-    // x,y,sample,bounce,hop,tick,shadowRay,workerID,otherPartyID,treeletID,timestamp,size,action
+    // x,y,sample,bounce,hop,shadowRay,workerID,otherPartyID,treeletID,timestamp,size,action
     oss << state.sample.pixel.x << ','
         << state.sample.pixel.y << ','
         << state.sample.num << ','
         << (maxDepth - state.remainingBounces) << ','
         << state.hop << ','
-        << state.tick << ','
         << state.isShadowRay << ','
         << *workerId << ','
         << ((action == RayAction::Sent ||
@@ -483,17 +479,15 @@ ResultType LambdaWorker::handleRayQueue() {
         if (treeletIds.count(nextTreelet)) {
             pushRayQueue(move(ray));
         } else {
+            ray->Serialize();
+
             if (treeletToWorker.count(nextTreelet)) {
                 logRayAction(*ray, RayAction::Queued);
-                ray->Serialize();
-
                 workerStats.recordSendingRay(*ray);
                 outQueue[nextTreelet].push_back(move(ray));
                 outQueueSize++;
             } else {
                 logRayAction(*ray, RayAction::Pending);
-                ray->Serialize();
-
                 workerStats.recordPendingRay(*ray);
                 neededTreelets.insert(nextTreelet);
                 pendingQueue[nextTreelet].push_back(move(ray));
@@ -1035,17 +1029,15 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             if (treeletIds.count(nextTreelet)) {
                 pushRayQueue(move(statePtr));
             } else {
+                statePtr->Serialize();
+
                 if (treeletToWorker.count(nextTreelet)) {
                     logRayAction(state, RayAction::Queued);
-                    statePtr->Serialize();
-
                     workerStats.recordSendingRay(state);
                     outQueue[nextTreelet].push_back(move(statePtr));
                     outQueueSize++;
                 } else {
                     logRayAction(state, RayAction::Pending);
-                    statePtr->Serialize();
-
                     workerStats.recordPendingRay(state);
                     neededTreelets.insert(nextTreelet);
                     pendingQueue[nextTreelet].push_back(move(statePtr));
@@ -1247,9 +1239,9 @@ bool LambdaWorker::processMessage(const Message& message) {
 
             RayStatePtr ray = make_unique<RayState>();
             ray->Deserialize(data + offset, len);
+            ray->hop++;
             offset += len;
 
-            ray->hop++;
             logRayAction(*ray, RayAction::Received, message.sender_id());
             pushRayQueue(move(ray));
         }

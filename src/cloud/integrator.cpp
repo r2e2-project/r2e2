@@ -61,7 +61,7 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
             auto &newRay = *newRayPtr;
 
             newRay.trackRay = rayState.trackRay;
-            newRay.tick = rayState.tick;
+            newRay.hop = rayState.hop;
             newRay.beta = rayState.beta * f * AbsDot(wi, it.shading.n) / pdf;
             newRay.ray = it.SpawnRay(wi);
             newRay.remainingBounces = rayState.remainingBounces - 1;
@@ -110,7 +110,6 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
                 shadowRay.ray = visibility.P0().SpawnRayTo(visibility.P1());
                 shadowRay.Ld = (f * Li / lightPdf) / lightSelectPdf;
                 shadowRay.isShadowRay = true;
-                shadowRay.hop = 0;
                 shadowRay.StartTrace();
 
                 newRays.push_back(move(shadowRayPtr));
