@@ -597,13 +597,13 @@ ResultType LambdaWorker::handlePeers() {
 
         case Worker::State::Connected:
             /* send keep alive */
-            if (peerId > 0 && peer.nextKeepAlive < now) {
+            /* if (peerId > 0 && peer.nextKeepAlive < now) {
                 peer.nextKeepAlive += KEEP_ALIVE_INTERVAL;
                 servicePackets.emplace_back(
                     peer.address, peer.id,
                     Message::str(*workerId, OpCode::Ping,
                                  put_field(*workerId)));
-            }
+            }*/
 
             break;
         }
