@@ -69,6 +69,11 @@ class LambdaWorker {
     struct Worker {
         enum class State { Connecting, Connected };
 
+        struct Diagnostics {
+            uint64_t bytesSent{0};
+            uint64_t bytesReceived{0};
+        };
+
         WorkerId id;
         Address address;
         State state{State::Connecting};
@@ -79,6 +84,8 @@ class LambdaWorker {
         Pacer pacer{true, DEFAULT_SEND_RATE};
 
         std::set<TreeletId> treelets{};
+
+        Diagnostics diagnostics;
 
         Worker(const WorkerId id, Address&& addr)
             : id(id), address(std::move(addr)) {}

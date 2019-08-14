@@ -742,6 +742,9 @@ ResultType LambdaWorker::handleUdpSend() {
                       datagram.destinationId, datagram.data.length());
         }
 
+        auto& peer = peers.at(datagram.destinationId);
+        peer.diagnostics.bytesSent += datagram.data.length();
+
         servicePackets.pop_front();
         return ResultType::Continue;
     }
@@ -753,6 +756,7 @@ ResultType LambdaWorker::handleUdpSend() {
                               packet.iovCount(), packet.length);
 
         packet.sentAt = packet_clock::now();
+        peer.diagnostics.bytesSent += packet.length;
         workerStats.netStats.packetsSent++;
 
         /* do the necessary logging */
@@ -877,6 +881,9 @@ ResultType LambdaWorker::handleUdpReceive() {
     while (it != messages.begin()) {
         it--;
         auto& message = *it;
+        auto& peer = peers.at(message.sender_id());
+
+        peer.diagnostics.bytesReceived += message.total_length();
 
         if (message.is_read()) break;
         message.set_read();
@@ -905,7 +912,7 @@ ResultType LambdaWorker::handleUdpReceive() {
             Chunk chunk(message.payload());
             auto& thisReceivedAcks = receivedAcks[datagram.first];
 
-            peers.at(message.sender_id()).pacer.set_rate(chunk.be32());
+            peer.pacer.set_rate(chunk.be32());
             chunk = chunk(4);
 
             if (message.tracked()) {
@@ -982,8 +989,22 @@ ResultType LambdaWorker::handleDiagnostics() {
         duration_cast<microseconds>(now() - workerDiagnostics.startTime)
             .count();
 
-    TLOG(DIAG) << timestamp << " "
-               << protoutil::to_json(to_protobuf(workerDiagnostics));
+    auto proto = to_protobuf(workerDiagnostics);
+
+    for (auto& peerkv : peers) {
+        auto& peer = peerkv.second;
+
+        if (peer.diagnostics.bytesSent || peer.diagnostics.bytesReceived) {
+            auto tdata = proto.add_traffic_data();
+            tdata->set_worker_id(peer.id);
+            tdata->set_bytes_sent(peer.diagnostics.bytesSent);
+            tdata->set_bytes_received(peer.diagnostics.bytesReceived);
+
+            peer.diagnostics = {};
+        }
+    }
+
+    TLOG(DIAG) << timestamp << " " << protoutil::to_json(proto);
 
     workerDiagnostics.reset();
 
