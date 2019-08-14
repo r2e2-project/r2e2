@@ -344,13 +344,22 @@ message WorkerStats {
     uint64 timestamp_us = 7;
 }
 
+message TrafficData {
+    uint64 worker_id = 1;
+    uint64 bytes_sent = 2;
+    uint64 bytes_received = 3;
+}
+
 message WorkerDiagnostics {
     uint64 bytes_sent = 1;
     uint64 bytes_received = 2;
     uint64 outstanding_udp = 3;
+
     repeated Action time_per_action = 4;
     repeated ActionIntervals intervals_per_action = 5;
     repeated Metrics metrics_over_time = 6;
+
+    repeated TrafficData traffic_data = 7;
 }
 
 // For stat output to logs.
