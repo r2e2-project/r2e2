@@ -17,7 +17,7 @@ inline timepoint_t now() { return std::chrono::system_clock::now(); };
 
 #define PER_RAY_STATS
 // #define PER_INTERVAL_STATS
-#define RECORD_METRICS
+// #define RECORD_INTERVALS
 
 constexpr double RAY_PERCENTILES[] = {0.5, 0.9, 0.99, 0.999, 0.9999};
 constexpr size_t NUM_PERCENTILES = sizeof(RAY_PERCENTILES) / sizeof(double);
@@ -145,8 +145,18 @@ namespace global {
 extern WorkerDiagnostics workerDiagnostics;
 }  // namespace global
 
+#ifdef RECORD_INTERVALS
+
 #define RECORD_INTERVAL(x) \
     auto __REC__ = pbrt::global::workerDiagnostics.recordInterval(x)
+
+#else
+
+#define RECORD_INTERVAL(x) \
+    do {                   \
+    } while (false)
+
+#endif
 
 }  // namespace pbrt
 
