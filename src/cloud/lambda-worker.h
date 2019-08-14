@@ -297,6 +297,7 @@ class LambdaWorker {
     std::map<Address, uint64_t> sequenceNumbers{};
 
     /* incoming rays */
+    uint32_t trafficShare;
     std::map<Address, SeqNoSet> receivedPacketSeqNos{};
     std::set<Address> toBeAcked{};
 

@@ -675,8 +675,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                         return (now - x.second) <= INACTIVITY_THRESHOLD;
                     }));
 
-    const uint32_t trafficShare =
-        max(1ul, config.maxUdpRate / activeSendersCount);
+    trafficShare = max(1ul, config.maxUdpRate / activeSendersCount);
 
     for (const auto& addr : toBeAcked) {
         auto& receivedSeqNos = receivedPacketSeqNos[addr];
