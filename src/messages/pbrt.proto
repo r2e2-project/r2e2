@@ -350,6 +350,11 @@ message TrafficData {
     uint64 bytes_received = 3;
 }
 
+message TreeletData {
+    uint32 treelet_id = 1;
+    uint32 queued_rays = 2;
+}
+
 message WorkerDiagnostics {
     uint64 bytes_sent = 1;
     uint64 bytes_received = 2;
@@ -360,6 +365,7 @@ message WorkerDiagnostics {
     repeated Metrics metrics_over_time = 6;
 
     repeated TrafficData traffic_data = 7;
+    repeated TreeletData treelet_data = 8;
 }
 
 // For stat output to logs.

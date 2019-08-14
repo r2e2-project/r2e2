@@ -1001,6 +1001,15 @@ ResultType LambdaWorker::handleDiagnostics() {
         }
     }
 
+    for (auto& outkv : outQueue) {
+        auto treeletId = outkv.first;
+        auto& queue = outkv.second;
+
+        auto tdata = proto.add_treelet_data();
+        tdata->set_treelet_id(treeletId);
+        tdata->set_queued_rays(queue.size());
+    }
+
     TLOG(DIAG) << timestamp << " " << protoutil::to_json(proto);
 
     workerDiagnostics.reset();
