@@ -742,9 +742,6 @@ ResultType LambdaWorker::handleUdpSend() {
                       datagram.destinationId, datagram.data.length());
         }
 
-        auto& peer = peers.at(datagram.destinationId);
-        peer.diagnostics.bytesSent += datagram.data.length();
-
         servicePackets.pop_front();
         return ResultType::Continue;
     }
@@ -881,9 +878,6 @@ ResultType LambdaWorker::handleUdpReceive() {
     while (it != messages.begin()) {
         it--;
         auto& message = *it;
-        auto& peer = peers.at(message.sender_id());
-
-        peer.diagnostics.bytesReceived += message.total_length();
 
         if (message.is_read()) break;
         message.set_read();
@@ -912,6 +906,7 @@ ResultType LambdaWorker::handleUdpReceive() {
             Chunk chunk(message.payload());
             auto& thisReceivedAcks = receivedAcks[datagram.first];
 
+            auto& peer = peers.at(message.sender_id());
             peer.pacer.set_rate(chunk.be32());
             chunk = chunk(4);
 
@@ -935,6 +930,8 @@ ResultType LambdaWorker::handleUdpReceive() {
 
             it = messages.erase(it);
         } else if (message.opcode() == OpCode::SendRays) {
+            auto& peer = peers.at(message.sender_id());
+            peer.diagnostics.bytesReceived += message.total_length();
             activeSenders[message.sender_id()] = packet_clock::now();
         }
     }
