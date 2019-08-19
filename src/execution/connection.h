@@ -17,6 +17,7 @@
 #include "net/nb_secure_socket.h"
 #include "net/socket.h"
 #include "util/timerfd.h"
+#include "util/units.h"
 #include "util/util.h"
 
 class ExecutionLoop;
@@ -48,7 +49,7 @@ class Connection {
 
 class Pacer {
   private:
-    uint64_t rate_Mbps_{80};
+    uint64_t rate_{80_Mbps};
     uint64_t bits_since_reference_{0};
     std::chrono::steady_clock::time_point rate_reference_pt_{
         std::chrono::steady_clock::now()};
@@ -57,12 +58,12 @@ class Pacer {
     bool enabled_;
 
   public:
-    Pacer(const bool enabled, const uint64_t rate_mbps)
-        : enabled_(enabled), rate_Mbps_(rate_mbps) {}
+    Pacer(const bool enabled, const uint64_t rate)
+        : enabled_(enabled), rate_(rate) {}
 
     int64_t micros_ahead_of_pace() const;
     bool within_pace() { return micros_ahead_of_pace() <= 0; }
-    void set_rate(const uint64_t rate) { rate_Mbps_ = rate; }
+    void set_rate(const uint64_t rate);
     void reset_reference();
     void record_send(const size_t data_len);
 };
@@ -74,8 +75,8 @@ class UDPConnection : public Pacer, public UDPSocket {
     std::queue<std::pair<Address, std::string>> packet_queue_;
 
   public:
-    UDPConnection(const bool pacing = false, const uint64_t rate_mbps = 80)
-        : Pacer(pacing, rate_mbps), UDPSocket() {
+    UDPConnection(const bool pacing = false, const uint64_t rate = 80)
+        : Pacer(pacing, rate), UDPSocket() {
         set_blocking(false);
     }
 

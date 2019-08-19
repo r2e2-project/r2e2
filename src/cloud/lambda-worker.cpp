@@ -675,7 +675,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                         return (now - x.second) <= INACTIVITY_THRESHOLD;
                     }));
 
-    trafficShare = max(1ul, config.maxUdpRate / activeSendersCount);
+    trafficShare = max(1'000'000ul, config.maxUdpRate / activeSendersCount);
 
     for (const auto& addr : toBeAcked) {
         auto& receivedSeqNos = receivedPacketSeqNos[addr];
@@ -1440,7 +1440,7 @@ int main(int argc, char* argv[]) {
     string storageUri;
 
     bool sendReliably = false;
-    uint64_t maxUdpRate = 80;
+    uint64_t maxUdpRate = 80_Mbps;
     int samplesPerPixel = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
     float rayActionsLogRate = 0.0;
@@ -1472,7 +1472,7 @@ int main(int argc, char* argv[]) {
         case 'i': publicIp = optarg; break;
         case 's': storageUri = optarg; break;
         case 'R': sendReliably = true; break;
-        case 'M': maxUdpRate = stoull(optarg); break;
+        case 'M': maxUdpRate = stoull(optarg) * 1'000'000; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'L': rayActionsLogRate = stof(optarg); break;
         case 'P': packetsLogRate = stof(optarg); break;

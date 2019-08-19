@@ -12,8 +12,13 @@ int64_t Pacer::micros_ahead_of_pace() const {
     const int64_t elapsed_micros =
         duration_cast<microseconds>(now - rate_reference_pt_).count();
     const int64_t elapsed_micros_if_at_pace =
-        bits_since_reference_ / rate_Mbps_;
+        (bits_since_reference_ * 1'000'000) / rate_ ;
     return elapsed_micros_if_at_pace - elapsed_micros;
+}
+
+void Pacer::set_rate(const uint64_t rate) {
+    rate_ = rate;
+    reset_reference();
 }
 
 void Pacer::reset_reference() {

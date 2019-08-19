@@ -26,6 +26,7 @@
 #include "util/seq_no_set.h"
 #include "util/temp_dir.h"
 #include "util/timerfd.h"
+#include "util/units.h"
 
 namespace pbrt {
 
