@@ -487,6 +487,7 @@ ResultType LambdaWorker::handleRayQueue() {
             if (treeletToWorker.count(nextTreelet)) {
                 logRayAction(*ray, RayAction::Queued);
                 workerStats.recordSendingRay(*ray);
+                outQueueLengthBytes[nextTreelet] += ray->SerializedSize();
                 outQueue[nextTreelet].push_back(move(ray));
                 outQueueSize++;
             } else {
@@ -794,6 +795,7 @@ ResultType LambdaWorker::handleUdpSend() {
     for (const auto& treeletId : myTreelets) {
         /* (1) pick a treelet randomly */
         auto& queue = outQueue[treeletId];
+        auto& queueLengthBytes = outQueueLengthBytes[treeletId];
 
         /* (2) pick a worker to send to */
         WorkerId peerId;
@@ -839,6 +841,7 @@ ResultType LambdaWorker::handleUdpSend() {
             packet.addRay(move(ray));
 
             queue.pop_front();
+            queueLengthBytes -= size;
             outQueueSize--;
         }
 
@@ -1063,6 +1066,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
                 if (treeletToWorker.count(nextTreelet)) {
                     logRayAction(state, RayAction::Queued);
                     workerStats.recordSendingRay(state);
+                    outQueueLengthBytes[nextTreelet] += state.SerializedSize();
                     outQueue[nextTreelet].push_back(move(statePtr));
                     outQueueSize++;
                 } else {
@@ -1240,6 +1244,7 @@ bool LambdaWorker::processMessage(const Message& message) {
                 if (pendingQueue.count(treeletId)) {
                     auto& treeletPending = pendingQueue[treeletId];
                     auto& treeletOut = outQueue[treeletId];
+                    auto& treeletOutLen = outQueueLengthBytes[treeletId];
 
                     outQueueSize += treeletPending.size();
                     pendingQueueSize -= treeletPending.size();
@@ -1247,6 +1252,7 @@ bool LambdaWorker::processMessage(const Message& message) {
                     while (!treeletPending.empty()) {
                         auto& front = treeletPending.front();
                         workerStats.recordSendingRay(*front);
+                        treeletOutLen += front->SerializedSize();
                         treeletOut.push_back(move(front));
                         treeletPending.pop_front();
                     }
