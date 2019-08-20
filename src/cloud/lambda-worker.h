@@ -128,19 +128,22 @@ class LambdaWorker {
         bool tracked{false};
         uint64_t sequenceNumber;
         size_t attempt{0};
-        size_t length{0};
+        size_t length{meow::Message::HEADER_LENGTH + sizeof(uint32_t)};
 
         char header[meow::Message::HEADER_LENGTH];
+        uint32_t queueLength;
         std::deque<std::unique_ptr<RayState>> rays;
 
         packet_clock::time_point sentAt;
 
         RayPacket(const Address& addr, const WorkerId destId,
-                  const TreeletId targetTreelet, const bool reliable = false,
+                  const TreeletId targetTreelet, const uint32_t queueLength,
+                  const bool reliable = false,
                   const uint64_t sequenceNumber = 0, const bool tracked = false)
             : destination(addr),
               destinationId(destId),
               targetTreelet(targetTreelet),
+              queueLength(queueLength),
               reliable(reliable),
               sequenceNumber(sequenceNumber),
               tracked(tracked) {}
@@ -150,6 +153,8 @@ class LambdaWorker {
 
             iov_[iovCount_++] = {.iov_base = ray->serialized,
                                  .iov_len = ray->serializedSize};
+
+            length += ray->serializedSize;
 
             rays.push_back(std::move(ray));
         }
@@ -162,14 +167,18 @@ class LambdaWorker {
 
         struct iovec* iov() {
             iov_[0].iov_base = header;
+            iov_[1].iov_base = &queueLength;
             return iov_;
         }
 
         size_t iovCount() const { return iovCount_; }
 
       private:
-        struct iovec iov_[20] = {{.iov_base = nullptr, .iov_len = 25}};
-        size_t iovCount_{1};
+        struct iovec iov_[20] = {
+            {.iov_base = nullptr, .iov_len = 25},
+            {.iov_base = nullptr, .iov_len = sizeof(uint32_t)}};
+
+        size_t iovCount_{2};
     };
 
     enum class RayAction {

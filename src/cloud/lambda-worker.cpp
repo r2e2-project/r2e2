@@ -822,10 +822,8 @@ ResultType LambdaWorker::handleUdpSend() {
         /* (3) collect the rays to fill a packet */
         const bool tracked = packetLogBD(randEngine);
 
-        RayPacket packet(peer.address, peer.id, treeletId, config.sendReliably,
-                         peerSeqNo, tracked);
-
-        packet.length = Message::HEADER_LENGTH;
+        RayPacket packet(peer.address, peer.id, treeletId, queueLengthBytes,
+                         config.sendReliably, peerSeqNo, tracked);
 
         while (!queue.empty()) {
             auto& ray = queue.front();
@@ -837,7 +835,6 @@ ResultType LambdaWorker::handleUdpSend() {
 
             if (size + packet.length > UDP_MTU_BYTES) break;
 
-            packet.length += size;
             packet.addRay(move(ray));
 
             queue.pop_front();
@@ -1264,8 +1261,11 @@ bool LambdaWorker::processMessage(const Message& message) {
     }
 
     case OpCode::SendRays: {
-        const char* data = message.payload().data();
-        const uint32_t dataLen = message.payload().length();
+        char const* data = message.payload().data();
+        const uint32_t queueLen = *reinterpret_cast<uint32_t const*>(data);
+        data += sizeof(uint32_t);
+
+        const uint32_t dataLen = message.payload().length() - sizeof(uint32_t);
         uint32_t offset = 0;
 
         while (offset < dataLen) {
