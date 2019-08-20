@@ -23,6 +23,9 @@ constexpr double RAY_PERCENTILES[] = {0.5, 0.9, 0.99, 0.999, 0.9999};
 constexpr size_t NUM_PERCENTILES = sizeof(RAY_PERCENTILES) / sizeof(double);
 
 struct RayStats {
+    uint64_t sentBytes{0};
+    uint64_t receivedBytes{0};
+
     /* rays waiting to be processed for this scene object */
     uint64_t waitingRays{0};
     /* rays processed for this scene object */
@@ -68,6 +71,8 @@ struct WorkerStats {
 
     const timepoint_t startTime{now()};
 
+    uint64_t sentBytes() const { return aggregateStats.sentBytes; }
+    uint64_t receivedBytes() const { return aggregateStats.receivedBytes; }
     uint64_t waitingRays() const { return aggregateStats.waitingRays; }
     uint64_t processedRays() const { return aggregateStats.processedRays; }
     uint64_t sendingRays() const { return aggregateStats.sendingRays; }
@@ -82,6 +87,9 @@ struct WorkerStats {
     void recordSendingRay(const RayState& ray);
     void recordPendingRay(const RayState& ray);
     void recordFinishedRay(const RayState& ray);
+
+    void recordSentBytes(const TreeletId treeletId, const uint64_t num);
+    void recordReceivedBytes(const TreeletId treeletId, const uint64_t num);
 
     void reset();
     void merge(const WorkerStats& other);

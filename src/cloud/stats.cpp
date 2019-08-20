@@ -12,6 +12,9 @@ WorkerDiagnostics workerDiagnostics;
 }  // namespace global
 
 void RayStats::reset() {
+    sentBytes = 0;
+    receivedBytes = 0;
+
     waitingRays = 0;
     processedRays = 0;
     demandedRays = 0;
@@ -21,6 +24,9 @@ void RayStats::reset() {
 }
 
 void RayStats::merge(const RayStats& other) {
+    sentBytes += other.sentBytes;
+    receivedBytes += other.receivedBytes;
+
     waitingRays += other.waitingRays;
     processedRays += other.processedRays;
     demandedRays += other.demandedRays;
@@ -63,6 +69,18 @@ void WorkerStats::recordFinishedRay(const RayState& ray) {
 }
 
 #undef INCREMENT_FIELD
+
+void WorkerStats::recordSentBytes(const TreeletId treeletId,
+                                  const uint64_t num) {
+    aggregateStats.sentBytes += num;
+    objectStats[ObjectKey{ObjectType::Treelet, treeletId}].sentBytes += num;
+}
+
+void WorkerStats::recordReceivedBytes(const TreeletId treeletId,
+                                      const uint64_t num) {
+    aggregateStats.receivedBytes += num;
+    objectStats[ObjectKey{ObjectType::Treelet, treeletId}].receivedBytes += num;
+}
 
 void WorkerStats::reset() {
     _finishedPaths = 0;

@@ -757,6 +757,8 @@ ResultType LambdaWorker::handleUdpSend() {
         peer.diagnostics.bytesSent += packet.length;
         workerStats.netStats.packetsSent++;
 
+        workerStats.recordSentBytes(packet.targetTreelet, packet.length);
+
         /* do the necessary logging */
         for (auto& rayPtr : packet.rays) {
             logRayAction(*rayPtr, RayAction::Sent, packet.destinationId);
@@ -1267,6 +1269,7 @@ bool LambdaWorker::processMessage(const Message& message) {
 
         const uint32_t dataLen = message.payload().length() - sizeof(uint32_t);
         uint32_t offset = 0;
+        bool first = true;
 
         while (offset < dataLen) {
             const auto len = *reinterpret_cast<const uint32_t*>(data + offset);
@@ -1276,6 +1279,11 @@ bool LambdaWorker::processMessage(const Message& message) {
             ray->Deserialize(data + offset, len);
             ray->hop++;
             offset += len;
+
+            if (first) {
+                workerStats.recordReceivedBytes(ray->CurrentTreelet(), dataLen);
+                first = false;
+            }
 
             logRayAction(*ray, RayAction::Received, message.sender_id());
             pushRayQueue(move(ray));

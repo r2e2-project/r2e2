@@ -258,6 +258,8 @@ protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey) {
 
 protobuf::RayStats to_protobuf(const RayStats& stats) {
     protobuf::RayStats proto;
+    proto.set_sent_bytes(stats.sentBytes);
+    proto.set_received_bytes(stats.receivedBytes);
     proto.set_waiting_rays(stats.waitingRays);
     proto.set_processed_rays(stats.processedRays);
     proto.set_demanded_rays(stats.demandedRays);
@@ -280,7 +282,7 @@ protobuf::QueueStats to_protobuf(const QueueStats& stats) {
     return proto;
 }
 
-protobuf::NetStats to_protobuf(const NetStats &stats) {
+protobuf::NetStats to_protobuf(const NetStats& stats) {
     protobuf::NetStats proto;
     proto.set_packets_sent(stats.packetsSent);
     proto.set_rtt(stats.rtt.count());
@@ -834,6 +836,8 @@ protobuf::SpectrumTexture spectrum_texture::to_protobuf(
 
 RayStats from_protobuf(const protobuf::RayStats& proto) {
     RayStats stats;
+    stats.sentBytes = proto.sent_bytes();
+    stats.receivedBytes = proto.received_bytes();
     stats.waitingRays = proto.waiting_rays();
     stats.processedRays = proto.processed_rays();
     stats.demandedRays = proto.demanded_rays();
@@ -857,7 +861,7 @@ QueueStats from_protobuf(const protobuf::QueueStats& proto) {
     return stats;
 }
 
-NetStats from_protobuf(const protobuf::NetStats &proto) {
+NetStats from_protobuf(const protobuf::NetStats& proto) {
     NetStats stats;
     stats.packetsSent = proto.packets_sent();
     stats.rtt = chrono::milliseconds{proto.rtt()};
