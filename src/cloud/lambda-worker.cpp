@@ -988,7 +988,7 @@ ResultType LambdaWorker::handleDiagnostics() {
 
     auto proto = to_protobuf(workerDiagnostics);
 
-    for (auto& peerkv : peers) {
+    /* for (auto& peerkv : peers) {
         auto& peer = peerkv.second;
 
         if (peer.diagnostics.bytesSent || peer.diagnostics.bytesReceived) {
@@ -1010,7 +1010,7 @@ ResultType LambdaWorker::handleDiagnostics() {
         tdata->set_queued_rays(queue.size());
     }
 
-    TLOG(DIAG) << timestamp << " " << protoutil::to_json(proto);
+    TLOG(DIAG) << timestamp << " " << protoutil::to_json(proto); */
 
     workerDiagnostics.reset();
 
