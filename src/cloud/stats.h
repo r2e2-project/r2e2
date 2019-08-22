@@ -25,6 +25,7 @@ constexpr size_t NUM_PERCENTILES = sizeof(RAY_PERCENTILES) / sizeof(double);
 struct RayStats {
     uint64_t sentBytes{0};
     uint64_t receivedBytes{0};
+    uint64_t generatedBytes{0};
 
     /* rays waiting to be processed for this scene object */
     uint64_t waitingRays{0};
@@ -90,6 +91,7 @@ struct WorkerStats {
 
     void recordSentBytes(const TreeletId treeletId, const uint64_t num);
     void recordReceivedBytes(const TreeletId treeletId, const uint64_t num);
+    void recordGeneratedBytes(const TreeletId treeletId, const uint64_t num);
 
     void reset();
     void merge(const WorkerStats& other);

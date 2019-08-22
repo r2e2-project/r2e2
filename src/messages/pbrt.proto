@@ -279,6 +279,7 @@ message ConnectResponse {
 message RayStats {
     uint64 sent_bytes = 1;
     uint64 received_bytes = 2;
+    uint64 generated_bytes = 3;
 
     uint64 waiting_rays = 4;
     uint64 processed_rays = 5;

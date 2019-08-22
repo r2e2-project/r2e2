@@ -250,7 +250,8 @@ class Stats(object):
         per_worker_treelet_fieldnames = [
             'workerID', 'treeletID', 'timestamp',
             'raysWaiting', 'raysProcessed', 'raysGenerated', 'raysSending',
-            'raysReceived', 'bytesSent', 'bytesReceived', 'raysFinished']
+            'raysReceived', 'bytesSent', 'bytesReceived', 'raysFinished',
+            'bytesGenerated']
         per_worker_treelet_data = {}
         csv_data = {}
         print('Quantizing worker stats', end='', flush=True)
@@ -266,7 +267,8 @@ class Stats(object):
                                    ('sendingRays', 'raysSending'),
                                    ('finishedRays', 'raysFinished'),
                                    ('sentBytes', 'bytesSent'),
-                                   ('receivedBytes', 'bytesReceived')]:
+                                   ('receivedBytes', 'bytesReceived'),
+                                   ('generatedBytes', 'bytesGenerated')]:
                     quantized_timestamps, quantized_data = quantize_sequence(
                         [min_timestamp] + [min_timestamp + x for x in stats.timestamps],
                         [0] + treelet_stats[field],

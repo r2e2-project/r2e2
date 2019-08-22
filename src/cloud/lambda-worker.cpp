@@ -484,6 +484,9 @@ ResultType LambdaWorker::handleRayQueue() {
         } else {
             ray->Serialize();
 
+            workerStats.recordGeneratedBytes(nextTreelet,
+                                             ray->SerializedSize());
+
             if (treeletToWorker.count(nextTreelet)) {
                 logRayAction(*ray, RayAction::Queued);
                 workerStats.recordSendingRay(*ray);
@@ -703,8 +706,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         auto& lease = activeLeases[addr];
 
         if (!lease.small) {
-            lease.allocation =
-                trafficShare + excess;
+            lease.allocation = trafficShare + excess;
         }
     }
 
@@ -1096,6 +1098,9 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
                 pushRayQueue(move(statePtr));
             } else {
                 statePtr->Serialize();
+
+                workerStats.recordGeneratedBytes(nextTreelet,
+                                                 state.SerializedSize());
 
                 if (treeletToWorker.count(nextTreelet)) {
                     logRayAction(state, RayAction::Queued);
