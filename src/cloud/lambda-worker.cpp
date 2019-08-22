@@ -669,21 +669,52 @@ ResultType LambdaWorker::handleReconnects() {
 ResultType LambdaWorker::handleRayAcknowledgements() {
     handleRayAcknowledgementsTimer.reset();
 
+    auto now = packet_clock::now();
+
+    /* remove expired leases */
+    for (auto it = activeLeases.begin(); it != activeLeases.end();) {
+        if (it->second.expiresAt > now) {
+            it = activeLeases.erase(it);
+        } else {
+            it++;
+        }
+    }
+
+    const uint32_t trafficShare = max<uint32_t>(
+        1'000'000, config.maxUdpRate / max<size_t>(1, activeLeases.size()));
+
+    uint32_t excess = 0;
+    uint32_t smallCount = 0;
+
+    for (auto& lease : activeLeases) {
+        if (8000 * lease.second.queueSize / trafficShare < 100) {
+            lease.second.allocation =
+                max<uint32_t>(1'400 * 8 * 10, 80 * lease.second.queueSize);
+            lease.second.small = true;
+            smallCount++;
+
+            excess += trafficShare - lease.second.allocation;
+        } else {
+            lease.second.small = false;
+        }
+    }
+
+    for (const auto& addr : toBeAcked) {
+        auto& lease = activeLeases[addr];
+
+        if (!lease.small) {
+            lease.allocation =
+                trafficShare + excess;
+        }
+    }
+
     /* count the number of active senders to this worker */
-    const auto activeSendersCount = max<uint32_t>(
-        1, count_if(activeSenders.begin(), activeSenders.end(),
-                    [now = packet_clock::now()](const auto& x) {
-                        return (now - x.second) <= INACTIVITY_THRESHOLD;
-                    }));
-
-    trafficShare = max(1'000'000ul, config.maxUdpRate / activeSendersCount);
-
     for (const auto& addr : toBeAcked) {
         auto& receivedSeqNos = receivedPacketSeqNos[addr];
 
         /* Let's construct the ack message for this worker */
         string ack{};
-        ack += put_field(trafficShare);
+        ack += put_field(activeLeases[addr].allocation);
         ack += put_field(receivedSeqNos.smallest_not_in_set());
 
         for (auto sIt = receivedSeqNos.set().cbegin();
@@ -704,8 +735,6 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
     toBeAcked.clear();
 
     // re-queue timed-out packets
-    const auto now = packet_clock::now();
-
     while (!outstandingRayPackets.empty() &&
            outstandingRayPackets.front().first <= now) {
         auto& packet = outstandingRayPackets.front().second;
@@ -932,9 +961,15 @@ ResultType LambdaWorker::handleUdpReceive() {
 
             it = messages.erase(it);
         } else if (message.opcode() == OpCode::SendRays) {
-            auto& peer = peers.at(message.sender_id());
-            peer.diagnostics.bytesReceived += message.total_length();
-            activeSenders[message.sender_id()] = packet_clock::now();
+            Chunk chunk(message.payload());
+
+            // FIXME
+            /* auto& peer = peers.at(message.sender_id());
+            peer.diagnostics.bytesReceived += message.total_length(); */
+
+            auto& lease = activeLeases[datagram.first];
+            lease.expiresAt = packet_clock::now() + INACTIVITY_THRESHOLD;
+            lease.queueSize = chunk.le32();
         }
     }
 

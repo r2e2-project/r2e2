@@ -295,8 +295,16 @@ class LambdaWorker {
 
     std::set<WorkerId> reconnectRequests;
 
-    std::map<WorkerId, packet_clock::time_point>
-        activeSenders{};  // used by the receiver
+    struct Lease {
+        packet_clock::time_point expiresAt{packet_clock::now() +
+                                           INACTIVITY_THRESHOLD};
+
+        bool small{false};
+        uint32_t allocation{1'400 * 8 * 10};
+        uint32_t queueSize{1'400};
+    };
+
+    std::map<Address, Lease> activeLeases{};  // used by the receiver
 
     std::map<TreeletId, std::pair<WorkerId, packet_clock::time_point>>
         workerForTreelet;  // used by the sender
@@ -314,7 +322,6 @@ class LambdaWorker {
     std::map<Address, uint64_t> sequenceNumbers{};
 
     /* incoming rays */
-    uint32_t trafficShare;
     std::map<Address, SeqNoSet> receivedPacketSeqNos{};
     std::set<Address> toBeAcked{};
 
