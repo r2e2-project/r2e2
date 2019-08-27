@@ -261,6 +261,7 @@ protobuf::RayStats to_protobuf(const RayStats& stats) {
     proto.set_sent_bytes(stats.sentBytes);
     proto.set_received_bytes(stats.receivedBytes);
     proto.set_generated_bytes(stats.generatedBytes);
+    proto.set_acknowledged_bytes(stats.acknowledgedBytes);
     proto.set_waiting_rays(stats.waitingRays);
     proto.set_processed_rays(stats.processedRays);
     proto.set_demanded_rays(stats.demandedRays);
@@ -840,6 +841,7 @@ RayStats from_protobuf(const protobuf::RayStats& proto) {
     stats.sentBytes = proto.sent_bytes();
     stats.receivedBytes = proto.received_bytes();
     stats.generatedBytes = proto.generated_bytes();
+    stats.acknowledgedBytes = proto.acknowledged_bytes();
     stats.waitingRays = proto.waiting_rays();
     stats.processedRays = proto.processed_rays();
     stats.demandedRays = proto.demanded_rays();

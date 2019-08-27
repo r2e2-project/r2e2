@@ -17,6 +17,7 @@ void RayStats::merge(const RayStats& other) {
     sentBytes += other.sentBytes;
     receivedBytes += other.receivedBytes;
     generatedBytes += other.generatedBytes;
+    acknowledgedBytes += other.acknowledgedBytes;
 
     waitingRays += other.waitingRays;
     processedRays += other.processedRays;
@@ -77,6 +78,13 @@ void WorkerStats::recordGeneratedBytes(const TreeletId treeletId,
                                        const uint64_t num) {
     aggregateStats.generatedBytes += num;
     objectStats[ObjectKey{ObjectType::Treelet, treeletId}].generatedBytes +=
+        num;
+}
+
+void WorkerStats::recordAcknowledgedBytes(const TreeletId treeletId,
+                                          const uint64_t num) {
+    aggregateStats.acknowledgedBytes += num;
+    objectStats[ObjectKey{ObjectType::Treelet, treeletId}].acknowledgedBytes +=
         num;
 }
 

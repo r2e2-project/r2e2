@@ -280,13 +280,14 @@ message RayStats {
     uint64 sent_bytes = 1;
     uint64 received_bytes = 2;
     uint64 generated_bytes = 3;
+    uint64 acknowledged_bytes = 4;
 
-    uint64 waiting_rays = 4;
-    uint64 processed_rays = 5;
-    uint64 demanded_rays = 6;
-    uint64 sending_rays = 7;
-    uint64 pending_rays = 8;
-    uint64 finished_rays = 9;
+    uint64 waiting_rays = 5;
+    uint64 processed_rays = 6;
+    uint64 demanded_rays = 7;
+    uint64 sending_rays = 8;
+    uint64 pending_rays = 9;
+    uint64 finished_rays = 10;
 }
 
 message QueueStats {

@@ -754,6 +754,9 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
             }
 
             rayPackets.push_back(move(packet));
+        } else {
+            workerStats.recordAcknowledgedBytes(packet.targetTreelet,
+                                                packet.raysLength());
         }
 
         outstandingRayPackets.pop_front();
