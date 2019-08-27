@@ -953,10 +953,8 @@ ResultType LambdaWorker::handleUdpReceive() {
             }
 
             if (chunk.size() >= 8) {
-                const auto next = chunk.be64();
+                thisReceivedAcks.insertAllBelow(chunk.be64());
                 chunk = chunk(8);
-
-                thisReceivedAcks.insertAllBelow(next);
 
                 while (chunk.size()) {
                     thisReceivedAcks.insert(chunk.be64());

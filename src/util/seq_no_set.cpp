@@ -32,9 +32,7 @@ void SeqNoSet::insert(const uint64_t value) {
 }
 
 void SeqNoSet::insertAllBelow(const uint64_t value) {
-    if (value == 0) {
-        return;
-    } else if (value < smallest_not_in_set_) {
+    if (value <= smallest_not_in_set_) {
         return;
     } else {
         smallest_not_in_set_ = value;
