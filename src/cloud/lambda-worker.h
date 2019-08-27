@@ -165,6 +165,10 @@ class LambdaWorker {
             memcpy(header, reinterpret_cast<const char*>(&val), sizeof(val));
         }
 
+        size_t raysLength() const {
+            return length - (meow::Message::HEADER_LENGTH + sizeof(uint32_t));
+        }
+
         struct iovec* iov() {
             iov_[0].iov_base = header;
             iov_[1].iov_base = &queueLength;

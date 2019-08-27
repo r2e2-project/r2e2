@@ -788,7 +788,7 @@ ResultType LambdaWorker::handleUdpSend() {
         peer.diagnostics.bytesSent += packet.length;
         workerStats.netStats.packetsSent++;
 
-        workerStats.recordSentBytes(packet.targetTreelet, packet.length);
+        workerStats.recordSentBytes(packet.targetTreelet, packet.raysLength());
 
         /* do the necessary logging */
         for (auto& rayPtr : packet.rays) {
