@@ -204,7 +204,7 @@ class Stats(object):
                     self.worker_stats.append(s)
 
     def write_csv(self, path: str):
-        quanta = 2.0 * 1e6 # seconds -> microseconds
+        quanta = 1.0 * 1e6 # seconds -> microseconds
         start_timestamp = self.worker_stats[0].start_timestamp
         end_timestamp = 0
         for stats in self.worker_stats:
