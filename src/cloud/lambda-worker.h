@@ -41,7 +41,7 @@ constexpr std::chrono::milliseconds INACTIVITY_THRESHOLD{50};
 constexpr std::chrono::milliseconds TREELET_PEER_TIMEOUT{200};
 constexpr std::chrono::milliseconds RECONNECTS_INTERVAL{2'000};
 
-constexpr uint64_t DEFAULT_SEND_RATE{1};
+constexpr uint64_t DEFAULT_SEND_RATE{1'400 * 8};
 
 struct WorkerConfiguration {
     bool sendReliably;
