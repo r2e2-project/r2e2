@@ -356,6 +356,12 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             }
         };
 
+        auto doDebugAssign = [this](Worker &worker) {
+            if (worker.id == 1) {
+                assignTreelet(worker, 0);
+            }
+        };
+
         /* assign a tile to the worker */
         const WorkerId id = workerIt->first;  // indexed starting at 1
         if (id <= nTiles.x * nTiles.y) {
@@ -377,6 +383,8 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
             doUniformAssign(workerIt->second);
         } else if (assignment & Assignment::All) {
             doAllAssign(workerIt->second);
+        } else if (assignment & Assignment::Debug) {
+            doDebugAssign(workerIt->second);
         } else {
             throw runtime_error("unrecognized assignment type");
         }
@@ -897,6 +905,7 @@ void usage(const char *argv0, int exitCode) {
          << "                               - static" << endl
          << "                               - static+uniform" << endl
          << "                               - all" << endl
+         << "                               - debug" << endl
          << "  -f --finished-ray ACTION   what to do with finished rays" << endl
          << "                               - discard (default)" << endl
          << "                               - send" << endl
@@ -1010,6 +1019,8 @@ int main(int argc, char *argv[]) {
                 assignment = Assignment::Uniform;
             } else if (strcmp(optarg, "all") == 0) {
                 assignment = Assignment::All;
+            } else if (strcmp(optarg, "debug") == 0) {
+                assignment = Assignment::Debug;
             } else {
                 usage(argv[0], EXIT_FAILURE);
             }

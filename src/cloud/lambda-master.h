@@ -36,6 +36,7 @@ struct Assignment {
     static constexpr int All        = (1 << 0);
     static constexpr int Static     = (1 << 1);
     static constexpr int Uniform    = (1 << 2);
+    static constexpr int Debug      = (1 << 3); /* only assigns T0 to one worker */
     // clang-format on
 };
 
