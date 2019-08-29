@@ -1048,9 +1048,9 @@ ResultType LambdaWorker::handleDiagnostics() {
         auto tdata = proto.add_treelet_data();
         tdata->set_treelet_id(treeletId);
         tdata->set_queued_rays(queue.size());
-    }
+    } */
 
-    TLOG(DIAG) << timestamp << " " << protoutil::to_json(proto); */
+    TLOG(DIAG) << timestamp << " " << protoutil::to_json(proto);
 
     workerDiagnostics.reset();
 
