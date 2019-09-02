@@ -683,8 +683,9 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         }
     }
 
-    const uint32_t trafficShare = max<uint32_t>(
-        1'000'000, config.maxUdpRate / max<size_t>(1, activeLeases.size()));
+    const uint32_t trafficShare =
+        max<uint32_t>(DEFAULT_SEND_RATE,
+                      config.maxUdpRate / max<size_t>(1, activeLeases.size()));
 
     uint32_t excess = 0;
     uint32_t smallCount = 0;
@@ -692,7 +693,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
     for (auto& lease : activeLeases) {
         if (8000 * lease.second.queueSize / trafficShare < 100) {
             lease.second.allocation =
-                max<uint32_t>(1'400 * 8 * 10, 80 * lease.second.queueSize);
+                max<uint32_t>(DEFAULT_SEND_RATE, 80 * lease.second.queueSize);
             lease.second.small = true;
             smallCount++;
 
