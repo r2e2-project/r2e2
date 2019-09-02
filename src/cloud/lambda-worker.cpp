@@ -672,11 +672,11 @@ ResultType LambdaWorker::handleReconnects() {
 ResultType LambdaWorker::handleRayAcknowledgements() {
     handleRayAcknowledgementsTimer.reset();
 
-    auto now = packet_clock::now();
+    const auto now = packet_clock::now();
 
     /* remove expired leases */
     for (auto it = activeLeases.begin(); it != activeLeases.end();) {
-        if (it->second.expiresAt > now) {
+        if (it->second.expiresAt <= now) {
             it = activeLeases.erase(it);
         } else {
             it++;
