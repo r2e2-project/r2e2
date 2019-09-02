@@ -303,11 +303,13 @@ class LambdaWorker {
         packet_clock::time_point expiresAt{packet_clock::now() +
                                            INACTIVITY_THRESHOLD};
 
+        WorkerId workerId{0};
         bool small{false};
         uint32_t allocation{1'400 * 8 * 10};
         uint32_t queueSize{1'400};
     };
 
+    const packet_clock::time_point workStart{packet_clock::now()};
     std::map<Address, Lease> activeLeases{};  // used by the receiver
 
     std::map<TreeletId, std::pair<WorkerId, packet_clock::time_point>>

@@ -72,6 +72,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                       workerDiagnostics.startTime.time_since_epoch())
                       .count();
 
+    TLOG(LEASE)
+        << "start "
+        << duration_cast<microseconds>(workStart.time_since_epoch()).count();
+
+    TLOG(LEASE) << "myId,workerId,timestamp,allocation,queueSize,expiresAt";
+
     if (trackRays) {
         TLOG(RAY) << "pathID,hop,shadowRay,workerID,otherPartyID,treeletID,"
                      "outQueue,udpQueue,outstanding,timestamp,size,action";
@@ -707,9 +713,24 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         auto& lease = activeLeases[addr];
 
         if (!lease.small) {
-            lease.allocation = trafficShare + excess;
+            lease.workerId = addressToWorker[addr];
+            lease.allocation = trafficShare + excess / toBeAcked.size();
         }
     }
+
+    /* START LOGGING */
+    /* TLOG(LEASE) << "myId,workerId,timestamp,allocation,queueSize,expiresAt"
+     */
+    for (auto& leasekv : activeLeases) {
+        auto& lease = leasekv.second;
+
+        TLOG(LEASE)
+            << *workerId << ',' << lease.workerId << ','
+            << duration_cast<microseconds>(now - workStart).count() << ','
+            << lease.allocation << ',' << lease.queueSize << ','
+            << duration_cast<microseconds>(lease.expiresAt - workStart).count();
+    }
+    /* END LOGGING */
 
     /* count the number of active senders to this worker */
     for (const auto& addr : toBeAcked) {
@@ -972,6 +993,7 @@ ResultType LambdaWorker::handleUdpReceive() {
             peer.diagnostics.bytesReceived += message.total_length(); */
 
             auto& lease = activeLeases[datagram.first];
+            lease.workerId = message.sender_id();
             lease.expiresAt = packet_clock::now() + INACTIVITY_THRESHOLD;
             lease.queueSize = chunk.le32();
         }
