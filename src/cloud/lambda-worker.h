@@ -83,6 +83,7 @@ class LambdaWorker {
         uint32_t tries{0};
 
         Pacer pacer{true, DEFAULT_SEND_RATE};
+        packet_clock::time_point lastReceived{packet_clock::now()};
 
         std::set<TreeletId> treelets{};
 
@@ -305,7 +306,7 @@ class LambdaWorker {
 
         WorkerId workerId{0};
         bool small{false};
-        uint32_t allocation{1'400 * 8 * 10};
+        uint32_t allocation{DEFAULT_SEND_RATE};
         uint32_t queueSize{1'400};
     };
 

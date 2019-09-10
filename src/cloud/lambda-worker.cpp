@@ -698,8 +698,9 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
 
     for (auto& lease : activeLeases) {
         if (8000 * lease.second.queueSize / trafficShare < 100) {
-            lease.second.allocation =
-                max<uint32_t>(DEFAULT_SEND_RATE, 80 * lease.second.queueSize);
+            lease.second.allocation = min<uint32_t>(
+                trafficShare,
+                max<uint32_t>(DEFAULT_SEND_RATE, 80 * lease.second.queueSize));
             lease.second.small = true;
             smallCount++;
 
@@ -854,6 +855,8 @@ ResultType LambdaWorker::handleUdpSend() {
 
     random_shuffle(myTreelets.begin(), myTreelets.end());
 
+    auto now = packet_clock::now();
+
     for (const auto& treeletId : myTreelets) {
         /* (1) pick a treelet randomly */
         auto& queue = outQueue[treeletId];
@@ -877,6 +880,10 @@ ResultType LambdaWorker::handleUdpSend() {
 
         if (!peer.pacer.within_pace()) {
             continue;
+        }
+
+        if (peer.lastReceived - now > INACTIVITY_THRESHOLD) {
+            peer.pacer = {true, DEFAULT_SEND_RATE};
         }
 
         auto& peerSeqNo = sequenceNumbers[peer.address];
@@ -970,6 +977,7 @@ ResultType LambdaWorker::handleUdpReceive() {
 
             auto& peer = peers.at(message.sender_id());
             peer.pacer.set_rate(chunk.be32());
+            peer.lastReceived = packet_clock::now();
             chunk = chunk(4);
 
             if (message.tracked()) {
