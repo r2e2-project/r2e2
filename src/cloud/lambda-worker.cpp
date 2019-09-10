@@ -72,11 +72,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                       workerDiagnostics.startTime.time_since_epoch())
                       .count();
 
-    TLOG(LEASE)
+    /* TLOG(LEASE)
         << "start "
         << duration_cast<microseconds>(workStart.time_since_epoch()).count();
 
-    TLOG(LEASE) << "myId,workerId,timestamp,allocation,queueSize,expiresAt";
+    TLOG(LEASE) << "myId,workerId,timestamp,allocation,queueSize,expiresAt"; */
 
     if (trackRays) {
         TLOG(RAY) << "pathID,hop,shadowRay,workerID,otherPartyID,treeletID,"
@@ -710,18 +710,22 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
     }
 
     for (const auto& addr : toBeAcked) {
+        activeLeases[addr];
+    }
+
+    for (const auto& addr : toBeAcked) {
         auto& lease = activeLeases[addr];
 
         if (!lease.small) {
             lease.workerId = addressToWorker[addr];
-            lease.allocation = trafficShare + excess / toBeAcked.size();
+            lease.allocation = trafficShare + excess / activeLeases.size();
         }
     }
 
     /* START LOGGING */
     /* TLOG(LEASE) << "myId,workerId,timestamp,allocation,queueSize,expiresAt"
      */
-    for (auto& leasekv : activeLeases) {
+    /* for (auto& leasekv : activeLeases) {
         auto& lease = leasekv.second;
 
         TLOG(LEASE)
@@ -729,7 +733,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
             << duration_cast<microseconds>(now - workStart).count() << ','
             << lease.allocation << ',' << lease.queueSize << ','
             << duration_cast<microseconds>(lease.expiresAt - workStart).count();
-    }
+    } */
     /* END LOGGING */
 
     /* count the number of active senders to this worker */
