@@ -248,7 +248,7 @@ class Stats(object):
         per_worker_worker_data = {}
         # rays processed,  rays generated, etc
         per_worker_treelet_fieldnames = [
-            'workerID', 'treeletID', 'timestamp',
+            'workerID', 'treeletID', 'timestamp', 'timestampS',
             'raysWaiting', 'raysProcessed', 'raysGenerated', 'raysSending',
             'raysReceived', 'bytesSent', 'bytesReceived', 'raysFinished',
             'bytesGenerated', 'bytesAcknowledged']
@@ -332,10 +332,12 @@ class Stats(object):
             for treelet_id, _ in stats.treelet_stats.items():
                 for i in range(num_timepoints):
                     timepoint = start_timestamp + quanta * i
+                    timepointS = (quanta * i) / 1e6
                     data = {
                         'workerID': stats.idx,
                         'treeletID': treelet_id,
                         'timestamp': timepoint,
+                        'timestampS': timepointS,
                     }
                     for k, v in treelet_rows[treelet_id].items():
                         data[k] = v[i]
