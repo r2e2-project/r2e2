@@ -357,7 +357,7 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
         };
 
         auto doDebugAssign = [this](Worker &worker) {
-            if (worker.id == 1) {
+            if (worker.id == this->numberOfLambdas) {
                 assignTreelet(worker, 0);
             }
         };
