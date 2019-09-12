@@ -689,12 +689,16 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         }
     }
 
+    for (const auto& addr : toBeAcked) {
+        activeLeases[addr];
+    }
+
     const uint32_t trafficShare =
         max<uint32_t>(DEFAULT_SEND_RATE,
                       config.maxUdpRate / max<size_t>(1, activeLeases.size()));
 
     uint32_t excess = 0;
-    uint32_t smallCount = 0;
+    uint32_t bigCount = activeLeases.size();
 
     for (auto& lease : activeLeases) {
         if (8000 * lease.second.queueSize / trafficShare < 100) {
@@ -702,7 +706,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                 trafficShare,
                 max<uint32_t>(DEFAULT_SEND_RATE, 80 * lease.second.queueSize));
             lease.second.small = true;
-            smallCount++;
+            bigCount--;
 
             excess += trafficShare - lease.second.allocation;
         } else {
@@ -710,16 +714,14 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         }
     }
 
-    for (const auto& addr : toBeAcked) {
-        activeLeases[addr];
-    }
+    const auto excessShare = 0;//(bigCount == 0) ? 0 : (excess / bigCount);
 
     for (const auto& addr : toBeAcked) {
         auto& lease = activeLeases[addr];
 
         if (!lease.small) {
             lease.workerId = addressToWorker[addr];
-            lease.allocation = trafficShare + excess / activeLeases.size();
+            lease.allocation = trafficShare + excessShare;
         }
     }
 
@@ -866,14 +868,13 @@ ResultType LambdaWorker::handleUdpSend() {
         WorkerId peerId;
 
         if (workerForTreelet.count(treeletId) &&
-            workerForTreelet[treeletId].second >= packet_clock::now()) {
+            workerForTreelet[treeletId].second >= now) {
             peerId = workerForTreelet[treeletId].first;
         } else {
             const auto& candidates = treeletToWorker[treeletId];
             peerId = *random::sample(candidates.begin(), candidates.end());
             workerForTreelet[treeletId].first = peerId;
-            workerForTreelet[treeletId].second =
-                packet_clock::now() + TREELET_PEER_TIMEOUT;
+            workerForTreelet[treeletId].second = now + 4 * INACTIVITY_THRESHOLD;
         }
 
         auto& peer = peers.at(peerId);
@@ -882,7 +883,7 @@ ResultType LambdaWorker::handleUdpSend() {
             continue;
         }
 
-        if (peer.lastReceived - now > INACTIVITY_THRESHOLD) {
+        if (now - peer.lastReceivedAck > 3 * INACTIVITY_THRESHOLD / 4) {
             peer.pacer = {true, DEFAULT_SEND_RATE};
         }
 
@@ -977,7 +978,7 @@ ResultType LambdaWorker::handleUdpReceive() {
 
             auto& peer = peers.at(message.sender_id());
             peer.pacer.set_rate(chunk.be32());
-            peer.lastReceived = packet_clock::now();
+            peer.lastReceivedAck = packet_clock::now();
             chunk = chunk(4);
 
             if (message.tracked()) {
