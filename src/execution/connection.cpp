@@ -61,9 +61,7 @@ void UDPConnection::sendmsg(const Address& peer, const iovec* iov,
         total_length += iov[i].iov_len;
     }
 
-    record_send(total_length);
-    bytes_sent += total_length;
-    UDPSocket::sendmsg(peer, iov, iovcnt);
+    sendmsg(peer, iov, iovcnt, total_length);
 }
 
 void UDPConnection::sendmsg(const Address& peer, const iovec* iov,
