@@ -714,7 +714,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         }
     }
 
-    const auto excessShare = 0;//(bigCount == 0) ? 0 : (excess / bigCount);
+    const auto excessShare = (bigCount == 0) ? 0 : (excess / bigCount);
 
     for (const auto& addr : toBeAcked) {
         auto& lease = activeLeases[addr];
