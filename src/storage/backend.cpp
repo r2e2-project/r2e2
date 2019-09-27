@@ -28,7 +28,8 @@ unique_ptr<StorageBackend> StorageBackend::create_backend( const string & uri )
       endpoint.host,
       endpoint.options.count( "region" )
         ? endpoint.options[ "region" ]
-        : "us-east-1" );
+        : "us-east-1",
+      endpoint.path );
   }
   else {
     throw runtime_error( "unknown storage backend" );

@@ -12,11 +12,13 @@ class S3StorageBackend : public StorageBackend
 private:
   S3Client client_;
   std::string bucket_;
+  std::string prefix_;
 
 public:
   S3StorageBackend( const AWSCredentials & credentials,
                     const std::string & s3_bucket,
-                    const std::string & s3_region );
+                    const std::string & s3_region,
+                    const std::string & prefix = {} );
 
   void put( const std::vector<storage::PutRequest> & requests,
             const PutCallback & success_callback = []( const storage::PutRequest & ){} ) override;
