@@ -132,13 +132,13 @@ int getTileSize(const Bounds2i &bounds, const size_t N) {
 LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
                            const uint32_t numberOfLambdas,
                            const string &publicAddress,
-                           const string &storageBackend,
+                           const string &storageBackendUri,
                            const string &awsRegion,
                            const MasterConfiguration &config)
     : scenePath(scenePath),
       numberOfLambdas(numberOfLambdas),
       publicAddress(publicAddress),
-      storageBackendUri(storageBackend),
+      storageBackendUri(storageBackendUri),
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
       awsRegion(awsRegion),
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
@@ -148,6 +148,27 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
       writeWorkerStatsTimer(WRITE_STATS_INTERVAL),
       config(config) {
     LOG(INFO) << "job-id=" << jobId;
+
+    roost::create_directories(scenePath);
+
+    vector<storage::GetRequest> sceneObjReqs{
+        {SceneManager::getFileName(ObjectType::Manifest, 0),
+         roost::path(scenePath) /
+             SceneManager::getFileName(ObjectType::Manifest, 0)},
+        {SceneManager::getFileName(ObjectType::Camera, 0),
+         roost::path(scenePath) /
+             SceneManager::getFileName(ObjectType::Camera, 0)}};
+
+    if (config.assignment & Assignment::Static) {
+        sceneObjReqs.emplace_back(
+            SceneManager::getFileName(ObjectType::StaticAssignment, 0),
+            roost::path(scenePath) /
+                SceneManager::getFileName(ObjectType::StaticAssignment, 0));
+    }
+
+    cerr << "Downloading scene data... ";
+    storageBackend->get(sceneObjReqs);
+    cerr << "done." << endl;
 
     global::manager.init(scenePath);
     loadCamera();
