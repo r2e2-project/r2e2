@@ -129,14 +129,20 @@ int getTileSize(const Bounds2i &bounds, const size_t N) {
     return tileSize;
 }
 
-LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
+LambdaMaster::~LambdaMaster() {
+    try {
+        roost::empty_directory(sceneDir.name());
+    } catch (exception &ex) {
+    }
+}
+
+LambdaMaster::LambdaMaster(const uint16_t listenPort,
                            const uint32_t numberOfLambdas,
                            const string &publicAddress,
                            const string &storageBackendUri,
                            const string &awsRegion,
                            const MasterConfiguration &config)
-    : scenePath(scenePath),
-      numberOfLambdas(numberOfLambdas),
+    : numberOfLambdas(numberOfLambdas),
       publicAddress(publicAddress),
       storageBackendUri(storageBackendUri),
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
@@ -149,21 +155,26 @@ LambdaMaster::LambdaMaster(const string &scenePath, const uint16_t listenPort,
       config(config) {
     LOG(INFO) << "job-id=" << jobId;
 
+    const string scenePath = sceneDir.name();
+    cerr << "Creating temp folder at " << scenePath << "... done." << endl;
+
     roost::create_directories(scenePath);
 
+    auto getSceneObjectRequest = [&scenePath](const ObjectType type) {
+        return storage::GetRequest{
+            SceneManager::getFileName(type, 0),
+            roost::path(scenePath) / SceneManager::getFileName(type, 0)};
+    };
+
     vector<storage::GetRequest> sceneObjReqs{
-        {SceneManager::getFileName(ObjectType::Manifest, 0),
-         roost::path(scenePath) /
-             SceneManager::getFileName(ObjectType::Manifest, 0)},
-        {SceneManager::getFileName(ObjectType::Camera, 0),
-         roost::path(scenePath) /
-             SceneManager::getFileName(ObjectType::Camera, 0)}};
+        getSceneObjectRequest(ObjectType::Manifest),
+        getSceneObjectRequest(ObjectType::Camera),
+        getSceneObjectRequest(ObjectType::Sampler),
+    };
 
     if (config.assignment & Assignment::Static) {
         sceneObjReqs.emplace_back(
-            SceneManager::getFileName(ObjectType::StaticAssignment, 0),
-            roost::path(scenePath) /
-                SceneManager::getFileName(ObjectType::StaticAssignment, 0));
+            getSceneObjectRequest(ObjectType::StaticAssignment));
     }
 
     cerr << "Downloading scene data... ";
@@ -958,7 +969,6 @@ int main(int argc, char *argv[]) {
 
     google::InitGoogleLogging(argv[0]);
 
-    string scene;
     uint16_t listenPort = 50000;
     int32_t numLambdas = -1;
     string publicIp;
@@ -980,7 +990,6 @@ int main(int argc, char *argv[]) {
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
 
     struct option long_options[] = {
-        {"scene-path", required_argument, nullptr, 's'},
         {"port", required_argument, nullptr, 'p'},
         {"ip", required_argument, nullptr, 'i'},
         {"aws-region", required_argument, nullptr, 'r'},
@@ -1004,7 +1013,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "s:p:i:r:b:l:whdD:a:S:f:L:c:P:M:Rg",
+            getopt_long(argc, argv, "p:i:r:b:l:whdD:a:S:f:L:c:P:M:Rg",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -1015,7 +1024,6 @@ int main(int argc, char *argv[]) {
         // clang-format off
         case 'R': sendReliably = true; break;
         case 'M': maxUdpRate = stoull(optarg); break;
-        case 's': scene = optarg; break;
         case 'p': listenPort = stoi(optarg); break;
         case 'i': publicIp = optarg; break;
         case 'r': region = optarg; break;
@@ -1083,10 +1091,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (scene.empty() || listenPort == 0 || numLambdas < 0 ||
-        samplesPerPixel < 0 || rayActionsLogRate < 0 ||
-        rayActionsLogRate > 1.0 || packetsLogRate < 0 || packetsLogRate > 1.0 ||
-        publicIp.empty() || storageBackendUri.empty() || region.empty()) {
+    if (listenPort == 0 || numLambdas < 0 || samplesPerPixel < 0 ||
+        rayActionsLogRate < 0 || rayActionsLogRate > 1.0 ||
+        packetsLogRate < 0 || packetsLogRate > 1.0 || publicIp.empty() ||
+        storageBackendUri.empty() || region.empty()) {
         usage(argv[0], 2);
     }
 
@@ -1110,7 +1118,7 @@ int main(int argc, char *argv[]) {
                                   cropWindow};
 
     try {
-        master = make_unique<LambdaMaster>(scene, listenPort, numLambdas,
+        master = make_unique<LambdaMaster>(listenPort, numLambdas,
                                            publicAddress.str(),
                                            storageBackendUri, region, config);
         master->run();

@@ -25,6 +25,7 @@
 #include "storage/backend.h"
 #include "util/optional.h"
 #include "util/seq_no_set.h"
+#include "util/temp_dir.h"
 #include "util/timerfd.h"
 #include "util/util.h"
 #include "util/uuid.h"
@@ -65,12 +66,13 @@ struct MasterConfiguration {
 
 class LambdaMaster {
   public:
-    LambdaMaster(const std::string &scenePath, const uint16_t listenPort,
-                 const uint32_t numberOfLambdas,
+    LambdaMaster(const uint16_t listenPort, const uint32_t numberOfLambdas,
                  const std::string &publicAddress,
                  const std::string &storageBackend,
                  const std::string &awsRegion,
                  const MasterConfiguration &config);
+
+    ~LambdaMaster();
 
     void run();
 
@@ -144,7 +146,7 @@ class LambdaMaster {
     const std::string lambdaFunctionName{
         safe_getenv_or("PBRT_LAMBDA_FUNCTION", "pbrt-lambda-function")};
 
-    const std::string scenePath;
+    const TempDirectory sceneDir{"/tmp/pbrt-lambda-master"};
     const uint32_t numberOfLambdas;
     const std::string publicAddress;
     const std::string storageBackendUri;
