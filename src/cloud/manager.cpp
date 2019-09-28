@@ -109,7 +109,14 @@ protobuf::Manifest SceneManager::makeManifest() const {
         size_t total_ids = autoIds[to_underlying(type)];
         for (size_t id = 0; id < total_ids; ++id) {
             ObjectKey type_id{type, id};
+
+            size_t size = 0;
+            if (type != ObjectType::TriangleMesh) {
+                size = roost::file_size_at(*sceneFD, getFileName(type, id));
+            }
+
             protobuf::Manifest::Object* obj = manifest.add_objects();
+            obj->set_size(size);
             (*obj->mutable_id()) = to_protobuf(type_id);
             if (dependencies.count(type_id) > 0) {
                 for (const ObjectKey& dep : dependencies.at(type_id)) {
@@ -142,12 +149,7 @@ map<ObjectType, vector<SceneManager::Object>> SceneManager::listObjects() {
     /* read the list of objects from the manifest file */
     for (auto& kv : dependencies) {
         const ObjectKey& id = kv.first;
-        size_t size = 0;
-        if (id.type != ObjectType::TriangleMesh) {
-            string filename = getFileName(id.type, id.id);
-            size = roost::file_size_at(*sceneFD, filename);
-        }
-        result[id.type].push_back(Object(id.id, size));
+        result[id.type].push_back(Object(id.id, objectSizes[id]));
     }
 
     return result;
@@ -171,6 +173,7 @@ void SceneManager::loadManifest() {
     reader->read(&manifest);
     for (const protobuf::Manifest::Object& obj : manifest.objects()) {
         ObjectKey id = from_protobuf(obj.id());
+        objectSizes[id] = obj.size();
         dependencies[id] = {};
         for (const protobuf::ObjectKey& dep : obj.dependencies()) {
             dependencies[id].insert(from_protobuf(dep));

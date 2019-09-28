@@ -441,6 +441,7 @@ message Manifest {
     message Object {
         ObjectKey id = 1;
         repeated ObjectKey dependencies = 2;
+        uint64 size = 3;
     };
     repeated Object objects = 1;
 }

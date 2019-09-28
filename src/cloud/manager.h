@@ -90,6 +90,7 @@ class SceneManager {
     Optional<FileDescriptor> sceneFD{};
     std::unordered_map<const void*, uint32_t> ptrIds{};
     std::map<ObjectKey, std::set<ObjectKey>> dependencies;
+    std::map<ObjectKey, uint64_t> objectSizes{};
     std::map<std::string, uint32_t> textureNameToId;
 };
 
