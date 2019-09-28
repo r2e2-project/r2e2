@@ -975,7 +975,7 @@ int main(int argc, char *argv[]) {
     string storageBackendUri;
     string region{"us-west-2"};
     bool sendReliably = false;
-    uint64_t maxUdpRate = 80;
+    uint64_t maxUdpRate = 200;
     bool collectWorkerStats = false;
     bool collectDiagnostics = false;
     bool collectDebugLogs = false;
