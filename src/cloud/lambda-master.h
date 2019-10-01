@@ -76,7 +76,7 @@ class LambdaMaster {
 
     void run();
 
-    std::string getSummary();
+    void printJobSummary() const;
 
   private:
     struct SceneObjectInfo {
@@ -198,6 +198,7 @@ class LambdaMaster {
 
     const timepoint_t startTime{now()};
 
+    timepoint_t allToAllConnectStart{};
     timepoint_t generationStart{};
     timepoint_t lastFinishedRay{};
 

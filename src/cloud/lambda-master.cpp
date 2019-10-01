@@ -498,6 +498,8 @@ ResultType LambdaMaster::handleConnectAll() {
     ostringstream oss;
     protobuf::ConnectTo proto;
 
+    allToAllConnectStart = now();
+
     {
         protobuf::RecordWriter writer{&oss};
         for (auto &workerkv : workers) {
@@ -781,6 +783,50 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
     return true;
 }
 
+void LambdaMaster::printJobSummary() const {
+    const static double LAMBDA_UNIT_COST = 0.00004897; /* $/lambda/sec */
+
+    cerr << "* Job summary: " << endl;
+    cerr << "  >> Average ray throughput: "
+         << (1.0 * workerStats.finishedRays() / numberOfLambdas /
+             duration_cast<seconds>(lastFinishedRay - generationStart).count())
+         << " rays/core/s" << endl;
+
+    cerr << "  >> Total run time: " << fixed << setprecision(2)
+         << (duration_cast<milliseconds>(lastFinishedRay - startTime).count() /
+             1000.0)
+         << " seconds" << endl;
+
+    cerr << "      - Launching lambdas & downloading the scene: " << fixed
+         << setprecision(2)
+         << (duration_cast<milliseconds>(allToAllConnectStart - startTime)
+                 .count() /
+             1000.0)
+         << " seconds" << endl;
+
+    cerr << "      - Making all-to-all connections: " << fixed
+         << setprecision(2)
+         << (duration_cast<milliseconds>(generationStart - allToAllConnectStart)
+                 .count() /
+             1000.0)
+         << " seconds" << endl;
+
+    cerr << "      - Tracing rays: " << fixed << setprecision(2)
+         << (duration_cast<milliseconds>(lastFinishedRay - generationStart)
+                 .count() /
+             1000.0)
+         << " seconds" << endl;
+
+    cerr << "  >> Estimated cost: $" << fixed << setprecision(2)
+         << (LAMBDA_UNIT_COST * numberOfLambdas *
+             ceil(duration_cast<milliseconds>(lastFinishedRay - startTime)
+                      .count() /
+                  1000.0))
+         << endl;
+
+    cerr << endl;
+}
+
 void LambdaMaster::run() {
     /* request launching the lambdas */
     StatusBar::get();
@@ -822,10 +868,9 @@ void LambdaMaster::run() {
         }
     }
 
-    cerr << "Average ray throughput: "
-         << (1.0 * workerStats.finishedRays() / numberOfLambdas /
-             duration_cast<seconds>(lastFinishedRay - generationStart).count())
-         << " rays/core/s" << endl;
+    cerr << endl;
+
+    printJobSummary();
 
     if (!getRequests.empty()) {
         cerr << "\nDownloading " << getRequests.size() << " log file(s)... ";
