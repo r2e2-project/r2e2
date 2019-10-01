@@ -299,6 +299,13 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         },
         []() { throw runtime_error("generate rays failed"); }));
 
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, [this]() { return ResultType::Exit; },
+        [this]() {
+            return this->totalPaths == this->workerStats.finishedPaths();
+        },
+        []() { throw runtime_error("job finish"); }));
+
     if (config.finishedRayAction == FinishedRayAction::SendBack) {
         loop.poller().add_action(Poller::Action(
             writeOutputTimer.fd, Direction::In,
