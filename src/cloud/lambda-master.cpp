@@ -731,6 +731,18 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
             lastFinishedRay = now();
         }
 
+        if ((generationStart.time_since_epoch().count() == 0 &&
+             allToAllConnectStart.time_since_epoch().count() != 0 && 
+             duration_cast<seconds>(now() - allToAllConnectStart).count() > 60) ||
+            (lastFinishedRay.time_since_epoch().count() == 0 &&
+             generationStart.time_since_epoch().count() != 0 && 
+             duration_cast<seconds>(now() - generationStart).count() > 60) ||
+            (lastFinishedRay.time_since_epoch().count() != 0 &&
+             duration_cast<seconds>(now() - lastFinishedRay).count() > 60)) {
+          cerr << "STUCK!" << endl;
+          exit(EXIT_FAILURE);
+        }
+
         /* merge into global worker stats */
         workerStats.merge(stats);
 
@@ -790,7 +802,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
     return true;
 }
 
-void LambdaMaster::printJobSummary() const {
+std::string LambdaMaster::printJobSummary() const {
     const static double LAMBDA_UNIT_COST = 0.00004897; /* $/lambda/sec */
 
     cerr << "* Job summary: " << endl;
@@ -832,6 +844,27 @@ void LambdaMaster::printJobSummary() const {
          << endl;
 
     cerr << endl;
+
+    if (workerStats.finishedPaths() != totalPaths)
+        return "";
+
+    stringstream strm;
+    strm << "{\n"
+         << R"(  "total_time": )" << fixed << setprecision(2)
+         << (duration_cast<milliseconds>(lastFinishedRay - startTime).count() / 1000.0)
+         << ",\n"
+         << R"(  "launch_time": )" << fixed << setprecision(2)
+         << ((duration_cast<milliseconds>(generationStart - allToAllConnectStart).count() / 1000.0) +
+              (duration_cast<milliseconds>(allToAllConnectStart - startTime).count() / 1000.0))
+         << ",\n"
+         << R"(  "ray_time": )" << fixed << setprecision(2)
+         << (duration_cast<milliseconds>(lastFinishedRay - generationStart).count() / 1000.0)
+         << ",\n"
+         << R"(  "num_lambdas": )" << numberOfLambdas << ",\n"
+         << R"(  "num_paths": )" << totalPaths << "\n"
+         << "}\n";
+
+    return strm.str();
 }
 
 void LambdaMaster::run() {
@@ -877,7 +910,12 @@ void LambdaMaster::run() {
 
     cerr << endl;
 
-    printJobSummary();
+    string json = printJobSummary();
+    if (json != "") {
+       ofstream json_out(config.logsDirectory + "/master.json");
+       json_out << json;
+       json_out.close();
+    }
 
     if (!getRequests.empty()) {
         cerr << "\nDownloading " << getRequests.size() << " log file(s)... ";

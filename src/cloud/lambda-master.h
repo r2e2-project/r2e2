@@ -77,7 +77,7 @@ class LambdaMaster {
 
     void run();
 
-    void printJobSummary() const;
+    std::string printJobSummary() const;
 
   private:
     struct SceneObjectInfo {
