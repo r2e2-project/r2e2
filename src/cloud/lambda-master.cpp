@@ -172,9 +172,16 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         getSceneObjectRequest(ObjectType::Sampler),
     };
 
-    if (config.assignment & Assignment::Static) {
-        sceneObjReqs.emplace_back(
-            getSceneObjectRequest(ObjectType::StaticAssignment));
+    if ((config.assignment & Assignment::Static)) {
+        if (config.assignmentFile.empty()) {
+            sceneObjReqs.emplace_back(
+                getSceneObjectRequest(ObjectType::StaticAssignment));
+        } else {
+            copy_then_rename(
+                config.assignmentFile,
+                roost::path(scenePath) /
+                    SceneManager::getFileName(ObjectType::StaticAssignment, 0));
+        }
     }
 
     cerr << "Downloading scene data... ";
@@ -1025,6 +1032,7 @@ int main(int argc, char *argv[]) {
     int32_t numLambdas = -1;
     string publicIp;
     string storageBackendUri;
+    string assignmentFile;
     string region{"us-west-2"};
     bool sendReliably = false;
     uint64_t maxUdpRate = 200;
@@ -1091,22 +1099,34 @@ int main(int argc, char *argv[]) {
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
             // clang-format on
 
-        case 'a':
-            if (strcmp(optarg, "static") == 0) {
+        case 'a': {
+            const string arg = optarg;
+            const auto eqpos = arg.find('=');
+            string name;
+
+            if (eqpos == string::npos) {
+                name = arg;
+            } else {
+                name = arg.substr(0, eqpos);
+                assignmentFile = arg.substr(eqpos + 1);
+            }
+
+            if (name == "static") {
                 assignment = Assignment::Static;
-            } else if (strcmp(optarg, "static+uniform") == 0) {
+            } else if (name == "static+uniform") {
                 assignment = Assignment::Static | Assignment::Uniform;
-            } else if (strcmp(optarg, "uniform") == 0) {
+            } else if (name == "uniform") {
                 assignment = Assignment::Uniform;
-            } else if (strcmp(optarg, "all") == 0) {
+            } else if (name == "all") {
                 assignment = Assignment::All;
-            } else if (strcmp(optarg, "debug") == 0) {
+            } else if (name == "debug") {
                 assignment = Assignment::Debug;
             } else {
                 usage(argv[0], EXIT_FAILURE);
             }
 
             break;
+        }
 
         case 'f':
             if (strcmp(optarg, "discard") == 0) {
@@ -1157,6 +1177,7 @@ int main(int argc, char *argv[]) {
 
     MasterConfiguration config = {task,
                                   assignment,
+                                  assignmentFile,
                                   finishedRayAction,
                                   sendReliably,
                                   maxUdpRate,

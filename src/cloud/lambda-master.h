@@ -51,6 +51,7 @@ enum class Task {
 struct MasterConfiguration {
     Task task;
     int assignment; /* look at `struct Assignment` */
+    std::string assignmentFile;
     FinishedRayAction finishedRayAction;
     bool sendReliably;
     uint64_t maxUdpRate;
