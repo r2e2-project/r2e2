@@ -795,7 +795,33 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
     return true;
 }
 
-std::string LambdaMaster::printJobSummary() const {
+void LambdaMaster::dumpJobSummary() const {
+    protobuf::JobSummary proto;
+
+    proto.set_total_time(
+        duration_cast<milliseconds>(lastFinishedRay - startTime).count() /
+        1000.0);
+
+    proto.set_launch_time(
+        duration_cast<milliseconds>(generationStart - allToAllConnectStart)
+                .count() /
+            1000.0 +
+        duration_cast<milliseconds>(allToAllConnectStart - startTime).count() /
+            1000.0);
+
+    proto.set_ray_time(
+        duration_cast<milliseconds>(lastFinishedRay - generationStart).count() /
+        1000.0);
+
+    proto.set_num_lambdas(numberOfLambdas);
+    proto.set_total_paths(totalPaths);
+    proto.set_finished_paths(workerStats.finishedPaths());
+
+    ofstream fout{config.jobSummaryPath};
+    fout << protoutil::to_json(proto) << endl;
+}
+
+void LambdaMaster::printJobSummary() const {
     const static double LAMBDA_UNIT_COST = 0.00004897; /* $/lambda/sec */
 
     cerr << "* Job summary: " << endl;
@@ -837,27 +863,6 @@ std::string LambdaMaster::printJobSummary() const {
          << endl;
 
     cerr << endl;
-
-    if (workerStats.finishedPaths() != totalPaths)
-        return "";
-
-    stringstream strm;
-    strm << "{\n"
-         << R"(  "total_time": )" << fixed << setprecision(2)
-         << (duration_cast<milliseconds>(lastFinishedRay - startTime).count() / 1000.0)
-         << ",\n"
-         << R"(  "launch_time": )" << fixed << setprecision(2)
-         << ((duration_cast<milliseconds>(generationStart - allToAllConnectStart).count() / 1000.0) +
-              (duration_cast<milliseconds>(allToAllConnectStart - startTime).count() / 1000.0))
-         << ",\n"
-         << R"(  "ray_time": )" << fixed << setprecision(2)
-         << (duration_cast<milliseconds>(lastFinishedRay - generationStart).count() / 1000.0)
-         << ",\n"
-         << R"(  "num_lambdas": )" << numberOfLambdas << ",\n"
-         << R"(  "num_paths": )" << totalPaths << "\n"
-         << "}\n";
-
-    return strm.str();
 }
 
 void LambdaMaster::run() {
@@ -903,11 +908,10 @@ void LambdaMaster::run() {
 
     cerr << endl;
 
-    string json = printJobSummary();
-    if (json != "") {
-       ofstream json_out(config.logsDirectory + "/master.json");
-       json_out << json;
-       json_out.close();
+    printJobSummary();
+
+    if (!config.jobSummaryPath.empty()) {
+        dumpJobSummary();
     }
 
     if (!getRequests.empty()) {
@@ -1034,6 +1038,7 @@ void usage(const char *argv0, int exitCode) {
          << "                               - upload" << endl
          << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
          << "  -t --timeout T             exit after T seconds of inactivity"
+         << "  -j --job-summary FILE      output the job summary in JSON format"
          << endl
          << "  -h --help                  show help information" << endl;
 
@@ -1077,6 +1082,7 @@ int main(int argc, char *argv[]) {
     Optional<Bounds2i> cropWindow;
     Task task = Task::RayTracing;
     uint32_t timeout = 0;
+    string jobSummaryPath;
 
     int assignment = Assignment::Uniform;
     int samplesPerPixel = 0;
@@ -1101,13 +1107,14 @@ int main(int argc, char *argv[]) {
         {"samples", required_argument, nullptr, 'S'},
         {"crop-window", required_argument, nullptr, 'c'},
         {"timeout", required_argument, nullptr, 't'},
+        {"job-summary", required_argument, nullptr, 'j'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:l:whdD:a:S:f:L:c:P:M:t:Rg",
+            getopt_long(argc, argv, "p:i:r:b:l:whdD:a:S:f:L:c:P:M:t:j:Rg",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -1131,6 +1138,7 @@ int main(int argc, char *argv[]) {
         case 'L': rayActionsLogRate = stof(optarg); break;
         case 'P': packetsLogRate = stof(optarg); break;
         case 't': timeout = stoul(optarg); break;
+        case 'j': jobSummaryPath = optarg; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
             // clang-format on
 
@@ -1224,7 +1232,8 @@ int main(int argc, char *argv[]) {
                                   packetsLogRate,
                                   logsDirectory,
                                   cropWindow,
-                                  chrono::seconds{timeout}};
+                                  chrono::seconds{timeout},
+                                  jobSummaryPath};
 
     try {
         master = make_unique<LambdaMaster>(listenPort, numLambdas,

@@ -64,6 +64,7 @@ struct MasterConfiguration {
     std::string logsDirectory;
     Optional<Bounds2i> cropWindow;
     std::chrono::seconds timeout;
+    std::string jobSummaryPath;
 };
 
 class LambdaMaster {
@@ -78,7 +79,8 @@ class LambdaMaster {
 
     void run();
 
-    std::string printJobSummary() const;
+    void printJobSummary() const;
+    void dumpJobSummary() const;
 
   private:
     struct SceneObjectInfo {
