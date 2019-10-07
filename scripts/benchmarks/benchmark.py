@@ -8,6 +8,7 @@ import os
 import shutil
 import signal
 import asyncio
+import json
 from math import floor, log10
 from datetime import datetime
 
@@ -15,13 +16,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-s', '--samples', nargs='+', type=int)
 parser.add_argument('-l', '--lambdas', nargs='+', type=int, required=True)
 parser.add_argument('-S', '--s3-path', default='cloudrt-processed-scenes')
-parser.add_argument('-p', '--pbrt-path', required=True)
-parser.add_argument('-b', '--build-path')
+parser.add_argument('-b', '--build-path', required=True)
 parser.add_argument('-x', '--exclude', nargs='+', type=str)
 parser.add_argument('-i', '--include', nargs='+', type=str)
 parser.add_argument('-I', '--ip')
 parser.add_argument('-g', '--generate-static', action='store_true')
-parser.add_argument('-P', '--start-port', default=9900, type=int)
+parser.add_argument('-p', '--start-port', default=9900, type=int)
 parser.add_argument('-o', '--out-dir', required=True)
 parser.add_argument('-n', '--run-name', required=True, type=str)
 
@@ -30,13 +30,11 @@ args = parser.parse_args()
 resource.setrlimit(resource.RLIMIT_NOFILE,
         (100000, 100000))
 
-if args.build_path is None:
-    build_path = os.path.join(args.pbrt_path, 'build')
-else:
-    build_path = args.build_path
+pbrt_path = os.path.abspath(os.path.join(os.path.dirname(
+    os.path.realpath(__file__)),
+    os.path.join(os.path.pardir, os.path.pardir)))
 
-pbrt_path = os.path.abspath(args.pbrt_path)
-build_path = os.path.abspath(build_path)
+build_path = os.path.abspath(args.build_path)
 
 master_path = os.path.join(build_path, 'pbrt-lambda-master')
 worker_path = os.path.join(build_path, 'pbrt-lambda-worker')
@@ -119,13 +117,18 @@ for i, scene in enumerate(scenes):
 #
 #asyncio.run(run(cmds))
 
+def job_finished(master):
+    with open(master, 'r') as f:
+        info = json.load(f)
+    return int(info['finishedPaths']) > 0 and int(info['finishedPaths']) == int(info['totalPaths'])
+
 def launch(cmd):
     subprocess.run(cmd, shell=True)
 
 for cmd, dir, scene in cmds:
     master = os.path.join(dir, 'master.json')
     i = 0
-    while not os.path.isfile(master):
+    while not os.path.isfile(master) or not job_finished(master):
         shutil.rmtree(dir, ignore_errors=True)
         if i > 2:
             break
