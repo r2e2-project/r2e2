@@ -31,7 +31,7 @@ for name in os.listdir(args.data):
     spp = name.split('-')[-1]
     info['spp'] = int(spp)
     df = pd.DataFrame(info, index=[0])
-    df = df[['name', 'num_lambdas', 'spp', 'total_time', 'launch_time', 'ray_time', 'num_paths']]
+    df = df[['name', 'numLambdas', 'spp', 'totalTime', 'launchTime', 'rayTime', 'totalPaths']]
 
     data.append(df)
 
