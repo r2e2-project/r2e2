@@ -1,5 +1,7 @@
 #include "connection.h"
 
+#include <cmath>
+
 #include "net/util.h"
 
 using namespace std;
@@ -8,32 +10,19 @@ using namespace chrono;
 int64_t Pacer::micros_ahead_of_pace() const {
     if (!enabled_) return -1;
 
-    const auto now = steady_clock::now();
-    const int64_t elapsed_micros =
-        duration_cast<microseconds>(now - rate_reference_pt_).count();
-    const int64_t elapsed_micros_if_at_pace =
-        (bits_since_reference_ * 1'000'000) / rate_ ;
-    return elapsed_micros_if_at_pace - elapsed_micros;
+    const auto T =
+        nanoseconds{static_cast<int64_t>(ceil(1e9 * packet_size_ / rate_))};
+
+    return duration_cast<microseconds>((last_sent_ + T) - clock::now()).count();
 }
 
-void Pacer::set_rate(const uint64_t rate) {
-    rate_ = rate;
-    reset_reference();
-}
-
-void Pacer::reset_reference() {
-    if (!enabled_) return;
-    rate_reference_pt_ = steady_clock::now();
-    bits_since_reference_ = 0;
-}
+void Pacer::set_rate(const uint64_t rate) { rate_ = rate; }
 
 void Pacer::record_send(const size_t data_len) {
     if (!enabled_) return;
 
-    bits_since_reference_ += data_len * 8;
-    if (steady_clock::now() >= rate_reference_pt_ + reference_reset_time_) {
-        reset_reference();
-    }
+    packet_size_ = 0.75 * packet_size_ + 0.25 * data_len * 8;
+    last_sent_ = clock::now();
 }
 
 pair<Address, string> UDPConnection::recvfrom(void) {
