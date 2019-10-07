@@ -541,7 +541,7 @@ ResultType LambdaMaster::handleConnectAll() {
 ResultType LambdaMaster::handleStatusMessage() {
     statusPrintTimer.reset();
 
-    if (now() - lastActionTime >= config.timeout) {
+    if (config.timeout.count() && now() - lastActionTime >= config.timeout) {
         cerr << "Job terminated due to inactivity." << endl;
         return ResultType::Exit;
     }
