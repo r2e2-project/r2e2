@@ -63,6 +63,7 @@ struct MasterConfiguration {
     float packetsLogRate;
     std::string logsDirectory;
     Optional<Bounds2i> cropWindow;
+    std::chrono::seconds timeout;
 };
 
 class LambdaMaster {
@@ -199,6 +200,7 @@ class LambdaMaster {
 
     const timepoint_t startTime{now()};
 
+    timepoint_t lastActionTime{startTime};
     timepoint_t allToAllConnectStart{};
     timepoint_t generationStart{};
     timepoint_t lastFinishedRay{};

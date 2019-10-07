@@ -443,7 +443,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 ResultType LambdaMaster::handleJobStart() {
     set<uint32_t> paired{0};
 
-    generationStart = now();
+    generationStart = lastActionTime = now();
 
     switch (config.task) {
     case Task::RayTracing:
@@ -505,7 +505,7 @@ ResultType LambdaMaster::handleConnectAll() {
     ostringstream oss;
     protobuf::ConnectTo proto;
 
-    allToAllConnectStart = now();
+    allToAllConnectStart = lastActionTime = now();
 
     {
         protobuf::RecordWriter writer{&oss};
@@ -540,6 +540,11 @@ ResultType LambdaMaster::handleConnectAll() {
 
 ResultType LambdaMaster::handleStatusMessage() {
     statusPrintTimer.reset();
+
+    if (now() - lastActionTime >= config.timeout) {
+        cerr << "Job terminated due to inactivity." << endl;
+        return ResultType::Exit;
+    }
 
     aggregateQueueStats();
 
@@ -728,19 +733,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         auto stats = from_protobuf(proto);
 
         if (stats.finishedRays() != 0) {
-            lastFinishedRay = now();
-        }
-
-        if ((generationStart.time_since_epoch().count() == 0 &&
-             allToAllConnectStart.time_since_epoch().count() != 0 && 
-             duration_cast<seconds>(now() - allToAllConnectStart).count() > 60) ||
-            (lastFinishedRay.time_since_epoch().count() == 0 &&
-             generationStart.time_since_epoch().count() != 0 && 
-             duration_cast<seconds>(now() - generationStart).count() > 60) ||
-            (lastFinishedRay.time_since_epoch().count() != 0 &&
-             duration_cast<seconds>(now() - lastFinishedRay).count() > 60)) {
-          cerr << "STUCK!" << endl;
-          exit(EXIT_FAILURE);
+            lastFinishedRay = lastActionTime = now();
         }
 
         /* merge into global worker stats */
@@ -1040,6 +1033,7 @@ void usage(const char *argv0, int exitCode) {
          << "                               - send" << endl
          << "                               - upload" << endl
          << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
+         << "  -t --timeout T             exit after T seconds of inactivity"
          << endl
          << "  -h --help                  show help information" << endl;
 
@@ -1082,6 +1076,7 @@ int main(int argc, char *argv[]) {
     string logsDirectory = "logs/";
     Optional<Bounds2i> cropWindow;
     Task task = Task::RayTracing;
+    uint32_t timeout = 0;
 
     int assignment = Assignment::Uniform;
     int samplesPerPixel = 0;
@@ -1105,13 +1100,14 @@ int main(int argc, char *argv[]) {
         {"logs-dir", required_argument, nullptr, 'D'},
         {"samples", required_argument, nullptr, 'S'},
         {"crop-window", required_argument, nullptr, 'c'},
+        {"timeout", required_argument, nullptr, 't'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:l:whdD:a:S:f:L:c:P:M:Rg",
+            getopt_long(argc, argv, "p:i:r:b:l:whdD:a:S:f:L:c:P:M:t:Rg",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -1134,6 +1130,7 @@ int main(int argc, char *argv[]) {
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'L': rayActionsLogRate = stof(optarg); break;
         case 'P': packetsLogRate = stof(optarg); break;
+        case 't': timeout = stoul(optarg); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
             // clang-format on
 
@@ -1226,7 +1223,8 @@ int main(int argc, char *argv[]) {
                                   rayActionsLogRate,
                                   packetsLogRate,
                                   logsDirectory,
-                                  cropWindow};
+                                  cropWindow,
+                                  chrono::seconds{timeout}};
 
     try {
         master = make_unique<LambdaMaster>(listenPort, numLambdas,
