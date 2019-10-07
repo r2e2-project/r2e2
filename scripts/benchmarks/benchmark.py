@@ -75,7 +75,7 @@ os.mkdir(out_dir)
 cmds = []
 cur_port = args.start_port
 for i, scene in enumerate(scenes):
-    cmdprefix = ("{master_path} --ip {ip}"
+    cmdprefix = ("{master_path} --ip {ip} --timeout 60"
               " --storage-backend s3://{s3_path}/{scene}?region=us-west-2"
               " --aws-region us-west-2 -R -f discard -w -d".format(
                   master_path=master_path,
@@ -95,12 +95,14 @@ for i, scene in enumerate(scenes):
             dir = os.path.join(out_dir,
                     "{scene}-{nlambdas}-{spp}".format(scene=scene, nlambdas=nlambdas,
                                                       spp=spp))
-            cmd = cmdprefix + " -S {spp} -L {rate} -D {dir} --lambdas {nlambdas} --port {port}".format(
+            cmd = cmdprefix + (" -S {spp} -L {rate} -D {dir} --job-summary {json}"
+                               " --lambdas {nlambdas} --port {port}").format(
                     spp=spp, rate=str(round(onespp_rate,
                                         -int(floor(log10(abs(onespp_rate)))))),
                     dir=dir,
                     nlambdas=nlambdas,
-                    port=cur_port)
+                    port=cur_port,
+                    json=os.path.join(dir, "master.json"))
             cur_port += 1
             cmds.append((cmd, dir, scene))
 
