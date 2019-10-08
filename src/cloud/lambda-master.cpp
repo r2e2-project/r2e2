@@ -1037,7 +1037,9 @@ void usage(const char *argv0, int exitCode) {
          << "                               - send" << endl
          << "                               - upload" << endl
          << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
+         << endl
          << "  -t --timeout T             exit after T seconds of inactivity"
+         << endl
          << "  -j --job-summary FILE      output the job summary in JSON format"
          << endl
          << "  -h --help                  show help information" << endl;
