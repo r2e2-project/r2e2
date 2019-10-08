@@ -8,13 +8,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
-parser.add_argument('csv')
+parser.add_argument('-i', '--input', required=True)
 parser.add_argument('-t', '--title', required=True)
 parser.add_argument('-o', '--out', required=True)
  
 args = parser.parse_args()
-
-data = pd.read_csv(args.csv)
 
 def gen_per_second_per_treelet(df, out):
     per_second_per_treelet = df.groupby(['timestampS', 'treeletID']).sum()
@@ -59,8 +57,6 @@ def gen_ray_queue(df, out, aggregate):
         for id, group in df.groupby('workerID'):
             per_time = group.groupby(['timestampS']).sum()
             cumulative = (per_time.raysWaiting - per_time.raysProcessed).cumsum()
-            if cumulative.max() > 100:
-                print(id)
             plt.plot(cumulative, label=str(id))
 
         plt.legend()
@@ -69,6 +65,8 @@ def gen_ray_queue(df, out, aggregate):
     plt.xlabel("Time (seconds)")
     plt.ylabel("Total Number of Waiting Rays")
     plt.savefig(out, dpi=300)
+
+data = pd.read_csv(os.path.join(args.input, 'data.csv'))
 
 gen_per_second_per_treelet(data, os.path.join(args.out, "per-treelet.png"))
 plt.clf()

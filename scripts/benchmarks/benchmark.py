@@ -34,6 +34,8 @@ pbrt_path = os.path.abspath(os.path.join(os.path.dirname(
     os.path.realpath(__file__)),
     os.path.join(os.path.pardir, os.path.pardir)))
 
+pbrt_scripts_path = os.path.join(pbrt_path, 'scripts')
+
 build_path = os.path.abspath(args.build_path)
 
 master_path = os.path.join(build_path, 'pbrt-lambda-master')
@@ -102,7 +104,7 @@ for i, scene in enumerate(scenes):
                     port=cur_port,
                     json=os.path.join(dir, "master.json"))
             cur_port += 1
-            cmds.append((cmd, dir, scene))
+            cmds.append((cmd, dir, scene, nlambdas, spp))
 
 #async def launch(cmd):
 #    print(cmd)
@@ -125,7 +127,7 @@ def job_finished(master):
 def launch(cmd):
     subprocess.run(cmd, shell=True)
 
-for cmd, dir, scene in cmds:
+for cmd, dir, scene, nlambdas, spp in cmds:
     master = os.path.join(dir, 'master.json')
     i = 0
     while not os.path.isfile(master) or not job_finished(master):
@@ -137,24 +139,30 @@ for cmd, dir, scene in cmds:
         i += 1
 
 cwd = os.getcwd()
-for cmd, dir, scene in cmds:
+for cmd, dir, scene, nlambdas, spp in cmds:
     if not os.path.isdir(dir):
         continue
 
     os.chdir(dir)
-    subprocess.run(os.path.join(pbrt_path,
-        "scripts/generate_trace.py") + " --diagnostics-directory .",
+    subprocess.run(os.path.join(pbrt_scripts_path,
+        "generate_trace.py") + " --diagnostics-directory .",
         shell=True, check=True)
 
     if args.generate_static:
-        subprocess.run(os.path.join(pbrt_path,
-            "scripts/generate_static_assignment.sh") + " data.csv > STATIC0",
+        subprocess.run(os.path.join(pbrt_scripts_path,
+            "generate_static_assignment.sh") + " data.csv > STATIC0",
             shell=True, check=True)
         subprocess.run("aws s3 cp STATIC0 s3://{s3_path}/{scene}/".format(
             s3_path=args.s3_path, scene=scene), shell=True, check=True)
     else:
-        subprocess.run(os.path.join(pbrt_path,
-            "scripts/parse_worker_info.py") + " -i . -o rays.csv",
+        subprocess.run(os.path.join(pbrt_scripts_path,
+            "parse_worker_info.py") + " -i . -o rays.csv",
+            shell=True, check=True)
+
+        graph_title = "{scene}: {nworkers} - {spp}spp".format(scene=scene, nworkers=nlambdas, spp=spp)
+        os.mkdir('graphs')
+        subprocess.run(os.path.join(os.path.join(pbrt_scripts_path, 'benchmarks'),
+            "detail-graphs.py") + " -i . -o graphs -t \"{title}\"".format(title=graph_title),
             shell=True, check=True)
 
     os.chdir(cwd)
