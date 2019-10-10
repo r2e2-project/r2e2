@@ -58,62 +58,24 @@ STAT_RATIO("BVH/Primitives per leaf node", totalPrimitives, totalLeafNodes);
 STAT_COUNTER("BVH/Interior nodes", interiorNodes);
 STAT_COUNTER("BVH/Leaf nodes", leafNodes);
 
-// BVHAccel Local Declarations
-struct BVHPrimitiveInfo {
-    BVHPrimitiveInfo() {}
-    BVHPrimitiveInfo(size_t primitiveNumber, const Bounds3f &bounds)
-        : primitiveNumber(primitiveNumber),
-          bounds(bounds),
-          centroid(.5f * bounds.pMin + .5f * bounds.pMax) {}
-    size_t primitiveNumber;
-    Bounds3f bounds;
-    Point3f centroid;
-};
+void BVHBuildNode::InitLeaf(int first, int n, const Bounds3f &b) {
+    firstPrimOffset = first;
+    nPrimitives = n;
+    bounds = b;
+    children[0] = children[1] = nullptr;
+    ++leafNodes;
+    ++totalLeafNodes;
+    totalPrimitives += n;
+}
 
-struct BVHBuildNode {
-    // BVHBuildNode Public Methods
-    void InitLeaf(int first, int n, const Bounds3f &b) {
-        firstPrimOffset = first;
-        nPrimitives = n;
-        bounds = b;
-        children[0] = children[1] = nullptr;
-        ++leafNodes;
-        ++totalLeafNodes;
-        totalPrimitives += n;
-    }
-    void InitInterior(int axis, BVHBuildNode *c0, BVHBuildNode *c1) {
-        children[0] = c0;
-        children[1] = c1;
-        bounds = Union(c0->bounds, c1->bounds);
-        splitAxis = axis;
-        nPrimitives = 0;
-        ++interiorNodes;
-    }
-    Bounds3f bounds;
-    BVHBuildNode *children[2];
-    int splitAxis, firstPrimOffset, nPrimitives;
-};
-
-struct MortonPrimitive {
-    int primitiveIndex;
-    uint32_t mortonCode;
-};
-
-struct LBVHTreelet {
-    int startIndex, nPrimitives;
-    BVHBuildNode *buildNodes;
-};
-
-struct LinearBVHNode {
-    Bounds3f bounds;
-    union {
-        int primitivesOffset;   // leaf
-        int secondChildOffset;  // interior
-    };
-    uint16_t nPrimitives;  // 0 -> interior node
-    uint8_t axis;          // interior node: xyz
-    uint8_t pad[1];        // ensure 32 byte total size
-};
+void BVHBuildNode::InitInterior(int axis, BVHBuildNode *c0, BVHBuildNode *c1) {
+    children[0] = c0;
+    children[1] = c1;
+    bounds = Union(c0->bounds, c1->bounds);
+    splitAxis = axis;
+    nPrimitives = 0;
+    ++interiorNodes;
+}
 
 // BVHAccel Utility Functions
 inline uint32_t LeftShift3(uint32_t x) {

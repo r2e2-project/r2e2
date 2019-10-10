@@ -46,12 +46,47 @@
 #include "messages/serialization.h"
 
 namespace pbrt {
-struct BVHBuildNode;
 
-// BVHAccel Forward Declarations
-struct BVHPrimitiveInfo;
-struct MortonPrimitive;
-struct LinearBVHNode;
+struct BVHPrimitiveInfo {
+    BVHPrimitiveInfo() {}
+    BVHPrimitiveInfo(size_t primitiveNumber, const Bounds3f &bounds)
+        : primitiveNumber(primitiveNumber),
+          bounds(bounds),
+          centroid(.5f * bounds.pMin + .5f * bounds.pMax) {}
+    size_t primitiveNumber;
+    Bounds3f bounds;
+    Point3f centroid;
+};
+
+struct BVHBuildNode {
+    // BVHBuildNode Public Methods
+    void InitLeaf(int first, int n, const Bounds3f &b);
+    void InitInterior(int axis, BVHBuildNode *c0, BVHBuildNode *c1);
+    Bounds3f bounds;
+    BVHBuildNode *children[2];
+    int splitAxis, firstPrimOffset, nPrimitives;
+};
+
+struct MortonPrimitive {
+    int primitiveIndex;
+    uint32_t mortonCode;
+};
+
+struct LBVHTreelet {
+    int startIndex, nPrimitives;
+    BVHBuildNode *buildNodes;
+};
+
+struct LinearBVHNode {
+    Bounds3f bounds;
+    union {
+        int primitivesOffset;   // leaf
+        int secondChildOffset;  // interior
+    };
+    uint16_t nPrimitives;  // 0 -> interior node
+    uint8_t axis;          // interior node: xyz
+    uint8_t pad[1];        // ensure 32 byte total size
+};
 
 // BVHAccel Declarations
 class BVHAccel : public Aggregate {
@@ -70,6 +105,14 @@ class BVHAccel : public Aggregate {
 
     uint32_t Dump(const size_t max_treelet_nodes) const;
 
+  protected:
+    void assignTreelets(uint32_t * labels, const uint32_t max_nodes) const;
+    uint32_t dumpTreelets(uint32_t *labels, const size_t max_treelet_nodes) const;
+    int flattenBVHTree(BVHBuildNode *node, int *offset);
+
+    LinearBVHNode *nodes = nullptr;
+    int nodeCount;
+  
   private:
     // BVHAccel Private Methods
     BVHBuildNode *recursiveBuild(
@@ -89,17 +132,11 @@ class BVHAccel : public Aggregate {
     BVHBuildNode *buildUpperSAH(MemoryArena &arena,
                                 std::vector<BVHBuildNode *> &treeletRoots,
                                 int start, int end, int *totalNodes) const;
-    int flattenBVHTree(BVHBuildNode *node, int *offset);
-
-    void assignTreelets(uint32_t * labels, const uint32_t max_nodes) const;
-    uint32_t dumpTreelets(uint32_t *labels, const size_t max_treelet_nodes) const;
 
     // BVHAccel Private Data
     const int maxPrimsInNode;
     const SplitMethod splitMethod;
     std::vector<std::shared_ptr<Primitive>> primitives;
-    LinearBVHNode *nodes = nullptr;
-    int nodeCount;
 };
 
 std::shared_ptr<BVHAccel> CreateBVHAccelerator(
