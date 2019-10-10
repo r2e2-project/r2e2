@@ -91,7 +91,8 @@ class IcoSphereBVH : public BVHAccel {
                  int num_tri_per_leaf, int num_subdiv)
         : BVHAccel({})
     {
-        BVHBuildNode *root = buildBVH(sphere_info, num_tri_per_leaf, num_subdiv);
+        MemoryArena arena(1024 * 1024);
+        BVHBuildNode *root = buildBVH(arena, sphere_info, num_tri_per_leaf, num_subdiv);
 
         nodes = AllocAligned<LinearBVHNode>(nodeCount);
         int offset = 0;
@@ -100,11 +101,11 @@ class IcoSphereBVH : public BVHAccel {
     }
 
   private:
-    BVHBuildNode *buildBVH(const SphereInfo &sphere_info,
+    BVHBuildNode *buildBVH(MemoryArena &arena, const SphereInfo &sphere_info,
                            int num_tri_per_leaf,
                            int num_subdiv)
     {
-        MemoryArena arena(1024 * 1024);
+        nodeCount = 0;
         int leaf_levels = log2(num_tri_per_leaf)/2;
         int recurse_levels = num_subdiv - leaf_levels;
 
@@ -126,7 +127,7 @@ class IcoSphereBVH : public BVHAccel {
         BVHBuildNode *node = arena.Alloc<BVHBuildNode>();
         nodeCount++;
         int nPrimitives = end - start;
-        std::cout << nPrimitives << std::endl;
+
         Bounds3f bounds;
         for (int i = start; i < end; i++) {
             bounds = Union(bounds, primitive_info[i].bounds);
