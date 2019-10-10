@@ -20,18 +20,6 @@ struct IcoTriangle {
   IcoTriangle(int a_, int b_, int c_)
       : a(a_), b(b_), c(c_), children()
   {}
-
-  Bounds3f Bounds(const vector<Point3f> &v) const {
-      if (children.size() == 0) {
-          return Union(Bounds3f(v[a], v[b]), v[c]);
-      }
-      Bounds3f bounds;
-      for (const IcoTriangle &c : children) {
-          bounds = Union(bounds, c.Bounds(v));
-      }
-
-      return bounds;
-  }
 };
 
 void WriteIndices(const IcoTriangle &tri, vector<int> &indices)
@@ -221,6 +209,7 @@ void Subdivide(IcoTriangle &face, vector<Point3f> &vertices,
     face.children.emplace_back(face.a, ab_idx, ac_idx);
     face.children.emplace_back(ab_idx, face.b, bc_idx);
     face.children.emplace_back(ac_idx, bc_idx, face.c);
+    face.children.emplace_back(ab_idx, bc_idx, ac_idx);
 
     for (IcoTriangle &child : face.children) {
         Subdivide(child, vertices, edge_cache, subdiv_remain - 1);
@@ -299,8 +288,7 @@ int main(int argc, char *argv[]) {
   char *out_dir = argv[5];
 
   if (num_tri_per_leaf > tri_per_face ||
-      num_tri_per_leaf == 0 ||
-      (num_tri_per_leaf & (num_tri_per_leaf - 1))) {
+      num_tri_per_leaf == 0) {
       cerr << "num_tri_per_leaf invalid" << endl;
       return -1;
   }
