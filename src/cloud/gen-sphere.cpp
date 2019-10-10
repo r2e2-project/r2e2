@@ -132,7 +132,7 @@ class IcoSphereBVH : public BVHAccel {
         for (int i = start; i < end; i++) {
             bounds = Union(bounds, primitive_info[i].bounds);
         }
-        assert(nPrimitives >= num_tri_per_leaf);
+        CHECK_GE(nPrimitives, num_tri_per_leaf);
         if (nPrimitives == num_tri_per_leaf) {
             int firstPrimOffset = primitives.size();
             for (int i = start; i < end; i++) {
@@ -281,23 +281,18 @@ int main(int argc, char *argv[]) {
   }
 
   int num_subdiv = atoi(argv[1]);
-  int tri_per_face = 1 << 2*num_subdiv;
 
   int num_tri_per_leaf = atoi(argv[2]);
   int num_leaf_per_treelet = atoi(argv[3]);
   int num_node_per_treelet = atoi(argv[4]);
   char *out_dir = argv[5];
 
-  if (num_tri_per_leaf > tri_per_face ||
-      num_tri_per_leaf == 0) {
+  if (num_tri_per_leaf <= 0) {
       cerr << "num_tri_per_leaf invalid" << endl;
       return -1;
   }
 
-  int num_leaf_per_face = tri_per_face / num_tri_per_leaf;
-
-  if (num_leaf_per_treelet > num_leaf_per_face ||
-      num_leaf_per_treelet  == 0 ||
+  if (num_leaf_per_treelet  <= 0 ||
       (num_leaf_per_treelet & (num_leaf_per_treelet - 1))) {
       cerr << "num_leaf_per_treelet invalid" << endl;
       return -1;
