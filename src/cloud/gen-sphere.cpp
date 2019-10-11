@@ -3,11 +3,13 @@
 #include "shapes/triangle.h"
 #include "materials/matte.h"
 #include "textures/constant.h"
+#include "cloud/manager.h"
 
 #include <iostream>
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
+#include <cstdlib>
 #include "pbrt.pb.h"
 
 using namespace std;
@@ -88,27 +90,59 @@ struct SphereInfo {
 class IcoSphereBVH : public BVHAccel {
   public:
     IcoSphereBVH(const SphereInfo &sphere_info,
-                 int num_tri_per_leaf, int num_subdiv)
+                 int num_tri_per_leaf, int num_leaf_per_treelet,
+                 int num_route_levels)
         : BVHAccel({})
     {
         MemoryArena arena(1024 * 1024);
-        BVHBuildNode *root = buildBVH(arena, sphere_info, num_tri_per_leaf, num_subdiv);
+        BVHBuildNode *root = buildBVH(arena, sphere_info, num_tri_per_leaf);
 
         nodes = AllocAligned<LinearBVHNode>(nodeCount);
         int offset = 0;
         flattenBVHTree(root, &offset);
         CHECK_EQ(nodeCount, offset);
+
+        custom_labels.resize(nodeCount);
+
+        int leaf_levels = log2(num_leaf_per_treelet);
+        int total_levels = log2(sphere_info.primitives.size() / num_tri_per_leaf);
+        int remaining_levels = total_levels - leaf_levels;
+        int levels_per_route_treelet = remaining_levels / num_route_levels;
+        if (num_route_levels == 1 || remaining_levels < 2) {
+            levels_per_route_treelet = 0;
+        }
+        int num_inner_treelet_levels = num_route_levels - 1;
+        int levels_for_root = remaining_levels - levels_per_route_treelet * num_inner_treelet_levels;
+
+        if (remaining_levels == 0) {
+            levels_for_root = total_levels;
+            num_inner_treelet_levels = 0;
+            leaf_levels = 0;
+        }
+
+        cout << "total_levels " << total_levels << endl;
+        cout << "leaf_levels" << leaf_levels << endl;
+        cout << "levels_per_route_treelet " << levels_per_route_treelet << endl;
+        cout << "levels_for_root " << levels_for_root << endl;
+        cout << "num_inner_treelet_levels " << num_inner_treelet_levels << endl;
+
+        vector<LinearBVHNode *> bvh_stack;
+        for (int i = 0; i < nodeCount; i++) {
+            custom_labels[i] = 1;
+        }
+    }
+    
+    void dumpTreelets() {
+        // maxTreeletNodes is only used when DumpTreelets recurses,
+        // which shouldn't happen for the sphere (no instances)
+        BVHAccel::dumpTreelets(custom_labels.data(), 0);
     }
 
   private:
     BVHBuildNode *buildBVH(MemoryArena &arena, const SphereInfo &sphere_info,
-                           int num_tri_per_leaf,
-                           int num_subdiv)
+                           int num_tri_per_leaf)
     {
         nodeCount = 0;
-        int leaf_levels = log2(num_tri_per_leaf)/2;
-        int recurse_levels = num_subdiv - leaf_levels;
-
         vector<BVHPrimitiveInfo> primitive_info(sphere_info.primitives.size());
         for (size_t i = 0; i < sphere_info.primitives.size(); i++) {
             primitive_info[i] = {i, sphere_info.primitives[i]->WorldBound()};
@@ -166,7 +200,7 @@ class IcoSphereBVH : public BVHAccel {
         return node;
     }
 
-    vector<shared_ptr<Primitive>> primitives;
+    vector<uint32_t> custom_labels;
 };
 
 uint64_t EdgeKey(int a_idx, int b_idx) {
@@ -269,35 +303,47 @@ SphereInfo BuildSphere(int num_subdivisions) {
     return SphereInfo(base, vertices);
 }
 
-void BuildBVHTreelets(const SphereInfo &sphere_info, int num_tri_per_leaf,
-                      int num_subdiv, const std::string &out_dir) {
-    IcoSphereBVH custom_bvh(sphere_info, num_tri_per_leaf, num_subdiv);
+void BuildBVHAndDump(const SphereInfo &sphere_info, int num_tri_per_leaf,
+                      int num_leaf_per_treelet, int num_route_levels, const std::string &out_dir) {
+    IcoSphereBVH custom_bvh(sphere_info, num_tri_per_leaf, num_leaf_per_treelet, num_route_levels);
+    custom_bvh.dumpTreelets();
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 6) {
-      cerr << "Args: num_subdivisions num_tri_per_leaf num_leaf_per_treelet num_node_per_treelet out_dir" << endl;
-      return -1;
-  }
+    if (argc < 6) {
+        cerr << "Args: num_subdivisions num_tri_per_leaf num_leaf_per_treelet num_route_levels out_dir" << endl;
+        return -1;
+    }
 
-  int num_subdiv = atoi(argv[1]);
+    int num_subdiv = atoi(argv[1]);
 
-  int num_tri_per_leaf = atoi(argv[2]);
-  int num_leaf_per_treelet = atoi(argv[3]);
-  int num_node_per_treelet = atoi(argv[4]);
-  char *out_dir = argv[5];
+    int num_tri_per_leaf = atoi(argv[2]);
+    int num_leaf_per_treelet = atoi(argv[3]);
+    int num_route_levels = atoi(argv[4]);
+    char *out_dir = argv[5];
 
-  if (num_tri_per_leaf <= 0) {
-      cerr << "num_tri_per_leaf invalid" << endl;
-      return -1;
-  }
+    if (num_tri_per_leaf <= 0) {
+        cerr << "num_tri_per_leaf invalid" << endl;
+        return -1;
+    }
 
-  if (num_leaf_per_treelet  <= 0 ||
-      (num_leaf_per_treelet & (num_leaf_per_treelet - 1))) {
-      cerr << "num_leaf_per_treelet invalid" << endl;
-      return -1;
-  }
+    if (num_leaf_per_treelet  <= 0 ||
+        (num_leaf_per_treelet & (num_leaf_per_treelet - 1))) {
+        cerr << "num_leaf_per_treelet invalid" << endl;
+        return -1;
+    }
 
-  SphereInfo sphere_info = BuildSphere(num_subdiv);
-  BuildBVHTreelets(sphere_info, num_tri_per_leaf, num_subdiv, out_dir);
+    if (num_route_levels <= 0) {
+        cerr << "num_route_levels invalid" << endl;
+        return -1;
+    }
+
+    PbrtOptions.dumpMaterials = false;
+    global::manager.init(out_dir);
+
+    SphereInfo sphere_info = BuildSphere(num_subdiv);
+    BuildBVHAndDump(sphere_info, num_tri_per_leaf, num_leaf_per_treelet, num_route_levels, out_dir);
+
+    auto manifestWriter = global::manager.GetWriter(ObjectType::Manifest);
+    manifestWriter->write(global::manager.makeManifest());
 }

@@ -111,6 +111,7 @@ class BVHAccel : public Aggregate {
     int flattenBVHTree(BVHBuildNode *node, int *offset);
 
     LinearBVHNode *nodes = nullptr;
+    std::vector<std::shared_ptr<Primitive>> primitives;
     int nodeCount;
   
   private:
@@ -136,7 +137,6 @@ class BVHAccel : public Aggregate {
     // BVHAccel Private Data
     const int maxPrimsInNode;
     const SplitMethod splitMethod;
-    std::vector<std::shared_ptr<Primitive>> primitives;
 };
 
 std::shared_ptr<BVHAccel> CreateBVHAccelerator(
