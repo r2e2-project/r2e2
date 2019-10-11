@@ -112,8 +112,8 @@ class IcoSphereBVH : public BVHAccel {
 
         custom_labels.resize(nodeCount);
 
-        int leaf_levels = log2(num_leaf_per_treelet);
-        int total_levels = log2(sphere_info.primitives.size() / num_tri_per_leaf);
+        int leaf_levels = log2(num_leaf_per_treelet) + 1;
+        int total_levels = log2(sphere_info.primitives.size() / num_tri_per_leaf) + 1;
         int remaining_levels = total_levels - leaf_levels;
         int levels_per_route_treelet = remaining_levels / num_route_levels;
         if (num_route_levels == 1 || remaining_levels < 2) {
@@ -141,10 +141,6 @@ class IcoSphereBVH : public BVHAccel {
 
         unsigned treeletid = 1;
         recursiveAssignment(&nodes[0], treeletid, 0, level_allocations);
-
-        for (int i = 0; i < nodeCount; i++) {
-            custom_labels[i] = 1;
-        }
     }
 
     void dumpTreelets() {
@@ -215,11 +211,39 @@ class IcoSphereBVH : public BVHAccel {
         return node;
     }
 
-    void recursiveAssignment(LinearBVHNode *root, uint32_t &cur_treelet_id,
+    void recursiveAssignment(LinearBVHNode *root, uint32_t &treelet_id,
                              int cur_allocation_idx, const vector<int> &allocations) {
-        vector<LinearBVHNode *> current;
+        vector<LinearBVHNode *> frontier, new_frontier;
         int cur_allocation = allocations[cur_allocation_idx];
-        current.push_back(root);
+        frontier.push_back(root);
+
+        uint32_t cur_treelet_id = treelet_id;
+
+        for (int i = 0; i < cur_allocation; i++) {
+            for (LinearBVHNode *node : frontier) {
+                int node_id = node - nodes;
+                CHECK_LT(node_id, custom_labels.size());
+                custom_labels[node_id] = cur_treelet_id;
+
+                if (node->nPrimitives > 0) {
+                    CHECK_EQ(i, cur_allocation - 1); // Should be in final level
+                    continue;
+                }
+                LinearBVHNode *a = node + 1;
+                LinearBVHNode *b = nodes + node->secondChildOffset;
+                new_frontier.push_back(a);
+                new_frontier.push_back(b);
+            }
+            frontier.clear();
+            frontier.swap(new_frontier);
+        }
+
+        CHECK_EQ(cur_allocation_idx == allocations.size() - 1, frontier.size() == 0);
+
+        for (LinearBVHNode *node : frontier) {
+            treelet_id++;
+            recursiveAssignment(node, treelet_id, cur_allocation_idx + 1, allocations);
+        }
     }
 
     vector<uint32_t> custom_labels;
