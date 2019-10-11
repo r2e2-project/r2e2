@@ -6,6 +6,10 @@ import argparse
 import os
 import matplotlib
 import matplotlib.pyplot as plt
+import pint
+
+U = pint.UnitRegistry()
+U.setup_matplotlib(True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', required=True)
@@ -66,8 +70,43 @@ def gen_ray_queue(df, out, aggregate):
     plt.ylabel("Total Number of Waiting Rays")
     plt.savefig(out, dpi=300)
 
-data = pd.read_csv(os.path.join(args.input, 'data.csv'))
+def sent_bytes(df, out, aggregate):
+    per_second_per_treelet = df.groupby(['timestampS', 'workerID']).sum()
+    
+    bytessent_ps_pt = per_second_per_treelet.bytesSent
+    mat = bytessent_ps_pt.unstack().to_numpy()
+    mat = np.nan_to_num(mat)
 
+    #max_out = (240 * U.mbps).to(U.bps).magnitude
+    #mat = mat / max_out
+    
+    plt.imshow(mat.transpose(), cmap='OrRd', interpolation='nearest', aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0), vmin=-1.5, vmax=mat.max())
+    plt.xlabel("Time (seconds)")
+    plt.ylabel("Treelet ID")
+    plt.title(args.title)
+    plt.clim(0, mat.max())
+    plt.colorbar()
+    plt.savefig(out, dpi=300)
+
+def received_bytes(df, out, aggregate):
+    per_second_per_treelet = df.groupby(['timestampS', 'workerID']).sum()
+    
+    bytessent_ps_pt = per_second_per_treelet.bytesReceived
+    mat = bytessent_ps_pt.unstack().to_numpy()
+    mat = np.nan_to_num(mat)
+
+    #max_out = (240 * U.mbps).to(U.bps).magnitude
+    #mat = mat / max_out
+    
+    plt.imshow(mat.transpose(), cmap='OrRd', interpolation='nearest', aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0), vmin=-1.5, vmax=mat.max())
+    plt.xlabel("Time (seconds)")
+    plt.ylabel("Treelet ID")
+    plt.title(args.title)
+    plt.clim(0, mat.max())
+    plt.colorbar()
+    plt.savefig(out, dpi=300)
+
+data = pd.read_csv(os.path.join(args.input, 'data.csv'))
 gen_per_second_per_treelet(data, os.path.join(args.out, "per-treelet.png"))
 plt.clf()
 gen_per_second_per_worker(data, os.path.join(args.out, "per-worker.png"))
@@ -75,3 +114,8 @@ plt.clf()
 gen_ray_queue(data, os.path.join(args.out, "aggregate-ray-queue.png"), aggregate=True)
 plt.clf()
 gen_ray_queue(data, os.path.join(args.out, "individual-ray-queue.png"), aggregate=False)
+plt.clf()
+sent_bytes(data, os.path.join(args.out, "per-worker-outrate.png"), aggregate=False)
+plt.clf()
+received_bytes(data, os.path.join(args.out, "per-worker-inrate.png"), aggregate=False)
+plt.clf()
