@@ -4,6 +4,7 @@
 #include "materials/matte.h"
 #include "textures/constant.h"
 #include "cloud/manager.h"
+#include "messages/utils.h"
 
 #include <iostream>
 #include <vector>
@@ -40,7 +41,8 @@ void WriteIndices(const IcoTriangle &tri, vector<int> &indices)
 }
 
 vector<shared_ptr<Primitive>> GenTriangleMesh(const vector<IcoTriangle> &tris,
-                                              const vector<Point3f> &vertices)
+                                              const vector<Point3f> &vertices,
+                                              const string &out_dir)
 {
     vector<int> indices;
     for (const IcoTriangle &tri : tris) {
@@ -60,7 +62,7 @@ vector<shared_ptr<Primitive>> GenTriangleMesh(const vector<IcoTriangle> &tris,
             vertices.data(), nullptr, normals.data(), nullptr, nullptr, nullptr,
             nullptr);
 
-    WritePlyFile("/tmp/sphere.ply", nTriangles, indices.data(), vertices.size(),
+    WritePlyFile(out_dir + "/pbrt/sphere.ply", nTriangles, indices.data(), vertices.size(),
                  vertices.data(), nullptr, normals.data(), nullptr, nullptr);
 
     vector<shared_ptr<Primitive>> primitives;
@@ -68,16 +70,14 @@ vector<shared_ptr<Primitive>> GenTriangleMesh(const vector<IcoTriangle> &tris,
 
     MediumInterface mi;
     ParamSet empty;
-    auto fmap = FloatTextureMap();
-    auto smap = SpectrumTextureMap();
+    std::map<std::string, std::shared_ptr<Texture<Float>>> fmap;
+    std::map<std::string, std::shared_ptr<Texture<Spectrum>>> smap;
     TextureParams tp(empty, empty, fmap, smap);
-
-    shared_ptr<Material> mtl(CreateMatteMaterial(tp));
-    currentMaterial = make_shared<MaterialInstance("matte", mtl, ParamSet());
+    std::shared_ptr<Material> mtl(CreateMatteMaterial(tp));
 
     int id = global::manager.getNextId(ObjectType::Material, mtl.get());
     auto writer = global::manager.GetWriter(ObjectType::Material, id);
-    writer->write(protobuf::material::to_protobuf("matte", tp));
+    writer->write(material::to_protobuf("matte", tp));
 
     for (shared_ptr<Shape> &tri : shapes) {
         primitives.push_back(make_shared<GeometricPrimitive>(tri, mtl, nullptr, mi));
@@ -89,8 +89,8 @@ vector<shared_ptr<Primitive>> GenTriangleMesh(const vector<IcoTriangle> &tris,
 struct SphereInfo {
     vector<shared_ptr<Primitive>> primitives;
 
-    SphereInfo(const vector<IcoTriangle> &tris, const vector<Point3f> &vertices)
-      : primitives(GenTriangleMesh(tris, vertices))
+    SphereInfo(const vector<IcoTriangle> &tris, const vector<Point3f> &vertices, const string &out_dir)
+      : primitives(GenTriangleMesh(tris, vertices, out_dir))
     {
     }
 };
@@ -273,7 +273,7 @@ void Subdivide(IcoTriangle &face, vector<Point3f> &vertices,
     }
 }
 
-SphereInfo BuildSphere(int num_subdivisions) {
+SphereInfo BuildSphere(int num_subdivisions, const string &out_dir) {
     double phi = (1.0 + sqrt(5.0)) / 2.0;
 
     vector<Point3f> vertices;
@@ -322,7 +322,7 @@ SphereInfo BuildSphere(int num_subdivisions) {
         Subdivide(target, vertices, edge_cache, num_subdivisions);
     }
 
-    return SphereInfo(base, vertices);
+    return SphereInfo(base, vertices, out_dir);
 }
 
 void BuildBVHAndDump(const SphereInfo &sphere_info, int num_tri_per_leaf,
@@ -361,9 +361,9 @@ int main(int argc, char *argv[]) {
     }
 
     PbrtOptions.dumpMaterials = false;
-    global::manager.init(out_dir);
+    global::manager.init(string(out_dir) + "/raw");
 
-    SphereInfo sphere_info = BuildSphere(num_subdiv);
+    SphereInfo sphere_info = BuildSphere(num_subdiv, out_dir);
     BuildBVHAndDump(sphere_info, num_tri_per_leaf, num_leaf_per_treelet, num_route_levels, out_dir);
 
     auto manifestWriter = global::manager.GetWriter(ObjectType::Manifest);

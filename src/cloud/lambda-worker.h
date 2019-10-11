@@ -150,7 +150,7 @@ class LambdaWorker {
               tracked(tracked) {}
 
         void addRay(RayStatePtr&& ray) {
-            assert(iovCount < sizeof(iov) / (sizeof struct iovec));
+            //assert(iovCount < sizeof(iov) / (sizeof struct iovec));
 
             iov_[iovCount_++] = {.iov_base = ray->serialized,
                                  .iov_len = ray->serializedSize};
