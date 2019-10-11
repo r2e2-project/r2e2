@@ -21,6 +21,7 @@ class CloudBVH : public Aggregate {
     struct TreeletInfo {
         std::set<uint32_t> children{};
         std::set<uint32_t> instances{};
+        Bounds3f bounds{};
     };
 
     CloudBVH(const uint32_t bvh_root = 0);

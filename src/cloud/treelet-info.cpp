@@ -10,6 +10,7 @@
 #include "cloud/manager.h"
 #include "util/exception.h"
 #include "util/path.h"
+#include "core/geometry.h"
 
 using namespace std;
 using namespace pbrt;
@@ -53,6 +54,8 @@ void printTreeletInfo(const map<uint32_t, CloudBVH::TreeletInfo> &treeletInfo,
         const auto &info = item.second;
 
         cout << "TREELET " << id << " " << treeletSize.at(id) << endl;
+
+        cout << "BOUNDS " << info.bounds << endl;
 
         cout << "CHILD";
         for (const auto t : info.children) {
@@ -113,8 +116,8 @@ int main(int argc, char const *argv[]) {
         map<uint32_t, CloudBVH::TreeletInfo> treeletInfo;
         map<uint32_t, size_t> treeletSize;
 
-        for (size_t i = 0; i < treeletCount; i++) {
-            CloudBVH bvh{};
+        for (uint32_t i = 0; i < treeletCount; i++) {
+            CloudBVH bvh{i};
             treeletInfo[i] = bvh.GetInfo(i);
             treeletSize[i] = roost::file_size(scenePath / filename(i));
         }

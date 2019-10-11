@@ -1,0 +1,24 @@
+Camera "environment"
+
+Film "image"
+"integer xresolution" [1024] "integer yresolution" [600]
+    "string filename" "killeroo-simple.png"
+
+Sampler "halton" "integer pixelsamples" [8]
+Integrator "path" "integer maxdepth" [5]
+Accelerator "bvh" # "integer dumptreeletsize" [150000]
+
+WorldBegin
+
+AttributeBegin
+  LightSource "point" "color I" [10 10 10]
+AttributeEnd
+
+AttributeBegin
+
+Material "matte" "color Kd" [.5 .5 .8]
+Shape "plymesh" "string filename" ["sphere.ply"]
+
+AttributeEnd
+
+WorldEnd

@@ -40,13 +40,7 @@ CloudBVH::CloudBVH(const uint32_t bvh_root) : bvh_root_(bvh_root) {
 }
 
 Bounds3f CloudBVH::WorldBound() const {
-    static bool got_it = false;
-
-    if (not got_it) {
-        loadTreelet(bvh_root_);
-        got_it = true;
-    }
-
+    loadTreelet(bvh_root_);
     return treelets_[bvh_root_].nodes[0].bounds;
 }
 
@@ -198,6 +192,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
     }
 
     treelet.nodes = move(nodes);
+    info.bounds = WorldBound();
 }
 
 void CloudBVH::Trace(RayState &rayState) {
