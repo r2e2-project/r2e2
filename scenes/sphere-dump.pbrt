@@ -1,0 +1,21 @@
+Camera "environment"
+
+Film "image" "integer xresolution" [1024] "integer yresolution" [600]
+     "string filename" "sphere-dump.png"
+
+Sampler "halton" "integer pixelsamples" [1]
+Integrator "path" "integer maxdepth" [5]
+
+Accelerator "bvh" "integer maxnodeprims" [1] "string splitmethod" ["equal"]
+            "integer dumptreeletsize" [320000]
+
+WorldBegin
+
+LightSource "point" "color I" [1 1 1]
+
+AttributeBegin
+Material "matte" "color Kd" [.5 .5 .8]
+Shape "plymesh" "string filename" ["geometry/sphere.ply"]
+AttributeEnd
+
+WorldEnd

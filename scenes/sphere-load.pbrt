@@ -1,0 +1,15 @@
+Camera "environment"
+
+Film "image" "integer xresolution" [1024] "integer yresolution" [600]
+     "string filename" "sphere-load.png"
+
+Sampler "halton" "integer pixelsamples" [1]
+Integrator "path" "integer maxdepth" [5]
+
+Accelerator "cloudbvh"
+
+WorldBegin
+
+LightSource "point" "color I" [1 1 1]
+
+WorldEnd
