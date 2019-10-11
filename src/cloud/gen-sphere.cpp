@@ -67,12 +67,20 @@ vector<shared_ptr<Primitive>> GenTriangleMesh(const vector<IcoTriangle> &tris,
     primitives.reserve(shapes.size());
 
     MediumInterface mi;
-    shared_ptr<Texture<Spectrum>> Kd = make_shared<ConstantTexture<Spectrum>>(0.5f);
-    shared_ptr<Texture<Float>> sigma = make_shared<ConstantTexture<Float>>(0.0f);
-    shared_ptr<MatteMaterial> mat = make_shared<MatteMaterial>(Kd, sigma, nullptr);
+    ParamSet empty;
+    auto fmap = FloatTextureMap();
+    auto smap = SpectrumTextureMap();
+    TextureParams tp(empty, empty, fmap, smap);
+
+    shared_ptr<Material> mtl(CreateMatteMaterial(tp));
+    currentMaterial = make_shared<MaterialInstance("matte", mtl, ParamSet());
+
+    int id = global::manager.getNextId(ObjectType::Material, mtl.get());
+    auto writer = global::manager.GetWriter(ObjectType::Material, id);
+    writer->write(protobuf::material::to_protobuf("matte", tp));
 
     for (shared_ptr<Shape> &tri : shapes) {
-        primitives.push_back(make_shared<GeometricPrimitive>(tri, mat, nullptr, mi));
+        primitives.push_back(make_shared<GeometricPrimitive>(tri, mtl, nullptr, mi));
     }
 
     return primitives;
@@ -120,18 +128,25 @@ class IcoSphereBVH : public BVHAccel {
             leaf_levels = 0;
         }
 
-        cout << "total_levels " << total_levels << endl;
-        cout << "leaf_levels" << leaf_levels << endl;
-        cout << "levels_per_route_treelet " << levels_per_route_treelet << endl;
-        cout << "levels_for_root " << levels_for_root << endl;
-        cout << "num_inner_treelet_levels " << num_inner_treelet_levels << endl;
+        vector<int> level_allocations;
+        level_allocations.push_back(levels_for_root);
+        for (int i = 0; i < num_inner_treelet_levels; i++) {
+            level_allocations.push_back(levels_per_route_treelet);
+        }
+        level_allocations.push_back(leaf_levels);
+        for (int a : level_allocations) {
+            cout << a << " ";
+        }
+        cout << endl;
 
-        vector<LinearBVHNode *> bvh_stack;
+        unsigned treeletid = 1;
+        recursiveAssignment(&nodes[0], treeletid, 0, level_allocations);
+
         for (int i = 0; i < nodeCount; i++) {
             custom_labels[i] = 1;
         }
     }
-    
+
     void dumpTreelets() {
         // maxTreeletNodes is only used when DumpTreelets recurses,
         // which shouldn't happen for the sphere (no instances)
@@ -198,6 +213,13 @@ class IcoSphereBVH : public BVHAccel {
                                           mid, end, num_tri_per_leaf));
 
         return node;
+    }
+
+    void recursiveAssignment(LinearBVHNode *root, uint32_t &cur_treelet_id,
+                             int cur_allocation_idx, const vector<int> &allocations) {
+        vector<LinearBVHNode *> current;
+        int cur_allocation = allocations[cur_allocation_idx];
+        current.push_back(root);
     }
 
     vector<uint32_t> custom_labels;
@@ -327,7 +349,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    if (num_leaf_per_treelet  <= 0 ||
+    if (num_leaf_per_treelet <= 0 ||
         (num_leaf_per_treelet & (num_leaf_per_treelet - 1))) {
         cerr << "num_leaf_per_treelet invalid" << endl;
         return -1;
