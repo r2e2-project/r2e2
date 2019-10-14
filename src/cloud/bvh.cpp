@@ -192,7 +192,6 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
     }
 
     treelet.nodes = move(nodes);
-    info.bounds = WorldBound();
 }
 
 void CloudBVH::Trace(RayState &rayState) {

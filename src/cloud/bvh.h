@@ -39,6 +39,7 @@ class CloudBVH : public Aggregate {
 
     const TreeletInfo &GetInfo(const uint32_t treelet_id) {
         loadTreelet(treelet_id);
+        treelet_info_.at(treelet_id).bounds = WorldBound();
         return treelet_info_.at(treelet_id);
     }
 
