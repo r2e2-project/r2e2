@@ -54,6 +54,8 @@ int main(int argc, char const *argv[]) {
         shared_ptr<Camera> camera = loadCamera(scenePath, transformCache);
 
         const Bounds2i sampleBounds = camera->film->GetSampleBounds();
+        const Vector2i sampleExtent = sampleBounds.Diagonal();
+        const auto samplesPerPixel = sampler->samplesPerPixel;
         const uint8_t maxDepth = 5;
         const float rayScale = 1 / sqrt((Float)sampler->samplesPerPixel);
 
@@ -62,21 +64,23 @@ int main(int argc, char const *argv[]) {
 
         /* Generate all the samples */
         size_t i = 0;
-        for (Point2i pixel : sampleBounds) {
-            sampler->StartPixel(pixel);
 
-            if (!InsideExclusive(pixel, sampleBounds)) continue;
+        for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
+            for (Point2i pixel : sampleBounds) {
+                sampler->StartPixel(pixel);
+                if (!InsideExclusive(pixel, sampleBounds)) continue;
+                sampler->SetSampleNumber(sample);
 
-            size_t sample_num = 0;
-            do {
                 CloudIntegrator::SampleData sampleData;
                 sampleData.sample = sampler->GetCameraSample(pixel);
 
                 RayStatePtr statePtr = make_unique<RayState>();
                 RayState &state = *statePtr;
 
-                state.sample.id = i++;
-                state.sample.num = sample_num++;
+                state.sample.id =
+                    (pixel.x + pixel.y * sampleExtent.x) * samplesPerPixel +
+                    sample;
+                state.sample.num = sample;
                 state.sample.pixel = pixel;
                 state.remainingBounces = maxDepth;
                 sampleData.weight = camera->GenerateRayDifferential(
@@ -87,7 +91,7 @@ int main(int argc, char const *argv[]) {
                 const auto len = statePtr->Serialize();
                 rayWriter.write(statePtr->serialized + 4, len - 4);
                 sampleWriter.write(to_protobuf(sampleData));
-            } while (sampler->StartNextSample());
+            }
         }
 
         cerr << i << " sample(s) were generated." << endl;
