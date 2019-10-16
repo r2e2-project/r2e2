@@ -57,6 +57,19 @@ void printTreeletInfo(const map<uint32_t, CloudBVH::TreeletInfo> &treeletInfo,
 
         cout << "BOUNDS " << info.bounds << endl;
 
+        cout << "BVH BOUNDS "; 
+        for( int i = 1; i < 16; i++){
+            if(info.treeletNodeBounds[i].pMin.x > info.treeletNodeBounds[i].pMax.x){
+                cout << " NULL ";
+
+            }
+            else{
+                cout << " " << info.treeletNodeBounds[i];
+            }
+        }
+        cout << endl;
+        delete info.treeletNodeBounds;
+
         cout << "CHILD";
         for (const auto t : info.children) {
             cout << " " << t;

@@ -3,6 +3,8 @@
 
 #include <map>
 #include <memory>
+#include <stack> 
+
 
 #include "cloud/raystate.h"
 #include "core/pbrt.h"
@@ -21,6 +23,7 @@ class CloudBVH : public Aggregate {
     struct TreeletInfo {
         std::set<uint32_t> children{};
         std::set<uint32_t> instances{};
+        Bounds3f* treeletNodeBounds;
         Bounds3f bounds{};
     };
 
@@ -37,11 +40,19 @@ class CloudBVH : public Aggregate {
     void Trace(RayState &rayState);
     bool Intersect(RayState &rayState, SurfaceInteraction *isect) const;
 
+    //returns array of Bounds3f with structure of Treelet's internal BVH nodes 
+    Bounds3f* getTreeletNodeBounds(const uint32_t treelet_id,const int recursion_limit = 4) const;
+
+
     const TreeletInfo &GetInfo(const uint32_t treelet_id) {
         loadTreelet(treelet_id);
         treelet_info_.at(treelet_id).bounds = WorldBound();
+        treelet_info_.at(treelet_id).treeletNodeBounds = getTreeletNodeBounds(treelet_id,4);
+        // treelet_info_.at(treelet_id).worldNode = treelets_.at(treelet_id).nodes[0];
         return treelet_info_.at(treelet_id);
     }
+
+    
 
   private:
     enum Child { LEFT = 0, RIGHT = 1 };
@@ -87,6 +98,10 @@ class CloudBVH : public Aggregate {
     void clear() const;
 
     Transform identity_transform_;
+    void RecurseBVHNodes(int depth, int recursion_limit,int idx,
+                        Treelet &currTreelet,TreeletNode &currNode,
+                        Bounds3f* treeletBounds) const;
+
 };
 
 std::shared_ptr<CloudBVH> CreateCloudBVH(const ParamSet &ps);
