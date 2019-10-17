@@ -101,8 +101,6 @@ class LambdaMaster {
         size_t freeSpace{2 * 1000 * 1000 * 1000};
 
         WorkerStats stats;
-        mutable std::ofstream statsOstream;
-
         uint64_t nextStatusLogTimestamp{0};
 
         struct {
@@ -158,6 +156,7 @@ class LambdaMaster {
     const Address awsAddress;
     const std::string awsRegion;
     const AWSCredentials awsCredentials{};
+    std::ofstream statsOstream{};
 
     ExecutionLoop loop{};
     std::shared_ptr<UDPConnection> udpConnection{};
@@ -210,7 +209,6 @@ class LambdaMaster {
     /* Worker stats */
     WorkerStats workerStats;
     size_t initializedWorkers{0};
-    size_t diagnosticsReceived{0};
 
     /* Static Assignments */
     void loadStaticAssignment(const uint32_t assignmentId,

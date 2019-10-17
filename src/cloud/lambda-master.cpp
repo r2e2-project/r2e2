@@ -197,6 +197,13 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         roost::create_directories(config.logsDirectory);
     }
 
+    if (config.collectWorkerStats) {
+        statsOstream.open(this->config.logsDirectory + "/" + "STATS",
+                          ios::out | ios::trunc);
+
+        statsOstream << "workers " << numberOfLambdas << '\n';
+    }
+
     if (config.cropWindow.initialized()) {
         sampleBounds = *config.cropWindow;
     }
@@ -373,13 +380,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                 .emplace(piecewise_construct, forward_as_tuple(currentWorkerId),
                          forward_as_tuple(currentWorkerId, move(connection)))
                 .first;
-
-        if (this->config.collectWorkerStats) {
-            workerIt->second.statsOstream.open(
-                this->config.logsDirectory + "/" + to_string(workerIt->first) +
-                    ".STATS",
-                ios::out | ios::trunc);
-        }
 
         /* assigns the minimal necessary scene objects for working with a
          * scene
@@ -746,13 +746,13 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         if (config.collectWorkerStats &&
             worker.nextStatusLogTimestamp < proto.timestamp_us()) {
             if (worker.nextStatusLogTimestamp == 0) {
-                worker.statsOstream << "start " << proto.worker_start_us()
-                                    << '\n';
+                statsOstream << "start " << worker.id << ' '
+                             << proto.worker_start_us() << '\n';
             }
 
-            worker.statsOstream << proto.timestamp_us() << " "
-                                << protoutil::to_json(to_protobuf(worker.stats))
-                                << '\n';
+            statsOstream << worker.id << ' ' << proto.timestamp_us() << ' '
+                         << protoutil::to_json(to_protobuf(worker.stats))
+                         << '\n';
 
             worker.nextStatusLogTimestamp =
                 duration_cast<microseconds>(WRITE_STATS_INTERVAL).count() +
@@ -890,13 +890,14 @@ void LambdaMaster::run() {
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 
+    statsOstream.close();
+
     vector<storage::GetRequest> getRequests;
     const string logPrefix = "logs/" + jobId + "/";
 
     for (const auto &workerkv : workers) {
         const auto &worker = workerkv.second;
         worker.connection->socket().close();
-        worker.statsOstream.close();
 
         if (config.collectDebugLogs || config.collectDiagnostics ||
             config.rayActionsLogRate || config.packetsLogRate) {

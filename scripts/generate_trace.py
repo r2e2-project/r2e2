@@ -124,86 +124,132 @@ class WorkerDiagnostics(object):
 
 
 class WorkerStats(object):
-    def __init__(self, idx, file_path : str):
+    def __init__(self, idx, file_path, start_timestamp):
         self.idx = idx
         self.path = file_path
 
         self.aggregate_stats = defaultdict(list)
         self.queue_stats = defaultdict(list)
-        treelet_stats = defaultdict(lambda: defaultdict(dict))
-        stat_keys = set()
         self.timestamps = []
+        self.start_timestamp = int(start_timestamp) if start_timestamp else None
+        self.treelet_stats = {}
+        self._prev_data = defaultdict(dict)
+        self._stat_keys = set()
+        self._treelet_stats = defaultdict(lambda: defaultdict(dict))
+
+        if not self.path:
+            return
+
         with open(file_path, 'r') as f:
             _, start_timestamp = f.readline().strip().split(' ')
             self.start_timestamp = int(start_timestamp)
 
-            prev_data = defaultdict(dict)
             for line in f:
                 split_line  = line.strip().split(' ')
                 if len(split_line) < 2:
                     continue
                 timestamp, json_data = split_line
-                timestamp = int(timestamp)
-                self.timestamps.append(timestamp)
-                data = json.loads(json_data)
-                for k, v in data['aggregateStats'].items():
-                    self.aggregate_stats[k].append(v)
-                for k, v in data['queueStats'].items():
-                    self.queue_stats[k].append(v)
-                for ray_stats in data['objectStats']:
-                    object_key = ray_stats['id']
-                    typ = object_key['type']
-                    typ_id = int(object_key['id'])
-                    stats = ray_stats['stats']
-                    if typ != TREELET_TYPE:
-                        continue
-                    for metric_name, v in stats.items():
-                        prev_v = 0
-                        if (typ_id in prev_data and
-                            metric_name in prev_data[typ_id]):
-                            prev_v = prev_data[typ_id][metric_name]
-                        treelet_stats[typ_id][metric_name][timestamp] = float(v) - prev_v
-                        prev_data[typ_id][metric_name] = float(v)
-                        stat_keys.add(metric_name)
 
-        self.treelet_stats = {}
-        for treelet_id in treelet_stats.keys():
+                add_data(timestamp, json_data)
+
+        finalize_load()
+
+    def add_data(self, timestamp, json_data):
+        timestamp = int(timestamp)
+        self.timestamps.append(timestamp)
+        data = json.loads(json_data)
+
+        for k, v in data['aggregateStats'].items():
+            self.aggregate_stats[k].append(v)
+
+        for k, v in data['queueStats'].items():
+            self.queue_stats[k].append(v)
+
+        for ray_stats in data['objectStats']:
+            object_key = ray_stats['id']
+            typ = object_key['type']
+            typ_id = int(object_key['id'])
+            stats = ray_stats['stats']
+
+            if typ != TREELET_TYPE:
+                continue
+
+            for metric_name, v in stats.items():
+                prev_v = 0
+
+                if (typ_id in self._prev_data and
+                    metric_name in self._prev_data[typ_id]):
+                    prev_v = self._prev_data[typ_id][metric_name]
+
+                self._treelet_stats[typ_id][metric_name][timestamp] = float(v) - prev_v
+                self._prev_data[typ_id][metric_name] = float(v)
+                self._stat_keys.add(metric_name)
+
+    def finalize_load(self):
+        for treelet_id in self._treelet_stats.keys():
             self.treelet_stats[treelet_id] = {}
-            for stat_key in stat_keys:
+            for stat_key in self._stat_keys:
                 self.treelet_stats[treelet_id][stat_key] = []
                 ll = self.treelet_stats[treelet_id][stat_key]
-                tvs = treelet_stats[treelet_id][stat_key]
+                tvs = self._treelet_stats[treelet_id][stat_key]
                 for t in self.timestamps:
                     if t in tvs:
                         v = tvs[t]
                     else:
                         v = 0
+
                     ll.append(v)
 
 def _load_fn(diagnostics_directory, path):
     diag = None
+
     if path.endswith('DIAG'):
         diag = WorkerDiagnostics(int(path[:path.find('.DIAG')]),
                                  os.path.join(diagnostics_directory, path))
-    stats = None
-    if path.endswith('STATS'):
-        stats = WorkerStats(int(path[:path.find('.STATS')]),
-                            os.path.join(diagnostics_directory, path))
-    print('.', end='', flush=True)
-    return diag, stats
+
+    return diag
 
 class Stats(object):
     def __init__(self, diagnostics_directory : str):
         worker_files = os.listdir(diagnostics_directory)
         self.worker_diagnostics = []
         self.worker_stats = []
+
+        print('Loading stats... ', end='')
+        if 'STATS' in worker_files:
+
+            with open('STATS') as fin:
+                worker_count = int(fin.readline().strip().split(" ")[-1])
+                self.worker_stats = [None] * worker_count
+
+                for line in fin:
+                    line = line.strip().split(" ")
+                    assert(len(line) == 3)
+
+                    if line[0] == 'start':
+                        worker_id = int(line[1])
+                        self.worker_stats[worker_id - 1] = WorkerStats(worker_id,
+                            file_path=None, start_timestamp=line[2])
+                    else:
+                        worker_id = int(line[0])
+                        self.worker_stats[worker_id - 1].add_data(line[1], line[2])
+
+                for stats in self.worker_stats:
+                    stats.finalize_load()
+
+            print('done.')
+        else:
+            print('STATS file not found.')
+
+        print('Loading diagnostics... ', end='')
+
         with Pool() as p:
             results = p.map(partial(_load_fn, diagnostics_directory), worker_files)
-            for d, s in results:
+            for d in results:
                 if d:
                     self.worker_diagnostics.append(d)
-                if s:
-                    self.worker_stats.append(s)
+
+        print('done.')
 
     def write_csv(self, path: str):
         quanta = 1.0 * 1e6 # seconds -> microseconds
@@ -212,10 +258,10 @@ class Stats(object):
         for stats in self.worker_stats:
             start_ts = stats.start_timestamp
             end_ts = start_ts + stats.timestamps[-1]
-            if start_ts < start_timestamp or end_ts > end_timestamp:
-                print('Current min {:d}, max {:d}'.format(start_timestamp, end_timestamp))
-                print('Worker id {:d}, min {:d}, max {:d}, path {:s}'.format(stats.idx,
-                                                                  start_ts, end_ts, stats.path))
+            # if start_ts < start_timestamp or end_ts > end_timestamp:
+            #     print('Current min {:d}, max {:d}'.format(start_timestamp, end_timestamp))
+            #     print('Worker id {:d}, min {:d}, max {:d}'.format(stats.idx,
+            #                                                       start_ts, end_ts))
             start_timestamp = min(start_timestamp, start_ts)
             end_timestamp = max(end_timestamp, end_ts)
 
@@ -1258,7 +1304,7 @@ def main():
                         help='Directory to write the generated graphs to.')
     args = parser.parse_args()
     #compare_model()
-    print('Reading diagnostics from {:s}...'.format(args.diagnostics_directory), end='')
+    #print('Reading diagnostics from {:s}...'.format(args.diagnostics_directory))
     diagnostics = Stats(args.diagnostics_directory)
     print()
     diagnostics.write_csv('data.csv')
