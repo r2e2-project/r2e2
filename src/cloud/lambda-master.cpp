@@ -151,7 +151,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       workerRequestTimer(WORKER_REQUEST_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL),
       writeOutputTimer(WRITE_OUTPUT_INTERVAL),
-      writeWorkerStatsTimer(WRITE_STATS_INTERVAL),
       config(config) {
     LOG(INFO) << "job-id=" << jobId;
 

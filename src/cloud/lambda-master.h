@@ -197,7 +197,6 @@ class LambdaMaster {
     TimerFD workerRequestTimer;
     TimerFD statusPrintTimer;
     TimerFD writeOutputTimer;
-    TimerFD writeWorkerStatsTimer;
 
     const timepoint_t startTime{now()};
 
