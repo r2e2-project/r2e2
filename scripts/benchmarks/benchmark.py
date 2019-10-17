@@ -91,7 +91,7 @@ for i, scene in enumerate(scenes):
 
     for nlambdas in args.lambdas:
         for spp in samples:
-            onespp_rate = 1 / spp / 1.5
+            onespp_rate = 1 / spp / 10
             dir = os.path.join(out_dir,
                     "{scene}-{nlambdas}-{spp}".format(scene=scene, nlambdas=nlambdas,
                                                       spp=spp))
