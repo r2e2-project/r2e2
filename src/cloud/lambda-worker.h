@@ -338,7 +338,7 @@ class LambdaWorker {
     std::vector<std::unique_ptr<Transform>> transformCache{};
     std::shared_ptr<Camera> camera{};
     std::unique_ptr<FilmTile> filmTile{};
-    std::shared_ptr<Sampler> sampler{};
+    std::shared_ptr<GlobalSampler> sampler{};
     std::unique_ptr<Scene> fakeScene{};
     std::vector<std::shared_ptr<Light>> lights{};
     std::shared_ptr<CloudBVH> bvh;

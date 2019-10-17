@@ -21,7 +21,7 @@ class CloudIntegrator : public Integrator {
     };
 
     CloudIntegrator(const int maxDepth, std::shared_ptr<const Camera> camera,
-                    std::shared_ptr<Sampler> sampler,
+                    std::shared_ptr<GlobalSampler> sampler,
                     const Bounds2i &pixelBounds)
         : maxDepth(maxDepth),
           camera(camera),
@@ -37,12 +37,12 @@ class CloudIntegrator : public Integrator {
     static std::pair<std::vector<RayStatePtr>, bool> Shade(
         RayStatePtr &&rayState, const std::shared_ptr<CloudBVH> &treelet,
         const std::vector<std::shared_ptr<Light>> &lights,
-        std::shared_ptr<Sampler> &sampler, MemoryArena &arena);
+        std::shared_ptr<GlobalSampler> &sampler, MemoryArena &arena);
 
   private:
     const int maxDepth;
     std::shared_ptr<const Camera> camera;
-    std::shared_ptr<Sampler> sampler;
+    std::shared_ptr<GlobalSampler> sampler;
     std::shared_ptr<CloudBVH> bvh;
     const Bounds2i pixelBounds;
 

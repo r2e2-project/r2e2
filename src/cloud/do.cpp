@@ -29,7 +29,7 @@ vector<shared_ptr<Light>> loadLights() {
     return lights;
 }
 
-shared_ptr<Sampler> loadSampler() {
+shared_ptr<GlobalSampler> loadSampler() {
     auto reader = global::manager.GetReader(ObjectType::Sampler);
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);

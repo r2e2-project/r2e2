@@ -194,4 +194,12 @@ Point2f GlobalSampler::Get2D() {
     return p;
 }
 
+int GlobalSampler::GetCurrentDimension() const {
+    return dimension;
+}
+
+void GlobalSampler::SetDimension(int dim) {
+    dimension = dim;
+}
+
 }  // namespace pbrt

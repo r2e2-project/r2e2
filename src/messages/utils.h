@@ -109,7 +109,7 @@ protobuf::Light to_protobuf(const std::string& name, const ParamSet& params,
 
 namespace sampler {
 
-std::shared_ptr<Sampler> from_protobuf(const protobuf::Sampler& sampler,
+std::shared_ptr<GlobalSampler> from_protobuf(const protobuf::Sampler& sampler,
                                        const int samplesPerPixel = 0);
 protobuf::Sampler to_protobuf(const std::string& name, const ParamSet& params,
                               const Bounds2i& sampleBounds);

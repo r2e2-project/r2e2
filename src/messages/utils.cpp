@@ -632,9 +632,9 @@ protobuf::Sampler sampler::to_protobuf(const string& name,
     return proto_sampler;
 }
 
-shared_ptr<Sampler> sampler::from_protobuf(const protobuf::Sampler& ps,
+shared_ptr<GlobalSampler> sampler::from_protobuf(const protobuf::Sampler& ps,
                                            const int samplesPerPixel) {
-    Sampler* sampler;
+    GlobalSampler* sampler;
 
     const string& name = ps.name();
     const Bounds2i sampleBounds = pbrt::from_protobuf(ps.sample_bounds());
@@ -647,22 +647,26 @@ shared_ptr<Sampler> sampler::from_protobuf(const protobuf::Sampler& ps,
     }
 
     if (name == "lowdiscrepancy" || name == "02sequence") {
-        sampler = CreateZeroTwoSequenceSampler(paramSet);
+        //sampler = CreateZeroTwoSequenceSampler(paramSet);
+        throw runtime_error("Unsupported sampler");
     } else if (name == "maxmindist") {
-        sampler = CreateMaxMinDistSampler(paramSet);
+        //sampler = CreateMaxMinDistSampler(paramSet);
+        throw runtime_error("Unsupported sampler");
     } else if (name == "halton") {
         sampler = CreateHaltonSampler(paramSet, sampleBounds);
     } else if (name == "sobol") {
         sampler = CreateSobolSampler(paramSet, sampleBounds);
     } else if (name == "random") {
-        sampler = CreateRandomSampler(paramSet);
+        //sampler = CreateRandomSampler(paramSet);
+        throw runtime_error("Unsupported sampler");
     } else if (name == "stratified") {
-        sampler = CreateStratifiedSampler(paramSet);
+        //sampler = CreateStratifiedSampler(paramSet);
+        throw runtime_error("Unsupported sampler");
     } else {
         throw runtime_error("unknown sampler name");
     }
 
-    return shared_ptr<Sampler>(sampler);
+    return shared_ptr<GlobalSampler>(sampler);
 }
 
 protobuf::Camera camera::to_protobuf(const string& name, const ParamSet& params,

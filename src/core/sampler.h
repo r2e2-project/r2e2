@@ -127,6 +127,9 @@ class GlobalSampler : public Sampler {
     virtual int64_t GetIndexForSample(int64_t sampleNum) const = 0;
     virtual Float SampleDimension(int64_t index, int dimension) const = 0;
 
+    int GetCurrentDimension() const;
+    void SetDimension(int dim);
+
   private:
     // GlobalSampler Private Data
     int dimension;

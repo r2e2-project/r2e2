@@ -27,9 +27,10 @@ RayStatePtr CloudIntegrator::Trace(RayStatePtr &&rayState,
 
 pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
     RayStatePtr &&rayStatePtr, const shared_ptr<CloudBVH> &treelet,
-    const vector<shared_ptr<Light>> &lights, shared_ptr<Sampler> &sampler,
+    const vector<shared_ptr<Light>> &lights, shared_ptr<GlobalSampler> &sampler,
     MemoryArena &arena) {
     vector<RayStatePtr> newRays;
+    RayStatePtr bouncePtr = nullptr;
     auto &rayState = *rayStatePtr;
 
     bool pathFinished = false;
@@ -46,6 +47,7 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
     /* setting the sampler */
     sampler->StartPixel(rayState.sample.pixel);
     sampler->SetSampleNumber(rayState.sample.num);
+    sampler->SetDimension(rayState.sample.dim);
 
     const auto bsdfFlags = BxDFType(BSDF_ALL & ~BSDF_SPECULAR);
 
@@ -57,8 +59,8 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
                                        BSDF_ALL, &flags);
 
         if (!f.IsBlack() && pdf > 0.f) {
-            RayStatePtr newRayPtr = make_unique<RayState>();
-            auto &newRay = *newRayPtr;
+            bouncePtr = make_unique<RayState>();
+            auto &newRay = *bouncePtr;
 
             newRay.trackRay = rayState.trackRay;
             newRay.hop = rayState.hop;
@@ -67,8 +69,6 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
             newRay.remainingBounces = rayState.remainingBounces - 1;
             newRay.sample = rayState.sample;
             newRay.StartTrace();
-
-            newRays.push_back(move(newRayPtr));
 
             ++nIntersectionTests;
         } else {
@@ -119,6 +119,11 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
         }
     }
 
+    if (bouncePtr) {
+        bouncePtr->sample.dim = sampler->GetCurrentDimension();
+        newRays.push_back(move(bouncePtr));
+    }
+
     return {move(newRays), pathFinished};
 }
 
@@ -154,6 +159,7 @@ void CloudIntegrator::Render(const Scene &scene) {
             state.sample.id = i++;
             state.sample.num = sample_num++;
             state.sample.pixel = pixel;
+            state.sample.dim = sampler->GetCurrentDimension();
             state.sample.pFilm = cameraSample.pFilm;
             state.sample.weight =
                 camera->GenerateRayDifferential(cameraSample, &state.ray);
@@ -245,7 +251,12 @@ CloudIntegrator *CreateCloudIntegrator(const ParamSet &params,
                                        shared_ptr<const Camera> camera) {
     const int maxDepth = params.FindOneInt("maxdepth", 5);
     Bounds2i pixelBounds = camera->film->GetSampleBounds();
-    return new CloudIntegrator(maxDepth, camera, sampler, pixelBounds);
+    auto globalSampler = dynamic_pointer_cast<GlobalSampler>(sampler);
+    if (!globalSampler) {
+        throw(runtime_error("CloudIntegrator only supports GlobalSamplers"));
+    }
+
+    return new CloudIntegrator(maxDepth, camera, globalSampler, pixelBounds);
 }
 
 }  // namespace pbrt

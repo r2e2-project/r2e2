@@ -29,6 +29,7 @@ struct RayState {
         Point2i pixel;
         Point2f pFilm;
         Float weight;
+        int dim;
     };
 
     RayState() = default;

@@ -25,7 +25,7 @@ shared_ptr<Camera> loadCamera(const string &scenePath,
     return camera::from_protobuf(proto_camera, transformCache);
 }
 
-shared_ptr<Sampler> loadSampler(const string &scenePath) {
+shared_ptr<GlobalSampler> loadSampler(const string &scenePath) {
     auto reader = global::manager.GetReader(ObjectType::Sampler);
     protobuf::Sampler proto_sampler;
     reader->read(&proto_sampler);
@@ -50,7 +50,7 @@ int main(int argc, char const *argv[]) {
         global::manager.init(scenePath);
 
         vector<unique_ptr<Transform>> transformCache;
-        shared_ptr<Sampler> sampler = loadSampler(scenePath);
+        shared_ptr<GlobalSampler> sampler = loadSampler(scenePath);
         shared_ptr<Camera> camera = loadCamera(scenePath, transformCache);
 
         const Bounds2i sampleBounds = camera->film->GetSampleBounds();
@@ -82,6 +82,7 @@ int main(int argc, char const *argv[]) {
                     sample;
                 state.sample.num = sample;
                 state.sample.pixel = pixel;
+                state.sample.dim = sampler->GetCurrentDimension();
                 state.remainingBounces = maxDepth;
                 sampleData.weight = camera->GenerateRayDifferential(
                     sampleData.sample, &state.ray);
