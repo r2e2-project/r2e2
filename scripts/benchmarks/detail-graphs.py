@@ -7,6 +7,7 @@ import os
 import matplotlib
 import matplotlib.pyplot as plt
 import pint
+import pylab
 
 U = pint.UnitRegistry()
 U.setup_matplotlib(True)
@@ -18,7 +19,7 @@ parser.add_argument('-o', '--out', required=True)
 
 args = parser.parse_args()
 
-COLOR_MAP = 'RdYlGn'
+COLOR_MAP = pylab.cm.get_cmap('RdYlGn', 12)
 
 def gen_per_second_per_treelet(df, out):
     per_second_per_treelet = df.groupby(['timestampS', 'treeletID']).sum()
@@ -84,7 +85,7 @@ def sent_bytes(df, out, aggregate):
 
     plt.imshow(mat.transpose(), cmap=COLOR_MAP, interpolation='nearest', aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0), vmin=-1.5, vmax=mat.max())
     plt.xlabel("Time (seconds)")
-    plt.ylabel("Treelet ID")
+    plt.ylabel("Worker ID")
     plt.title(args.title)
     plt.clim(0, mat.max())
     plt.colorbar()
@@ -102,7 +103,7 @@ def received_bytes(df, out, aggregate):
 
     plt.imshow(mat.transpose(), cmap=COLOR_MAP, interpolation='nearest', aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0), vmin=-1.5, vmax=mat.max())
     plt.xlabel("Time (seconds)")
-    plt.ylabel("Treelet ID")
+    plt.ylabel("Worker ID")
     plt.title(args.title)
     plt.clim(0, mat.max())
     plt.colorbar()
