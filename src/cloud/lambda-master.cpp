@@ -49,7 +49,6 @@ using PollerResult = Poller::Result::Type;
 
 constexpr milliseconds WORKER_REQUEST_INTERVAL{250};
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
-constexpr milliseconds WRITE_STATS_INTERVAL{5'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
 shared_ptr<Sampler> loadSampler(const int samplesPerPixel) {
@@ -151,6 +150,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       workerRequestTimer(WORKER_REQUEST_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL),
       writeOutputTimer(WRITE_OUTPUT_INTERVAL),
+      workerStatsInterval(config.workerStatsInterval),
       config(config) {
     LOG(INFO) << "job-id=" << jobId;
 
@@ -191,12 +191,12 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     loadCamera();
 
     if (config.collectDebugLogs || config.collectDiagnostics ||
-        config.collectWorkerStats || config.rayActionsLogRate > 0 ||
+        config.workerStatsInterval > 0 || config.rayActionsLogRate > 0 ||
         config.packetsLogRate > 0) {
         roost::create_directories(config.logsDirectory);
     }
 
-    if (config.collectWorkerStats) {
+    if (config.workerStatsInterval > 0) {
         statsOstream.open(this->config.logsDirectory + "/" + "STATS",
                           ios::out | ios::trunc);
 
@@ -742,7 +742,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         auto &worker = workers.at(workerId);
         worker.stats.merge(stats);
 
-        if (config.collectWorkerStats &&
+        if (config.workerStatsInterval > 0 &&
             worker.nextStatusLogTimestamp < proto.timestamp_us()) {
             if (worker.nextStatusLogTimestamp == 0) {
                 statsOstream << "start " << worker.id << ' '
@@ -754,7 +754,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
                          << '\n';
 
             worker.nextStatusLogTimestamp =
-                duration_cast<microseconds>(WRITE_STATS_INTERVAL).count() +
+                duration_cast<microseconds>(workerStatsInterval).count() +
                 proto.timestamp_us();
         }
 
@@ -1019,7 +1019,8 @@ void usage(const char *argv0, int exitCode) {
          << "  -M --max-udp-rate RATE     maximum UDP send rate for workers"
          << endl
          << "  -g --debug-logs            collect worker debug logs" << endl
-         << "  -w --worker-stats          dump worker stats" << endl
+         << "  -w --worker-stats N        dump worker stats every N seconds"
+         << endl
          << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
          << "  -P --log-packets RATE      log packets" << endl
@@ -1075,7 +1076,7 @@ int main(int argc, char *argv[]) {
     string region{"us-west-2"};
     bool sendReliably = false;
     uint64_t maxUdpRate = 200;
-    bool collectWorkerStats = false;
+    uint64_t workerStatsInterval = 0;
     bool collectDiagnostics = false;
     bool collectDebugLogs = false;
     float rayActionsLogRate = 0.0;
@@ -1101,7 +1102,7 @@ int main(int argc, char *argv[]) {
         {"reliable-udp", no_argument, nullptr, 'R'},
         {"max-udp-rate", required_argument, nullptr, 'M'},
         {"debug-logs", no_argument, nullptr, 'g'},
-        {"worker-stats", no_argument, nullptr, 'w'},
+        {"worker-stats", required_argument, nullptr, 'w'},
         {"diagnostics", no_argument, nullptr, 'd'},
         {"log-rays", required_argument, nullptr, 'L'},
         {"log-packets", required_argument, nullptr, 'P'},
@@ -1116,7 +1117,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:l:whdD:a:S:f:L:c:P:M:t:j:Rg",
+            getopt_long(argc, argv, "p:i:r:b:l:w:hdD:a:S:f:L:c:P:M:t:j:Rg",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -1133,7 +1134,7 @@ int main(int argc, char *argv[]) {
         case 'b': storageBackendUri = optarg; break;
         case 'l': numLambdas = stoul(optarg); break;
         case 'g': collectDebugLogs = true; break;
-        case 'w': collectWorkerStats = true; break;
+        case 'w': workerStatsInterval = stoul(optarg); break;
         case 'd': collectDiagnostics = true; break;
         case 'D': logsDirectory = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
@@ -1229,7 +1230,7 @@ int main(int argc, char *argv[]) {
                                   samplesPerPixel,
                                   collectDebugLogs,
                                   collectDiagnostics,
-                                  collectWorkerStats,
+                                  workerStatsInterval,
                                   rayActionsLogRate,
                                   packetsLogRate,
                                   logsDirectory,

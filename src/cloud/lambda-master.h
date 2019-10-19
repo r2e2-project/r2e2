@@ -58,7 +58,7 @@ struct MasterConfiguration {
     int samplesPerPixel;
     bool collectDebugLogs;
     bool collectDiagnostics;
-    bool collectWorkerStats;
+    uint64_t workerStatsInterval;
     float rayActionsLogRate;
     float packetsLogRate;
     std::string logsDirectory;
@@ -206,7 +206,8 @@ class LambdaMaster {
     timepoint_t lastFinishedRay{};
 
     /* Worker stats */
-    WorkerStats workerStats;
+    WorkerStats workerStats{};
+    std::chrono::seconds workerStatsInterval;
     size_t initializedWorkers{0};
 
     /* Static Assignments */
