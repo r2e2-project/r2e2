@@ -8,9 +8,9 @@
 
 #include "cloud/bvh.h"
 #include "cloud/manager.h"
+#include "core/geometry.h"
 #include "util/exception.h"
 #include "util/path.h"
-#include "core/geometry.h"
 
 using namespace std;
 using namespace pbrt;
@@ -57,13 +57,13 @@ void printTreeletInfo(const map<uint32_t, CloudBVH::TreeletInfo> &treeletInfo,
 
         cout << "BOUNDS " << info.bounds << endl;
 
-        cout << "BVH BOUNDS "; 
-        for( int i = 1; i < 16; i++){
-            if(info.treeletNodeBounds[i].pMin.x > info.treeletNodeBounds[i].pMax.x){
+        cout << "BVH BOUNDS ";
+        for (int i = 1; i < 16; i++) {
+            if (info.treeletNodeBounds[i].pMin.x >
+                info.treeletNodeBounds[i].pMax.x) {
                 cout << " NULL ";
 
-            }
-            else{
+            } else {
                 cout << " " << info.treeletNodeBounds[i];
             }
         }
