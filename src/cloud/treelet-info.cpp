@@ -3,6 +3,7 @@
 #include <iostream>
 #include <map>
 #include <queue>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -47,40 +48,52 @@ void generateReport(const roost::path &scenePath,
     }
 }
 
+string toString(const Bounds3f &bounds) {
+    ostringstream oss;
+
+    oss << fixed << setprecision(3) << "[[" << bounds.pMin.x << ','
+        << bounds.pMin.y << ',' << bounds.pMin.z << "],[" << bounds.pMax.x
+        << ',' << bounds.pMax.y << ',' << bounds.pMax.z << "]]";
+
+    return oss.str();
+}
+
 void printTreeletInfo(const map<uint32_t, CloudBVH::TreeletInfo> &treeletInfo,
                       const map<uint32_t, size_t> &treeletSize) {
     for (const auto &item : treeletInfo) {
         const auto id = item.first;
         const auto &info = item.second;
 
-        cout << "TREELET " << id << " " << treeletSize.at(id) << endl;
+        cout << "TREELET " << id << " " << treeletSize.at(id) << '\n';
 
-        cout << "BOUNDS " << info.bounds << endl;
+        cout << "BOUNDS " << toString(info.bounds) << '\n';
 
-        cout << "BVH BOUNDS ";
+        cout << "BVH_BOUNDS [";
         for (int i = 1; i < 16; i++) {
             if (info.treeletNodeBounds[i].pMin.x >
                 info.treeletNodeBounds[i].pMax.x) {
-                cout << " NULL ";
+                cout << "null";
 
             } else {
-                cout << " " << info.treeletNodeBounds[i];
+                cout << toString(info.treeletNodeBounds[i]);
             }
+
+            if (i != 15) cout << ',';
         }
-        cout << endl;
+        cout << "]\n";
         delete info.treeletNodeBounds;
 
         cout << "CHILD";
         for (const auto t : info.children) {
             cout << " " << t;
         }
-        cout << endl;
+        cout << '\n';
 
         cout << "INSTANCE";
         for (const auto t : info.instances) {
             cout << " " << t;
         }
-        cout << endl;
+        cout << '\n';
     }
 }
 
