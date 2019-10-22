@@ -434,47 +434,51 @@ bool CloudBVH::IntersectP(const Ray &ray) const {
     return false;
 }
 
-Bounds3f *CloudBVH::getTreeletNodeBounds(const uint32_t treelet_id,
-                                         const int recursion_limit) const {
+vector<Bounds3f> CloudBVH::getTreeletNodeBounds(
+    const uint32_t treelet_id, const int recursionLimit) const {
     loadTreelet(treelet_id);
-    int depth = 0;
-    int idx = 1;
+
+    vector<Bounds3f> treeletBounds;
+
+    const int depth = 0;
+    const int idx = 1;
+
     // load base node bounds
     auto &currTreelet = treelets_.at(treelet_id);
     auto &currNode = currTreelet.nodes[0];
 
     // size reflects indexing starting at 1
-    size_t size = std::pow(2, recursion_limit);
-    Bounds3f *treeletBounds = new Bounds3f[size];
-    *treeletBounds = {Bounds3f{}};
-    RecurseBVHNodes(depth, recursion_limit, idx, currTreelet, currNode,
+    const size_t size = pow(2, recursionLimit);
+    treeletBounds.resize(size);
+    recurseBVHNodes(depth, recursionLimit, idx, currTreelet, currNode,
                     treeletBounds);
 
     return treeletBounds;
 }
 
-void CloudBVH::RecurseBVHNodes(int depth, int recursion_limit, int idx,
-                               Treelet &currTreelet, TreeletNode &currNode,
-                               Bounds3f *treeletBounds) const {
-    if (depth == recursion_limit) {
+void CloudBVH::recurseBVHNodes(const int depth, const int recursionLimit,
+                               const int idx, const Treelet &currTreelet,
+                               const TreeletNode &currNode,
+                               vector<Bounds3f> &treeletBounds) const {
+    if (depth == recursionLimit) {
         return;
-    } else {
-        // save  left value
-        if (currNode.has[0]) {
-            uint32_t left = currNode.child[0];
-            // treeletBounds[2 * idx] = currTreelet.nodes[left].bounds;
-            RecurseBVHNodes(depth + 1, recursion_limit, 2 * idx, currTreelet,
-                            currTreelet.nodes[left], treeletBounds);
-        }
-        treeletBounds[idx] = currNode.bounds;
-        // save right value
-        if (currNode.has[1]) {
-            uint32_t right = currNode.child[1];
-            // treeletBounds[2 * idx + 1] = currTreelet.nodes[right].bounds;
-            RecurseBVHNodes(depth + 1, recursion_limit, 2 * idx + 1,
-                            currTreelet, currTreelet.nodes[right],
-                            treeletBounds);
-        }
+    }
+
+    // save the current node
+    treeletBounds[idx] = currNode.bounds;
+
+    // save left value, if there's one
+    if (currNode.has[0]) {
+        const uint32_t left = currNode.child[0];
+        recurseBVHNodes(depth + 1, recursionLimit, 2 * idx, currTreelet,
+                        currTreelet.nodes[left], treeletBounds);
+    }
+
+    // save right value, if there's one
+    if (currNode.has[1]) {
+        const uint32_t right = currNode.child[1];
+        recurseBVHNodes(depth + 1, recursionLimit, 2 * idx + 1, currTreelet,
+                        currTreelet.nodes[right], treeletBounds);
     }
 }
 

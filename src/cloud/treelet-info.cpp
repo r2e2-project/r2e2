@@ -60,6 +60,9 @@ string toString(const Bounds3f &bounds) {
 
 void printTreeletInfo(const map<uint32_t, CloudBVH::TreeletInfo> &treeletInfo,
                       const map<uint32_t, size_t> &treeletSize) {
+
+    cout << "TREELETS " << treeletInfo.size() << '\n';
+
     for (const auto &item : treeletInfo) {
         const auto id = item.first;
         const auto &info = item.second;
@@ -68,8 +71,8 @@ void printTreeletInfo(const map<uint32_t, CloudBVH::TreeletInfo> &treeletInfo,
 
         cout << "BOUNDS " << toString(info.bounds) << '\n';
 
-        cout << "BVH_BOUNDS [";
-        for (int i = 1; i < 16; i++) {
+        cout << "BVH_NODES [";
+        for (int i = 1; i < info.treeletNodeBounds.size(); i++) {
             if (info.treeletNodeBounds[i].pMin.x >
                 info.treeletNodeBounds[i].pMax.x) {
                 cout << "null";
@@ -78,10 +81,9 @@ void printTreeletInfo(const map<uint32_t, CloudBVH::TreeletInfo> &treeletInfo,
                 cout << toString(info.treeletNodeBounds[i]);
             }
 
-            if (i != 15) cout << ',';
+            if (i != info.treeletNodeBounds.size() - 1) cout << ',';
         }
         cout << "]\n";
-        delete info.treeletNodeBounds;
 
         cout << "CHILD";
         for (const auto t : info.children) {

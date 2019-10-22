@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <stack>
+#include <vector>
 
 #include "cloud/raystate.h"
 #include "core/pbrt.h"
@@ -22,7 +23,7 @@ class CloudBVH : public Aggregate {
     struct TreeletInfo {
         std::set<uint32_t> children{};
         std::set<uint32_t> instances{};
-        Bounds3f *treeletNodeBounds;
+        std::vector<Bounds3f> treeletNodeBounds;
         Bounds3f bounds{};
     };
 
@@ -38,10 +39,6 @@ class CloudBVH : public Aggregate {
 
     void Trace(RayState &rayState);
     bool Intersect(RayState &rayState, SurfaceInteraction *isect) const;
-
-    // returns array of Bounds3f with structure of Treelet's internal BVH nodes
-    Bounds3f *getTreeletNodeBounds(const uint32_t treelet_id,
-                                   const int recursion_limit = 4) const;
 
     const TreeletInfo &GetInfo(const uint32_t treelet_id) {
         loadTreelet(treelet_id);
@@ -96,10 +93,16 @@ class CloudBVH : public Aggregate {
     void loadTreelet(const uint32_t root_id) const;
     void clear() const;
 
+    // returns array of Bounds3f with structure of Treelet's internal BVH nodes
+    std::vector<Bounds3f> getTreeletNodeBounds(
+        const uint32_t treelet_id, const int recursionLimit = 4) const;
+
+    void recurseBVHNodes(const int depth, const int recursionLimit,
+                         const int idx, const Treelet &currTreelet,
+                         const TreeletNode &currNode,
+                         std::vector<Bounds3f> &treeletBounds) const;
+
     Transform identity_transform_;
-    void RecurseBVHNodes(int depth, int recursion_limit, int idx,
-                         Treelet &currTreelet, TreeletNode &currNode,
-                         Bounds3f *treeletBounds) const;
 };
 
 std::shared_ptr<CloudBVH> CreateCloudBVH(const ParamSet &ps);
