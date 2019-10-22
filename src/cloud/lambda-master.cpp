@@ -1009,7 +1009,6 @@ void usage(const char *argv0, int exitCode) {
     cerr << "Usage: " << argv0 << " [OPTION]... [TASK]" << endl
          << endl
          << "Options:" << endl
-         << "  -s --scene-path PATH       path to scene dump" << endl
          << "  -p --port PORT             port to use" << endl
          << "  -i --ip IPSTRING           public ip of this machine" << endl
          << "  -r --aws-region REGION     region to run lambdas in" << endl
