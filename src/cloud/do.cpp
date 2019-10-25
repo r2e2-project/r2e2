@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "cloud/bvh.h"
 #include "cloud/integrator.h"
@@ -27,6 +28,13 @@ vector<shared_ptr<Light>> loadLights() {
     }
 
     return lights;
+}
+
+shared_ptr<Camera> loadCamera(vector<unique_ptr<Transform>> &transformCache) {
+    auto reader = global::manager.GetReader(ObjectType::Camera);
+    protobuf::Camera proto_camera;
+    reader->read(&proto_camera);
+    return camera::from_protobuf(proto_camera, transformCache);
 }
 
 shared_ptr<GlobalSampler> loadSampler() {
@@ -90,10 +98,14 @@ int main(int argc, char const *argv[]) {
         }
 
         MemoryArena arena;
+        vector<unique_ptr<Transform>> transformCache;
+        auto camera = loadCamera(transformCache);
         auto treelet = make_shared<CloudBVH>();
         auto sampler = loadSampler();
         auto lights = loadLights();
         auto fakeScene = loadFakeScene();
+
+        const auto sampleExtent = camera->film->GetSampleBounds().Diagonal();
 
         for (auto &light : lights) {
             light->Preprocess(fakeScene);
@@ -114,8 +126,10 @@ int main(int argc, char const *argv[]) {
                     finishedRays.push_back(move(rayStatePtr));
                 }
             } else if (rayState.hit) {
-                auto newRays = CloudIntegrator::Shade(
-                    move(rayStatePtr), treelet, lights, sampler, arena).first;
+                auto newRays =
+                    CloudIntegrator::Shade(move(rayStatePtr), treelet, lights,
+                                           sampleExtent, sampler, arena)
+                        .first;
 
                 for (auto &newRay : newRays) {
                     outputRays.push_back(move(newRay));

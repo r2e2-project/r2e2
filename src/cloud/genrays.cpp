@@ -80,8 +80,6 @@ int main(int argc, char const *argv[]) {
                 state.sample.id =
                     (pixel.x + pixel.y * sampleExtent.x) * samplesPerPixel +
                     sample;
-                state.sample.num = sample;
-                state.sample.pixel = pixel;
                 state.sample.dim = sampler->GetCurrentDimension();
                 state.remainingBounces = maxDepth;
                 sampleData.weight = camera->GenerateRayDifferential(

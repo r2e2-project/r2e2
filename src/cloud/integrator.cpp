@@ -27,8 +27,8 @@ RayStatePtr CloudIntegrator::Trace(RayStatePtr &&rayState,
 
 pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
     RayStatePtr &&rayStatePtr, const shared_ptr<CloudBVH> &treelet,
-    const vector<shared_ptr<Light>> &lights, shared_ptr<GlobalSampler> &sampler,
-    MemoryArena &arena) {
+    const vector<shared_ptr<Light>> &lights, const Vector2i &sampleExtent,
+    shared_ptr<GlobalSampler> &sampler, MemoryArena &arena) {
     vector<RayStatePtr> newRays;
     RayStatePtr bouncePtr = nullptr;
     auto &rayState = *rayStatePtr;
@@ -45,8 +45,9 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
     }
 
     /* setting the sampler */
-    sampler->StartPixel(rayState.sample.pixel);
-    sampler->SetSampleNumber(rayState.sample.num);
+    sampler->StartPixel(
+        rayState.SamplePixel(sampleExtent, sampler->samplesPerPixel));
+    sampler->SetSampleNumber(rayState.SampleNum(sampler->samplesPerPixel));
     sampler->SetDimension(rayState.sample.dim);
 
     const auto bsdfFlags = BxDFType(BSDF_ALL & ~BSDF_SPECULAR);
@@ -136,7 +137,8 @@ void CloudIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
 
 void CloudIntegrator::Render(const Scene &scene) {
     Preprocess(scene, *sampler);
-    Bounds2i sampleBounds = camera->film->GetSampleBounds();
+    const Bounds2i sampleBounds = camera->film->GetSampleBounds();
+    const Vector2i sampleExtent = sampleBounds.Diagonal();
     unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
     deque<RayStatePtr> rayQueue;
@@ -156,9 +158,9 @@ void CloudIntegrator::Render(const Scene &scene) {
             RayStatePtr statePtr = make_unique<RayState>();
             auto &state = *statePtr;
 
-            state.sample.id = i++;
-            state.sample.num = sample_num++;
-            state.sample.pixel = pixel;
+            state.sample.id = (pixel.x + pixel.y * sampleExtent.x) *
+                                  sampler->samplesPerPixel +
+                              sample_num;
             state.sample.dim = sampler->GetCurrentDimension();
             state.sample.pFilm = cameraSample.pFilm;
             state.sample.weight =
@@ -203,8 +205,9 @@ void CloudIntegrator::Render(const Scene &scene) {
                 finishedRays.push_back(move(newRayPtr));
             }
         } else if (state.hit) {
-            auto newRays =
-                Shade(move(statePtr), bvh, scene.lights, sampler, arena).first;
+            auto newRays = Shade(move(statePtr), bvh, scene.lights,
+                                 sampleExtent, sampler, arena)
+                               .first;
             for (auto &newRay : newRays) {
                 rayQueue.push_back(move(newRay));
             }

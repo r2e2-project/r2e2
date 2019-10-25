@@ -12,6 +12,16 @@ constexpr int offset_of(T const &t, U T::*a) {
     return (char const *)&(t.*a) - (char const *)&t;
 }
 
+// sample.id =
+//  (pixel.x + pixel.y * sampleExtent.x) * config.samplesPerPixel + sample;
+
+int64_t RayState::SampleNum(const uint32_t spp) { return sample.id % spp; }
+
+Point2i RayState::SamplePixel(const Vector2i &extent, const uint32_t spp) {
+    const int point = static_cast<int>(sample.id / spp);
+    return Point2i{point % extent.x, point / extent.x};
+}
+
 void RayState::StartTrace() {
     hit = false;
     toVisitPush({});

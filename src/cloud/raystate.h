@@ -25,8 +25,6 @@ struct RayState {
 
     struct Sample {
         uint64_t id;
-        int64_t num;
-        Point2i pixel;
         Point2f pFilm;
         Float weight;
         int dim;
@@ -63,6 +61,9 @@ struct RayState {
 
     size_t serializedSize{0};
     char serialized[1400];
+
+    int64_t SampleNum(const uint32_t spp);
+    Point2i SamplePixel(const Vector2i &extent, const uint32_t spp);
 
     bool toVisitEmpty() const { return toVisitHead == 0; }
     const TreeletNode &toVisitTop() const { return toVisit[toVisitHead - 1]; }

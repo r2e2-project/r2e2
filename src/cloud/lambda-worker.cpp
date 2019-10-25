@@ -458,7 +458,7 @@ ResultType LambdaWorker::handleRayQueue() {
             }
         } else if (ray.hit) {
             auto newRays = CloudIntegrator::Shade(move(rayPtr), bvh, lights,
-                                                  sampler, arena);
+                                                  sampleExtent, sampler, arena);
 
             for (auto& newRay : newRays.first) {
                 logRayAction(*newRay, RayAction::Generated);
@@ -1094,7 +1094,6 @@ ResultType LambdaWorker::handleDiagnostics() {
 
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
     const Bounds2i sampleBounds = camera->film->GetSampleBounds();
-    const Vector2i sampleExtent = sampleBounds.Diagonal();
     const auto samplesPerPixel = sampler->samplesPerPixel;
     const Float rayScale = 1 / sqrt((Float)samplesPerPixel);
 
@@ -1116,8 +1115,6 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             state.sample.id =
                 (pixel.x + pixel.y * sampleExtent.x) * config.samplesPerPixel +
                 sample;
-            state.sample.num = sample;
-            state.sample.pixel = pixel;
             state.sample.pFilm = cameraSample.pFilm;
             state.sample.weight =
                 camera->GenerateRayDifferential(cameraSample, &state.ray);
@@ -1422,6 +1419,7 @@ void LambdaWorker::loadCamera() {
     reader->read(&proto_camera);
     camera = camera::from_protobuf(proto_camera, transformCache);
     filmTile = camera->film->GetFilmTile(camera->film->GetSampleBounds());
+    sampleExtent = camera->film->GetSampleBounds().Diagonal();
 }
 
 void LambdaWorker::loadSampler() {
