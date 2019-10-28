@@ -24,6 +24,7 @@ Point2i RayState::SamplePixel(const Vector2i &extent, const uint32_t spp) {
 
 void RayState::StartTrace() {
     hit = false;
+    toVisitHead = 0;
     toVisitPush({});
 }
 

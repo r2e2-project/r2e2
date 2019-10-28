@@ -1,7 +1,7 @@
 #ifndef PBRT_CLOUD_RAYSTATE_H
 #define PBRT_CLOUD_RAYSTATE_H
 
-#include <deque>
+#include <memory>
 
 #include "core/camera.h"
 #include "core/geometry.h"
