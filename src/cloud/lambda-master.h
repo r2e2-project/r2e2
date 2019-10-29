@@ -197,6 +197,7 @@ class LambdaMaster {
     TimerFD workerRequestTimer;
     TimerFD statusPrintTimer;
     TimerFD writeOutputTimer;
+    std::unique_ptr<TimerFD> exitTimer;
 
     const timepoint_t startTime{now()};
 

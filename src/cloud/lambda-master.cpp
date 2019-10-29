@@ -50,6 +50,7 @@ using PollerResult = Poller::Result::Type;
 constexpr milliseconds WORKER_REQUEST_INTERVAL{250};
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
+constexpr milliseconds EXIT_GRACE_PERIOD{10'000};
 
 shared_ptr<Sampler> loadSampler(const int samplesPerPixel) {
     auto reader = global::manager.GetReader(ObjectType::Sampler);
@@ -312,13 +313,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         },
         []() { throw runtime_error("generate rays failed"); }));
 
-    loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, [this]() { return ResultType::Exit; },
-        [this]() {
-            return this->totalPaths == this->workerStats.finishedPaths();
-        },
-        []() { throw runtime_error("job finish"); }));
-
     if (config.finishedRayAction == FinishedRayAction::SendBack) {
         loop.poller().add_action(Poller::Action(
             writeOutputTimer.fd, Direction::In,
@@ -543,6 +537,22 @@ ResultType LambdaMaster::handleStatusMessage() {
     if (config.timeout.count() && now() - lastActionTime >= config.timeout) {
         cerr << "Job terminated due to inactivity." << endl;
         return ResultType::Exit;
+    } else if (exitTimer == nullptr &&
+               totalPaths == workerStats.finishedPaths()) {
+        cerr << "Terminating the job in "
+             << duration_cast<seconds>(EXIT_GRACE_PERIOD).count() << "s..."
+             << endl;
+
+        exitTimer = make_unique<TimerFD>(EXIT_GRACE_PERIOD);
+
+        loop.poller().add_action(
+            Poller::Action(exitTimer->fd, Direction::In,
+                           [this]() {
+                               exitTimer = nullptr;
+                               return ResultType::Exit;
+                           },
+                           [this]() { return true; },
+                           []() { throw runtime_error("job finish"); }));
     }
 
     aggregateQueueStats();
