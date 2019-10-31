@@ -64,44 +64,52 @@ LambdaWorker::ServicePacket::ServicePacket(const Address& addr,
       ackId(ackId),
       tracked(tracked) {}
 
-LambdaWorker::RayPacket::RayPacket(const Address& addr, const WorkerId destId,
-                                   const TreeletId targetTreelet,
-                                   const uint32_t queueLength,
-                                   const bool reliable,
-                                   const uint64_t sequenceNumber,
-                                   const bool tracked)
-    : destination(addr),
-      destinationId(destId),
-      targetTreelet(targetTreelet),
-      queueLength(queueLength),
-      reliable(reliable),
-      sequenceNumber(sequenceNumber),
-      tracked(tracked) {}
+void LambdaWorker::RayPacket::setDestination(const WorkerId id,
+                                             const Address& address) {
+    destination_.reset(id, address);
+}
+
+void LambdaWorker::RayPacket::setRetransmission(const bool retransmission) {
+    retransmission_ = retransmission;
+}
+
+void LambdaWorker::RayPacket::setTargetTreelet(const TreeletId targetTreelet) {
+    targetTreelet_ = targetTreelet;
+}
+
+void LambdaWorker::RayPacket::setSequenceNumber(const uint64_t sequenceNumber) {
+    sequenceNumber_ = sequenceNumber;
+    Message::update_sequence_number(header_, sequenceNumber_);
+}
 
 void LambdaWorker::RayPacket::addRay(RayStatePtr&& ray) {
     assert(iovCount < sizeof(iov) / (sizeof struct iovec));
 
-    iov_[iovCount_++] = {.iov_base = ray->serialized,
+    iov_[iovCount_++] = {.iov_base = ray->serialized.get(),
                          .iov_len = ray->serializedSize};
 
-    length += ray->serializedSize;
+    length_ += ray->serializedSize;
 
-    rays.push_back(move(ray));
+    rays_.push_back(move(ray));
 }
 
 void LambdaWorker::RayPacket::incrementAttempts() {
-    attempt++;
-    const uint16_t val = htobe16(attempt);
-    memcpy(header, reinterpret_cast<const char*>(&val), sizeof(val));
+    attempt_++;
+    const uint16_t val = htobe16(attempt_);
+    memcpy(header_, reinterpret_cast<const char*>(&val), sizeof(val));
 }
 
 size_t LambdaWorker::RayPacket::raysLength() const {
-    return length - (meow::Message::HEADER_LENGTH + sizeof(uint32_t));
+    return length_ - (Message::HEADER_LENGTH + sizeof(uint32_t));
 }
 
-struct iovec* LambdaWorker::RayPacket::iov() {
-    iov_[0].iov_base = header;
-    iov_[1].iov_base = &queueLength;
+struct iovec* LambdaWorker::RayPacket::iov(const WorkerId workerId) {
+    Message::str(header_, workerId, OpCode::SendRays,
+                 length_ - Message::HEADER_LENGTH, reliable_, sequenceNumber_,
+                 tracked_);
+
+    iov_[0].iov_base = header_;
+    iov_[1].iov_base = &queueLength_;
     return iov_;
 }
 
@@ -821,22 +829,22 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
     while (!outstandingRayPackets.empty() &&
            outstandingRayPackets.front().first <= now) {
         auto& packet = outstandingRayPackets.front().second;
-        auto& thisReceivedAcks = receivedAcks[packet.destination];
+        auto& thisReceivedAcks = receivedAcks[packet.destination()->second];
 
         workerStats.netStats.rtt +=
-            duration_cast<milliseconds>(now - packet.sentAt);
+            duration_cast<milliseconds>(now - packet.sentAt());
 
-        if (!thisReceivedAcks.contains(packet.sequenceNumber)) {
+        if (!thisReceivedAcks.contains(packet.sequenceNumber())) {
             packet.incrementAttempts();
-            packet.retransmission = true;
+            packet.setRetransmission(true);
 
-            if (packet.attempt % 6 == 0) {
-                reconnectRequests.insert(packet.destinationId);
+            if (packet.attempt() % 6 == 0) {
+                reconnectRequests.insert(packet.destination()->first);
             }
 
             rayPackets.push_back(move(packet));
         } else {
-            workerStats.recordAcknowledgedBytes(packet.targetTreelet,
+            workerStats.recordAcknowledgedBytes(packet.targetTreelet(),
                                                 packet.raysLength());
         }
 
@@ -863,28 +871,31 @@ ResultType LambdaWorker::handleUdpSend() {
     }
 
     auto sendRayPacket = [this](Worker& peer, RayPacket&& packet) {
-        peer.pacer.record_send(packet.length);
+        peer.pacer.record_send(packet.length());
 
-        udpConnection.sendmsg(packet.destination, packet.iov(),
-                              packet.iovCount(), packet.length);
+        udpConnection.sendmsg(packet.destination()->second,
+                              packet.iov(*workerId), packet.iovCount(),
+                              packet.length());
 
-        packet.sentAt = packet_clock::now();
-        peer.diagnostics.bytesSent += packet.length;
+        packet.recordSendTime();
+        peer.diagnostics.bytesSent += packet.length();
         workerStats.netStats.packetsSent++;
 
-        workerStats.recordSentBytes(packet.targetTreelet, packet.raysLength());
+        workerStats.recordSentBytes(packet.targetTreelet(),
+                                    packet.raysLength());
 
         /* do the necessary logging */
-        for (auto& rayPtr : packet.rays) {
-            logRayAction(*rayPtr, RayAction::Sent, packet.destinationId);
+        for (auto& rayPtr : packet.rays()) {
+            logRayAction(*rayPtr, RayAction::Sent, packet.destination()->first);
         }
 
-        if (trackPackets && packet.tracked) {
-            logPacket(packet.sequenceNumber, packet.attempt, PacketAction::Sent,
-                      packet.destinationId, packet.length, packet.rays.size());
+        if (trackPackets && packet.tracked()) {
+            logPacket(packet.sequenceNumber(), packet.attempt(),
+                      PacketAction::Sent, packet.destination()->first,
+                      packet.length(), packet.rayCount());
         }
 
-        if (packet.reliable) {
+        if (packet.reliable()) {
             outstandingRayPackets.emplace_back(
                 packet_clock::now() + PACKET_TIMEOUT, move(packet));
         }
@@ -892,7 +903,7 @@ ResultType LambdaWorker::handleUdpSend() {
 
     for (auto it = rayPackets.begin(); it != rayPackets.end(); it++) {
         RayPacket& packet = *it;
-        auto& peer = peers.at(packet.destinationId);
+        auto& peer = peers.at(packet.destination()->first);
         if (peer.pacer.within_pace()) {
             sendRayPacket(peer, move(packet));
             rayPackets.erase(it);
@@ -944,8 +955,13 @@ ResultType LambdaWorker::handleUdpSend() {
         /* (3) collect the rays to fill a packet */
         const bool tracked = packetLogBD(randEngine);
 
-        RayPacket packet(peer.address, peer.id, treeletId, queueLengthBytes,
-                         config.sendReliably, peerSeqNo, tracked);
+        RayPacket packet{};
+        packet.setDestination(peer.id, peer.address);
+        packet.setTargetTreelet(treeletId);
+        packet.setReliable(config.sendReliably);
+        packet.setSequenceNumber(peerSeqNo);
+        packet.setTracked(tracked);
+        packet.setQueueLength(queueLengthBytes);
 
         while (!queue.empty()) {
             auto& ray = queue.front();
@@ -955,7 +971,7 @@ ResultType LambdaWorker::handleUdpSend() {
                 throw runtime_error("ray is not serialized");
             }
 
-            if (size + packet.length > UDP_MTU_BYTES) break;
+            if (size + packet.length() > UDP_MTU_BYTES) break;
 
             packet.addRay(move(ray));
 
@@ -968,14 +984,9 @@ ResultType LambdaWorker::handleUdpSend() {
             outQueue.erase(treeletId);
         }
 
-        /* (4) fix the header */
-        Message::str(packet.header, *workerId, OpCode::SendRays,
-                     packet.length - Message::HEADER_LENGTH,
-                     config.sendReliably, peerSeqNo, tracked);
-
         if (tracked) {
             logPacket(peerSeqNo, 0, PacketAction::Queued, peer.id,
-                      packet.length, packet.rays.size());
+                      packet.length(), packet.rayCount());
         }
 
         peerSeqNo++;
