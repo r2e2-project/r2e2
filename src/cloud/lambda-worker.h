@@ -118,42 +118,63 @@ class LambdaWorker {
         ServicePacket& operator=(ServicePacket&&) = default;
     };
 
-    struct RayPacket {
-        Address destination;
-        WorkerId destinationId;
-        TreeletId targetTreelet;
-
-        bool retransmission{false};
-        bool reliable{false};
-        bool tracked{false};
-        uint64_t sequenceNumber;
-        size_t attempt{0};
-        size_t length{meow::Message::HEADER_LENGTH + sizeof(uint32_t)};
-
-        char header[meow::Message::HEADER_LENGTH];
-        uint32_t queueLength;
-        std::deque<std::unique_ptr<RayState>> rays;
-
-        packet_clock::time_point sentAt;
-
-        RayPacket(const Address& addr, const WorkerId destId,
-                  const TreeletId targetTreelet, const uint32_t queueLength,
-                  const bool reliable = false,
-                  const uint64_t sequenceNumber = 0,
-                  const bool tracked = false);
-
+    class RayPacket {
+      public:
+        RayPacket() {}
         RayPacket(const RayPacket&) = delete;
         RayPacket(RayPacket&&) = default;
         RayPacket& operator=(const RayPacket&) = delete;
         RayPacket& operator=(RayPacket&&) = default;
 
-        void addRay(RayStatePtr&& ray);
+        void setDestination(const WorkerId id, const Address& address);
+        void setRetransmission(const bool retransmission);
+        void setTargetTreelet(const TreeletId targetTreelet);
+        void setReliable(const bool reliable) { reliable_ = reliable; }
+        void setTracked(const bool tracked) { tracked_ = tracked; }
+        void setSequenceNumber(const uint64_t sequenceNumber);
+        void setQueueLength(const uint32_t len) { queueLength_ = len; }
+        void recordSendTime() { sentAt_ = packet_clock::now(); }
         void incrementAttempts();
+
+        const auto& destination() const { return destination_; }
+        TreeletId targetTreelet() const { return targetTreelet_; }
+        uint64_t sequenceNumber() const { return sequenceNumber_; }
+        bool retransmission() const { return retransmission_; }
+        bool reliable() const { return reliable_; }
+        bool tracked() const { return tracked_; }
+        size_t attempt() const { return attempt_; }
+        size_t length() const { return length_; }
+        size_t rayCount() const { return rays_.size(); }
+        uint32_t queueLength() const { return queueLength_; }
+        const char* header() const { return header_; }
+        packet_clock::time_point sentAt() const { return sentAt_; }
+
+        void addRay(RayStatePtr&& ray);
+
+        const auto& rays() const { return rays_; }
+        auto& rays() { return rays_; }
         size_t raysLength() const;
-        struct iovec* iov();
+
+        struct iovec* iov(const WorkerId workerId);
         size_t iovCount() const { return iovCount_; }
 
       private:
+        Optional<std::pair<WorkerId, Address>> destination_{};
+        TreeletId targetTreelet_{0};
+        uint64_t sequenceNumber_{0};
+        uint32_t queueLength_{0};
+
+        /* packet info */
+        bool retransmission_{false};
+        bool reliable_{false};
+        bool tracked_{false};
+        size_t attempt_{0};
+        size_t length_{meow::Message::HEADER_LENGTH + sizeof(uint32_t)};
+        packet_clock::time_point sentAt_{};
+
+        char header_[meow::Message::HEADER_LENGTH];
+        std::deque<std::unique_ptr<RayState>> rays_{};
+
         struct iovec iov_[20] = {
             {.iov_base = nullptr, .iov_len = 25},
             {.iov_base = nullptr, .iov_len = sizeof(uint32_t)}};
