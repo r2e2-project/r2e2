@@ -110,13 +110,12 @@ class LambdaWorker {
 
         ServicePacket(const Address& addr, const WorkerId destId,
                       std::string&& data, const bool ackPacket = false,
-                      const uint64_t ackId = 0, const bool tracked = false)
-            : destination(addr),
-              destinationId(destId),
-              data(move(data)),
-              ackPacket(ackPacket),
-              ackId(ackId),
-              tracked(tracked) {}
+                      const uint64_t ackId = 0, const bool tracked = false);
+
+        ServicePacket(const ServicePacket&) = delete;
+        ServicePacket(ServicePacket&&) = default;
+        ServicePacket& operator=(const ServicePacket&) = delete;
+        ServicePacket& operator=(ServicePacket&&) = default;
     };
 
     struct RayPacket {
@@ -140,42 +139,18 @@ class LambdaWorker {
         RayPacket(const Address& addr, const WorkerId destId,
                   const TreeletId targetTreelet, const uint32_t queueLength,
                   const bool reliable = false,
-                  const uint64_t sequenceNumber = 0, const bool tracked = false)
-            : destination(addr),
-              destinationId(destId),
-              targetTreelet(targetTreelet),
-              queueLength(queueLength),
-              reliable(reliable),
-              sequenceNumber(sequenceNumber),
-              tracked(tracked) {}
+                  const uint64_t sequenceNumber = 0,
+                  const bool tracked = false);
 
-        void addRay(RayStatePtr&& ray) {
-            assert(iovCount < sizeof(iov) / (sizeof struct iovec));
+        RayPacket(const RayPacket&) = delete;
+        RayPacket(RayPacket&&) = default;
+        RayPacket& operator=(const RayPacket&) = delete;
+        RayPacket& operator=(RayPacket&&) = default;
 
-            iov_[iovCount_++] = {.iov_base = ray->serialized.get(),
-                                 .iov_len = ray->serializedSize};
-
-            length += ray->serializedSize;
-
-            rays.push_back(std::move(ray));
-        }
-
-        void incrementAttempts() {
-            attempt++;
-            const uint16_t val = htobe16(attempt);
-            memcpy(header, reinterpret_cast<const char*>(&val), sizeof(val));
-        }
-
-        size_t raysLength() const {
-            return length - (meow::Message::HEADER_LENGTH + sizeof(uint32_t));
-        }
-
-        struct iovec* iov() {
-            iov_[0].iov_base = header;
-            iov_[1].iov_base = &queueLength;
-            return iov_;
-        }
-
+        void addRay(RayStatePtr&& ray);
+        void incrementAttempts();
+        size_t raysLength() const;
+        struct iovec* iov();
         size_t iovCount() const { return iovCount_; }
 
       private:
@@ -219,6 +194,10 @@ class LambdaWorker {
         Diagnostics,
         NetStats,
     };
+
+    ////////////////////////////////////////////////////////////////////////////
+    // MEMBER FUNCTIONS                                                       //
+    ////////////////////////////////////////////////////////////////////////////
 
     bool processMessage(const meow::Message& message);
     void initializeScene();

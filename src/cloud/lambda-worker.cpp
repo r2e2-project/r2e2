@@ -52,6 +52,59 @@ constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 #define TLOG(tag) LOG(INFO) << "[" #tag "] "
 
+LambdaWorker::ServicePacket::ServicePacket(const Address& addr,
+                                           const WorkerId destId, string&& data,
+                                           const bool ackPacket,
+                                           const uint64_t ackId,
+                                           const bool tracked)
+    : destination(addr),
+      destinationId(destId),
+      data(move(data)),
+      ackPacket(ackPacket),
+      ackId(ackId),
+      tracked(tracked) {}
+
+LambdaWorker::RayPacket::RayPacket(const Address& addr, const WorkerId destId,
+                                   const TreeletId targetTreelet,
+                                   const uint32_t queueLength,
+                                   const bool reliable,
+                                   const uint64_t sequenceNumber,
+                                   const bool tracked)
+    : destination(addr),
+      destinationId(destId),
+      targetTreelet(targetTreelet),
+      queueLength(queueLength),
+      reliable(reliable),
+      sequenceNumber(sequenceNumber),
+      tracked(tracked) {}
+
+void LambdaWorker::RayPacket::addRay(RayStatePtr&& ray) {
+    assert(iovCount < sizeof(iov) / (sizeof struct iovec));
+
+    iov_[iovCount_++] = {.iov_base = ray->serialized,
+                         .iov_len = ray->serializedSize};
+
+    length += ray->serializedSize;
+
+    rays.push_back(move(ray));
+}
+
+void LambdaWorker::RayPacket::incrementAttempts() {
+    attempt++;
+    const uint16_t val = htobe16(attempt);
+    memcpy(header, reinterpret_cast<const char*>(&val), sizeof(val));
+}
+
+size_t LambdaWorker::RayPacket::raysLength() const {
+    return length - (meow::Message::HEADER_LENGTH + sizeof(uint32_t));
+}
+
+struct iovec* LambdaWorker::RayPacket::iov() {
+    iov_[0].iov_base = header;
+    iov_[1].iov_base = &queueLength;
+    return iov_;
+}
+
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const uint16_t coordinatorPort,
                            const string& storageUri,
