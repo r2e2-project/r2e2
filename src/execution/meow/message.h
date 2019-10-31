@@ -102,6 +102,9 @@ class Message {
                            const uint64_t sequence_number = 0,
                            const bool tracked = false);
 
+    static void update_sequence_number(char* message_str,
+                                       const uint64_t sequence_number);
+
     static uint32_t expected_length(const Chunk& chunk);
 
     bool is_read() const { return read_; }

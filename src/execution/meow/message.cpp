@@ -61,6 +61,11 @@ void Message::str(char* message_str, const uint64_t sender_id,
     message_str[24] = to_underlying(opcode);
 }
 
+void Message::update_sequence_number(char* message_str,
+                                     const uint64_t sequence_number) {
+    put_field(message_str, sequence_number, 12);
+}
+
 std::string Message::str(const uint64_t sender_id, const OpCode opcode,
                          const string& payload, const bool reliable,
                          const uint64_t sequence_number, const bool tracked) {
