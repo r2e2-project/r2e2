@@ -60,7 +60,7 @@ struct RayState {
        will be stored below */
 
     size_t serializedSize{0};
-    char serialized[1400];
+    std::unique_ptr<char[]> serialized{nullptr};
 
     int64_t SampleNum(const uint32_t spp);
     Point2i SamplePixel(const Vector2i &extent, const uint32_t spp);

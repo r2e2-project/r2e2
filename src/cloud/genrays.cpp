@@ -88,7 +88,7 @@ int main(int argc, char const *argv[]) {
                 state.StartTrace();
 
                 const auto len = statePtr->Serialize();
-                rayWriter.write(statePtr->serialized + 4, len - 4);
+                rayWriter.write(statePtr->serialized.get() + 4, len - 4);
                 sampleWriter.write(to_protobuf(sampleData));
             }
         }

@@ -142,7 +142,7 @@ int main(int argc, char const *argv[]) {
             protobuf::RecordWriter writer{outputPath};
             for (auto &rayState : outputRays) {
                 const auto len = rayState->Serialize();
-                writer.write(rayState->serialized + 4, len - 4);
+                writer.write(rayState->serialized.get() + 4, len - 4);
             }
         }
 
@@ -151,7 +151,7 @@ int main(int argc, char const *argv[]) {
             protobuf::RecordWriter writer{finishedPath};
             for (auto &finished : finishedRays) {
                 const auto len = finished->Serialize();
-                writer.write(finished->serialized + 4, len - 4);
+                writer.write(finished->serialized.get() + 4, len - 4);
             }
         }
 
