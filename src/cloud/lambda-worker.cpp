@@ -580,6 +580,7 @@ ResultType LambdaWorker::handleOutQueue() {
         const TreeletId treeletId = it->first;
         auto& rayList = it->second;
         auto& packetList = sendQueue[treeletId];
+        bool checkPreviousPacket = !packetList.empty();
 
         while (!rayList.empty()) {
             RayPacket packet{};
@@ -593,11 +594,21 @@ ResultType LambdaWorker::handleOutQueue() {
 
                 ray->Serialize();
                 const auto size = ray->SerializedSize();
+
+                checkPreviousPacket =
+                    checkPreviousPacket &&
+                    (packetList.back().length() + size <= UDP_MTU_BYTES);
+
+                /* if we have room in an older packet, put it there */
+                if (checkPreviousPacket) {
+                    packetList.back().addRay(move(ray));
+                } else {
+                    /* put it in this new packet */
+                    if (size + packet.length() > UDP_MTU_BYTES) break;
+                    packet.addRay(move(ray));
+                }
+
                 workerStats.recordGeneratedBytes(treeletId, size);
-
-                if (size + packet.length() > UDP_MTU_BYTES) break;
-
-                packet.addRay(move(ray));
                 rayList.pop_front();
                 outQueueSize--;
             }
