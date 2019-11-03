@@ -203,6 +203,7 @@ class LambdaWorker {
 
     enum class Event {
         RayQueue,
+        OutQueue,
         FinishedQueue,
         FinishedPaths,
         Peers,
@@ -229,6 +230,7 @@ class LambdaWorker {
     void loadFakeScene();
 
     Poller::Action::Result::Type handleRayQueue();
+    Poller::Action::Result::Type handleOutQueue();
     Poller::Action::Result::Type handleFinishedQueue();
     Poller::Action::Result::Type handleFinishedPaths();
     Poller::Action::Result::Type handlePeers();
@@ -322,7 +324,8 @@ class LambdaWorker {
     std::deque<ServicePacket> servicePackets{};
 
     /* outgoing rays */
-    std::deque<RayPacket> rayPackets{};
+    std::map<TreeletId, std::deque<RayPacket>> sendQueue{};
+    std::deque<RayPacket> retransmissionQueue{};
     std::deque<std::pair<packet_clock::time_point, RayPacket>>
         outstandingRayPackets{};
     std::map<Address, SeqNoSet> receivedAcks{};
