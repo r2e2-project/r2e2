@@ -555,15 +555,9 @@ ResultType LambdaWorker::handleRayQueue() {
         if (treeletIds.count(nextTreelet)) {
             pushRayQueue(move(ray));
         } else {
-            ray->Serialize();
-
-            workerStats.recordGeneratedBytes(nextTreelet,
-                                             ray->SerializedSize());
-
             if (treeletToWorker.count(nextTreelet)) {
                 logRayAction(*ray, RayAction::Queued);
                 workerStats.recordSendingRay(*ray);
-                outQueueLengthBytes[nextTreelet] += ray->SerializedSize();
                 outQueue[nextTreelet].push_back(move(ray));
                 outQueueSize++;
             } else {
@@ -596,16 +590,14 @@ ResultType LambdaWorker::handleOutQueue() {
 
             while (!rayList.empty()) {
                 auto& ray = rayList.front();
-                const auto size = ray->SerializedSize();
 
-                if (size == 0) {
-                    throw runtime_error("ray is not serialized");
-                }
+                ray->Serialize();
+                const auto size = ray->SerializedSize();
+                workerStats.recordGeneratedBytes(treeletId, size);
 
                 if (size + packet.length() > UDP_MTU_BYTES) break;
 
                 packet.addRay(move(ray));
-
                 rayList.pop_front();
                 outQueueSize--;
             }
@@ -1217,15 +1209,9 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             if (treeletIds.count(nextTreelet)) {
                 pushRayQueue(move(statePtr));
             } else {
-                statePtr->Serialize();
-
-                workerStats.recordGeneratedBytes(nextTreelet,
-                                                 state.SerializedSize());
-
                 if (treeletToWorker.count(nextTreelet)) {
                     logRayAction(state, RayAction::Queued);
                     workerStats.recordSendingRay(state);
-                    outQueueLengthBytes[nextTreelet] += state.SerializedSize();
                     outQueue[nextTreelet].push_back(move(statePtr));
                     outQueueSize++;
                 } else {
@@ -1403,7 +1389,6 @@ bool LambdaWorker::processMessage(const Message& message) {
                 if (pendingQueue.count(treeletId)) {
                     auto& treeletPending = pendingQueue[treeletId];
                     auto& treeletOut = outQueue[treeletId];
-                    auto& treeletOutLen = outQueueLengthBytes[treeletId];
 
                     outQueueSize += treeletPending.size();
                     pendingQueueSize -= treeletPending.size();
@@ -1411,7 +1396,6 @@ bool LambdaWorker::processMessage(const Message& message) {
                     while (!treeletPending.empty()) {
                         auto& front = treeletPending.front();
                         workerStats.recordSendingRay(*front);
-                        treeletOutLen += front->SerializedSize();
                         treeletOut.push_back(move(front));
                         treeletPending.pop_front();
                     }
