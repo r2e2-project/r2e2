@@ -193,8 +193,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         udpConnection, Direction::Out, bind(&LambdaWorker::handleUdpSend, this),
         [this]() {
             return udpConnection.within_pace() &&
-                   (!servicePackets.empty() || !rayPackets.empty() ||
-                    outQueueSize > 0);
+                   (!servicePackets.empty() || !retransmissionQueue.empty() ||
+                    !sendQueue.empty());
         },
         []() { throw runtime_error("udp out failed"); }));
 
@@ -203,6 +203,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         dummyFD, Direction::Out, bind(&LambdaWorker::handleRayQueue, this),
         [this]() { return !rayQueue.empty(); },
         []() { throw runtime_error("ray queue failed"); }));
+
+    /* create ray packets */
+    eventAction[Event::OutQueue] = loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, bind(&LambdaWorker::handleOutQueue, this),
+        [this]() { return outQueueSize > 0; },
+        []() { throw runtime_error("out queue failed"); }));
 
     /* send finished rays */
     /* FIXME we're throwing out finished rays, for now */
@@ -280,11 +286,11 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
                                  const uint32_t rate) {
     /* (1) disable all unnecessary actions */
     set<uint64_t> toDeactivate{
-        eventAction[Event::RayQueue],   eventAction[Event::FinishedQueue],
-        eventAction[Event::Peers],      eventAction[Event::NeededTreelets],
-        eventAction[Event::UdpSend],    eventAction[Event::UdpReceive],
-        eventAction[Event::RayAcks],    eventAction[Event::Diagnostics],
-        eventAction[Event::WorkerStats]};
+        eventAction[Event::RayQueue],       eventAction[Event::OutQueue],
+        eventAction[Event::FinishedQueue],  eventAction[Event::Peers],
+        eventAction[Event::NeededTreelets], eventAction[Event::UdpSend],
+        eventAction[Event::UdpReceive],     eventAction[Event::RayAcks],
+        eventAction[Event::Diagnostics],    eventAction[Event::WorkerStats]};
 
     loop.poller().deactivate_actions(toDeactivate);
 
@@ -447,7 +453,8 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                             : *workerId) << ','
         << state.CurrentTreelet() << ','
         << outQueueSize << ','
-        << (servicePackets.size() + rayPackets.size()) << ','
+        << (servicePackets.size() + retransmissionQueue.size() +
+            sendQueue.size()) << ','
         << outstandingRayPackets.size() << ','
         << duration_cast<microseconds>(
                rays_clock::now().time_since_epoch()).count() << ','
@@ -481,7 +488,7 @@ ResultType LambdaWorker::handleRayQueue() {
 
     deque<RayStatePtr> processedRays;
 
-    constexpr size_t MAX_RAYS = 3'000;
+    constexpr size_t MAX_RAYS = 5'000;
 
     for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
         RayStatePtr rayPtr = popRayQueue();
@@ -565,6 +572,49 @@ ResultType LambdaWorker::handleRayQueue() {
                 neededTreelets.insert(nextTreelet);
                 pendingQueue[nextTreelet].push_back(move(ray));
                 pendingQueueSize++;
+            }
+        }
+    }
+
+    return ResultType::Continue;
+}
+
+ResultType LambdaWorker::handleOutQueue() {
+    auto it = outQueue.begin();
+
+    while (it != outQueue.end()) {
+        const TreeletId treeletId = it->first;
+        auto& rayList = it->second;
+        auto& packetList = sendQueue[treeletId];
+
+        while (!rayList.empty()) {
+            RayPacket packet{};
+            packet.setTargetTreelet(treeletId);
+            packet.setReliable(config.sendReliably);
+            packet.setTracked(packetLogBD(randEngine));
+            packet.setQueueLength(10'000'000);
+
+            while (!rayList.empty()) {
+                auto& ray = rayList.front();
+                const auto size = ray->SerializedSize();
+
+                if (size == 0) {
+                    throw runtime_error("ray is not serialized");
+                }
+
+                if (size + packet.length() > UDP_MTU_BYTES) break;
+
+                packet.addRay(move(ray));
+
+                rayList.pop_front();
+                outQueueSize--;
+            }
+
+            packetList.emplace_back(move(packet));
+
+            if (rayList.empty()) {
+                it = outQueue.erase(it);
+                break;
             }
         }
     }
@@ -842,7 +892,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
                 reconnectRequests.insert(packet.destination()->first);
             }
 
-            rayPackets.push_back(move(packet));
+            retransmissionQueue.push_back(move(packet));
         } else {
             workerStats.recordAcknowledgedBytes(packet.targetTreelet(),
                                                 packet.raysLength());
@@ -901,31 +951,31 @@ ResultType LambdaWorker::handleUdpSend() {
         }
     };
 
-    for (auto it = rayPackets.begin(); it != rayPackets.end(); it++) {
+    for (auto it = retransmissionQueue.begin(); it != retransmissionQueue.end();
+         it++) {
         RayPacket& packet = *it;
         auto& peer = peers.at(packet.destination()->first);
         if (peer.pacer.within_pace()) {
             sendRayPacket(peer, move(packet));
-            rayPackets.erase(it);
+            retransmissionQueue.erase(it);
             return ResultType::Continue;
         }
     }
 
-    vector<TreeletId> myTreelets;
-    myTreelets.reserve(outQueue.size());
+    vector<TreeletId> shuffledTreelets;
+    shuffledTreelets.reserve(sendQueue.size());
 
-    for (const auto& kv : outQueue) {
-        myTreelets.push_back(kv.first);
+    for (const auto& kv : sendQueue) {
+        shuffledTreelets.push_back(kv.first);
     }
 
-    random_shuffle(myTreelets.begin(), myTreelets.end());
+    random_shuffle(shuffledTreelets.begin(), shuffledTreelets.end());
 
     auto now = packet_clock::now();
 
-    for (const auto& treeletId : myTreelets) {
+    for (const auto& treeletId : shuffledTreelets) {
         /* (1) pick a treelet randomly */
-        auto& queue = outQueue[treeletId];
-        auto& queueLengthBytes = outQueueLengthBytes[treeletId];
+        auto& queue = sendQueue[treeletId];
 
         /* (2) pick a worker to send to */
         WorkerId peerId;
@@ -951,47 +1001,20 @@ ResultType LambdaWorker::handleUdpSend() {
         }
 
         auto& peerSeqNo = sequenceNumbers[peer.address];
+        auto& packet = queue.front();
 
-        /* (3) collect the rays to fill a packet */
-        const bool tracked = packetLogBD(randEngine);
-
-        RayPacket packet{};
         packet.setDestination(peer.id, peer.address);
-        packet.setTargetTreelet(treeletId);
-        packet.setReliable(config.sendReliably);
         packet.setSequenceNumber(peerSeqNo);
-        packet.setTracked(tracked);
-        packet.setQueueLength(queueLengthBytes);
-
-        while (!queue.empty()) {
-            auto& ray = queue.front();
-            const auto size = ray->SerializedSize();
-
-            if (size == 0) {
-                throw runtime_error("ray is not serialized");
-            }
-
-            if (size + packet.length() > UDP_MTU_BYTES) break;
-
-            packet.addRay(move(ray));
-
-            queue.pop_front();
-            queueLengthBytes -= size;
-            outQueueSize--;
-        }
-
-        if (queue.empty()) {
-            outQueue.erase(treeletId);
-        }
-
-        if (tracked) {
-            logPacket(peerSeqNo, 0, PacketAction::Queued, peer.id,
-                      packet.length(), packet.rayCount());
-        }
-
-        peerSeqNo++;
 
         sendRayPacket(peer, move(packet));
+
+        peerSeqNo++;
+        queue.pop_front();
+
+        if (queue.empty()) {
+            sendQueue.erase(treeletId);
+        }
+
         break;
     }
 
@@ -1093,7 +1116,7 @@ ResultType LambdaWorker::handleWorkerStats() {
         });
     qStats.connected = peers.size() - qStats.connecting;
     qStats.outstandingUdp = outstandingRayPackets.size();
-    qStats.queuedUdp = rayPackets.size() + servicePackets.size();
+    qStats.queuedUdp = retransmissionQueue.size() + servicePackets.size();
 
     auto proto = to_protobuf(workerStats);
 
@@ -1117,7 +1140,7 @@ ResultType LambdaWorker::handleDiagnostics() {
     workerDiagnostics.bytesReceived =
         udpConnection.bytes_received - lastDiagnostics.bytesReceived;
 
-    workerDiagnostics.outstandingUdp = rayPackets.size();
+    workerDiagnostics.outstandingUdp = retransmissionQueue.size();
     lastDiagnostics.bytesSent = udpConnection.bytes_sent;
     lastDiagnostics.bytesReceived = udpConnection.bytes_received;
 
