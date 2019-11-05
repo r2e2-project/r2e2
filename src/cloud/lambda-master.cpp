@@ -117,16 +117,12 @@ void LambdaMaster::loadStaticAssignment(const uint32_t assignmentId,
     /* XXX count empty workers */
 }
 
-int getTileSize(const Bounds2i &bounds, const size_t N) {
-    int tileSize = ceil(sqrt(bounds.Area() / N));
-    const Vector2i extent = bounds.Diagonal();
+int defaultTileSize(int spp) {
+    int bytesPerSec = 30e+6;
+    int avgRayBytes = 500;
+    int raysPerSec = bytesPerSec / avgRayBytes;
 
-    while (ceil(1.0 * extent.x / tileSize) * ceil(1.0 * extent.y / tileSize) >
-           N) {
-        tileSize++;
-    }
-
-    return tileSize;
+    return ceil(sqrt(raysPerSec / spp));
 }
 
 LambdaMaster::~LambdaMaster() {
@@ -152,6 +148,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       statusPrintTimer(STATUS_PRINT_INTERVAL),
       writeOutputTimer(WRITE_OUTPUT_INTERVAL),
       workerStatsInterval(config.workerStatsInterval),
+      tileSize(config.tileSize),
       config(config) {
     LOG(INFO) << "job-id=" << jobId;
 
@@ -281,13 +278,18 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     udpConnection->bind({"0.0.0.0", listenPort});
 
-    const Vector2i sampleExtent = sampleBounds.Diagonal();
-    const int tileSize = getTileSize(sampleBounds, numberOfLambdas);
-    const Point2i nTiles((sampleExtent.x + tileSize - 1) / tileSize,
-                         (sampleExtent.y + tileSize - 1) / tileSize);
+    int spp = loadSampler(config.samplesPerPixel)->samplesPerPixel;
+    totalPaths = sampleBounds.Area() * spp;
 
-    totalPaths = sampleBounds.Area() *
-                 loadSampler(config.samplesPerPixel)->samplesPerPixel;
+    if (tileSize == 0) {
+        tileSize = defaultTileSize(spp);
+        std::cout << tileSize << std::endl;
+    }
+
+    const Vector2i sampleExtent = sampleBounds.Diagonal();
+    nTiles = Point2i((sampleExtent.x + tileSize - 1) / tileSize,
+                     (sampleExtent.y + tileSize - 1) / tileSize);
+
 
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaMaster::handleMessages, this),
@@ -327,9 +329,9 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                        [this]() { return true; },
                        []() { throw runtime_error("status print failed"); }));
 
-    loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfLambdas, nTiles,
-                                                 tileSize](ExecutionLoop &loop,
-                                                           TCPSocket &&socket) {
+    loop.make_listener({"0.0.0.0", listenPort},
+        [this, numberOfLambdas](ExecutionLoop &loop, TCPSocket &&socket) {
+
         if (currentWorkerId > numberOfLambdas) {
             socket.close();
             return false;
@@ -401,18 +403,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
             }
         };
 
-        /* assign a tile to the worker */
-        const WorkerId id = workerIt->first;  // indexed starting at 1
-        if (id <= nTiles.x * nTiles.y) {
-            const int tileX = (id - 1) % nTiles.x;
-            const int tileY = (id - 1) / nTiles.x;
-            const int x0 = this->sampleBounds.pMin.x + tileX * tileSize;
-            const int x1 = min(x0 + tileSize, this->sampleBounds.pMax.x);
-            const int y0 = this->sampleBounds.pMin.y + tileY * tileSize;
-            const int y1 = min(y0 + tileSize, this->sampleBounds.pMax.y);
-            workerIt->second.tile.reset(Point2i{x0, y0}, Point2i{x1, y1});
-        }
-
         /* assign treelet to worker based on most in-demand treelets */
         const auto assignment = this->config.assignment;
 
@@ -441,15 +431,13 @@ ResultType LambdaMaster::handleJobStart() {
     switch (config.task) {
     case Task::RayTracing:
         for (auto &workerkv : workers) {
-            auto &worker = workerkv.second;
-            if (worker.tile.initialized()) {
-                protobuf::GenerateRays proto;
-                *proto.mutable_crop_window() = to_protobuf(*worker.tile);
-                const string genRaysStr = Message::str(
-                    0, OpCode::GenerateRays, protoutil::to_string(proto));
-                worker.connection->enqueue_write(genRaysStr);
+            if (cameraRaysRemaining()) {
+                auto &worker = workerkv.second;
+                sendWorkerTile(worker);
             }
         }
+
+        canSendTiles = true;
 
         break;
 
@@ -768,6 +756,12 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
                 proto.timestamp_us();
         }
 
+        if (canSendTiles && cameraRaysRemaining() &&
+            stats.queueStats.pending + stats.queueStats.out +
+            stats.queueStats.ray < config.newTileThreshold) {
+            sendWorkerTile(worker);
+        }
+
         break;
     }
 
@@ -977,6 +971,30 @@ void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
 
 void LambdaMaster::updateObjectUsage(const Worker &worker) {}
 
+bool LambdaMaster::cameraRaysRemaining() const {
+    return curTile < nTiles.x * nTiles.y;
+}
+
+Bounds2i LambdaMaster::nextCameraTile() {
+    const int tileX = curTile % nTiles.x;
+    const int tileY = curTile / nTiles.x;
+    const int x0 = this->sampleBounds.pMin.x + tileX * tileSize;
+    const int x1 = min(x0 + tileSize, this->sampleBounds.pMax.x);
+    const int y0 = this->sampleBounds.pMin.y + tileY * tileSize;
+    const int y1 = min(y0 + tileSize, this->sampleBounds.pMax.y);
+
+    curTile++;
+    return Bounds2i(Point2i{x0, y0}, Point2i{x1, y1});
+}
+
+void LambdaMaster::sendWorkerTile(const Worker &worker) {
+    protobuf::GenerateRays proto;
+    *proto.mutable_crop_window() = to_protobuf(nextCameraTile());
+    const string genRaysStr = Message::str(
+        0, OpCode::GenerateRays, protoutil::to_string(proto));
+    worker.connection->enqueue_write(genRaysStr);
+}
+
 HTTPRequest LambdaMaster::generateRequest() {
     protobuf::InvocationPayload proto;
     proto.set_storage_backend(storageBackendUri);
@@ -1094,6 +1112,8 @@ int main(int argc, char *argv[]) {
     Optional<Bounds2i> cropWindow;
     Task task = Task::RayTracing;
     uint32_t timeout = 0;
+    uint32_t pixelsPerTile = 0;
+    uint64_t newTileThreshold = 10000;
     string jobSummaryPath;
 
     int assignment = Assignment::Uniform;
@@ -1120,6 +1140,8 @@ int main(int argc, char *argv[]) {
         {"crop-window", required_argument, nullptr, 'c'},
         {"timeout", required_argument, nullptr, 't'},
         {"job-summary", required_argument, nullptr, 'j'},
+        {"pix-per-tile", required_argument, nullptr, 'T'},
+        {"new-tile-send", required_argument, nullptr, 'n'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
@@ -1151,6 +1173,8 @@ int main(int argc, char *argv[]) {
         case 'P': packetsLogRate = stof(optarg); break;
         case 't': timeout = stoul(optarg); break;
         case 'j': jobSummaryPath = optarg; break;
+        case 'T': pixelsPerTile = stoul(optarg); break;
+        case 'n': newTileThreshold = stoull(optarg); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
             // clang-format on
 
@@ -1221,9 +1245,12 @@ int main(int argc, char *argv[]) {
     if (listenPort == 0 || numLambdas < 0 || samplesPerPixel < 0 ||
         rayActionsLogRate < 0 || rayActionsLogRate > 1.0 ||
         packetsLogRate < 0 || packetsLogRate > 1.0 || publicIp.empty() ||
-        storageBackendUri.empty() || region.empty()) {
+        storageBackendUri.empty() || region.empty() || newTileThreshold == 0 ||
+        (cropWindow.initialized() && pixelsPerTile > cropWindow->Area())) {
         usage(argv[0], 2);
     }
+
+    int tileSize = ceil(sqrt(pixelsPerTile));
 
     ostringstream publicAddress;
     publicAddress << publicIp << ":" << listenPort;
@@ -1244,8 +1271,10 @@ int main(int argc, char *argv[]) {
                                   packetsLogRate,
                                   logsDirectory,
                                   cropWindow,
+                                  tileSize,
                                   chrono::seconds{timeout},
-                                  jobSummaryPath};
+                                  jobSummaryPath,
+                                  newTileThreshold};
 
     try {
         master = make_unique<LambdaMaster>(listenPort, numLambdas,

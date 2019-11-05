@@ -63,8 +63,10 @@ struct MasterConfiguration {
     float packetsLogRate;
     std::string logsDirectory;
     Optional<Bounds2i> cropWindow;
+    int tileSize;
     std::chrono::seconds timeout;
     std::string jobSummaryPath;
+    uint64_t newTileThreshold;
 };
 
 class LambdaMaster {
@@ -96,7 +98,6 @@ class LambdaMaster {
 
         std::shared_ptr<TCPConnection> connection;
         Optional<Address> udpAddress{};
-        Optional<Bounds2i> tile;
         std::set<ObjectKey> objects;
         size_t freeSpace{2 * 1000 * 1000 * 1000};
 
@@ -216,6 +217,15 @@ class LambdaMaster {
                               const uint32_t numWorkers);
 
     std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
+
+    /* Camera tile allocation */
+    bool cameraRaysRemaining() const;
+    Bounds2i nextCameraTile();
+    void sendWorkerTile(const Worker &worker);
+    size_t curTile{0};
+    int tileSize;
+    Point2i nTiles{};
+    bool canSendTiles{false};
 
     const MasterConfiguration config;
 };
