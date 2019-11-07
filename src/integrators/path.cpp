@@ -44,6 +44,7 @@ namespace pbrt {
 
 STAT_PERCENT("Integrator/Zero-radiance paths", zeroRadiancePaths, totalPaths);
 STAT_INT_DISTRIBUTION("Integrator/Path length", pathLength);
+STAT_COUNTER("Integrator/Total rays traced", totalRays);
 
 // PathIntegrator Method Definitions
 PathIntegrator::PathIntegrator(int maxDepth,
@@ -79,6 +80,7 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
     Float etaScale = 1;
 
     for (bounces = 0;; ++bounces) {
+        ++totalRays;
         // Find next path vertex and accumulate contribution
         VLOG(2) << "Path tracer bounce " << bounces << ", current L = " << L
                 << ", beta = " << beta;
@@ -119,6 +121,7 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         if (isect.bsdf->NumComponents(BxDFType(BSDF_ALL & ~BSDF_SPECULAR)) >
             0) {
             ++totalPaths;
+            ++totalRays;
             Spectrum Ld = beta * UniformSampleOneLight(isect, scene, arena,
                                                        sampler, false, distrib);
             VLOG(2) << "Sampled direct lighting Ld = " << Ld;
@@ -162,6 +165,7 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             // Account for the direct subsurface scattering component
             L += beta * UniformSampleOneLight(pi, scene, arena, sampler, false,
                                               lightDistribution->Lookup(pi.p));
+            ++totalRays;
 
             // Account for the indirect subsurface scattering component
             Spectrum f = pi.bsdf->Sample_f(pi.wo, &wi, sampler.Get2D(), &pdf,
