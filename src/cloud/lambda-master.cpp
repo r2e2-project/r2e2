@@ -819,6 +819,7 @@ void LambdaMaster::dumpJobSummary() const {
     proto.set_num_lambdas(numberOfLambdas);
     proto.set_total_paths(totalPaths);
     proto.set_finished_paths(workerStats.finishedPaths());
+    proto.set_finished_rays(workerStats.finishedRays());
 
     ofstream fout{config.jobSummaryPath};
     fout << protoutil::to_json(proto) << endl;

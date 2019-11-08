@@ -455,4 +455,5 @@ message JobSummary {
     uint32 num_lambdas = 4;
     uint64 total_paths = 5;
     uint64 finished_paths = 6;
+    uint64 finished_rays = 7;
 }

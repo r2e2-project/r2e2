@@ -138,6 +138,8 @@ for cmd, dir, scene, nlambdas, spp in cmds:
         launch(cmd)
         i += 1
 
+perfs = {}
+
 cwd = os.getcwd()
 for cmd, dir, scene, nlambdas, spp in cmds:
     if not os.path.isdir(dir):
@@ -166,3 +168,11 @@ for cmd, dir, scene, nlambdas, spp in cmds:
             shell=True, check=True)
 
     os.chdir(cwd)
+    
+    with open(os.path.join(dir, 'master.json')) as f:
+        info = json.load(f)
+
+    perfs[scene] = int(info['finishedRays']) / info['numLambdas'] / info['rayTime']
+
+with open(os.path.join(out_dir, 'perf.json'), 'w') as f:
+    json.dump(perfs, f)
