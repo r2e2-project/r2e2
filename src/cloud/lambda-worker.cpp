@@ -133,12 +133,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                       workerDiagnostics.startTime.time_since_epoch())
                       .count();
 
-    /* TLOG(LEASE)
-        << "start "
-        << duration_cast<microseconds>(workStart.time_since_epoch()).count();
-
-    TLOG(LEASE) << "myId,workerId,timestamp,allocation,queueSize,expiresAt"; */
-
     if (trackRays) {
         TLOG(RAY) << "pathID,hop,shadowRay,workerID,otherPartyID,treeletID,"
                      "outQueue,udpQueue,outstanding,timestamp,size,action";
@@ -254,21 +248,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                        bind(&LambdaWorker::handleReconnects, this),
                        [this]() { return !reconnectRequests.empty(); },
                        []() { throw runtime_error("reconnect failed"); }));
-
-    /* request new peers for neighboring treelets */
-    /* loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out,
-        bind(&LambdaWorker::handleNeededTreelets, this),
-        [this]() { return !neededTreelets.empty(); },
-        []() { throw runtime_error("treelet request failed"); })); */
-
-    /* send back finished paths */
-    /* loop.poller().add_action(
-        Poller::Action(finishedPathsTimer.fd, Direction::In,
-                       bind(&LambdaWorker::handleFinishedPaths, this),
-                       [this]() { return !finishedPathIds.empty(); },
-                       []() { throw runtime_error("finished paths failed");
-       }));*/
 
     coordinatorConnection->enqueue_write(
         Message::str(0, OpCode::Hey, safe_getenv_or(LOG_STREAM_ENVAR, "")));
@@ -719,15 +698,6 @@ ResultType LambdaWorker::handlePeers() {
         }
 
         case Worker::State::Connected:
-            /* send keep alive */
-            /* if (peerId > 0 && peer.nextKeepAlive < now) {
-                peer.nextKeepAlive += KEEP_ALIVE_INTERVAL;
-                servicePackets.emplace_back(
-                    peer.address, peer.id,
-                    Message::str(*workerId, OpCode::Ping,
-                                 put_field(*workerId)));
-            }*/
-
             break;
         }
 
@@ -837,20 +807,6 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
             lease.allocation = trafficShare + excessShare;
         }
     }
-
-    /* START LOGGING */
-    /* TLOG(LEASE) << "myId,workerId,timestamp,allocation,queueSize,expiresAt"
-     */
-    /* for (auto& leasekv : activeLeases) {
-        auto& lease = leasekv.second;
-
-        TLOG(LEASE)
-            << *workerId << ',' << lease.workerId << ','
-            << duration_cast<microseconds>(now - workStart).count() << ','
-            << lease.allocation << ',' << lease.queueSize << ','
-            << duration_cast<microseconds>(lease.expiresAt - workStart).count();
-    } */
-    /* END LOGGING */
 
     /* count the number of active senders to this worker */
     for (const auto& addr : toBeAcked) {
@@ -1152,28 +1108,6 @@ ResultType LambdaWorker::handleDiagnostics() {
             .count();
 
     auto proto = to_protobuf(workerDiagnostics);
-
-    /* for (auto& peerkv : peers) {
-        auto& peer = peerkv.second;
-
-        if (peer.diagnostics.bytesSent || peer.diagnostics.bytesReceived) {
-            auto tdata = proto.add_traffic_data();
-            tdata->set_worker_id(peer.id);
-            tdata->set_bytes_sent(peer.diagnostics.bytesSent);
-            tdata->set_bytes_received(peer.diagnostics.bytesReceived);
-
-            peer.diagnostics = {};
-        }
-    }
-
-    for (auto& outkv : outQueue) {
-        auto treeletId = outkv.first;
-        auto& queue = outkv.second;
-
-        auto tdata = proto.add_treelet_data();
-        tdata->set_treelet_id(treeletId);
-        tdata->set_queued_rays(queue.size());
-    } */
 
     TLOG(DIAG) << timestamp << " " << protoutil::to_json(proto);
 
