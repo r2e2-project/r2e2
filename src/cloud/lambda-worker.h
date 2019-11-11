@@ -202,7 +202,7 @@ class LambdaWorker {
     };
 
     enum class Event {
-        RayQueue,
+        TraceQueue,
         OutQueue,
         FinishedQueue,
         FinishedPaths,
@@ -229,7 +229,7 @@ class LambdaWorker {
     void loadLights();
     void loadFakeScene();
 
-    Poller::Action::Result::Type handleRayQueue();
+    Poller::Action::Result::Type handleTraceQueue();
     Poller::Action::Result::Type handleOutQueue();
     Poller::Action::Result::Type handleFinishedQueue();
     Poller::Action::Result::Type handleFinishedPaths();
@@ -252,8 +252,8 @@ class LambdaWorker {
     void generateRays(const Bounds2i& cropWindow);
     void getObjects(const protobuf::GetObjects& objects);
 
-    void pushRayQueue(RayStatePtr&& state);
-    RayStatePtr popRayQueue();
+    void pushTraceQueue(RayStatePtr&& state);
+    RayStatePtr popTraceQueue();
 
     void logRayAction(const RayState& state, const RayAction action,
                       const WorkerId otherParty = -1);
@@ -350,7 +350,7 @@ class LambdaWorker {
     MemoryArena arena;
 
     /* Rays */
-    std::deque<RayStatePtr> rayQueue{};
+    std::deque<RayStatePtr> traceQueue{};
     std::deque<RayStatePtr> finishedQueue{};
     std::map<TreeletId, std::deque<RayStatePtr>> pendingQueue{};
     std::map<TreeletId, std::deque<RayStatePtr>> outQueue{};
