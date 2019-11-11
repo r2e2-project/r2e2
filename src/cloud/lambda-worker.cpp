@@ -193,9 +193,9 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("udp out failed"); }));
 
     /* trace rays */
-    eventAction[Event::RayQueue] = loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaWorker::handleRayQueue, this),
-        [this]() { return !rayQueue.empty(); },
+    eventAction[Event::TraceQueue] = loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out, bind(&LambdaWorker::handleTraceQueue, this),
+        [this]() { return !traceQueue.empty(); },
         []() { throw runtime_error("ray queue failed"); }));
 
     /* create ray packets */
@@ -265,7 +265,7 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
                                  const uint32_t rate) {
     /* (1) disable all unnecessary actions */
     set<uint64_t> toDeactivate{
-        eventAction[Event::RayQueue],       eventAction[Event::OutQueue],
+        eventAction[Event::TraceQueue],     eventAction[Event::OutQueue],
         eventAction[Event::FinishedQueue],  eventAction[Event::Peers],
         eventAction[Event::NeededTreelets], eventAction[Event::UdpSend],
         eventAction[Event::UdpReceive],     eventAction[Event::RayAcks],
@@ -457,8 +457,8 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
     TLOG(RAY) << oss.str();
 }
 
-ResultType LambdaWorker::handleRayQueue() {
-    RECORD_INTERVAL("handleRayQueue");
+ResultType LambdaWorker::handleTraceQueue() {
+    RECORD_INTERVAL("handleTraceQueue");
 
     auto recordFinishedPath = [this](const uint64_t pathId) {
         this->workerStats.recordFinishedPath();
@@ -469,8 +469,8 @@ ResultType LambdaWorker::handleRayQueue() {
 
     constexpr size_t MAX_RAYS = 5'000;
 
-    for (size_t i = 0; i < MAX_RAYS && !rayQueue.empty(); i++) {
-        RayStatePtr rayPtr = popRayQueue();
+    for (size_t i = 0; i < MAX_RAYS && !traceQueue.empty(); i++) {
+        RayStatePtr rayPtr = popTraceQueue();
         RayState& ray = *rayPtr;
 
         const uint64_t pathId = ray.PathID();
@@ -532,7 +532,7 @@ ResultType LambdaWorker::handleRayQueue() {
         const TreeletId nextTreelet = ray->CurrentTreelet();
 
         if (treeletIds.count(nextTreelet)) {
-            pushRayQueue(move(ray));
+            pushTraceQueue(move(ray));
         } else {
             if (treeletToWorker.count(nextTreelet)) {
                 logRayAction(*ray, RayAction::Queued);
@@ -1065,7 +1065,7 @@ ResultType LambdaWorker::handleWorkerStats() {
     workerStatsTimer.reset();
 
     auto& qStats = workerStats.queueStats;
-    qStats.ray = rayQueue.size();
+    qStats.ray = traceQueue.size();
     qStats.finished = finishedQueue.size();
     qStats.pending = pendingQueueSize;
     qStats.out = outQueueSize;
@@ -1152,7 +1152,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             const auto nextTreelet = state.CurrentTreelet();
 
             if (treeletIds.count(nextTreelet)) {
-                pushRayQueue(move(statePtr));
+                pushTraceQueue(move(statePtr));
             } else {
                 if (treeletToWorker.count(nextTreelet)) {
                     logRayAction(state, RayAction::Queued);
@@ -1189,14 +1189,14 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
     storageBackend->get(requests);
 }
 
-void LambdaWorker::pushRayQueue(RayStatePtr&& state) {
+void LambdaWorker::pushTraceQueue(RayStatePtr&& state) {
     workerStats.recordWaitingRay(*state);
-    rayQueue.push_back(move(state));
+    traceQueue.push_back(move(state));
 }
 
-RayStatePtr LambdaWorker::popRayQueue() {
-    RayStatePtr state = move(rayQueue.front());
-    rayQueue.pop_front();
+RayStatePtr LambdaWorker::popTraceQueue() {
+    RayStatePtr state = move(traceQueue.front());
+    traceQueue.pop_front();
 
     workerStats.recordProcessedRay(*state);
 
@@ -1375,7 +1375,7 @@ bool LambdaWorker::processMessage(const Message& message) {
             }
 
             logRayAction(*ray, RayAction::Received, message.sender_id());
-            pushRayQueue(move(ray));
+            pushTraceQueue(move(ray));
         }
 
         break;
