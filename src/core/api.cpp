@@ -117,6 +117,7 @@
 #include "media/homogeneous.h"
 #include "cloud/integrator.h"
 #include "cloud/bvh.h"
+#include "cloud/treelettestbvh.h"
 #include "cloud/manager.h"
 
 #include <map>
@@ -899,6 +900,8 @@ std::shared_ptr<Primitive> MakeAccelerator(
         accel = CreateKdTreeAccelerator(std::move(prims), paramSet);
     else if (name == "cloudbvh")
         accel = CreateCloudBVH(paramSet);
+    else if (name == "treelettestbvh")
+        accel = CreateTreeletTestBVH(std::move(prims), paramSet);
     else
         Warning("Accelerator \"%s\" unknown.", name.c_str());
     paramSet.ReportUnused();

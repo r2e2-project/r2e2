@@ -19,12 +19,13 @@ class TreeletTestBVH : public BVHAccel {
                    SplitMethod splitMethod = SplitMethod::SAH);
 
     TreeletTestBVH(std::vector<std::shared_ptr<Primitive>> p,
+                   TreeletMap &&treelets,
                    int maxPrimsInNode = 1,
-                   SplitMethod splitMethod = SplitMethod::SAH,
-                   TreeletMap &&treelets);
+                   SplitMethod splitMethod = SplitMethod::SAH);
   private:
-    std::vector<std::vector<std::pair<int, double>>> assignWeights(int idx) const;
-    std::unordered_map<int, int> computeTreelets( 
+    std::vector<std::vector<std::pair<int, double>>> assignWeights(
+        const Vector3f &rayDir) const;
+    std::vector<uint32_t> computeTreelets( 
         const std::vector<std::vector<std::pair<int, double>>> &weights) const;
 
     TreeletMap treeletAllocations{};
