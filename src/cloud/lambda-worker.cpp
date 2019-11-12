@@ -272,6 +272,7 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
         eventAction[Event::Diagnostics],    eventAction[Event::WorkerStats]};
 
     loop.poller().deactivate_actions(toDeactivate);
+    udpConnection.reset_reference();
 
     if (rate) {
         udpConnection.set_rate(rate);
@@ -955,8 +956,8 @@ ResultType LambdaWorker::handleUdpSend() {
             continue;
         }
 
-        if (now - peer.lastReceivedAck > INACTIVITY_THRESHOLD) {
-            peer.pacer.set_rate(DEFAULT_SEND_RATE);
+        if (now - peer.lastReceivedAck > 3 * INACTIVITY_THRESHOLD / 4) {
+            peer.pacer = {true, DEFAULT_SEND_RATE};
         }
 
         auto& peerSeqNo = sequenceNumbers[peer.address];
