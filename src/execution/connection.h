@@ -49,21 +49,22 @@ class Connection {
 
 class Pacer {
   private:
-    using clock = std::chrono::high_resolution_clock;
-
-    uint64_t rate_;
-    uint32_t packet_size_{700 * 8};
-    clock::time_point last_sent_{clock::now()};
+    uint64_t rate_{80_Mbps};
+    uint64_t bits_since_reference_{0};
+    std::chrono::steady_clock::time_point rate_reference_pt_{
+        std::chrono::steady_clock::now()};
+    std::chrono::microseconds reference_reset_time_{1'000'000};
 
     bool enabled_;
 
   public:
     Pacer(const bool enabled, const uint64_t rate)
-        : rate_(rate), enabled_(enabled) {}
+        : enabled_(enabled), rate_(rate) {}
 
     int64_t micros_ahead_of_pace() const;
     bool within_pace() { return micros_ahead_of_pace() <= 0; }
     void set_rate(const uint64_t rate);
+    void reset_reference();
     void record_send(const size_t data_len);
 };
 
