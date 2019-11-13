@@ -2,6 +2,7 @@
 #define PBRT_ACCELERATORS_TREELET_TEST_BVH_H
 
 #include "accelerators/bvh.h"
+#include "cloud/bvh.h"
 #include "pbrt.h"
 #include "primitive.h"
 #include <memory>
@@ -54,7 +55,13 @@ class TreeletTestBVH : public BVHAccel {
     std::vector<uint32_t> computeTreelets(const TraversalGraph &graph,
                                           int maxTreeletBytes);
 
+    unsigned getNodeSize(int nodeIdx) const;
+
     TreeletMap treeletAllocations{};
+    const unsigned nodeSize = sizeof(CloudBVH::TreeletNode);
+    // Assume on average 2 unique vertices, normals etc per triangle
+    const unsigned leafSize = 3 * sizeof(int) + 2 * (sizeof(Point3f) +
+            sizeof(Normal3f) + sizeof(Vector3f) + sizeof(Point2f));
 };
 
 std::shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(

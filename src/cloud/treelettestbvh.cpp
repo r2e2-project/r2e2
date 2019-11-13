@@ -151,29 +151,85 @@ TreeletTestBVH::createTraversalGraph(const Vector3f &rayDir) const {
     }
 
     sort(allEdges.begin(), allEdges.end(), [](const Edge *a, const Edge *b) {
-        return a->modelWeight < b->modelWeight;
+        return a->modelWeight > b->modelWeight;
     });
 
     return { move(weights), move(allEdges), move(topologicalSort) };
 }
 
+unsigned TreeletTestBVH::getNodeSize(int nodeIdx) const {
+    const LinearBVHNode * node = &nodes[nodeIdx];
+    const unsigned nodeSize = sizeof(CloudBVH::TreeletNode);
+    // Assume on average 2 unique vertices, normals etc per triangle
+    const unsigned primSize = 3 * sizeof(int) + 2 * (sizeof(Point3f) +
+            sizeof(Normal3f) + sizeof(Vector3f) + sizeof(Point2f));
+
+    return nodeSize + node->nPrimitives * primSize;
+}
+
+
 vector<uint32_t>
 TreeletTestBVH::computeTreeletsAgglomerative(const TraversalGraph &graph,
                                              int maxTreeletBytes) {
     vector<uint32_t> assignment(nodeCount);
-    return assignment;
+    vector<unsigned> treeletSizes(nodeCount);
+    vector<list<int>> treeletNodes(nodeCount);
+
+    // Start each node in unique treelet
+    for (unsigned i = 0; i < nodeCount; i++) {
+        assignment[i] = i;
+        treeletSizes[i] = getNodeSize(i);
+        treeletNodes[i].push_back(i);
+    }
+
+    for (auto edge : graph.sortedEdges) {
+        uint32_t srcTreelet = assignment[edge->src];
+        uint32_t dstTreelet = assignment[edge->dst];
+        if (srcTreelet == dstTreelet) continue;
+
+        unsigned srcSize = treeletSizes[srcTreelet];
+        unsigned dstSize = treeletSizes[dstTreelet];
+        unsigned joinedSize = srcSize + dstSize;
+
+        if (joinedSize > maxTreeletBytes) continue;
+        treeletSizes[srcTreelet] = joinedSize;
+
+        for (int node : treeletNodes[dstTreelet]) {
+            assignment[node] = srcTreelet;
+        }
+
+        CHECK_EQ(assignment[edge->dst], srcTreelet);
+
+        treeletNodes[srcTreelet].splice(treeletNodes[srcTreelet].end(),
+                                        move(treeletNodes[dstTreelet]));
+    }
+
+    unsigned curTreeletID = 0;
+    vector<uint32_t> contiguousAssignment(nodeCount);
+
+    uint64_t totalBytes = 0;
+    unsigned totalNodes = 0;
+
+    for (const auto &curNodes : treeletNodes) {
+        if (curNodes.empty()) continue;
+        for (int node : curNodes) {
+            contiguousAssignment[node] = curTreeletID;
+            totalBytes += getNodeSize(node);
+            totalNodes++;
+        }
+
+        curTreeletID++;
+    }
+    CHECK_EQ(totalNodes, nodeCount); // All treelets assigned?
+    printf("Average treelet size %f\n", (double)totalBytes / curTreeletID);
+
+    return contiguousAssignment;
 }
 
 vector<uint32_t>
 TreeletTestBVH::computeTreeletsTopological(const TraversalGraph &graph,
                                            int maxTreeletBytes) {
     vector<uint32_t> assignment(nodeCount);
-    return assignment;
-}
-
-vector<uint32_t> TreeletTestBVH::computeTreelets(const TraversalGraph &graph,
-                                                 int maxTreeletBytes) {
-    return computeTreeletsTopological(graph, maxTreeletBytes);
 
     //vector<int> frontier{0};
 
@@ -194,6 +250,13 @@ vector<uint32_t> TreeletTestBVH::computeTreelets(const TraversalGraph &graph,
     //    }
     //    CHECK_NE(bestNext, 0);
     //}
+
+    return assignment;
+}
+
+vector<uint32_t> TreeletTestBVH::computeTreelets(const TraversalGraph &graph,
+                                                 int maxTreeletBytes) {
+    return computeTreeletsAgglomerative(graph, maxTreeletBytes);
 }
 
 }
