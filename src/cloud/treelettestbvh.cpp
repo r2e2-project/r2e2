@@ -154,6 +154,9 @@ TreeletTestBVH::createTraversalGraph(const Vector3f &rayDir) const {
         return a->modelWeight > b->modelWeight;
     });
 
+    printf("Graph gen complete: %d verts %d edges\n",
+           topologicalSort.size(), allEdges.size());
+
     return { move(weights), move(allEdges), move(topologicalSort) };
 }
 
@@ -221,7 +224,8 @@ TreeletTestBVH::computeTreeletsAgglomerative(const TraversalGraph &graph,
         curTreeletID++;
     }
     CHECK_EQ(totalNodes, nodeCount); // All treelets assigned?
-    printf("Average treelet size %f\n", (double)totalBytes / curTreeletID);
+    printf("Num Treelets %d, Average treelet size %f\n",
+           curTreeletID, (double)totalBytes / curTreeletID);
 
     return contiguousAssignment;
 }
