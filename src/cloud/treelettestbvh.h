@@ -4,8 +4,8 @@
 #include "accelerators/bvh.h"
 #include "pbrt.h"
 #include "primitive.h"
-#include <unordered_map>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 namespace pbrt {
@@ -15,6 +15,7 @@ class TreeletTestBVH : public BVHAccel {
     using TreeletMap = std::array<std::vector<uint32_t>, 8>;
 
     TreeletTestBVH(std::vector<std::shared_ptr<Primitive>> p,
+                   int maxTreeletBytes,
                    int maxPrimsInNode = 1,
                    SplitMethod splitMethod = SplitMethod::SAH);
 
@@ -23,10 +24,35 @@ class TreeletTestBVH : public BVHAccel {
                    int maxPrimsInNode = 1,
                    SplitMethod splitMethod = SplitMethod::SAH);
   private:
-    std::vector<std::vector<std::pair<int, double>>> assignWeights(
-        const Vector3f &rayDir) const;
-    std::vector<uint32_t> computeTreelets( 
-        const std::vector<std::vector<std::pair<int, double>>> &weights) const;
+    struct Edge {
+        int src;
+        int dst;
+        float modelWeight;
+        int rayCount;
+
+        Edge(int src, int dst, float modelWeight, int rayCount)
+            : src(src), dst(dst), modelWeight(modelWeight), rayCount(rayCount)
+        {}
+    };
+
+    struct TraversalGraph {
+        std::vector<std::unordered_map<int, Edge>> adjacencyList;
+        std::vector<Edge *> sortedEdges;
+        std::vector<int> topologicalVertices;
+    };
+
+    TraversalGraph createTraversalGraph(const Vector3f &rayDir) const;
+
+    std::vector<uint32_t>
+        computeTreeletsAgglomerative(const TraversalGraph &graph,
+                                     int maxTreeletBytes);
+
+    std::vector<uint32_t>
+        computeTreeletsTopological(const TraversalGraph &graph,
+                                   int maxTreeletBytes);
+
+    std::vector<uint32_t> computeTreelets(const TraversalGraph &graph,
+                                          int maxTreeletBytes);
 
     TreeletMap treeletAllocations{};
 };
