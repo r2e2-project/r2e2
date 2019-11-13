@@ -50,9 +50,6 @@ class CloudBVH : public Aggregate {
         return treelet_info_.at(treelet_id);
     }
 
-  private:
-    enum Child { LEFT = 0, RIGHT = 1 };
-
     struct TreeletNode {
         Bounds3f bounds;
         uint8_t axis;
@@ -70,6 +67,9 @@ class CloudBVH : public Aggregate {
         TreeletNode(const Bounds3f &bounds, const uint8_t axis)
             : bounds(bounds), axis(axis) {}
     };
+
+  private:
+    enum Child { LEFT = 0, RIGHT = 1 };
 
     struct Treelet {
         std::vector<TreeletNode> nodes{};
