@@ -125,6 +125,18 @@ int defaultTileSize(int spp) {
     return ceil(sqrt(raysPerSec / spp));
 }
 
+int autoTileSize(const Bounds2i &bounds, const size_t N) {
+    int tileSize = ceil(sqrt(bounds.Area() / N));
+    const Vector2i extent = bounds.Diagonal();
+
+    while (ceil(1.0 * extent.x / tileSize) * ceil(1.0 * extent.y / tileSize) >
+           N) {
+        tileSize++;
+    }
+
+    return tileSize;
+}
+
 LambdaMaster::~LambdaMaster() {
     try {
         roost::empty_directory(sceneDir.name());
@@ -280,13 +292,16 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     int spp = loadSampler(config.samplesPerPixel)->samplesPerPixel;
     totalPaths = sampleBounds.Area() * spp;
+    const Vector2i sampleExtent = sampleBounds.Diagonal();
 
     if (tileSize == 0) {
         tileSize = defaultTileSize(spp);
-        std::cout << tileSize << std::endl;
+    } else if (tileSize == numeric_limits<typeof(tileSize)>::max()) {
+        tileSize = autoTileSize(sampleBounds, numberOfLambdas);
     }
 
-    const Vector2i sampleExtent = sampleBounds.Diagonal();
+    cout << "Tile size is " << tileSize << "\u00d7" << tileSize << '.' << endl;
+
     nTiles = Point2i((sampleExtent.x + tileSize - 1) / tileSize,
                      (sampleExtent.y + tileSize - 1) / tileSize);
 
@@ -1124,6 +1139,7 @@ int main(int argc, char *argv[]) {
 
     int assignment = Assignment::Uniform;
     int samplesPerPixel = 0;
+    int tileSize = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
 
     struct option long_options[] = {
@@ -1179,10 +1195,21 @@ int main(int argc, char *argv[]) {
         case 'P': packetsLogRate = stof(optarg); break;
         case 't': timeout = stoul(optarg); break;
         case 'j': jobSummaryPath = optarg; break;
-        case 'T': pixelsPerTile = stoul(optarg); break;
         case 'n': newTileThreshold = stoull(optarg); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
+
             // clang-format on
+
+        case 'T': {
+            if (strcmp(optarg, "auto") == 0) {
+                tileSize = numeric_limits<typeof(tileSize)>::max();
+                pixelsPerTile = numeric_limits<typeof(pixelsPerTile)>::max();
+            } else {
+                pixelsPerTile = stoul(optarg);
+                tileSize = ceil(sqrt(pixelsPerTile));
+            }
+            break;
+        }
 
         case 'a': {
             const string arg = optarg;
@@ -1255,8 +1282,6 @@ int main(int argc, char *argv[]) {
         (cropWindow.initialized() && pixelsPerTile > cropWindow->Area())) {
         usage(argv[0], 2);
     }
-
-    int tileSize = ceil(sqrt(pixelsPerTile));
 
     ostringstream publicAddress;
     publicAddress << publicIp << ":" << listenPort;
