@@ -6,6 +6,7 @@
 #include "pbrt.h"
 #include "primitive.h"
 #include <memory>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -36,9 +37,14 @@ class TreeletTestBVH : public BVHAccel {
         {}
     };
 
+    struct OutEdges {
+        Edge *missEdge = nullptr;
+        Edge *hitEdge = nullptr;
+    };
+
     struct TraversalGraph {
-        std::vector<std::unordered_map<int, Edge>> adjacencyList;
-        std::vector<Edge *> sortedEdges;
+        std::vector<OutEdges> adjacencyList;
+        std::vector<Edge> edgeList;
         std::vector<int> topologicalVertices;
     };
 
@@ -46,14 +52,14 @@ class TreeletTestBVH : public BVHAccel {
 
     std::vector<uint32_t>
         computeTreeletsAgglomerative(const TraversalGraph &graph,
-                                     int maxTreeletBytes);
+                                     int maxTreeletBytes) const;
 
     std::vector<uint32_t>
         computeTreeletsTopological(const TraversalGraph &graph,
-                                   int maxTreeletBytes);
+                                   int maxTreeletBytes) const;
 
     std::vector<uint32_t> computeTreelets(const TraversalGraph &graph,
-                                          int maxTreeletBytes);
+                                          int maxTreeletBytes) const;
 
     unsigned getNodeSize(int nodeIdx) const;
 
