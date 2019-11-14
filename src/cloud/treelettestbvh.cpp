@@ -77,9 +77,9 @@ TreeletTestBVH::createTraversalGraph(const Vector3f &rayDir) const {
 
     bool dirIsNeg[3] = { rayDir.x < 0, rayDir.y < 0, rayDir.z < 0 };
 
-    auto addEdge = [&weights, &allEdges, &probabilities]
+    auto addEdge = [this, &weights, &allEdges, &probabilities]
                        (auto src, auto dst, auto prob, bool hitEdge) {
-        allEdges.emplace_back(src, dst, prob, 0);
+        allEdges.emplace_back(src, dst, prob, 0, this->getNodeSize(dst));
 
         if (hitEdge) {
             weights[src].hitEdge = &allEdges.back();
@@ -236,6 +236,12 @@ TreeletTestBVH::computeTreeletsAgglomerative(const TraversalGraph &graph,
 vector<uint32_t>
 TreeletTestBVH::computeTreeletsTopological(const TraversalGraph &graph,
                                            int maxTreeletBytes) const {
+    struct EdgeCmp {
+        bool operator()(const Edge *a, const Edge *b) {
+            return a->modelWeight > b->modelWeight;
+        }
+    };
+
     vector<uint32_t> assignment(nodeCount);
     vector<list<int>::iterator> sortLocs(nodeCount);
     list<int> topoSort;
@@ -251,21 +257,20 @@ TreeletTestBVH::computeTreeletsTopological(const TraversalGraph &graph,
         assignment[curNode] = curTreelet;
 
         unsigned remainingBytes = maxTreeletBytes - getNodeSize(curNode);
-        list<const Edge *> edgeOptions;
-        while (remainingBytes > 0) {
+        multiset<const Edge *, EdgeCmp> edgeOptions;
+        while (remainingBytes > sizeof(CloudBVH::TreeletNode)) {
             const OutEdges &choices = graph.adjacencyList[curNode];
-            // Should only be no outgoing edges at terminal node
-            CHECK_EQ(!choices.hitEdge && !choices.missEdge, topoSort.empty());
 
-            if (choices.hitEdge) {
-                edgeOptions.push_back(choices.hitEdge);
+            if (choices.hitEdge &&
+                    choices.hitEdge->dstBytes < remainingBytes) {
+                edgeOptions.insert(choices.hitEdge);
             }
 
-            if (choices.missEdge) {
-                edgeOptions.push_back(choices.missEdge);
+            if (choices.missEdge &&
+                    choices.missEdge->dstBytes < remainingBytes) {
+                edgeOptions.insert(choices.missEdge);
             }
 
-            float maxWeight = 0;
             unsigned usedBytes = 0;
             auto bestEdgeIter = edgeOptions.end();
 
@@ -274,17 +279,16 @@ TreeletTestBVH::computeTreeletsTopological(const TraversalGraph &graph,
                 auto nextIter = next(edgeIter);
                 const Edge *edge = *edgeIter;
                 int dst = edge->dst;
-                unsigned curBytes = getNodeSize(dst);
+                unsigned curBytes = edge->dstBytes;
                 float curWeight = edge->modelWeight;
 
                 // This node already belongs to a treelet
                 if (assignment[dst] != 0 || curBytes > remainingBytes) {
-                    printf("%d %d\n", assignment[dst], remainingBytes);
                     edgeOptions.erase(edgeIter);
-                } else if (curWeight > maxWeight) {
-                    maxWeight = curWeight;
+                } else {
                     usedBytes = curBytes;
                     bestEdgeIter = edgeIter;
+                    break;
                 }
 
                 edgeIter = nextIter;
@@ -297,15 +301,16 @@ TreeletTestBVH::computeTreeletsTopological(const TraversalGraph &graph,
             const Edge *bestEdge = *bestEdgeIter;
             edgeOptions.erase(bestEdgeIter);
 
-            int bestNode = bestEdge->dst;
-            topoSort.erase(sortLocs[bestNode]);
-            assignment[bestNode] = curTreelet;
+            curNode = bestEdge->dst;
+
+            topoSort.erase(sortLocs[curNode]);
+            assignment[curNode] = curTreelet;
             remainingBytes -= usedBytes;
         }
 
         curTreelet++;
     }
-    printf("Generated %d treelets\n", curTreelet);
+    printf("Generated %d treelets\n", curTreelet - 1);
 
     for (auto &treelet : assignment) {
         treelet--;
