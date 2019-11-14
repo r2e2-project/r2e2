@@ -31,9 +31,12 @@ class TreeletTestBVH : public BVHAccel {
         int dst;
         float modelWeight;
         int rayCount;
+        unsigned dstBytes; // Cache for performance
 
-        Edge(int src, int dst, float modelWeight, int rayCount)
-            : src(src), dst(dst), modelWeight(modelWeight), rayCount(rayCount)
+        Edge(int src, int dst, float modelWeight, int rayCount,
+             unsigned dstBytes)
+            : src(src), dst(dst), modelWeight(modelWeight),
+              rayCount(rayCount), dstBytes(dstBytes)
         {}
     };
 
