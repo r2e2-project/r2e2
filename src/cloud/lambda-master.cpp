@@ -290,7 +290,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     nTiles = Point2i((sampleExtent.x + tileSize - 1) / tileSize,
                      (sampleExtent.y + tileSize - 1) / tileSize);
 
-
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaMaster::handleMessages, this),
         [this]() { return !incomingMessages.empty(); },
@@ -329,9 +328,9 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                        [this]() { return true; },
                        []() { throw runtime_error("status print failed"); }));
 
-    loop.make_listener({"0.0.0.0", listenPort},
-        [this, numberOfLambdas](ExecutionLoop &loop, TCPSocket &&socket) {
-
+    loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfLambdas](
+                                                    ExecutionLoop &loop,
+                                                    TCPSocket &&socket) {
         if (currentWorkerId > numberOfLambdas) {
             socket.close();
             return false;
@@ -758,7 +757,8 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 
         if (canSendTiles && cameraRaysRemaining() &&
             stats.queueStats.pending + stats.queueStats.out +
-            stats.queueStats.ray < config.newTileThreshold) {
+                    stats.queueStats.ray <
+                config.newTileThreshold) {
             sendWorkerTile(worker);
         }
 
@@ -991,8 +991,8 @@ Bounds2i LambdaMaster::nextCameraTile() {
 void LambdaMaster::sendWorkerTile(const Worker &worker) {
     protobuf::GenerateRays proto;
     *proto.mutable_crop_window() = to_protobuf(nextCameraTile());
-    const string genRaysStr = Message::str(
-        0, OpCode::GenerateRays, protoutil::to_string(proto));
+    const string genRaysStr =
+        Message::str(0, OpCode::GenerateRays, protoutil::to_string(proto));
     worker.connection->enqueue_write(genRaysStr);
 }
 
@@ -1066,6 +1066,11 @@ void usage(const char *argv0, int exitCode) {
          << "                               - send" << endl
          << "                               - upload" << endl
          << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
+         << endl
+         << "  -T --pix-per-tile N        pixels per tile (default=44)" << endl
+         << "  -n --new-tile-send N       threshold for sending new tiles"
+         << endl
+
          << endl
          << "  -t --timeout T             exit after T seconds of inactivity"
          << endl
@@ -1149,7 +1154,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:l:w:hdD:a:S:f:L:c:P:M:t:j:Rg",
+            getopt_long(argc, argv, "p:i:r:b:l:w:hdD:a:S:f:L:c:P:M:t:j:T:n:Rg",
                         long_options, nullptr);
 
         if (opt == -1) {
