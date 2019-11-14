@@ -272,7 +272,6 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
         eventAction[Event::Diagnostics],    eventAction[Event::WorkerStats]};
 
     loop.poller().deactivate_actions(toDeactivate);
-    udpConnection.reset_reference();
 
     if (rate) {
         udpConnection.set_rate(rate);

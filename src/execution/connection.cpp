@@ -1,5 +1,7 @@
 #include "connection.h"
 
+#include <cmath>
+
 #include "net/util.h"
 
 using namespace std;
@@ -8,31 +10,24 @@ using namespace chrono;
 int64_t Pacer::micros_ahead_of_pace() const {
     if (!enabled_) return -1;
 
-    const auto now = steady_clock::now();
-    const int64_t elapsed_micros =
-        duration_cast<microseconds>(now - rate_reference_pt_).count();
-    const int64_t elapsed_micros_if_at_pace =
-        (bits_since_reference_ * 1'000'000) / rate_ ;
-    return elapsed_micros_if_at_pace - elapsed_micros;
+    const auto now = pacer_clock::now();
+    const auto promise_end =
+        ref_time_ + microseconds{static_cast<uint64_t>(
+                        ceil(1e6 * bits_since_ref_ / rate_))};
+
+    return duration_cast<microseconds>(promise_end - now).count();
 }
 
-void Pacer::set_rate(const uint64_t rate) {
-    rate_ = rate;
-    reset_reference();
-}
-
-void Pacer::reset_reference() {
-    if (!enabled_) return;
-    rate_reference_pt_ = steady_clock::now();
-    bits_since_reference_ = 0;
-}
+void Pacer::set_rate(const uint64_t rate) { rate_ = rate; }
 
 void Pacer::record_send(const size_t data_len) {
     if (!enabled_) return;
 
-    bits_since_reference_ += data_len * 8;
-    if (steady_clock::now() >= rate_reference_pt_ + reference_reset_time_) {
-        reset_reference();
+    if (within_pace()) {
+        ref_time_ = pacer_clock::now();
+        bits_since_ref_ = data_len * 8;
+    } else {
+        bits_since_ref_ += data_len * 8;
     }
 }
 
