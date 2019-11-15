@@ -43,6 +43,9 @@ def handler(event, context):
     if event['maxUdpRate']:
         command += ['--max-udp-rate', str(event['maxUdpRate'])]
 
+    if event['logLeases']:
+        command += ['--log-leases']
+
     retcode = run_command(command)
     print("retcode={}".format(retcode))
 

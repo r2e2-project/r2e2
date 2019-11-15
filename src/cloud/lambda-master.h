@@ -58,6 +58,7 @@ struct MasterConfiguration {
     int samplesPerPixel;
     bool collectDebugLogs;
     bool collectDiagnostics;
+    bool logLeases;
     uint64_t workerStatsInterval;
     float rayActionsLogRate;
     float packetsLogRate;

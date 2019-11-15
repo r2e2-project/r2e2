@@ -143,6 +143,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                         "rayCount,timestamp,action";
     }
 
+    if (config.logLeases) {
+        TLOG(LEASE) << "logging leases";
+    }
+
     PbrtOptions.nThreads = 1;
     bvh = make_shared<CloudBVH>();
     manager.init(".");
@@ -1527,6 +1531,7 @@ void usage(const char* argv0, int exitCode) {
          << "  -R --reliable-udp          send ray packets reliably" << endl
          << "  -M --max-udp-rate RATE     maximum UDP rate (Mbps)" << endl
          << "  -S --samples N             number of samples per pixel" << endl
+         << "  -e --log-leases            log leases"
          << "  -L --log-rays RATE         log ray actions" << endl
          << "  -P --log-packets RATE      log packets" << endl
          << "  -f --finished-ray ACTION   what to do with finished rays" << endl
@@ -1549,6 +1554,7 @@ int main(int argc, char* argv[]) {
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
     float rayActionsLogRate = 0.0;
     float packetsLogRate = 0.0;
+    bool logLeases = false;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
@@ -1556,6 +1562,7 @@ int main(int argc, char* argv[]) {
         {"storage-backend", required_argument, nullptr, 's'},
         {"reliable-udp", no_argument, nullptr, 'R'},
         {"samples", required_argument, nullptr, 'S'},
+        {"log-leases", no_argument, nullptr, 'e'},
         {"log-rays", required_argument, nullptr, 'L'},
         {"log-packets", required_argument, nullptr, 'P'},
         {"finished-ray", required_argument, nullptr, 'f'},
@@ -1565,7 +1572,7 @@ int main(int argc, char* argv[]) {
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "p:i:s:S:f:L:P:M:hR",
+        const int opt = getopt_long(argc, argv, "p:i:s:S:f:L:P:M:hRe",
                                     long_options, nullptr);
 
         if (opt == -1) break;
@@ -1578,6 +1585,7 @@ int main(int argc, char* argv[]) {
         case 'R': sendReliably = true; break;
         case 'M': maxUdpRate = stoull(optarg) * 1'000'000; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
+        case 'e': logLeases = true; break;
         case 'L': rayActionsLogRate = stof(optarg); break;
         case 'P': packetsLogRate = stof(optarg); break;
         case 'f': finishedRayAction = (FinishedRayAction)stoi(optarg); break;
@@ -1594,9 +1602,9 @@ int main(int argc, char* argv[]) {
     }
 
     unique_ptr<LambdaWorker> worker;
-    WorkerConfiguration config{sendReliably,      maxUdpRate,
-                               samplesPerPixel,   finishedRayAction,
-                               rayActionsLogRate, packetsLogRate};
+    WorkerConfiguration config{
+        sendReliably,      maxUdpRate,     samplesPerPixel, finishedRayAction,
+        rayActionsLogRate, packetsLogRate, logLeases};
 
     try {
         worker =
