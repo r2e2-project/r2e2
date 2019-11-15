@@ -177,67 +177,155 @@ unsigned TreeletTestBVH::getNodeSize(int nodeIdx) const {
 vector<uint32_t>
 TreeletTestBVH::computeTreeletsAgglomerative(const TraversalGraph &graph,
                                              int maxTreeletBytes) const {
-    //vector<uint32_t> assignment(nodeCount);
-    //vector<unsigned> treeletSizes(nodeCount);
-    //vector<list<int>> treeletNodes(nodeCount);
+    vector<unsigned> treeletSizes(nodeCount);
+    vector<list<int>> treeletNodes(nodeCount);
+    vector<unordered_map<int, float>> adjacencyList(nodeCount);
+    vector<unordered_map<uint32_t, decltype(adjacencyList)::value_type::iterator>>
+        reverseAdjacencyList(nodeCount);
 
-    //// Start each node in unique treelet
-    //for (unsigned i = 0; i < nodeCount; i++) {
-    //    assignment[i] = i;
-    //    treeletSizes[i] = getNodeSize(i);
-    //    treeletNodes[i].push_back(i);
-    //}
+    list<uint32_t> liveTreelets;
+    // Map from original treelet ids to position in liveTreelets list
+    vector<decltype(liveTreelets)::iterator> treeletLocs(nodeCount);
 
-    //for (auto edge : graph.edgeList) {
-    //    uint32_t srcTreelet = assignment[edge->src];
-    //    uint32_t dstTreelet = assignment[edge->dst];
-    //    if (srcTreelet == dstTreelet) continue;
+    auto addEdge =
+        [&adjacencyList, &reverseAdjacencyList](uint32_t src, const Edge *edge) {
+        if (edge) {
+            auto res = adjacencyList[src].emplace(edge->dst,
+                                                  edge->modelWeight);
 
-    //    unsigned srcSize = treeletSizes[srcTreelet];
-    //    unsigned dstSize = treeletSizes[dstTreelet];
-    //    unsigned joinedSize = srcSize + dstSize;
+            reverseAdjacencyList[edge->dst].emplace(src, res.first);
+        }
+    };
 
-    //    if (joinedSize > maxTreeletBytes) continue;
-    //    treeletSizes[srcTreelet] = joinedSize;
+    // Start each node in unique treelet
+    for (uint32_t vert : graph.topologicalVertices) {
+        liveTreelets.push_back(vert);
+        treeletLocs[vert] = --liveTreelets.end();
 
-    //    for (int node : treeletNodes[dstTreelet]) {
-    //        assignment[node] = srcTreelet;
-    //    }
+        treeletSizes[vert] = getNodeSize(vert);
+        treeletNodes[vert].push_back(vert);
 
-    //    CHECK_EQ(assignment[edge->dst], srcTreelet);
+        const OutEdges &outEdges = graph.adjacencyList[vert];
+        addEdge(vert, outEdges.hitEdge);
+        addEdge(vert, outEdges.missEdge);
+    }
 
-    //    treeletNodes[srcTreelet].splice(treeletNodes[srcTreelet].end(),
-    //                                    move(treeletNodes[dstTreelet]));
-    //}
+    while (true) {
+        bool treeletsCombined = false;
 
-    //unsigned curTreeletID = 0;
-    vector<uint32_t> contiguousAssignment(nodeCount);
+        auto treeletIter = liveTreelets.begin();
+        while (treeletIter != liveTreelets.end()) {
+            int curTreelet = *treeletIter;
+            unsigned srcSize = treeletSizes[curTreelet];
 
-    //uint64_t totalBytes = 0;
-    //unsigned totalNodes = 0;
+            auto bestEdgeIter = adjacencyList[curTreelet].end();
+            float maxWeight = 0;
+            auto edgeIter = adjacencyList[curTreelet].begin();
+            while (edgeIter != adjacencyList[curTreelet].end()) {
+                auto nextIter = next(edgeIter);
+                int dstTreelet = edgeIter->first;
+                float dstWeight = edgeIter->second;
+                unsigned dstSize = treeletSizes[dstTreelet];
 
-    //for (const auto &curNodes : treeletNodes) {
-    //    if (curNodes.empty()) continue;
-    //    for (int node : curNodes) {
-    //        contiguousAssignment[node] = curTreeletID;
-    //        totalBytes += getNodeSize(node);
-    //        totalNodes++;
-    //    }
+                if (srcSize + dstSize > maxTreeletBytes) {
+                    adjacencyList[curTreelet].erase(edgeIter);
+                    size_t erased = reverseAdjacencyList[dstTreelet].erase(curTreelet);
+                    CHECK_EQ(erased, 1);
+                } else if (dstWeight > maxWeight) {
+                    bestEdgeIter = edgeIter;
+                    maxWeight = dstWeight;
+                }
 
-    //    curTreeletID++;
-    //}
-    //CHECK_EQ(totalNodes, nodeCount); // All treelets assigned?
-    //printf("Num Treelets %d, Average treelet size %f\n",
-    //       curTreeletID, (double)totalBytes / curTreeletID);
+                edgeIter = nextIter;
+            }
 
-    return contiguousAssignment;
+            if (bestEdgeIter != adjacencyList[curTreelet].end()) {
+                treeletsCombined = true;
+                int mergeTreelet = bestEdgeIter->first;
+                CHECK_NE(mergeTreelet, curTreelet);
+
+                liveTreelets.erase(treeletLocs[mergeTreelet]);
+
+                treeletSizes[curTreelet] += treeletSizes[mergeTreelet];
+
+                // Merge in outgoing edges from mergeTreelet
+                for (const auto &edge_pair : adjacencyList[mergeTreelet]) {
+                    CHECK_NE(edge_pair.first, mergeTreelet); // Cycle
+
+                    size_t erased = reverseAdjacencyList[edge_pair.first].erase(mergeTreelet);
+                    CHECK_EQ(erased, 1);
+
+                    if (edge_pair.first == curTreelet) continue;
+
+                    auto res = adjacencyList[curTreelet].emplace(edge_pair.first, edge_pair.second);
+
+                    if (!res.second) {
+                        res.first->second += edge_pair.second;
+                    } else {
+                        reverseAdjacencyList[edge_pair.first].emplace(curTreelet, res.first);
+                    }
+                }
+                treeletNodes[curTreelet].splice(treeletNodes[curTreelet].end(),
+                                            move(treeletNodes[mergeTreelet]));
+
+                bool found = false;
+                // Update all links pointing to the treelet that was merged
+                for (const auto &backLink : reverseAdjacencyList[mergeTreelet]) {
+                    const auto &edge = *backLink.second;
+                    CHECK_EQ(edge.first, mergeTreelet);
+                    float weight = edge.second;
+
+                    adjacencyList[backLink.first].erase(backLink.second);
+
+                    if (backLink.first == curTreelet) {
+                        CHECK_EQ(found, false);
+                        found = true;
+                        continue;
+                    }
+
+                    auto res = adjacencyList[backLink.first].emplace(curTreelet, weight);
+                    if (!res.second) {
+                        res.first->second += weight;
+                    } else {
+                        reverseAdjacencyList[curTreelet].emplace(backLink.first, res.first);
+                    }
+                }
+                CHECK_EQ(found, true);
+            }
+
+            treeletIter = next(treeletIter);
+        }
+
+        if (!treeletsCombined) {
+            break;
+        }
+    }
+
+    unsigned curTreeletID = 0;
+    vector<uint32_t> assignment(nodeCount);
+
+    unsigned totalNodes = 0;
+
+    for (const auto &curNodes : treeletNodes) {
+        if (curNodes.empty()) continue;
+        for (int node : curNodes) {
+            assignment[node] = curTreeletID;
+            totalNodes++;
+        }
+
+        curTreeletID++;
+    }
+    CHECK_EQ(totalNodes, nodeCount); // All treelets assigned?
+    printf("Generated %d treelets\n", curTreeletID);
+
+    return assignment;
 }
 
 vector<uint32_t>
 TreeletTestBVH::computeTreeletsTopological(const TraversalGraph &graph,
                                            int maxTreeletBytes) const {
     struct EdgeCmp {
-        bool operator()(const Edge *a, const Edge *b) {
+        bool operator()(const Edge *a, const Edge *b) const {
             return a->modelWeight > b->modelWeight;
         }
     };
@@ -322,7 +410,8 @@ TreeletTestBVH::computeTreeletsTopological(const TraversalGraph &graph,
 vector<uint32_t> TreeletTestBVH::computeTreelets(const TraversalGraph &graph,
                                                  int maxTreeletBytes) const {
     map<uint32_t, vector<unsigned>> sizes;
-    auto assignment = computeTreeletsTopological(graph, maxTreeletBytes);
+    //auto assignment = computeTreeletsTopological(graph, maxTreeletBytes);
+    auto assignment = computeTreeletsAgglomerative(graph, maxTreeletBytes);
     for (int node = 0; node < nodeCount; node++) {
         uint32_t treelet = assignment[node];
         sizes[treelet].push_back(getNodeSize(node));
