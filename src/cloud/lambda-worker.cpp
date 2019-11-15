@@ -1487,31 +1487,34 @@ void LambdaWorker::initializeScene() {
 void LambdaWorker::uploadLogs() {
     if (!workerId.initialized()) return;
 
-    benchmarkData.stats.merge(benchmarkData.checkpoint);
+    if (benchmarkTimer != nullptr) {
+        benchmarkData.stats.merge(benchmarkData.checkpoint);
 
-    TLOG(BENCH) << "start "
-                << duration_cast<milliseconds>(
-                       benchmarkData.start.time_since_epoch())
-                       .count();
-
-    TLOG(BENCH) << "end "
-                << duration_cast<milliseconds>(
-                       benchmarkData.end.time_since_epoch())
-                       .count();
-
-    for (const auto& item : benchmarkData.checkpoints) {
-        TLOG(BENCH) << "checkpoint "
+        TLOG(BENCH) << "start "
                     << duration_cast<milliseconds>(
-                           item.timestamp.time_since_epoch())
-                           .count()
-                    << " " << item.bytesSent << " " << item.bytesReceived << " "
-                    << item.packetsSent << " " << item.packetsReceived;
-    }
+                           benchmarkData.start.time_since_epoch())
+                           .count();
 
-    TLOG(BENCH) << "stats " << benchmarkData.stats.bytesSent << " "
-                << benchmarkData.stats.bytesReceived << " "
-                << benchmarkData.stats.packetsSent << " "
-                << benchmarkData.stats.packetsReceived;
+        TLOG(BENCH) << "end "
+                    << duration_cast<milliseconds>(
+                           benchmarkData.end.time_since_epoch())
+                           .count();
+
+        for (const auto& item : benchmarkData.checkpoints) {
+            TLOG(BENCH) << "checkpoint "
+                        << duration_cast<milliseconds>(
+                               item.timestamp.time_since_epoch())
+                               .count()
+                        << " " << item.bytesSent << " " << item.bytesReceived
+                        << " " << item.packetsSent << " "
+                        << item.packetsReceived;
+        }
+
+        TLOG(BENCH) << "stats " << benchmarkData.stats.bytesSent << " "
+                    << benchmarkData.stats.bytesReceived << " "
+                    << benchmarkData.stats.packetsSent << " "
+                    << benchmarkData.stats.packetsReceived;
+    }
 
     google::FlushLogFiles(google::INFO);
 
