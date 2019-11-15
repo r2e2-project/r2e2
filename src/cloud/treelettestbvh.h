@@ -25,16 +25,20 @@ class TreeletTestBVH : public BVHAccel {
                    TreeletMap &&treelets,
                    int maxPrimsInNode = 1,
                    SplitMethod splitMethod = SplitMethod::SAH);
+
+    bool Intersect(const Ray &ray, SurfaceInteraction *isect) const;
+    bool IntersectP(const Ray &ray) const;
+
   private:
     struct Edge {
-        int src;
-        int dst;
+        uint64_t src;
+        uint64_t dst;
         float modelWeight;
-        int rayCount;
-        unsigned dstBytes; // Cache for performance
+        uint64_t rayCount;
+        uint64_t dstBytes; // Cache for performance
 
-        Edge(int src, int dst, float modelWeight, int rayCount,
-             unsigned dstBytes)
+        Edge(uint64_t src, uint64_t dst, float modelWeight, uint64_t rayCount,
+             uint64_t dstBytes)
             : src(src), dst(dst), modelWeight(modelWeight),
               rayCount(rayCount), dstBytes(dstBytes)
         {}
@@ -48,29 +52,29 @@ class TreeletTestBVH : public BVHAccel {
     struct TraversalGraph {
         std::vector<OutEdges> adjacencyList;
         std::vector<Edge> edgeList;
-        std::vector<int> topologicalVertices;
+        std::vector<uint64_t> topologicalVertices;
     };
 
     TraversalGraph createTraversalGraph(const Vector3f &rayDir) const;
 
     std::vector<uint32_t>
         computeTreeletsAgglomerative(const TraversalGraph &graph,
-                                     int maxTreeletBytes) const;
+                                     uint64_t maxTreeletBytes) const;
 
     std::vector<uint32_t>
         computeTreeletsTopological(const TraversalGraph &graph,
-                                   int maxTreeletBytes) const;
+                                   uint64_t maxTreeletBytes) const;
 
     std::vector<uint32_t> computeTreelets(const TraversalGraph &graph,
-                                          int maxTreeletBytes) const;
+                                          uint64_t maxTreeletBytes) const;
 
-    unsigned getNodeSize(int nodeIdx) const;
+    std::vector<uint32_t> origAssignTreelets(const uint64_t) const;
 
+    uint64_t getNodeSize(int nodeIdx) const;
+
+    std::array<TraversalGraph, 8> graphs;
     TreeletMap treeletAllocations{};
-    const unsigned nodeSize = sizeof(CloudBVH::TreeletNode);
-    // Assume on average 2 unique vertices, normals etc per triangle
-    const unsigned leafSize = 3 * sizeof(int) + 2 * (sizeof(Point3f) +
-            sizeof(Normal3f) + sizeof(Vector3f) + sizeof(Point2f));
+    std::vector<uint32_t> origTreeletAllocation;
 };
 
 std::shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(
