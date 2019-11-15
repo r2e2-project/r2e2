@@ -313,7 +313,8 @@ class LambdaWorker {
         uint32_t allocation{DEFAULT_SEND_RATE};
         uint32_t queueSize{1'400};
 
-        void log(const packet_clock::time_point& workStart) const;
+        void log(const WorkerId thisWorker,
+                 const packet_clock::time_point& workStart) const;
     };
 
     const packet_clock::time_point workStart{packet_clock::now()};
