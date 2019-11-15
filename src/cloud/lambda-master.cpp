@@ -1261,7 +1261,12 @@ int main(int argc, char *argv[]) {
 
         case 'c':
             cropWindow = parseCropWindowOptarg(optarg);
-            if (!cropWindow.initialized()) usage(argv[0], EXIT_FAILURE);
+
+            if (!cropWindow.initialized()) {
+                cerr << "Error: bad crop window (" << optarg << ")." << endl;
+                usage(argv[0], EXIT_FAILURE);
+            }
+
             break;
 
         default:
@@ -1285,7 +1290,9 @@ int main(int argc, char *argv[]) {
         rayActionsLogRate < 0 || rayActionsLogRate > 1.0 ||
         packetsLogRate < 0 || packetsLogRate > 1.0 || publicIp.empty() ||
         storageBackendUri.empty() || region.empty() || newTileThreshold == 0 ||
-        (cropWindow.initialized() && pixelsPerTile > cropWindow->Area())) {
+        (cropWindow.initialized() && pixelsPerTile != 0 &&
+         pixelsPerTile != numeric_limits<typeof(pixelsPerTile)>::max() &&
+         pixelsPerTile > cropWindow->Area())) {
         usage(argv[0], 2);
     }
 
