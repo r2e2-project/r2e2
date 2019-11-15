@@ -1021,6 +1021,7 @@ HTTPRequest LambdaMaster::generateRequest() {
     proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
     proto.set_ray_actions_log_rate(config.rayActionsLogRate);
     proto.set_packets_log_rate(config.packetsLogRate);
+    proto.set_log_leases(config.logLeases);
 
     return LambdaInvocationRequest(
                awsCredentials, awsRegion, lambdaFunctionName,
@@ -1062,9 +1063,10 @@ void usage(const char *argv0, int exitCode) {
          << "  -M --max-udp-rate RATE     maximum UDP send rate for workers"
          << endl
          << "  -g --debug-logs            collect worker debug logs" << endl
-         << "  -w --worker-stats N        dump worker stats every N seconds"
-         << endl
          << "  -d --diagnostics           collect worker diagnostics" << endl
+         << "  -e --log-leases            log leases" << endl
+         << "  -w --worker-stats N        log worker stats every N seconds"
+         << endl
          << "  -L --log-rays RATE         log ray actions" << endl
          << "  -P --log-packets RATE      log packets" << endl
          << "  -D --logs-dir DIR          set logs directory (default: logs/)"
@@ -1127,6 +1129,7 @@ int main(int argc, char *argv[]) {
     uint64_t workerStatsInterval = 0;
     bool collectDiagnostics = false;
     bool collectDebugLogs = false;
+    bool logLeases = false;
     float rayActionsLogRate = 0.0;
     float packetsLogRate = 0.0;
     string logsDirectory = "logs/";
@@ -1153,8 +1156,9 @@ int main(int argc, char *argv[]) {
         {"reliable-udp", no_argument, nullptr, 'R'},
         {"max-udp-rate", required_argument, nullptr, 'M'},
         {"debug-logs", no_argument, nullptr, 'g'},
-        {"worker-stats", required_argument, nullptr, 'w'},
         {"diagnostics", no_argument, nullptr, 'd'},
+        {"log-leases", no_argument, nullptr, 'e'},
+        {"worker-stats", required_argument, nullptr, 'w'},
         {"log-rays", required_argument, nullptr, 'L'},
         {"log-packets", required_argument, nullptr, 'P'},
         {"logs-dir", required_argument, nullptr, 'D'},
@@ -1170,7 +1174,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:l:w:hdD:a:S:f:L:c:P:M:t:j:T:n:Rg",
+            getopt_long(argc, argv, "p:i:r:b:l:w:hdD:a:S:f:L:c:P:M:t:j:T:n:Rge",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -1187,6 +1191,7 @@ int main(int argc, char *argv[]) {
         case 'b': storageBackendUri = optarg; break;
         case 'l': numLambdas = stoul(optarg); break;
         case 'g': collectDebugLogs = true; break;
+        case 'e': logLeases = true; break;
         case 'w': workerStatsInterval = stoul(optarg); break;
         case 'd': collectDiagnostics = true; break;
         case 'D': logsDirectory = optarg; break;
@@ -1297,6 +1302,7 @@ int main(int argc, char *argv[]) {
                                   samplesPerPixel,
                                   collectDebugLogs,
                                   collectDiagnostics,
+                                  logLeases,
                                   workerStatsInterval,
                                   rayActionsLogRate,
                                   packetsLogRate,

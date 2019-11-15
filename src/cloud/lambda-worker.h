@@ -50,6 +50,7 @@ struct WorkerConfiguration {
     FinishedRayAction finishedRayAction;
     float rayActionsLogRate;
     float packetsLogRate;
+    bool logLeases;
 };
 
 class LambdaWorker {
