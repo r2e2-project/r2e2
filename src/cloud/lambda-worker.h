@@ -50,6 +50,7 @@ struct WorkerConfiguration {
     FinishedRayAction finishedRayAction;
     float rayActionsLogRate;
     float packetsLogRate;
+    bool collectDiagnostics;
     bool logLeases;
 };
 

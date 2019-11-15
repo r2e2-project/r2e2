@@ -46,6 +46,9 @@ def handler(event, context):
     if event['logLeases']:
         command += ['--log-leases']
 
+    if event['collectDiagnostics']:
+        command += ['--diagnostics']
+
     retcode = run_command(command)
     print("retcode={}".format(retcode))
 

@@ -1021,6 +1021,7 @@ HTTPRequest LambdaMaster::generateRequest() {
     proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
     proto.set_ray_actions_log_rate(config.rayActionsLogRate);
     proto.set_packets_log_rate(config.packetsLogRate);
+    proto.set_collect_diagnostics(config.collectDiagnostics);
     proto.set_log_leases(config.logLeases);
 
     return LambdaInvocationRequest(

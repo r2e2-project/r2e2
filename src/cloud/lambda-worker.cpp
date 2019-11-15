@@ -128,10 +128,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     FLAGS_log_prefix = false;
     google::InitGoogleLogging(logBase.c_str());
 
-    TLOG(DIAG) << "start "
-               << duration_cast<microseconds>(
-                      workerDiagnostics.startTime.time_since_epoch())
-                      .count();
+    if (config.collectDiagnostics) {
+        TLOG(DIAG) << "start "
+                   << duration_cast<microseconds>(
+                          workerDiagnostics.startTime.time_since_epoch())
+                          .count();
+    }
 
     if (trackRays) {
         TLOG(RAY) << "pathID,hop,shadowRay,workerID,otherPartyID,treeletID,"
@@ -242,10 +244,14 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("worker stats failed"); }));
 
     /* record diagnostics */
-    eventAction[Event::Diagnostics] = loop.poller().add_action(Poller::Action(
-        workerDiagnosticsTimer.fd, Direction::In,
-        bind(&LambdaWorker::handleDiagnostics, this), [this]() { return true; },
-        []() { throw runtime_error("handle diagnostics failed"); }));
+    if (config.collectDiagnostics) {
+        eventAction[Event::Diagnostics] =
+            loop.poller().add_action(Poller::Action(
+                workerDiagnosticsTimer.fd, Direction::In,
+                bind(&LambdaWorker::handleDiagnostics, this),
+                [this]() { return true; },
+                []() { throw runtime_error("handle diagnostics failed"); }));
+    }
 
     loop.poller().add_action(
         Poller::Action(reconnectTimer.fd, Direction::In,
@@ -1535,6 +1541,7 @@ void usage(const char* argv0, int exitCode) {
          << "  -M --max-udp-rate RATE     maximum UDP rate (Mbps)" << endl
          << "  -S --samples N             number of samples per pixel" << endl
          << "  -e --log-leases            log leases"
+         << "  -d --diagnostics           collect worker diagnostics"
          << "  -L --log-rays RATE         log ray actions" << endl
          << "  -P --log-packets RATE      log packets" << endl
          << "  -f --finished-ray ACTION   what to do with finished rays" << endl
@@ -1557,6 +1564,7 @@ int main(int argc, char* argv[]) {
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
     float rayActionsLogRate = 0.0;
     float packetsLogRate = 0.0;
+    bool collectDiagnostics = false;
     bool logLeases = false;
 
     struct option long_options[] = {
@@ -1565,6 +1573,7 @@ int main(int argc, char* argv[]) {
         {"storage-backend", required_argument, nullptr, 's'},
         {"reliable-udp", no_argument, nullptr, 'R'},
         {"samples", required_argument, nullptr, 'S'},
+        {"diagnostics", no_argument, nullptr, 'd'},
         {"log-leases", no_argument, nullptr, 'e'},
         {"log-rays", required_argument, nullptr, 'L'},
         {"log-packets", required_argument, nullptr, 'P'},
@@ -1575,7 +1584,7 @@ int main(int argc, char* argv[]) {
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "p:i:s:S:f:L:P:M:hRe",
+        const int opt = getopt_long(argc, argv, "p:i:s:S:f:L:P:M:hRde",
                                     long_options, nullptr);
 
         if (opt == -1) break;
@@ -1588,6 +1597,7 @@ int main(int argc, char* argv[]) {
         case 'R': sendReliably = true; break;
         case 'M': maxUdpRate = stoull(optarg) * 1'000'000; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
+        case 'd': collectDiagnostics = true; break;
         case 'e': logLeases = true; break;
         case 'L': rayActionsLogRate = stof(optarg); break;
         case 'P': packetsLogRate = stof(optarg); break;
@@ -1605,9 +1615,10 @@ int main(int argc, char* argv[]) {
     }
 
     unique_ptr<LambdaWorker> worker;
-    WorkerConfiguration config{
-        sendReliably,      maxUdpRate,     samplesPerPixel, finishedRayAction,
-        rayActionsLogRate, packetsLogRate, logLeases};
+    WorkerConfiguration config{sendReliably,       maxUdpRate,
+                               samplesPerPixel,    finishedRayAction,
+                               rayActionsLogRate,  packetsLogRate,
+                               collectDiagnostics, logLeases};
 
     try {
         worker =
