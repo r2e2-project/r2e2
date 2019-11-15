@@ -113,6 +113,12 @@ struct iovec* LambdaWorker::RayPacket::iov(const WorkerId workerId) {
     return iov_;
 }
 
+void LambdaWorker::Lease::log(const packet_clock::time_point& workStart) const {
+    TLOG(LEASE) << duration_cast<milliseconds>(expiresAt - workStart).count()
+                << ' ' << workerId << ' ' << small << ' ' << allocation << ' '
+                << queueSize;
+}
+
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const uint16_t coordinatorPort,
                            const string& storageUri,
@@ -146,7 +152,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     }
 
     if (config.logLeases) {
-        TLOG(LEASE) << "logging leases";
+        TLOG(LEASE) << "start "
+                    << duration_cast<milliseconds>(workStart.time_since_epoch())
+                           .count();
+
+        TLOG(LEASE) << "expiresAt,workerId,small,allocation,queueSize";
     }
 
     PbrtOptions.nThreads = 1;
@@ -815,6 +825,12 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
         if (!lease.small) {
             lease.workerId = addressToWorker[addr];
             lease.allocation = trafficShare + excessShare;
+        }
+    }
+
+    if (config.logLeases) {
+        for (const auto& lease : activeLeases) {
+            lease.second.log(workStart);
         }
     }
 
