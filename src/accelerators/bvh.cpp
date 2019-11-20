@@ -199,6 +199,16 @@ BVHAccel::BVHAccel(std::vector<std::shared_ptr<Primitive>> p,
     CHECK_EQ(totalNodes, offset);
 }
 
+BVHAccel::BVHAccel(std::vector<std::shared_ptr<Primitive>> &&p,
+                   LinearBVHNode *n,
+                   int nCount)
+    : nodes(n),
+      primitives(std::move(p)),
+      nodeCount(nCount),
+      maxPrimsInNode(1),
+      splitMethod(SplitMethod::SAH)
+{}
+
 Bounds3f BVHAccel::WorldBound() const {
     return nodes ? nodes[0].bounds : Bounds3f();
 }

@@ -14,17 +14,33 @@ namespace pbrt {
 
 class TreeletTestBVH : public BVHAccel {
   public:
+    enum class TraversalAlgorithm {
+        CheckSend,
+        SendCheck
+    };
+
+    enum class PartitionAlgorithm {
+        PseudoAgglomerative,
+        OneByOne
+    };
+
     using TreeletMap = std::array<std::vector<uint32_t>, 8>;
 
-    TreeletTestBVH(std::vector<std::shared_ptr<Primitive>> p,
+    TreeletTestBVH(std::vector<std::shared_ptr<Primitive>> &&p,
                    int maxTreeletBytes,
+                   TraversalAlgorithm traversal,
+                   PartitionAlgorithm partition,
                    int maxPrimsInNode = 1,
-                   SplitMethod splitMethod = SplitMethod::SAH);
+                   SplitMethod splitMethod = SplitMethod::SAH,
+                   bool dumpBVH = false,
+                   const std::string &dumpBVHPath = "");
 
-    TreeletTestBVH(std::vector<std::shared_ptr<Primitive>> p,
-                   TreeletMap &&treelets,
-                   int maxPrimsInNode = 1,
-                   SplitMethod splitMethod = SplitMethod::SAH);
+    TreeletTestBVH(std::vector<std::shared_ptr<Primitive>> &&p,
+                   LinearBVHNode *deserializedNodes,
+                   int deserializedNodeCount,
+                   int maxTreeletBytes,
+                   TraversalAlgorithm traversal,
+                   PartitionAlgorithm partition);
 
     bool Intersect(const Ray &ray, SurfaceInteraction *isect) const;
     bool IntersectP(const Ray &ray) const;
@@ -33,48 +49,63 @@ class TreeletTestBVH : public BVHAccel {
     struct Edge {
         uint64_t src;
         uint64_t dst;
-        float modelWeight;
-        uint64_t rayCount;
-        uint64_t dstBytes; // Cache for performance
+        float weight;
 
-        Edge(uint64_t src, uint64_t dst, float modelWeight, uint64_t rayCount,
-             uint64_t dstBytes)
-            : src(src), dst(dst), modelWeight(modelWeight),
-              rayCount(rayCount), dstBytes(dstBytes)
+        Edge(uint64_t src, uint64_t dst, float weight)
+            : src(src), dst(dst), weight(weight)
         {}
     };
 
-    struct OutEdges {
-        Edge *missEdge = nullptr;
-        Edge *hitEdge = nullptr;
-    };
-
     struct TraversalGraph {
-        std::vector<OutEdges> adjacencyList;
-        std::vector<Edge> edgeList;
-        std::vector<uint64_t> topologicalVertices;
+        std::vector<Edge> edges;
+        std::vector<uint64_t> topoSort;
+
+        std::vector<std::pair<Edge *, uint64_t>> outgoing;
+        std::vector<std::unordered_map<uint64_t, uint64_t>> rayCounts;
+
+        TraversalGraph(int nodeCount, int maxOutgoing);
+        TraversalGraph() = default;
     };
 
-    TraversalGraph createTraversalGraph(const Vector3f &rayDir) const;
+    void SetNodeSizes();
+    void AllocateTreelets(int maxTreeletBytes);
+
+    TraversalGraph CreateTraversalGraphSendCheck(const Vector3f &rayDir) const;
+
+    TraversalGraph CreateTraversalGraphCheckSend(const Vector3f &rayDir) const;
+
+    TraversalGraph CreateTraversalGraph(const Vector3f &rayDir) const;
 
     std::vector<uint32_t>
-        computeTreeletsAgglomerative(const TraversalGraph &graph,
+        ComputeTreeletsAgglomerative(const TraversalGraph &graph,
                                      uint64_t maxTreeletBytes) const;
 
     std::vector<uint32_t>
-        computeTreeletsTopological(const TraversalGraph &graph,
+        ComputeTreeletsTopological(const TraversalGraph &graph,
                                    uint64_t maxTreeletBytes) const;
 
-    std::vector<uint32_t> computeTreelets(const TraversalGraph &graph,
+    std::vector<uint32_t> ComputeTreelets(const TraversalGraph &graph,
                                           uint64_t maxTreeletBytes) const;
 
-    std::vector<uint32_t> origAssignTreelets(const uint64_t) const;
+    std::vector<uint32_t> OrigAssignTreelets(const uint64_t) const;
 
-    uint64_t getNodeSize(int nodeIdx) const;
+    uint64_t GetNodeSize(int nodeIdx) const;
 
-    std::array<TraversalGraph, 8> graphs;
+    bool IntersectSendCheck(const Ray &ray,
+                            SurfaceInteraction *isect) const;
+    bool IntersectPSendCheck(const Ray &ray) const;
+
+    bool IntersectCheckSend(const Ray &ray,
+                            SurfaceInteraction *isect) const;
+    bool IntersectPCheckSend(const Ray &ray) const;
+
+    std::array<TraversalGraph, 8> graphs{};
     TreeletMap treeletAllocations{};
-    std::vector<uint32_t> origTreeletAllocation;
+    std::vector<uint32_t> origTreeletAllocation{};
+
+    TraversalAlgorithm traversalAlgo;
+    PartitionAlgorithm partitionAlgo;
+    std::vector<uint64_t> nodeSizes;
 };
 
 std::shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(
