@@ -5,6 +5,7 @@
 #include "cloud/bvh.h"
 #include "pbrt.h"
 #include "primitive.h"
+#include <atomic>
 #include <memory>
 #include <set>
 #include <unordered_map>
@@ -22,6 +23,27 @@ class TreeletTestBVH : public BVHAccel {
     enum class PartitionAlgorithm {
         PseudoAgglomerative,
         OneByOne
+    };
+
+    struct Edge {
+        uint64_t src;
+        uint64_t dst;
+        float weight;
+
+        Edge(uint64_t src, uint64_t dst, float weight)
+            : src(src), dst(dst), weight(weight)
+        {}
+    };
+
+    struct TraversalGraph {
+        std::vector<Edge> edges;
+        std::vector<uint64_t> topoSort;
+
+        std::vector<std::pair<Edge *, uint64_t>> outgoing;
+        std::vector<std::unordered_map<uint64_t, std::atomic_uint64_t>> rayCounts;
+
+        TraversalGraph(int nodeCount, int maxOutgoing);
+        TraversalGraph() = default;
     };
 
     using TreeletMap = std::array<std::vector<uint32_t>, 8>;
@@ -46,27 +68,6 @@ class TreeletTestBVH : public BVHAccel {
     bool IntersectP(const Ray &ray) const;
 
   private:
-    struct Edge {
-        uint64_t src;
-        uint64_t dst;
-        float weight;
-
-        Edge(uint64_t src, uint64_t dst, float weight)
-            : src(src), dst(dst), weight(weight)
-        {}
-    };
-
-    struct TraversalGraph {
-        std::vector<Edge> edges;
-        std::vector<uint64_t> topoSort;
-
-        std::vector<std::pair<Edge *, uint64_t>> outgoing;
-        std::vector<std::unordered_map<uint64_t, uint64_t>> rayCounts;
-
-        TraversalGraph(int nodeCount, int maxOutgoing);
-        TraversalGraph() = default;
-    };
-
     void SetNodeSizes();
     void AllocateTreelets(int maxTreeletBytes);
 
