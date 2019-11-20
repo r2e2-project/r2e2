@@ -61,22 +61,6 @@ TreeletTestBVH::TreeletTestBVH(vector<shared_ptr<Primitive>> &&p,
     AllocateTreelets(maxTreeletBytes);
 }
 
-void TreeletTestBVH::SetNodeSizes() {
-    nodeSizes.reserve(nodeCount);
-    for (int i = 0; i < nodeCount; i++) {
-        nodeSizes.push_back(GetNodeSize(i));
-    }
-}
-
-void TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
-    origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
-    for (unsigned i = 0; i < 8; i++) {
-        Vector3f dir = computeRayDir(i);
-        graphs[i] = CreateTraversalGraph(dir);
-        treeletAllocations[i] = ComputeTreelets(graphs[i], maxTreeletBytes);
-    }
-}
-
 shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(
     vector<shared_ptr<Primitive>> prims, const ParamSet &ps) {
     int maxTreeletBytes = ps.FindOneInt("maxtreeletbytes", 1'000'000'000);
@@ -144,6 +128,22 @@ shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(
                                                travAlgo, partAlgo,
                                                maxPrimsInNode, splitMethod);
         }
+    }
+}
+
+void TreeletTestBVH::SetNodeSizes() {
+    nodeSizes.reserve(nodeCount);
+    for (int i = 0; i < nodeCount; i++) {
+        nodeSizes.push_back(GetNodeSize(i));
+    }
+}
+
+void TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
+    origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
+    for (unsigned i = 0; i < 8; i++) {
+        Vector3f dir = computeRayDir(i);
+        graphs[i] = CreateTraversalGraph(dir);
+        treeletAllocations[i] = ComputeTreelets(graphs[i], maxTreeletBytes);
     }
 }
 
@@ -249,7 +249,9 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir) const {
 
 TreeletTestBVH::TraversalGraph
 TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir) const {
-    TraversalGraph g(nodeCount, 2);
+    // Other parts of PBRT crash if tree depth > 64. + 2 for child edges
+    const int maxOutgoing = 66;
+    TraversalGraph g(nodeCount, maxOutgoing);
 
     vector<float> probabilities(nodeCount);
 
@@ -278,7 +280,7 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir) const {
 
         LinearBVHNode *node = &nodes[curIdx];
         float curProb = probabilities[curIdx];
-        CHECK_GT(curProb, 0.0);
+        CHECK_GE(curProb, 0.0);
         CHECK_LE(curProb, 1.0001); // FP error (should be 1.0)
 
         if (node->nPrimitives == 0) {
@@ -293,7 +295,7 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir) const {
 
         float runningProb = 1.0;
         for (int i = traversalStack.size() - 1; i >= 0; i--) {
-            auto nextStackElem = traversalStack.back();
+            auto &nextStackElem = traversalStack[i];
             LinearBVHNode *nextHitNode = &nodes[nextStackElem.first];
             LinearBVHNode *parentHitNode = &nodes[nextStackElem.second];
             
@@ -306,15 +308,18 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir) const {
             float pathProb = curProb * runningProb * condHitProb;
 
             addEdge(curIdx, nextStackElem.first, pathProb);
+            // runningProb can become 0 here if condHitProb == 1
+            // could break, but then edges don't get added and Intersect
+            // may crash if it turns out that edge gets taken
             runningProb *= 1.0 - condHitProb;
         }
         CHECK_LE(runningProb, 1.0);
-        CHECK_GT(runningProb, 0.0);
+        CHECK_GE(runningProb, 0.0);
 
         probabilities[curIdx] = -10000;
     }
 
-    CHECK_EQ(g.edges.capacity(), nodeCount * 2);
+    CHECK_EQ(g.edges.capacity(), nodeCount * maxOutgoing);
 
     for (auto prob : probabilities) {
         CHECK_EQ(prob, -10000);
@@ -518,8 +523,18 @@ TreeletTestBVH::ComputeTreeletsAgglomerative(const TraversalGraph &graph,
 vector<uint32_t>
 TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
                                            uint64_t maxTreeletBytes) const {
+    struct OutEdge {
+        float weight;
+        uint64_t dst;
+
+        OutEdge(const Edge &edge)
+            : weight(edge.weight),
+              dst(edge.dst)
+        {}
+    };
+
     struct EdgeCmp {
-        bool operator()(const Edge &a, const Edge &b) const {
+        bool operator()(const OutEdge &a, const OutEdge &b) const {
             if (a.weight > b.weight) {
                 return true;
             }
@@ -547,19 +562,22 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
         assignment[curNode] = curTreelet;
 
         uint64_t remainingBytes = maxTreeletBytes - nodeSizes[curNode];
-        set<Edge, EdgeCmp> cut;
+        set<OutEdge, EdgeCmp> cut;
         while (remainingBytes >= sizeof(CloudBVH::TreeletNode)) {
             auto outgoingBounds = graph.outgoing[curNode];
             for (int i = 0; i < outgoingBounds.second; i++) {
                 const Edge *edge = outgoingBounds.first + i;
                 if (nodeSizes[edge->dst] > remainingBytes) break;
-                auto res = cut.insert(*edge);
-                if (!res.second) {
-                    Edge update = *res.first;
-                    update.weight += edge->weight;
+                auto res = cut.emplace(*edge);
+
+                float runningWeight = edge->weight;
+                while (!res.second) {
+                    OutEdge update = *res.first;
+                    update.weight += runningWeight;
+                    runningWeight = update.weight;
+
                     cut.erase(res.first);
                     res = cut.insert(update);
-                    CHECK_EQ(res.second, true);
                 }
             }
 
@@ -638,9 +656,6 @@ TreeletTestBVH::ComputeTreelets(const TraversalGraph &graph,
 
 vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletBytes) const {
     /* pass one */
-    const uint64_t INSTANCE_SIZE = 1;
-    const uint64_t TRIANGLE_SIZE = 3;
-
     std::unique_ptr<uint64_t[]> subtree_footprint(new uint64_t[nodeCount]);
     std::unique_ptr<float []> best_costs(new float[nodeCount]);
 
@@ -987,8 +1002,8 @@ bool TreeletTestBVH::IntersectCheckSend(const Ray &ray,
             }
         }
 
-        while (toVisitOffset >= 0) {
-            int nodeIndex = nodesToVisit[toVisitOffset--];
+        while (toVisitOffset > 0) {
+            int nodeIndex = nodesToVisit[--toVisitOffset];
             if (nodes[nodeIndex].bounds.IntersectP(ray, invDir, dirIsNeg)) {
                 currentNodeIndex = nodeIndex;
                 break;
@@ -1054,8 +1069,8 @@ bool TreeletTestBVH::IntersectPCheckSend(const Ray &ray) const {
             }
         }
 
-        while (toVisitOffset >= 0) {
-            int nodeIndex = nodesToVisit[toVisitOffset--];
+        while (toVisitOffset > 0) {
+            int nodeIndex = nodesToVisit[--toVisitOffset];
             if (nodes[nodeIndex].bounds.IntersectP(ray, invDir, dirIsNeg)) {
                 currentNodeIndex = nodeIndex;
                 break;
