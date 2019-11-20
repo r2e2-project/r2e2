@@ -98,6 +98,9 @@ class BVHAccel : public Aggregate {
     BVHAccel(std::vector<std::shared_ptr<Primitive>> p,
              int maxPrimsInNode = 1,
              SplitMethod splitMethod = SplitMethod::SAH);
+    BVHAccel(std::vector<std::shared_ptr<Primitive>> &&p,
+             LinearBVHNode *n,
+             int nCount);
     Bounds3f WorldBound() const;
     ~BVHAccel();
     bool Intersect(const Ray &ray, SurfaceInteraction *isect) const;
