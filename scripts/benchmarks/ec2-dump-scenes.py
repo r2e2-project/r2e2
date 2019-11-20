@@ -57,7 +57,7 @@ status, out, err = run_on_ec2("""
     screen -L -Logfile ~/dump.log -S dump-scenes -d -m ~/pbrt-v3/scripts/benchmarks/process-benchmark-scenes.sh {source} {dest}
 """.format(source=args.source, dest=args.destination))
 
-if status is not 0:
+if status != 0:
     print(out)
     print(err)
 
