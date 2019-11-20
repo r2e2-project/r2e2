@@ -249,7 +249,78 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir) const {
 
 TreeletTestBVH::TraversalGraph
 TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir) const {
-    return TraversalGraph{};
+    TraversalGraph g(nodeCount, 2);
+
+    vector<float> probabilities(nodeCount);
+
+    bool dirIsNeg[3] = { rayDir.x < 0, rayDir.y < 0, rayDir.z < 0 };
+
+    auto addEdge = [this, &probabilities, &g](auto src, auto dst, auto prob) {
+        g.edges.emplace_back(src, dst, prob);
+
+        if (g.outgoing[src].first == nullptr) {
+            g.outgoing[src].first = &g.edges.back();
+        }
+        g.outgoing[src].second++;
+
+        probabilities[dst] += prob;
+    };
+
+    vector<pair<uint64_t, uint64_t>> traversalStack {{0, 0}};
+    traversalStack.reserve(64);
+
+    probabilities[0] = 1.0;
+    while (traversalStack.size() > 0) {
+        auto curStackElem = traversalStack.back();
+        uint64_t curIdx = curStackElem.first;
+        traversalStack.pop_back();
+        g.topoSort.push_back(curIdx);
+
+        LinearBVHNode *node = &nodes[curIdx];
+        float curProb = probabilities[curIdx];
+        CHECK_GT(curProb, 0.0);
+        CHECK_LE(curProb, 1.0001); // FP error (should be 1.0)
+
+        if (node->nPrimitives == 0) {
+            if (dirIsNeg[node->axis]) {
+                traversalStack.emplace_back(curIdx + 1, curIdx);
+                traversalStack.emplace_back(node->secondChildOffset, curIdx);
+            } else {
+                traversalStack.emplace_back(node->secondChildOffset, curIdx);
+                traversalStack.emplace_back(curIdx + 1, curIdx);
+            }
+        }
+
+        float runningProb = 1.0;
+        for (int i = traversalStack.size() - 1; i >= 0; i--) {
+            auto nextStackElem = traversalStack.back();
+            LinearBVHNode *nextHitNode = &nodes[nextStackElem.first];
+            LinearBVHNode *parentHitNode = &nodes[nextStackElem.second];
+            
+            // FIXME ask Pat about this
+            float nextSA = nextHitNode->bounds.SurfaceArea();
+            float parentSA = parentHitNode->bounds.SurfaceArea();
+
+            float condHitProb = nextSA / parentSA;
+            CHECK_LE(condHitProb, 1.0);
+            float pathProb = curProb * runningProb * condHitProb;
+
+            addEdge(curIdx, nextStackElem.first, pathProb);
+            runningProb *= 1.0 - condHitProb;
+        }
+        CHECK_LE(runningProb, 1.0);
+        CHECK_GT(runningProb, 0.0);
+
+        probabilities[curIdx] = -10000;
+    }
+
+    CHECK_EQ(g.edges.capacity(), nodeCount * 2);
+
+    for (auto prob : probabilities) {
+        CHECK_EQ(prob, -10000);
+    }
+
+    return g;
 }
 
 TreeletTestBVH::TraversalGraph
@@ -264,6 +335,18 @@ TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir) const {
         case TraversalAlgorithm::CheckSend:
             graph = CreateTraversalGraphCheckSend(rayDir);
             break;
+    }
+
+    // Init rayCounts so unordered_map isn't modified during intersection
+    for (uint64_t srcIdx = 0; srcIdx < nodeCount; srcIdx++) {
+        auto outgoing = graph.outgoing[srcIdx];
+        for (const Edge *outgoingEdge = outgoing.first;
+             outgoingEdge < outgoing.first + outgoing.second;
+             outgoingEdge++) {
+            uint64_t dstIdx = outgoingEdge->dst;
+            auto res = graph.rayCounts[srcIdx].emplace(dstIdx, 0);
+            CHECK_EQ(res.second, true);
+        }
     }
 
     printf("Graph gen complete: %u verts %u edges\n",
@@ -721,6 +804,13 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
     return labels;
 }
 
+void UpdateRayCount(const TreeletTestBVH::TraversalGraph &graph,
+                    uint64_t src, uint64_t dst) {
+    atomic_uint64_t &rayCount =
+        const_cast<atomic_uint64_t &>(graph.rayCounts[src].find(dst)->second);
+    rayCount++;
+}
+
 bool TreeletTestBVH::IntersectSendCheck(const Ray &ray,
                                         SurfaceInteraction *isect) const {
     if (!nodes) return false;
@@ -733,7 +823,6 @@ bool TreeletTestBVH::IntersectSendCheck(const Ray &ray,
     int nodesToVisit[64];
 
     int dirIdx = computeIdx(invDir);
-    //auto &rayCounts = graphs[dirIdx].rayCounts; FIXME RACE
     const auto &newLabels = treeletAllocations[dirIdx];
     const auto &oldLabels = origTreeletAllocation;
     
@@ -769,7 +858,7 @@ bool TreeletTestBVH::IntersectSendCheck(const Ray &ray,
             currentNodeIndex = nodesToVisit[--toVisitOffset];
         }
 
-        //rayCounts[prevNodeIndex][currentNodeIndex]++;
+        UpdateRayCount(graphs[dirIdx], prevNodeIndex, currentNodeIndex);
 
         uint32_t curNewTreelet = newLabels[currentNodeIndex];
         uint32_t curOldTreelet = oldLabels[currentNodeIndex];
@@ -798,7 +887,6 @@ bool TreeletTestBVH::IntersectPSendCheck(const Ray &ray) const {
     int toVisitOffset = 0, currentNodeIndex = 0;
 
     int dirIdx = computeIdx(invDir);
-    //auto &rayCounts = graphs[dirIdx].rayCounts;
     const auto &newLabels = treeletAllocations[dirIdx];
     const auto &oldLabels = origTreeletAllocation;
 
@@ -836,7 +924,7 @@ bool TreeletTestBVH::IntersectPSendCheck(const Ray &ray) const {
             currentNodeIndex = nodesToVisit[--toVisitOffset];
         }
 
-        //rayCounts[prevNodeIndex][currentNodeIndex]++;
+        UpdateRayCount(graphs[dirIdx], prevNodeIndex, currentNodeIndex);
 
         uint32_t curNewTreelet = newLabels[currentNodeIndex];
         uint32_t curOldTreelet = oldLabels[currentNodeIndex];
@@ -868,7 +956,6 @@ bool TreeletTestBVH::IntersectCheckSend(const Ray &ray,
     int nodesToVisit[64];
 
     int dirIdx = computeIdx(invDir);
-    //auto &rayCounts = graphs[dirIdx].rayCounts;
     const auto &newLabels = treeletAllocations[dirIdx];
     const auto &oldLabels = origTreeletAllocation;
     
@@ -910,7 +997,7 @@ bool TreeletTestBVH::IntersectCheckSend(const Ray &ray,
 
         if (currentNodeIndex == prevNodeIndex) break;
 
-        //rayCounts[prevNodeIndex][currentNodeIndex]++;
+        UpdateRayCount(graphs[dirIdx], prevNodeIndex, currentNodeIndex);
 
         uint32_t curNewTreelet = newLabels[currentNodeIndex];
         uint32_t curOldTreelet = oldLabels[currentNodeIndex];
@@ -939,7 +1026,6 @@ bool TreeletTestBVH::IntersectPCheckSend(const Ray &ray) const {
     int toVisitOffset = 0, currentNodeIndex = 0;
 
     int dirIdx = computeIdx(invDir);
-    //auto &rayCounts = graphs[dirIdx].rayCounts;
     const auto &newLabels = treeletAllocations[dirIdx];
     const auto &oldLabels = origTreeletAllocation;
 
@@ -978,7 +1064,7 @@ bool TreeletTestBVH::IntersectPCheckSend(const Ray &ray) const {
 
         if (currentNodeIndex == prevNodeIndex) break;
 
-        //rayCounts[prevNodeIndex][currentNodeIndex]++;
+        UpdateRayCount(graphs[dirIdx], prevNodeIndex, currentNodeIndex);
 
         uint32_t curNewTreelet = newLabels[currentNodeIndex];
         uint32_t curOldTreelet = oldLabels[currentNodeIndex];
