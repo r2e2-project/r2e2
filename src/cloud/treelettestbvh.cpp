@@ -80,6 +80,10 @@ shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(
     TreeletTestBVH::PartitionAlgorithm partAlgo;
     if (partAlgoName == "onebyone")
         partAlgo = TreeletTestBVH::PartitionAlgorithm::OneByOne;
+    else if (partAlgoName == "topohierarchical")
+        partAlgo = TreeletTestBVH::PartitionAlgorithm::TopologicalHierarchical;
+    else if (partAlgoName == "DPTree")
+        partAlgo = TreeletTestBVH::PartitionAlgorithm::DPTree;
     else if (partAlgoName == "agglomerative")
         partAlgo = TreeletTestBVH::PartitionAlgorithm::PseudoAgglomerative;
     else {
@@ -334,6 +338,8 @@ TreeletTestBVH::TraversalGraph
 TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction) const {
     cout << "Starting graph gen\n";
     TraversalGraph graph;
+
+    //FIXME fix probabilities here on up edges
 
     switch (traversalAlgo) {
         case TraversalAlgorithm::SendCheck:
@@ -635,12 +641,34 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
 }
 
 vector<uint32_t>
+TreeletTestBVH::ComputeTreeletsTopologicalHierarchical(
+        const TraversalGraph &graph, uint64_t maxTreeletBytes) const {
+    vector<uint32_t> assignment;
+
+    return assignment;
+}
+
+vector<uint32_t>
+TreeletTestBVH::ComputeTreeletsDPTree(
+        const TraversalGraph &graph, uint64_t maxTreeletBytes) const {
+    vector<uint32_t> assignment;
+
+    return assignment;
+}
+                                                       
+vector<uint32_t>
 TreeletTestBVH::ComputeTreelets(const TraversalGraph &graph,
                                 uint64_t maxTreeletBytes) const {
     vector<uint32_t> assignment;
     switch (partitionAlgo) {
         case PartitionAlgorithm::OneByOne:
             assignment = ComputeTreeletsTopological(graph, maxTreeletBytes);
+            break;
+        case PartitionAlgorithm::TopologicalHierarchical:
+            assignment = ComputeTreeletsTopologicalHierarchical(graph, maxTreeletBytes);
+            break;
+        case PartitionAlgorithm::DPTree:
+            assignment = ComputeTreeletsDPTree(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::PseudoAgglomerative:
             assignment = ComputeTreeletsAgglomerative(graph, maxTreeletBytes);
