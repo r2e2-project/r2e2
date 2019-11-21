@@ -71,11 +71,11 @@ class TreeletTestBVH : public BVHAccel {
     void SetNodeSizes();
     void AllocateTreelets(int maxTreeletBytes);
 
-    TraversalGraph CreateTraversalGraphSendCheck(const Vector3f &rayDir) const;
+    TraversalGraph CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const;
 
-    TraversalGraph CreateTraversalGraphCheckSend(const Vector3f &rayDir) const;
+    TraversalGraph CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthReduction) const;
 
-    TraversalGraph CreateTraversalGraph(const Vector3f &rayDir) const;
+    TraversalGraph CreateTraversalGraph(const Vector3f &rayDir, int depthReduction) const;
 
     std::vector<uint32_t>
         ComputeTreeletsAgglomerative(const TraversalGraph &graph,
