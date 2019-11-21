@@ -22,7 +22,9 @@ class TreeletTestBVH : public BVHAccel {
 
     enum class PartitionAlgorithm {
         PseudoAgglomerative,
-        OneByOne
+        OneByOne,
+        TopologicalHierarchical,
+        DPTree
     };
 
     struct Edge {
@@ -84,6 +86,14 @@ class TreeletTestBVH : public BVHAccel {
     std::vector<uint32_t>
         ComputeTreeletsTopological(const TraversalGraph &graph,
                                    uint64_t maxTreeletBytes) const;
+
+    std::vector<uint32_t>
+        ComputeTreeletsTopologicalHierarchical(const TraversalGraph &graph,
+                                               uint64_t maxTreeletBytes) const;
+
+    std::vector<uint32_t>
+        ComputeTreeletsDPTree(const TraversalGraph &graph,
+                                               uint64_t maxTreeletBytes) const;
 
     std::vector<uint32_t> ComputeTreelets(const TraversalGraph &graph,
                                           uint64_t maxTreeletBytes) const;
