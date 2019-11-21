@@ -142,7 +142,7 @@ void TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
     origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
     for (unsigned i = 0; i < 8; i++) {
         Vector3f dir = computeRayDir(i);
-        graphs[i] = CreateTraversalGraph(dir);
+        graphs[i] = CreateTraversalGraph(dir, 0);
         treeletAllocations[i] = ComputeTreelets(graphs[i], maxTreeletBytes);
     }
 }
@@ -158,7 +158,8 @@ TreeletTestBVH::TraversalGraph::TraversalGraph(int nodeCount, int maxOutgoing)
 }
 
 TreeletTestBVH::TraversalGraph
-TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir) const {
+TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const {
+    (void)depthReduction;
     TraversalGraph g(nodeCount, 2);
 
     vector<float> probabilities(nodeCount);
@@ -248,7 +249,8 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir) const {
 }
 
 TreeletTestBVH::TraversalGraph
-TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir) const {
+TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthReduction) const {
+    (void)depthReduction;
     // Other parts of PBRT crash if tree depth > 64. + 2 for child edges
     const int maxOutgoing = 66;
     TraversalGraph g(nodeCount, maxOutgoing);
@@ -329,16 +331,16 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir) const {
 }
 
 TreeletTestBVH::TraversalGraph
-TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir) const {
+TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction) const {
     cout << "Starting graph gen\n";
     TraversalGraph graph;
 
     switch (traversalAlgo) {
         case TraversalAlgorithm::SendCheck:
-            graph = CreateTraversalGraphSendCheck(rayDir);
+            graph = CreateTraversalGraphSendCheck(rayDir, depthReduction);
             break;
         case TraversalAlgorithm::CheckSend:
-            graph = CreateTraversalGraphCheckSend(rayDir);
+            graph = CreateTraversalGraphCheckSend(rayDir, depthReduction);
             break;
     }
 
@@ -354,7 +356,7 @@ TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir) const {
         }
     }
 
-    printf("Graph gen complete: %u verts %u edges\n",
+    printf("Graph gen complete: %lu verts %lu edges\n",
            graph.topoSort.size(), graph.edges.size());
 
     return graph;
@@ -514,7 +516,7 @@ TreeletTestBVH::ComputeTreeletsAgglomerative(const TraversalGraph &graph,
         curTreeletID++;
     }
     CHECK_EQ(totalNodes, nodeCount); // All treelets assigned?
-    printf("Generated %d treelets\n", curTreeletID - 1);
+    printf("Generated %u treelets\n", curTreeletID - 1);
 
     return assignment;
 #endif
@@ -563,21 +565,27 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
 
         uint64_t remainingBytes = maxTreeletBytes - nodeSizes[curNode];
         set<OutEdge, EdgeCmp> cut;
+        unordered_map<uint64_t, decltype(cut)::iterator> uniqueLookup;
         while (remainingBytes >= sizeof(CloudBVH::TreeletNode)) {
             auto outgoingBounds = graph.outgoing[curNode];
             for (int i = 0; i < outgoingBounds.second; i++) {
                 const Edge *edge = outgoingBounds.first + i;
                 if (nodeSizes[edge->dst] > remainingBytes) break;
-                auto res = cut.emplace(*edge);
+                auto preexisting = uniqueLookup.find(edge->dst);
+                if (preexisting == uniqueLookup.end()) {
+                    auto res = cut.emplace(*edge);
+                    CHECK_EQ(res.second, true);
+                    uniqueLookup.emplace(edge->dst, res.first);
+                } else {
+                    auto &iter = preexisting->second;
+                    OutEdge update = *iter;
+                    CHECK_EQ(update.dst, edge->dst);
+                    update.weight += edge->weight;
 
-                float runningWeight = edge->weight;
-                while (!res.second) {
-                    OutEdge update = *res.first;
-                    update.weight += runningWeight;
-                    runningWeight = update.weight;
-
-                    cut.erase(res.first);
-                    res = cut.insert(update);
+                    cut.erase(iter);
+                    auto res = cut.insert(update);
+                    CHECK_EQ(res.second, true);
+                    iter = res.first;
                 }
             }
 
@@ -594,6 +602,8 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
                 // This node already belongs to a treelet
                 if (assignment[dst] != 0 || curBytes > remainingBytes) {
                     cut.erase(edge);
+                    auto eraseRes = uniqueLookup.erase(dst);
+                    CHECK_EQ(eraseRes, 1);
                 } else {
                     usedBytes = curBytes;
                     bestEdge = edge;
@@ -608,6 +618,8 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
             }
 
             cut.erase(bestEdge);
+            auto eraseRes = uniqueLookup.erase(bestEdge->dst);
+            CHECK_EQ(eraseRes, 1);
 
             curNode = bestEdge->dst;
 
@@ -644,11 +656,11 @@ TreeletTestBVH::ComputeTreelets(const TraversalGraph &graph,
         totalBytes += bytes;
     }
 
-    printf("Generated %u treelets: %lu total bytes from %d nodes\n",
+    printf("Generated %lu treelets: %lu total bytes from %d nodes\n",
            sizes.size(), totalBytes, nodeCount);
 
     for (auto &sz : sizes) {
-        printf("Treelet %d: %lu bytes\n", sz.first, sz.second);
+        printf("Treelet %u: %lu bytes\n", sz.first, sz.second);
     }
 
     return assignment;
@@ -809,7 +821,7 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
         totalBytes += bytes;
     }
 
-    printf("Original method generated %u treelets: %lu total bytes from %d nodes\n",
+    printf("Original method generated %lu treelets: %lu total bytes from %d nodes\n",
            sizes.size(), totalBytes, nodeCount);
 
     for (auto &sz : sizes) {
