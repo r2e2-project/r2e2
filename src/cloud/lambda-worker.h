@@ -359,6 +359,7 @@ class LambdaWorker {
     std::deque<RayStatePtr> finishedQueue{};
     std::map<TreeletId, std::deque<RayStatePtr>> pendingQueue{};
     std::map<TreeletId, std::deque<RayStatePtr>> outQueue{};
+    std::map<TreeletId, size_t> outQueueBytes{};
     size_t pendingQueueSize{0};
     size_t outQueueSize{0};
     std::deque<uint64_t> finishedPathIds{};
