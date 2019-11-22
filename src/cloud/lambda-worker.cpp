@@ -115,9 +115,12 @@ struct iovec* LambdaWorker::RayPacket::iov(const WorkerId workerId) {
 
 void LambdaWorker::Lease::log(const WorkerId thisWorker,
                               const packet_clock::time_point& workStart) const {
+    auto now = packet_clock::now();
+
     TLOG(LEASE) << thisWorker << ','
-                << duration_cast<milliseconds>(expiresAt - workStart).count()
-                << ',' << workerId << ',' << small << ',' << allocation << ','
+                << duration_cast<milliseconds>(now - workStart).count() << ','
+                << duration_cast<milliseconds>(expiresAt - now).count() << ','
+                << workerId << ',' << small << ',' << allocation << ','
                 << queueSize;
 }
 
