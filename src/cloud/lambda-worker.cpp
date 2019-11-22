@@ -583,6 +583,7 @@ ResultType LambdaWorker::handleOutQueue() {
         auto& rayList = it->second;
         auto& packetList = sendQueue[treeletId];
         bool checkPreviousPacket = !packetList.empty();
+        auto& qBytes = outQueueBytes[treeletId];
 
         while (!rayList.empty()) {
             RayPacket packet{};
@@ -596,6 +597,8 @@ ResultType LambdaWorker::handleOutQueue() {
 
                 ray->Serialize();
                 const auto size = ray->SerializedSize();
+
+                qBytes += size;
 
                 checkPreviousPacket =
                     checkPreviousPacket &&
@@ -922,6 +925,10 @@ ResultType LambdaWorker::handleUdpSend() {
         workerStats.recordSentBytes(packet.targetTreelet(),
                                     packet.raysLength());
 
+        if (!packet.retransmission()) {
+            outQueueBytes[packet.targetTreelet()] -= packet.raysLength();
+        }
+
         /* do the necessary logging */
         for (auto& rayPtr : packet.rays()) {
             logRayAction(*rayPtr, RayAction::Sent, packet.destination()->first);
@@ -993,6 +1000,7 @@ ResultType LambdaWorker::handleUdpSend() {
 
         packet.setDestination(peer.id, peer.address);
         packet.setSequenceNumber(peerSeqNo);
+        packet.setQueueLength(outQueueBytes[treeletId]);
 
         sendRayPacket(peer, move(packet));
 
@@ -1050,8 +1058,10 @@ ResultType LambdaWorker::handleUdpReceive() {
             Chunk chunk(message.payload());
             auto& thisReceivedAcks = receivedAcks[datagram.first];
 
+            const auto rate = chunk.be32();
+
             auto& peer = peers.at(message.sender_id());
-            peer.pacer.set_rate(chunk.be32());
+            peer.pacer.set_rate(rate);
             peer.lastReceivedAck = packet_clock::now();
             chunk = chunk(4);
 
