@@ -304,25 +304,6 @@ class LambdaWorker {
 
     std::set<WorkerId> reconnectRequests;
 
-    struct Lease {
-        packet_clock::time_point expiresAt{packet_clock::now() +
-                                           INACTIVITY_THRESHOLD};
-
-        WorkerId workerId{0};
-        bool small{false};
-        uint32_t allocation{DEFAULT_SEND_RATE};
-        uint32_t queueSize{1'400};
-
-        void log(const WorkerId thisWorker,
-                 const packet_clock::time_point& workStart) const;
-    };
-
-    const packet_clock::time_point workStart{packet_clock::now()};
-    std::map<Address, Lease> activeLeases{};  // used by the receiver
-
-    std::map<TreeletId, std::pair<WorkerId, packet_clock::time_point>>
-        workerForTreelet;  // used by the sender
-
     /* Sending rays to other nodes */
     uint64_t ackId{0};
     UDPConnection udpConnection{true, config.maxUdpRate};
@@ -380,6 +361,26 @@ class LambdaWorker {
     TimerFD reconnectTimer{RECONNECTS_INTERVAL};
 
     bool terminated{false};
+
+    ////////////////////////////////////////////////////////////////////////////
+    // BENCHMARKING                                                           //
+    ////////////////////////////////////////////////////////////////////////////
+
+    struct Lease {
+        packet_clock::time_point start{packet_clock::now()};
+        packet_clock::time_point expiresAt{start + INACTIVITY_THRESHOLD};
+
+        WorkerId workerId{0};
+        bool small{false};
+        uint32_t allocation{DEFAULT_SEND_RATE};
+        uint32_t queueSize{1'400};
+    };
+
+    const packet_clock::time_point workStart{packet_clock::now()};
+    std::map<Address, Lease> activeLeases{};  // used by the receiver
+
+    std::map<TreeletId, std::pair<WorkerId, packet_clock::time_point>>
+        workerForTreelet;  // used by the sender
 
     ////////////////////////////////////////////////////////////////////////////
     // BENCHMARKING                                                           //
