@@ -44,6 +44,7 @@ TreeletTestBVH::TreeletTestBVH(vector<shared_ptr<Primitive>> &&p,
         file.close();
     }
     SetNodeSizes();
+    SetSubtreeSizes();
     AllocateTreelets(maxTreeletBytes);
 }
 
@@ -142,6 +143,19 @@ void TreeletTestBVH::SetNodeSizes() {
     }
 }
 
+void TreeletTestBVH::SetSubtreeSizes() {
+    subtreeSizes.resize(nodeCount);
+
+    for (int idx = nodeCount - 1; idx >= 0; idx--) {
+        const LinearBVHNode &node = nodes[idx];
+        subtreeSizes[idx] = nodeSizes[idx];
+        if (node.nPrimitives == 0) {
+            subtreeSizes[idx] += subtreeSizes[idx + 1] +
+                                 subtreeSizes[node.secondChildOffset];
+        }
+    }
+}
+
 void TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
     origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
     for (unsigned i = 0; i < 8; i++) {
@@ -155,7 +169,7 @@ TreeletTestBVH::IntermediateTraversalGraph
 TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const {
     (void)depthReduction;
     IntermediateTraversalGraph g;
-    g.topoSort.reserve(nodeCount);
+    g.depthFirst.reserve(nodeCount);
     g.outgoing.resize(nodeCount);
 
     vector<float> probabilities(nodeCount);
@@ -180,7 +194,7 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
     while (traversalStack.size() > 0) {
         uint64_t curIdx = traversalStack.back();
         traversalStack.pop_back();
-        g.topoSort.push_back(curIdx);
+        g.depthFirst.push_back(curIdx);
 
         LinearBVHNode *node = &nodes[curIdx];
         float curProb = probabilities[curIdx];
@@ -246,7 +260,7 @@ TreeletTestBVH::IntermediateTraversalGraph
 TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthReduction) const {
     (void)depthReduction;
     IntermediateTraversalGraph g;
-    g.topoSort.reserve(nodeCount);
+    g.depthFirst.reserve(nodeCount);
     g.outgoing.resize(nodeCount);
 
     vector<float> probabilities(nodeCount);
@@ -272,7 +286,7 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
         auto curStackElem = traversalStack.back();
         uint64_t curIdx = curStackElem.first;
         traversalStack.pop_back();
-        g.topoSort.push_back(curIdx);
+        g.depthFirst.push_back(curIdx);
 
         LinearBVHNode *node = &nodes[curIdx];
         float curProb = probabilities[curIdx];
@@ -348,7 +362,7 @@ TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction)
         intermediate.edges.pop_front();
     }
 
-    graph.topoSort = move(intermediate.topoSort);
+    graph.depthFirst = move(intermediate.depthFirst);
 
     auto adjacencyIter = intermediate.outgoing.begin();
     while (adjacencyIter != intermediate.outgoing.end()) {
@@ -374,7 +388,7 @@ TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction)
     }
 
     printf("Graph gen complete: %lu verts %lu edges\n",
-           graph.topoSort.size(), graph.edges.size());
+           graph.depthFirst.size(), graph.edges.size());
 
     return graph;
 }
@@ -567,17 +581,17 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
     };
 
     vector<uint32_t> assignment(nodeCount);
-    list<uint64_t> topoSort;
-    vector<decltype(topoSort)::iterator> sortLocs(nodeCount);
-    for (uint64_t vert : graph.topoSort) {
-        topoSort.push_back(vert);
-        sortLocs[vert] = --topoSort.end();
+    list<uint64_t> depthFirst;
+    vector<decltype(depthFirst)::iterator> sortLocs(nodeCount);
+    for (uint64_t vert : graph.depthFirst) {
+        depthFirst.push_back(vert);
+        sortLocs[vert] = --depthFirst.end();
     }
 
     uint32_t curTreelet = 1;
-    while (!topoSort.empty()) {
-        uint64_t curNode = topoSort.front();
-        topoSort.pop_front();
+    while (!depthFirst.empty()) {
+        uint64_t curNode = depthFirst.front();
+        depthFirst.pop_front();
         assignment[curNode] = curTreelet;
 
         uint64_t remainingBytes = maxTreeletBytes - nodeSizes[curNode];
@@ -640,7 +654,7 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
 
             curNode = bestEdge->dst;
 
-            topoSort.erase(sortLocs[curNode]);
+            depthFirst.erase(sortLocs[curNode]);
             assignment[curNode] = curTreelet;
             remainingBytes -= usedBytes;
         }
@@ -688,17 +702,23 @@ TreeletTestBVH::ComputeTreeletsGreedySize(
     };
 
     vector<uint32_t> assignment(nodeCount);
-    list<uint64_t> topoSort;
-    vector<decltype(topoSort)::iterator> sortLocs(nodeCount);
-    for (uint64_t vert : graph.topoSort) {
-        topoSort.push_back(vert);
-        sortLocs[vert] = --topoSort.end();
+    list<uint64_t> depthFirst;
+    vector<decltype(depthFirst)::iterator> sortLocs(nodeCount);
+    for (uint64_t vert : graph.depthFirst) {
+        depthFirst.push_back(vert);
+        sortLocs[vert] = --depthFirst.end();
+    }
+
+    vector<uint64_t> cutoffSizes(nodeCount);
+    for (uint64_t vert : graph.depthFirst) {
+        uint64_t cur = cutoffSizes[vert];
+
     }
 
     uint32_t curTreelet = 1;
-    while (!topoSort.empty()) {
-        uint64_t curNode = topoSort.front();
-        topoSort.pop_front();
+    while (!depthFirst.empty()) {
+        uint64_t curNode = depthFirst.front();
+        depthFirst.pop_front();
         assignment[curNode] = curTreelet;
 
         uint64_t remainingBytes = maxTreeletBytes - nodeSizes[curNode];
@@ -761,7 +781,7 @@ TreeletTestBVH::ComputeTreeletsGreedySize(
 
             curNode = bestEdge->dst;
 
-            topoSort.erase(sortLocs[curNode]);
+            depthFirst.erase(sortLocs[curNode]);
             assignment[curNode] = curTreelet;
             remainingBytes -= usedBytes;
         }
@@ -812,7 +832,6 @@ TreeletTestBVH::ComputeTreelets(const TraversalGraph &graph,
 
 vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletBytes) const {
     /* pass one */
-    std::unique_ptr<uint64_t[]> subtree_footprint(new uint64_t[nodeCount]);
     std::unique_ptr<float []> best_costs(new float[nodeCount]);
 
     float max_nodes = (float)maxTreeletBytes / sizeof(CloudBVH::TreeletNode);
@@ -820,16 +839,6 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
 
     for (int root_index = nodeCount - 1; root_index >= 0; root_index--) {
         const LinearBVHNode & root_node = nodes[root_index];
-
-        if (root_node.nPrimitives) { /* leaf */
-            /* determine the footprint of the node by adding up the size of all
-             * primitives */
-            uint64_t footprint = nodeSizes[root_index];
-            subtree_footprint[root_index] = footprint;
-        } else {
-            subtree_footprint[root_index] = sizeof(CloudBVH::TreeletNode) + subtree_footprint[root_index + 1]
-                                              + subtree_footprint[root_node.secondChildOffset];
-        }
 
         std::set<int> cut;
         cut.insert(root_index);
@@ -843,7 +852,7 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
             if (remaining_size > 0) {
                 for (const auto n : cut) {
                     const float gain = nodes[n].bounds.SurfaceArea() + AREA_EPSILON;
-                    const uint64_t price = std::min(subtree_footprint[n], remaining_size);
+                    const uint64_t price = std::min(subtreeSizes[n], remaining_size);
                     const float score = gain / price;
                     if (score > best_score) {
                         best_score = score;
@@ -908,7 +917,7 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
             if (remaining_size > 0) {
                 for (const auto n : cut) {
                     const float gain = nodes[n].bounds.SurfaceArea() + AREA_EPSILON;
-                    const uint64_t price = std::min(subtree_footprint[n], remaining_size);
+                    const uint64_t price = std::min(subtreeSizes[n], remaining_size);
                     const float score = gain / price;
                     if (score > best_score) {
                         best_score = score;
