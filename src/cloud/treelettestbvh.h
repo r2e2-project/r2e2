@@ -39,14 +39,16 @@ class TreeletTestBVH : public BVHAccel {
 
     struct IntermediateTraversalGraph {
         std::deque<Edge> edges;
-        std::vector<uint64_t> topoSort;
+        std::vector<uint64_t> depthFirst;
+        std::vector<uint64_t> leftSiblings;
 
         std::deque<std::pair<uint64_t, uint64_t>> outgoing;
     };
 
     struct TraversalGraph {
         std::vector<Edge> edges;
-        std::vector<uint64_t> topoSort;
+        std::vector<uint64_t> depthFirst;
+        std::vector<uint64_t> leftSiblings;
 
         std::vector<std::pair<Edge *, uint64_t>> outgoing;
 
@@ -76,6 +78,7 @@ class TreeletTestBVH : public BVHAccel {
 
   private:
     void SetNodeSizes();
+    void SetSubtreeSizes();
     void AllocateTreelets(int maxTreeletBytes);
 
     IntermediateTraversalGraph CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const;
@@ -122,6 +125,7 @@ class TreeletTestBVH : public BVHAccel {
     TraversalAlgorithm traversalAlgo;
     PartitionAlgorithm partitionAlgo;
     std::vector<uint64_t> nodeSizes;
+    std::vector<uint64_t> subtreeSizes;
 };
 
 std::shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(
