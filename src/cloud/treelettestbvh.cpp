@@ -82,8 +82,8 @@ shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(
         partAlgo = TreeletTestBVH::PartitionAlgorithm::OneByOne;
     else if (partAlgoName == "topohierarchical")
         partAlgo = TreeletTestBVH::PartitionAlgorithm::TopologicalHierarchical;
-    else if (partAlgoName == "DPTree")
-        partAlgo = TreeletTestBVH::PartitionAlgorithm::DPTree;
+    else if (partAlgoName == "greedysize")
+        partAlgo = TreeletTestBVH::PartitionAlgorithm::GreedySize;
     else if (partAlgoName == "agglomerative")
         partAlgo = TreeletTestBVH::PartitionAlgorithm::PseudoAgglomerative;
     else {
@@ -151,20 +151,12 @@ void TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
     }
 }
 
-TreeletTestBVH::TraversalGraph::TraversalGraph(int nodeCount, int maxOutgoing) 
-    : edges(),
-      topoSort(),
-      outgoing(nodeCount, {nullptr, 0}),
-      rayCounts(nodeCount)
-{
-    edges.reserve(nodeCount * maxOutgoing);
-    topoSort.reserve(nodeCount);
-}
-
-TreeletTestBVH::TraversalGraph
+TreeletTestBVH::IntermediateTraversalGraph
 TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const {
     (void)depthReduction;
-    TraversalGraph g(nodeCount, 2);
+    IntermediateTraversalGraph g;
+    g.topoSort.reserve(nodeCount);
+    g.outgoing.resize(nodeCount);
 
     vector<float> probabilities(nodeCount);
 
@@ -173,8 +165,8 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
     auto addEdge = [this, &probabilities, &g](auto src, auto dst, auto prob) {
         g.edges.emplace_back(src, dst, prob);
 
-        if (g.outgoing[src].first == nullptr) {
-            g.outgoing[src].first = &g.edges.back();
+        if (g.outgoing[src].second == 0) { // No outgoing yet
+            g.outgoing[src].first = g.edges.size() - 1;
         }
         g.outgoing[src].second++;
 
@@ -243,8 +235,6 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
         probabilities[curIdx] = -10000;
     }
 
-    CHECK_EQ(g.edges.capacity(), nodeCount * 2);
-
     for (auto prob : probabilities) {
         CHECK_EQ(prob, -10000);
     }
@@ -252,12 +242,12 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
     return g;
 }
 
-TreeletTestBVH::TraversalGraph
+TreeletTestBVH::IntermediateTraversalGraph
 TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthReduction) const {
     (void)depthReduction;
-    // Other parts of PBRT crash if tree depth > 64. + 2 for child edges
-    const int maxOutgoing = 66;
-    TraversalGraph g(nodeCount, maxOutgoing);
+    IntermediateTraversalGraph g;
+    g.topoSort.reserve(nodeCount);
+    g.outgoing.resize(nodeCount);
 
     vector<float> probabilities(nodeCount);
 
@@ -266,8 +256,8 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
     auto addEdge = [this, &probabilities, &g](auto src, auto dst, auto prob) {
         g.edges.emplace_back(src, dst, prob);
 
-        if (g.outgoing[src].first == nullptr) {
-            g.outgoing[src].first = &g.edges.back();
+        if (g.outgoing[src].second == 0) { // No outgoing yet
+            g.outgoing[src].first = g.edges.size() - 1;
         }
         g.outgoing[src].second++;
 
@@ -325,8 +315,6 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
         probabilities[curIdx] = -10000;
     }
 
-    CHECK_EQ(g.edges.capacity(), nodeCount * maxOutgoing);
-
     for (auto prob : probabilities) {
         CHECK_EQ(prob, -10000);
     }
@@ -337,18 +325,41 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
 TreeletTestBVH::TraversalGraph
 TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction) const {
     cout << "Starting graph gen\n";
-    TraversalGraph graph;
+    IntermediateTraversalGraph intermediate;
 
     //FIXME fix probabilities here on up edges
 
     switch (traversalAlgo) {
         case TraversalAlgorithm::SendCheck:
-            graph = CreateTraversalGraphSendCheck(rayDir, depthReduction);
+            intermediate = CreateTraversalGraphSendCheck(rayDir, depthReduction);
             break;
         case TraversalAlgorithm::CheckSend:
-            graph = CreateTraversalGraphCheckSend(rayDir, depthReduction);
+            intermediate = CreateTraversalGraphCheckSend(rayDir, depthReduction);
             break;
     }
+    cout << "Intermediate finished\n";
+
+    // Remake graph with contiguous vectors
+    TraversalGraph graph;
+    auto edgeIter = intermediate.edges.begin();
+    while (edgeIter != intermediate.edges.end()) {
+        graph.edges.push_back(*edgeIter);
+        edgeIter++;
+        intermediate.edges.pop_front();
+    }
+
+    graph.topoSort = move(intermediate.topoSort);
+
+    auto adjacencyIter = intermediate.outgoing.begin();
+    while (adjacencyIter != intermediate.outgoing.end()) {
+        uint64_t idx = adjacencyIter->first;
+        uint64_t weight = adjacencyIter->second;
+        graph.outgoing.emplace_back(&graph.edges[idx], weight);
+        adjacencyIter++;
+        intermediate.outgoing.pop_front();
+    }
+
+    graph.rayCounts.resize(nodeCount);
 
     // Init rayCounts so unordered_map isn't modified during intersection
     for (uint64_t srcIdx = 0; srcIdx < nodeCount; srcIdx++) {
@@ -649,9 +660,114 @@ TreeletTestBVH::ComputeTreeletsTopologicalHierarchical(
 }
 
 vector<uint32_t>
-TreeletTestBVH::ComputeTreeletsDPTree(
+TreeletTestBVH::ComputeTreeletsGreedySize(
         const TraversalGraph &graph, uint64_t maxTreeletBytes) const {
-    vector<uint32_t> assignment;
+
+    struct OutEdge {
+        float weight;
+        uint64_t dst;
+
+        OutEdge(const Edge &edge)
+            : weight(edge.weight),
+              dst(edge.dst)
+        {}
+    };
+
+    struct EdgeCmp {
+        bool operator()(const OutEdge &a, const OutEdge &b) const {
+            if (a.weight > b.weight) {
+                return true;
+            }
+
+            if (a.weight < b.weight) {
+                return false;
+            }
+
+            return a.dst < b.dst;
+        }
+    };
+
+    vector<uint32_t> assignment(nodeCount);
+    list<uint64_t> topoSort;
+    vector<decltype(topoSort)::iterator> sortLocs(nodeCount);
+    for (uint64_t vert : graph.topoSort) {
+        topoSort.push_back(vert);
+        sortLocs[vert] = --topoSort.end();
+    }
+
+    uint32_t curTreelet = 1;
+    while (!topoSort.empty()) {
+        uint64_t curNode = topoSort.front();
+        topoSort.pop_front();
+        assignment[curNode] = curTreelet;
+
+        uint64_t remainingBytes = maxTreeletBytes - nodeSizes[curNode];
+        set<OutEdge, EdgeCmp> cut;
+        unordered_map<uint64_t, decltype(cut)::iterator> uniqueLookup;
+        while (remainingBytes >= sizeof(CloudBVH::TreeletNode)) {
+            auto outgoingBounds = graph.outgoing[curNode];
+            for (int i = 0; i < outgoingBounds.second; i++) {
+                const Edge *edge = outgoingBounds.first + i;
+                if (nodeSizes[edge->dst] > remainingBytes) break;
+                auto preexisting = uniqueLookup.find(edge->dst);
+                if (preexisting == uniqueLookup.end()) {
+                    auto res = cut.emplace(*edge);
+                    CHECK_EQ(res.second, true);
+                    uniqueLookup.emplace(edge->dst, res.first);
+                } else {
+                    auto &iter = preexisting->second;
+                    OutEdge update = *iter;
+                    CHECK_EQ(update.dst, edge->dst);
+                    update.weight += edge->weight;
+
+                    cut.erase(iter);
+                    auto res = cut.insert(update);
+                    CHECK_EQ(res.second, true);
+                    iter = res.first;
+                }
+            }
+
+            uint64_t usedBytes = 0;
+            auto bestEdge = cut.end();
+
+            auto edge = cut.begin();
+            while (edge != cut.end()) {
+                auto nextEdge = next(edge);
+                uint64_t dst = edge->dst;
+                uint64_t curBytes = nodeSizes[dst];
+                float curWeight = edge->weight;
+
+                // This node already belongs to a treelet
+                if (assignment[dst] != 0 || curBytes > remainingBytes) {
+                    cut.erase(edge);
+                    auto eraseRes = uniqueLookup.erase(dst);
+                    CHECK_EQ(eraseRes, 1);
+                } else {
+                    usedBytes = curBytes;
+                    bestEdge = edge;
+                    break;
+                }
+
+                edge = nextEdge;
+            }
+            // Treelet full
+            if (bestEdge == cut.end()) {
+                break;
+            }
+
+            cut.erase(bestEdge);
+            auto eraseRes = uniqueLookup.erase(bestEdge->dst);
+            CHECK_EQ(eraseRes, 1);
+
+            curNode = bestEdge->dst;
+
+            topoSort.erase(sortLocs[curNode]);
+            assignment[curNode] = curTreelet;
+            remainingBytes -= usedBytes;
+        }
+
+        curTreelet++;
+    }
 
     return assignment;
 }
@@ -667,8 +783,8 @@ TreeletTestBVH::ComputeTreelets(const TraversalGraph &graph,
         case PartitionAlgorithm::TopologicalHierarchical:
             assignment = ComputeTreeletsTopologicalHierarchical(graph, maxTreeletBytes);
             break;
-        case PartitionAlgorithm::DPTree:
-            assignment = ComputeTreeletsDPTree(graph, maxTreeletBytes);
+        case PartitionAlgorithm::GreedySize:
+            assignment = ComputeTreeletsGreedySize(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::PseudoAgglomerative:
             assignment = ComputeTreeletsAgglomerative(graph, maxTreeletBytes);

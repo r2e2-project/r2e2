@@ -24,7 +24,7 @@ class TreeletTestBVH : public BVHAccel {
         PseudoAgglomerative,
         OneByOne,
         TopologicalHierarchical,
-        DPTree
+        GreedySize
     };
 
     struct Edge {
@@ -37,15 +37,20 @@ class TreeletTestBVH : public BVHAccel {
         {}
     };
 
+    struct IntermediateTraversalGraph {
+        std::deque<Edge> edges;
+        std::vector<uint64_t> topoSort;
+
+        std::deque<std::pair<uint64_t, uint64_t>> outgoing;
+    };
+
     struct TraversalGraph {
         std::vector<Edge> edges;
         std::vector<uint64_t> topoSort;
 
         std::vector<std::pair<Edge *, uint64_t>> outgoing;
-        std::vector<std::unordered_map<uint64_t, std::atomic_uint64_t>> rayCounts;
 
-        TraversalGraph(int nodeCount, int maxOutgoing);
-        TraversalGraph() = default;
+        std::vector<std::unordered_map<uint64_t, std::atomic_uint64_t>> rayCounts;
     };
 
     using TreeletMap = std::array<std::vector<uint32_t>, 8>;
@@ -73,9 +78,9 @@ class TreeletTestBVH : public BVHAccel {
     void SetNodeSizes();
     void AllocateTreelets(int maxTreeletBytes);
 
-    TraversalGraph CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const;
+    IntermediateTraversalGraph CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const;
 
-    TraversalGraph CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthReduction) const;
+    IntermediateTraversalGraph CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthReduction) const;
 
     TraversalGraph CreateTraversalGraph(const Vector3f &rayDir, int depthReduction) const;
 
@@ -92,8 +97,8 @@ class TreeletTestBVH : public BVHAccel {
                                                uint64_t maxTreeletBytes) const;
 
     std::vector<uint32_t>
-        ComputeTreeletsDPTree(const TraversalGraph &graph,
-                                               uint64_t maxTreeletBytes) const;
+        ComputeTreeletsGreedySize(const TraversalGraph &graph,
+                                  uint64_t maxTreeletBytes) const;
 
     std::vector<uint32_t> ComputeTreelets(const TraversalGraph &graph,
                                           uint64_t maxTreeletBytes) const;
