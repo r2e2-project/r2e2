@@ -40,7 +40,8 @@ class TreeletTestBVH : public BVHAccel {
     struct IntermediateTraversalGraph {
         std::deque<Edge> edges;
         std::vector<uint64_t> depthFirst;
-        std::vector<uint64_t> leftSiblings;
+        std::vector<uint64_t> predSiblings;
+        std::vector<uint64_t> parents;
 
         std::deque<std::pair<uint64_t, uint64_t>> outgoing;
     };
@@ -48,7 +49,8 @@ class TreeletTestBVH : public BVHAccel {
     struct TraversalGraph {
         std::vector<Edge> edges;
         std::vector<uint64_t> depthFirst;
-        std::vector<uint64_t> leftSiblings;
+        std::vector<uint64_t> predSiblings;
+        std::vector<uint64_t> parents;
 
         std::vector<std::pair<Edge *, uint64_t>> outgoing;
 

@@ -170,6 +170,8 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
     (void)depthReduction;
     IntermediateTraversalGraph g;
     g.depthFirst.reserve(nodeCount);
+    g.predSiblings.resize(nodeCount);
+    g.parents.resize(nodeCount);
     g.outgoing.resize(nodeCount);
 
     vector<float> probabilities(nodeCount);
@@ -214,6 +216,9 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
                 traversalStack.push_back(node->secondChildOffset);
                 traversalStack.push_back(curIdx + 1);
             }
+            g.predSiblings[*(traversalStack.end() - 1)] = *(traversalStack.end() - 2);
+            g.parents[*(traversalStack.end() - 1)] = curIdx;
+            g.parents[*(traversalStack.end() - 2)] = curIdx;
 
             nextHit = traversalStack.back();
             LinearBVHNode *nextHitNode = &nodes[nextHit];
@@ -261,6 +266,8 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
     (void)depthReduction;
     IntermediateTraversalGraph g;
     g.depthFirst.reserve(nodeCount);
+    g.predSiblings.resize(nodeCount);
+    g.parents.resize(nodeCount);
     g.outgoing.resize(nodeCount);
 
     vector<float> probabilities(nodeCount);
@@ -278,13 +285,12 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
         probabilities[dst] += prob;
     };
 
-    vector<pair<uint64_t, uint64_t>> traversalStack {{0, 0}};
+    vector<uint64_t> traversalStack {0};
     traversalStack.reserve(64);
 
     probabilities[0] = 1.0;
     while (traversalStack.size() > 0) {
-        auto curStackElem = traversalStack.back();
-        uint64_t curIdx = curStackElem.first;
+        uint64_t curIdx = traversalStack.back();
         traversalStack.pop_back();
         g.depthFirst.push_back(curIdx);
 
@@ -295,19 +301,22 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
 
         if (node->nPrimitives == 0) {
             if (dirIsNeg[node->axis]) {
-                traversalStack.emplace_back(curIdx + 1, curIdx);
-                traversalStack.emplace_back(node->secondChildOffset, curIdx);
+                traversalStack.push_back(curIdx + 1);
+                traversalStack.push_back(node->secondChildOffset);
             } else {
-                traversalStack.emplace_back(node->secondChildOffset, curIdx);
-                traversalStack.emplace_back(curIdx + 1, curIdx);
+                traversalStack.push_back(node->secondChildOffset);
+                traversalStack.push_back(curIdx + 1);
             }
+            g.predSiblings[*(traversalStack.end() - 1)] = *(traversalStack.end() - 2);
+            g.parents[*(traversalStack.end() - 1)] = curIdx;
+            g.parents[*(traversalStack.end() - 2)] = curIdx;
         }
 
         float runningProb = 1.0;
         for (int i = traversalStack.size() - 1; i >= 0; i--) {
-            auto &nextStackElem = traversalStack[i];
-            LinearBVHNode *nextHitNode = &nodes[nextStackElem.first];
-            LinearBVHNode *parentHitNode = &nodes[nextStackElem.second];
+            uint64_t nextNode = traversalStack[i];
+            LinearBVHNode *nextHitNode = &nodes[nextNode];
+            LinearBVHNode *parentHitNode = &nodes[g.parents[nextNode]];
             
             // FIXME ask Pat about this
             float nextSA = nextHitNode->bounds.SurfaceArea();
@@ -317,7 +326,7 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
             CHECK_LE(condHitProb, 1.0);
             float pathProb = curProb * runningProb * condHitProb;
 
-            addEdge(curIdx, nextStackElem.first, pathProb);
+            addEdge(curIdx, nextNode, pathProb);
             // runningProb can become 0 here if condHitProb == 1
             // could break, but then edges don't get added and Intersect
             // may crash if it turns out that edge gets taken
@@ -363,6 +372,8 @@ TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction)
     }
 
     graph.depthFirst = move(intermediate.depthFirst);
+    graph.predSiblings = move(intermediate.predSiblings);
+    graph.parents = move(intermediate.parents);
 
     auto adjacencyIter = intermediate.outgoing.begin();
     while (adjacencyIter != intermediate.outgoing.end()) {
@@ -680,20 +691,24 @@ TreeletTestBVH::ComputeTreeletsGreedySize(
     struct OutEdge {
         float weight;
         uint64_t dst;
+        uint64_t subtreeSize;
 
-        OutEdge(const Edge &edge)
+        OutEdge(const Edge &edge, uint64_t subtreeSize)
             : weight(edge.weight),
-              dst(edge.dst)
+              dst(edge.dst),
+              subtreeSize(subtreeSize)
         {}
     };
 
     struct EdgeCmp {
         bool operator()(const OutEdge &a, const OutEdge &b) const {
-            if (a.weight > b.weight) {
+            float aEff = a.weight / a.subtreeSize;
+            float bEff = b.weight / b.subtreeSize;
+            if (aEff > bEff) {
                 return true;
             }
 
-            if (a.weight < b.weight) {
+            if (aEff < bEff) {
                 return false;
             }
 
@@ -709,12 +724,6 @@ TreeletTestBVH::ComputeTreeletsGreedySize(
         sortLocs[vert] = --depthFirst.end();
     }
 
-    vector<uint64_t> cutoffSizes(nodeCount);
-    for (uint64_t vert : graph.depthFirst) {
-        uint64_t cur = cutoffSizes[vert];
-
-    }
-
     uint32_t curTreelet = 1;
     while (!depthFirst.empty()) {
         uint64_t curNode = depthFirst.front();
@@ -725,13 +734,14 @@ TreeletTestBVH::ComputeTreeletsGreedySize(
         set<OutEdge, EdgeCmp> cut;
         unordered_map<uint64_t, decltype(cut)::iterator> uniqueLookup;
         while (remainingBytes >= sizeof(CloudBVH::TreeletNode)) {
+            // Add new edges leaving curNode
             auto outgoingBounds = graph.outgoing[curNode];
             for (int i = 0; i < outgoingBounds.second; i++) {
                 const Edge *edge = outgoingBounds.first + i;
                 if (nodeSizes[edge->dst] > remainingBytes) break;
                 auto preexisting = uniqueLookup.find(edge->dst);
                 if (preexisting == uniqueLookup.end()) {
-                    auto res = cut.emplace(*edge);
+                    auto res = cut.emplace(*edge, subtreeSizes[edge->dst]);
                     CHECK_EQ(res.second, true);
                     uniqueLookup.emplace(edge->dst, res.first);
                 } else {
