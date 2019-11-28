@@ -471,6 +471,7 @@ FILE ( GLOB PBRT_SOURCE
   src/textures/*
   src/media/*
   src/cloud/*
+  src/cloud/worker/*
   src/messages/*
   src/util/*
   src/net/*

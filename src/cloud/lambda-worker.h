@@ -28,7 +28,10 @@
 #include "util/timerfd.h"
 #include "util/units.h"
 
+#define TLOG(tag) LOG(INFO) << "[" #tag "] "
+
 namespace pbrt {
+constexpr size_t UDP_MTU_BYTES{1'350};
 
 constexpr std::chrono::milliseconds PEER_CHECK_INTERVAL{250};
 constexpr std::chrono::milliseconds HANDLE_ACKS_INTERVAL{10};
@@ -234,23 +237,27 @@ class LambdaWorker {
     void loadLights();
     void loadFakeScene();
 
+    /* rays.cpp */
     Poller::Action::Result::Type handleTraceQueue();
     Poller::Action::Result::Type handleOutQueue();
     Poller::Action::Result::Type handleFinishedQueue();
     Poller::Action::Result::Type handleFinishedPaths();
+
+    /* messages.cpp */
     Poller::Action::Result::Type handlePeers();
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleNeededTreelets();
+    Poller::Action::Result::Type handleReconnects();
 
+    /* network.cpp */
     Poller::Action::Result::Type handleUdpSend();
     Poller::Action::Result::Type handleUdpReceive();
     Poller::Action::Result::Type handleRayAcknowledgements();
 
+    /* logs.cpp */
     Poller::Action::Result::Type handleWorkerStats();
     Poller::Action::Result::Type handleDiagnostics();
     Poller::Action::Result::Type handleLogLease();
-
-    Poller::Action::Result::Type handleReconnects();
 
     meow::Message createConnectionRequest(const Worker& peer);
     meow::Message createConnectionResponse(const Worker& peer);
