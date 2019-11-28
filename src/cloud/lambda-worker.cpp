@@ -113,6 +113,75 @@ struct iovec* LambdaWorker::RayPacket::iov(const WorkerId workerId) {
     return iov_;
 }
 
+void LambdaWorker::grantLease(const WorkerId workerId,
+                              const uint32_t queueSize) {
+    auto& lease = grantedLeases[workerId];
+    lease.queueSize = queueSize;
+    lease.expiresAt = packet_clock::now() + INACTIVITY_THRESHOLD;
+}
+
+void LambdaWorker::takeLease(const WorkerId workerId, const uint32_t rate) {
+    auto& peer = peers.at(workerId);
+    peer.pacer.set_rate(rate);
+
+    auto& lease = takenLeases[workerId];
+    lease.expiresAt = packet_clock::now() + INACTIVITY_THRESHOLD;
+}
+
+void LambdaWorker::rebalanceLeases() {
+    const uint32_t trafficShare =
+        max<uint32_t>(DEFAULT_SEND_RATE,
+                      config.maxUdpRate / max<size_t>(1, grantedLeases.size()));
+
+    uint32_t excess = 0;
+    uint32_t bigCount = grantedLeases.size();
+
+    for (auto& lease : grantedLeases) {
+        if (8000 * lease.second.queueSize / trafficShare < 100) {
+            lease.second.allocation = min<uint32_t>(
+                trafficShare,
+                max<uint32_t>(DEFAULT_SEND_RATE, 80 * lease.second.queueSize));
+            lease.second.small = true;
+            bigCount--;
+        } else {
+            lease.second.small = false;
+        }
+    }
+
+    const uint32_t excessShare = (bigCount == 0) ? 0 : (excess / bigCount);
+
+    for (auto& lease : grantedLeases) {
+        if (!lease.second.small) {
+            lease.second.allocation += excessShare;
+        }
+    }
+}
+
+void LambdaWorker::expireLeases() {
+    auto now = packet_clock::now();
+
+    for (auto it = grantedLeases.begin(); it != grantedLeases.end();) {
+        const WorkerId workerId = it->first;
+        auto& lease = it->second;
+
+        if (config.logLeases) {
+            leaseLogs.granted[workerId] +=
+                (lease.allocation * duration_cast<milliseconds>(
+                                        min(now, lease.expiresAt) - lease.start)
+                                        .count()) /
+                1000;
+
+            lease.start = now;
+        }
+
+        if (lease.expiresAt <= now) {
+            it = grantedLeases.erase(it);
+        } else {
+            it++;
+        }
+    }
+}
+
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const uint16_t coordinatorPort,
                            const string& storageUri,
@@ -249,6 +318,16 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                 []() { throw runtime_error("handle diagnostics failed"); }));
     }
 
+    if (config.logLeases) {
+        leaseLogs.start = packet_clock::now();
+
+        eventAction[Event::LogLeases] = loop.poller().add_action(
+            Poller::Action(leaseLogTimer.fd, Direction::In,
+                           bind(&LambdaWorker::handleLogLease, this),
+                           [this]() { return true; },
+                           []() { throw runtime_error("log lease failed"); }));
+    }
+
     loop.poller().add_action(
         Poller::Action(reconnectTimer.fd, Direction::In,
                        bind(&LambdaWorker::handleReconnects, this),
@@ -275,7 +354,8 @@ void LambdaWorker::initBenchmark(const uint32_t duration,
         eventAction[Event::FinishedQueue],  eventAction[Event::Peers],
         eventAction[Event::NeededTreelets], eventAction[Event::UdpSend],
         eventAction[Event::UdpReceive],     eventAction[Event::RayAcks],
-        eventAction[Event::Diagnostics],    eventAction[Event::WorkerStats]};
+        eventAction[Event::Diagnostics],    eventAction[Event::WorkerStats],
+        eventAction[Event::LogLeases]};
 
     loop.poller().deactivate_actions(toDeactivate);
 
@@ -461,6 +541,26 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
     // clang-format on
 
     TLOG(RAY) << oss.str();
+}
+
+ResultType LambdaWorker::handleLogLease() {
+    leaseLogTimer.reset();
+
+    const auto now = packet_clock::now();
+
+    TLOG(GLEASE)
+        << leaseLogs.granted.size() << " "
+        << duration_cast<milliseconds>(leaseLogs.start - workStart).count()
+        << " " << duration_cast<milliseconds>(now - workStart).count();
+
+    for (const auto& kv : leaseLogs.granted) {
+        TLOG(GLEASE) << kv.first << ' ' << kv.second;
+    }
+
+    leaseLogs.granted.clear();
+    leaseLogs.start = packet_clock::now();
+
+    return ResultType::Continue;
 }
 
 ResultType LambdaWorker::handleTraceQueue() {
@@ -770,52 +870,7 @@ ResultType LambdaWorker::handleReconnects() {
 ResultType LambdaWorker::handleRayAcknowledgements() {
     handleRayAcknowledgementsTimer.reset();
 
-    const auto now = packet_clock::now();
-
-    /* remove expired leases */
-    for (auto it = activeLeases.begin(); it != activeLeases.end();) {
-        if (it->second.expiresAt <= now) {
-            it = activeLeases.erase(it);
-        } else {
-            it++;
-        }
-    }
-
-    for (const auto& addr : toBeAcked) {
-        activeLeases[addr];
-    }
-
-    const uint32_t trafficShare =
-        max<uint32_t>(DEFAULT_SEND_RATE,
-                      config.maxUdpRate / max<size_t>(1, activeLeases.size()));
-
-    uint32_t excess = 0;
-    uint32_t bigCount = activeLeases.size();
-
-    for (auto& lease : activeLeases) {
-        if (8000 * lease.second.queueSize / trafficShare < 100) {
-            lease.second.allocation = min<uint32_t>(
-                trafficShare,
-                max<uint32_t>(DEFAULT_SEND_RATE, 80 * lease.second.queueSize));
-            lease.second.small = true;
-            bigCount--;
-
-            excess += trafficShare - lease.second.allocation;
-        } else {
-            lease.second.small = false;
-        }
-    }
-
-    const auto excessShare = (bigCount == 0) ? 0 : (excess / bigCount);
-
-    for (const auto& addr : toBeAcked) {
-        auto& lease = activeLeases[addr];
-
-        if (!lease.small) {
-            lease.workerId = addressToWorker[addr];
-            lease.allocation = trafficShare + excessShare;
-        }
-    }
+    rebalanceLeases();
 
     /* count the number of active senders to this worker */
     for (const auto& addr : toBeAcked) {
@@ -823,7 +878,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
 
         /* Let's construct the ack message for this worker */
         string ack{};
-        ack += put_field(activeLeases[addr].allocation);
+        ack += put_field(grantedLeases[addressToWorker[addr]].allocation);
         ack += put_field(receivedSeqNos.smallest_not_in_set());
 
         for (auto sIt = receivedSeqNos.set().cbegin();
@@ -842,6 +897,9 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
     }
 
     toBeAcked.clear();
+    expireLeases();
+
+    const auto now = packet_clock::now();
 
     // re-queue timed-out packets
     while (!outstandingRayPackets.empty() &&
@@ -959,17 +1017,24 @@ ResultType LambdaWorker::handleUdpSend() {
             const auto& candidates = treeletToWorker[treeletId];
             peerId = *random::sample(candidates.begin(), candidates.end());
             workerForTreelet[treeletId].first = peerId;
-            workerForTreelet[treeletId].second = now + 4 * INACTIVITY_THRESHOLD;
+            workerForTreelet[treeletId].second = now + WORKER_TREELET_TIME;
         }
 
         auto& peer = peers.at(peerId);
 
-        if (!peer.pacer.within_pace()) {
-            continue;
+        /* (1) do we have a lease for this worker? */
+        auto leaseIt = takenLeases.find(peerId);
+
+        /* (2) is it expired? */
+        if (leaseIt == takenLeases.end() ||
+            (leaseIt->second.expiresAt <= now &&
+             (takenLeases.erase(leaseIt), true))) {
+            peer.pacer.set_rate(DEFAULT_SEND_RATE);
         }
 
-        if (now - peer.lastReceivedAck > 3 * INACTIVITY_THRESHOLD / 4) {
-            peer.pacer = {true, DEFAULT_SEND_RATE};
+        /* (3) are we within pace? */
+        if (!peer.pacer.within_pace()) {
+            continue;
         }
 
         auto& peerSeqNo = sequenceNumbers[peer.address];
@@ -1038,8 +1103,8 @@ ResultType LambdaWorker::handleUdpReceive() {
             const auto rate = chunk.be32();
 
             auto& peer = peers.at(message.sender_id());
-            peer.pacer.set_rate(rate);
-            peer.lastReceivedAck = packet_clock::now();
+            takeLease(message.sender_id(), rate);
+
             chunk = chunk(4);
 
             if (message.tracked()) {
@@ -1061,15 +1126,8 @@ ResultType LambdaWorker::handleUdpReceive() {
             it = messages.erase(it);
         } else if (message.opcode() == OpCode::SendRays) {
             Chunk chunk(message.payload());
-
-            // FIXME
-            /* auto& peer = peers.at(message.sender_id());
-            peer.diagnostics.bytesReceived += message.total_length(); */
-
-            auto& lease = activeLeases[datagram.first];
-            lease.workerId = message.sender_id();
-            lease.expiresAt = packet_clock::now() + INACTIVITY_THRESHOLD;
-            lease.queueSize = chunk.le32();
+            const auto queueSize = chunk.le32();
+            grantLease(message.sender_id(), queueSize);
         }
     }
 

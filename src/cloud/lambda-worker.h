@@ -37,9 +37,11 @@ constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr std::chrono::milliseconds KEEP_ALIVE_INTERVAL{40'000};
 constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
 constexpr std::chrono::milliseconds PACKET_TIMEOUT{20};
-constexpr std::chrono::milliseconds INACTIVITY_THRESHOLD{1'00};
+constexpr std::chrono::milliseconds INACTIVITY_THRESHOLD{40};
+constexpr std::chrono::milliseconds WORKER_TREELET_TIME{200};
 // constexpr std::chrono::milliseconds TREELET_PEER_TIMEOUT{200};
 constexpr std::chrono::milliseconds RECONNECTS_INTERVAL{2'000};
+constexpr std::chrono::milliseconds LEASE_LOG_INTERVAL{200};
 
 constexpr uint64_t DEFAULT_SEND_RATE{1'400 * 8};
 
@@ -216,6 +218,7 @@ class LambdaWorker {
         RayAcks,
         WorkerStats,
         Diagnostics,
+        LogLeases,
         NetStats,
     };
 
@@ -245,6 +248,7 @@ class LambdaWorker {
 
     Poller::Action::Result::Type handleWorkerStats();
     Poller::Action::Result::Type handleDiagnostics();
+    Poller::Action::Result::Type handleLogLease();
 
     Poller::Action::Result::Type handleReconnects();
 
@@ -359,8 +363,11 @@ class LambdaWorker {
     TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
     TimerFD handleRayAcknowledgementsTimer{HANDLE_ACKS_INTERVAL};
     TimerFD reconnectTimer{RECONNECTS_INTERVAL};
+    TimerFD leaseLogTimer{LEASE_LOG_INTERVAL};
 
     bool terminated{false};
+
+    const packet_clock::time_point workStart{packet_clock::now()};
 
     ////////////////////////////////////////////////////////////////////////////
     // BENCHMARKING                                                           //
@@ -371,13 +378,23 @@ class LambdaWorker {
         packet_clock::time_point expiresAt{start + INACTIVITY_THRESHOLD};
 
         WorkerId workerId{0};
-        bool small{false};
         uint32_t allocation{DEFAULT_SEND_RATE};
         uint32_t queueSize{1'400};
+        bool small{true};
     };
 
-    const packet_clock::time_point workStart{packet_clock::now()};
-    std::map<Address, Lease> activeLeases{};  // used by the receiver
+    void grantLease(const WorkerId workerId, const uint32_t queueSize);
+    void takeLease(const WorkerId workerId, const uint32_t rate);
+    void rebalanceLeases();
+    void expireLeases();
+
+    std::map<WorkerId, Lease> grantedLeases{};  // used by the receiver
+    std::map<WorkerId, Lease> takenLeases{};    // used by the sender
+
+    struct {
+        packet_clock::time_point start{};
+        std::map<WorkerId, uint64_t> granted{};
+    } leaseLogs;
 
     std::map<TreeletId, std::pair<WorkerId, packet_clock::time_point>>
         workerForTreelet;  // used by the sender
