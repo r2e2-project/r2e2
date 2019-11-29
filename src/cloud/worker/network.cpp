@@ -13,6 +13,37 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
+size_t LambdaWorker::Lease::allocatedBits(
+    const packet_clock::time_point now) const {
+    return (allocation *
+            duration_cast<milliseconds>(min(now, expiresAt) - start).count()) /
+           1000;
+}
+
+LambdaWorker::packet_clock::time_point LambdaWorker::flushLeaseInfo(
+    const bool granted, const bool taken) {
+    const auto now = packet_clock::now();
+    if (!config.logLeases) return now;
+
+    auto flush = [&now](map<WorkerId, Lease>& leases,
+                        map<WorkerId, size_t>& bytes) {
+        for (auto& lease : leases) {
+            bytes[lease.first] += lease.second.allocatedBits(now);
+            lease.second.start = min(now, lease.second.expiresAt);
+        }
+    };
+
+    if (granted) {
+        flush(grantedLeases, leaseLogs.granted);
+    }
+
+    if (taken) {
+        flush(takenLeases, leaseLogs.taken);
+    }
+
+    return now;
+}
+
 void LambdaWorker::grantLease(const WorkerId workerId,
                               const uint32_t queueSize) {
     auto& lease = grantedLeases[workerId];
@@ -25,7 +56,15 @@ void LambdaWorker::takeLease(const WorkerId workerId, const uint32_t rate) {
     peer.pacer.set_rate(rate);
 
     auto& lease = takenLeases[workerId];
-    lease.expiresAt = packet_clock::now() + INACTIVITY_THRESHOLD;
+    const auto now = packet_clock::now();
+    lease.expiresAt = now + INACTIVITY_THRESHOLD;
+
+    if (config.logLeases) {
+        leaseLogs.taken[workerId] += lease.allocatedBits(now);
+        lease.start = now;
+    }
+
+    lease.allocation = rate;
 }
 
 void LambdaWorker::rebalanceLeases() {
@@ -60,19 +99,11 @@ void LambdaWorker::rebalanceLeases() {
 void LambdaWorker::expireLeases() {
     auto now = packet_clock::now();
 
+    flushLeaseInfo(true, false);
+
     for (auto it = grantedLeases.begin(); it != grantedLeases.end();) {
         const WorkerId workerId = it->first;
         auto& lease = it->second;
-
-        if (config.logLeases) {
-            leaseLogs.granted[workerId] +=
-                (lease.allocation * duration_cast<milliseconds>(
-                                        min(now, lease.expiresAt) - lease.start)
-                                        .count()) /
-                1000;
-
-            lease.start = now;
-        }
 
         if (lease.expiresAt <= now) {
             it = grantedLeases.erase(it);

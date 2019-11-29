@@ -107,7 +107,7 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
 ResultType LambdaWorker::handleLogLease() {
     leaseLogTimer.reset();
 
-    const auto now = packet_clock::now();
+    const auto now = flushLeaseInfo(true, true);
 
     TLOG(GLEASE)
         << leaseLogs.granted.size() << " "
@@ -118,7 +118,17 @@ ResultType LambdaWorker::handleLogLease() {
         TLOG(GLEASE) << kv.first << ' ' << kv.second;
     }
 
+    TLOG(TLEASE)
+        << leaseLogs.taken.size() << " "
+        << duration_cast<milliseconds>(leaseLogs.start - workStart).count()
+        << " " << duration_cast<milliseconds>(now - workStart).count();
+
+    for (const auto& kv : leaseLogs.taken) {
+        TLOG(TLEASE) << kv.first << ' ' << kv.second;
+    }
+
     leaseLogs.granted.clear();
+    leaseLogs.taken.clear();
     leaseLogs.start = packet_clock::now();
 
     return ResultType::Continue;
