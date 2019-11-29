@@ -388,6 +388,8 @@ class LambdaWorker {
         uint32_t allocation{DEFAULT_SEND_RATE};
         uint32_t queueSize{1'400};
         bool small{true};
+
+        size_t allocatedBits(const packet_clock::time_point now) const;
     };
 
     void grantLease(const WorkerId workerId, const uint32_t queueSize);
@@ -395,12 +397,16 @@ class LambdaWorker {
     void rebalanceLeases();
     void expireLeases();
 
+    packet_clock::time_point flushLeaseInfo(const bool granted,
+                                            const bool taken);
+
     std::map<WorkerId, Lease> grantedLeases{};  // used by the receiver
     std::map<WorkerId, Lease> takenLeases{};    // used by the sender
 
     struct {
         packet_clock::time_point start{};
         std::map<WorkerId, uint64_t> granted{};
+        std::map<WorkerId, uint64_t> taken{};
     } leaseLogs;
 
     std::map<TreeletId, std::pair<WorkerId, packet_clock::time_point>>
