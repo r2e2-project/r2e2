@@ -687,6 +687,7 @@ TreeletTestBVH::ComputeTreeletsTopologicalHierarchical(
 vector<uint32_t>
 TreeletTestBVH::ComputeTreeletsGreedySize(
         const TraversalGraph &graph, uint64_t maxTreeletBytes) const {
+    static const float AREA_EPSILON = nodes[0].bounds.SurfaceArea() * (maxTreeletBytes / sizeof(CloudBVH::TreeletNode)) / (nodeCount * 10);
 
     struct OutEdge {
         float weight;
@@ -702,8 +703,8 @@ TreeletTestBVH::ComputeTreeletsGreedySize(
 
     struct EdgeCmp {
         bool operator()(const OutEdge &a, const OutEdge &b) const {
-            float aEff = a.weight / a.subtreeSize;
-            float bEff = b.weight / b.subtreeSize;
+            float aEff = (a.weight + AREA_EPSILON) / a.subtreeSize;
+            float bEff = (b.weight + AREA_EPSILON) / b.subtreeSize;
             if (aEff > bEff) {
                 return true;
             }
