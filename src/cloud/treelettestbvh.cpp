@@ -160,8 +160,22 @@ void TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
     origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
     for (unsigned i = 0; i < 8; i++) {
         Vector3f dir = computeRayDir(i);
-        graphs[i] = CreateTraversalGraph(dir, 0);
-        treeletAllocations[i] = ComputeTreelets(graphs[i], maxTreeletBytes);
+        TraversalGraph graph = CreateTraversalGraph(dir, 0);
+
+        //rayCounts[i].resize(nodeCount);
+        //// Init rayCounts so unordered_map isn't modified during intersection
+        //for (uint64_t srcIdx = 0; srcIdx < nodeCount; srcIdx++) {
+        //    auto outgoing = graph.outgoing[srcIdx];
+        //    for (const Edge *outgoingEdge = outgoing.first;
+        //         outgoingEdge < outgoing.first + outgoing.second;
+        //         outgoingEdge++) {
+        //        uint64_t dstIdx = outgoingEdge->dst;
+        //        auto res = rayCounts[i][srcIdx].emplace(dstIdx, 0);
+        //        CHECK_EQ(res.second, true);
+        //    }
+        //}
+
+        treeletAllocations[i] = ComputeTreelets(graph, maxTreeletBytes);
     }
 }
 
@@ -382,20 +396,6 @@ TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction)
         graph.outgoing.emplace_back(&graph.edges[idx], weight);
         adjacencyIter++;
         intermediate.outgoing.pop_front();
-    }
-
-    graph.rayCounts.resize(nodeCount);
-
-    // Init rayCounts so unordered_map isn't modified during intersection
-    for (uint64_t srcIdx = 0; srcIdx < nodeCount; srcIdx++) {
-        auto outgoing = graph.outgoing[srcIdx];
-        for (const Edge *outgoingEdge = outgoing.first;
-             outgoingEdge < outgoing.first + outgoing.second;
-             outgoingEdge++) {
-            uint64_t dstIdx = outgoingEdge->dst;
-            auto res = graph.rayCounts[srcIdx].emplace(dstIdx, 0);
-            CHECK_EQ(res.second, true);
-        }
     }
 
     printf("Graph gen complete: %lu verts %lu edges\n",
@@ -687,7 +687,7 @@ TreeletTestBVH::ComputeTreeletsTopologicalHierarchical(
 vector<uint32_t>
 TreeletTestBVH::ComputeTreeletsGreedySize(
         const TraversalGraph &graph, uint64_t maxTreeletBytes) const {
-    static const float AREA_EPSILON = nodes[0].bounds.SurfaceArea() * (maxTreeletBytes / sizeof(CloudBVH::TreeletNode)) / (nodeCount * 10);
+    static const float ROOT_SIZE = subtreeSizes[0];
 
     struct OutEdge {
         float weight;
@@ -703,8 +703,8 @@ TreeletTestBVH::ComputeTreeletsGreedySize(
 
     struct EdgeCmp {
         bool operator()(const OutEdge &a, const OutEdge &b) const {
-            float aEff = (a.weight + AREA_EPSILON) / a.subtreeSize;
-            float bEff = (b.weight + AREA_EPSILON) / b.subtreeSize;
+            float aEff = 15.f * a.weight - (float)a.subtreeSize / ROOT_SIZE;
+            float bEff = 15.f * b.weight - (float)b.subtreeSize / ROOT_SIZE;
             if (aEff > bEff) {
                 return true;
             }
@@ -995,11 +995,11 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
     return labels;
 }
 
-void UpdateRayCount(const TreeletTestBVH::TraversalGraph &graph,
+void UpdateRayCount(const TreeletTestBVH::RayCountMap &rayCounts,
                     uint64_t src, uint64_t dst) {
-    atomic_uint64_t &rayCount =
-        const_cast<atomic_uint64_t &>(graph.rayCounts[src].find(dst)->second);
-    rayCount++;
+    //atomic_uint64_t &rayCount =
+    //    const_cast<atomic_uint64_t &>(rayCounts[src].find(dst)->second);
+    //rayCount++;
 }
 
 bool TreeletTestBVH::IntersectSendCheck(const Ray &ray,
@@ -1049,7 +1049,7 @@ bool TreeletTestBVH::IntersectSendCheck(const Ray &ray,
             currentNodeIndex = nodesToVisit[--toVisitOffset];
         }
 
-        UpdateRayCount(graphs[dirIdx], prevNodeIndex, currentNodeIndex);
+        UpdateRayCount(rayCounts[dirIdx], prevNodeIndex, currentNodeIndex);
 
         uint32_t curNewTreelet = newLabels[currentNodeIndex];
         uint32_t curOldTreelet = oldLabels[currentNodeIndex];
@@ -1115,7 +1115,7 @@ bool TreeletTestBVH::IntersectPSendCheck(const Ray &ray) const {
             currentNodeIndex = nodesToVisit[--toVisitOffset];
         }
 
-        UpdateRayCount(graphs[dirIdx], prevNodeIndex, currentNodeIndex);
+        UpdateRayCount(rayCounts[dirIdx], prevNodeIndex, currentNodeIndex);
 
         uint32_t curNewTreelet = newLabels[currentNodeIndex];
         uint32_t curOldTreelet = oldLabels[currentNodeIndex];
@@ -1188,7 +1188,7 @@ bool TreeletTestBVH::IntersectCheckSend(const Ray &ray,
 
         if (currentNodeIndex == prevNodeIndex) break;
 
-        UpdateRayCount(graphs[dirIdx], prevNodeIndex, currentNodeIndex);
+        UpdateRayCount(rayCounts[dirIdx], prevNodeIndex, currentNodeIndex);
 
         uint32_t curNewTreelet = newLabels[currentNodeIndex];
         uint32_t curOldTreelet = oldLabels[currentNodeIndex];
@@ -1255,7 +1255,7 @@ bool TreeletTestBVH::IntersectPCheckSend(const Ray &ray) const {
 
         if (currentNodeIndex == prevNodeIndex) break;
 
-        UpdateRayCount(graphs[dirIdx], prevNodeIndex, currentNodeIndex);
+        UpdateRayCount(rayCounts[dirIdx], prevNodeIndex, currentNodeIndex);
 
         uint32_t curNewTreelet = newLabels[currentNodeIndex];
         uint32_t curOldTreelet = oldLabels[currentNodeIndex];
