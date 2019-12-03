@@ -53,11 +53,10 @@ class TreeletTestBVH : public BVHAccel {
         std::vector<uint64_t> parents;
 
         std::vector<std::pair<Edge *, uint64_t>> outgoing;
-
-        std::vector<std::unordered_map<uint64_t, std::atomic_uint64_t>> rayCounts;
     };
 
     using TreeletMap = std::array<std::vector<uint32_t>, 8>;
+    using RayCountMap = std::vector<std::unordered_map<uint64_t, std::atomic_uint64_t>>;
 
     TreeletTestBVH(std::vector<std::shared_ptr<Primitive>> &&p,
                    int maxTreeletBytes,
@@ -119,8 +118,7 @@ class TreeletTestBVH : public BVHAccel {
     bool IntersectCheckSend(const Ray &ray,
                             SurfaceInteraction *isect) const;
     bool IntersectPCheckSend(const Ray &ray) const;
-
-    std::array<TraversalGraph, 8> graphs{};
+    std::array<RayCountMap, 8> rayCounts;
     TreeletMap treeletAllocations{};
     std::vector<uint32_t> origTreeletAllocation{};
 
