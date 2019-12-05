@@ -205,9 +205,9 @@ void TreeletTestBVH::SetNodeInfo() {
 
     // Update subtreeSizes to include one copy of each instance in children
     for (auto &inclPair : instanceInclusions) {
-        auto instPtr = inclPair.first;
+        BVHAccel *instPtr = inclPair.first;
         uint64_t instanceSize = instanceSizes.find(instPtr)->second;
-        auto instNodes = inclPair.second;
+        vector<int> &instNodes = inclPair.second;
 
         unordered_set<int> subtreeUpdates;
         for (int instanceNode : instNodes) {
@@ -905,8 +905,8 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
             if (!res.second) continue;
 
             uint64_t instanceSize = instanceSizes.find(instance)->second;
-            auto impacts = instanceImpacts.find(instance)->second;
-            auto inclusions = instanceInclusions.find(instance)->second;
+            const vector<int> &impacts = instanceImpacts.find(instance)->second;
+            const vector<int> &inclusions = instanceInclusions.find(instance)->second;
 
             for (int updateNode : impacts) {
                 curSubtreeSizes[updateNode] -= instanceSize;
@@ -921,8 +921,8 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
     auto UndoUpdateSizes = [this, &curNodeSizes, &curSubtreeSizes](const unordered_set<BVHAccel *> &includedInstances, int rootIndex) {
         for (auto instance : includedInstances) {
             uint64_t instanceSize = instanceSizes.find(instance)->second;
-            auto impacts = instanceImpacts.find(instance)->second;
-            auto inclusions = instanceInclusions.find(instance)->second;
+            const vector<int> &impacts = instanceImpacts.find(instance)->second;
+            const vector<int> &inclusions = instanceInclusions.find(instance)->second;
 
             for (int updateNode : impacts) {
                 curSubtreeSizes[updateNode] += instanceSize;
