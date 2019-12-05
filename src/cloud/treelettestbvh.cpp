@@ -213,6 +213,7 @@ void TreeletTestBVH::SetNodeInfo() {
         for (int instanceNode : instNodes) {
             int updateNode = instanceNode;
             while (updateNode != 0 && subtreeUpdates.count(updateNode) == 0) {
+                instanceImpacts[instPtr].push_back(updateNode);
                 subtreeSizes[updateNode] += instanceSize;
 
                 subtreeUpdates.insert(updateNode);
@@ -899,24 +900,20 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
     vector<uint64_t> curSubtreeSizes(subtreeSizes);
 
     auto UpdateSizes = [this, &curNodeSizes, &curSubtreeSizes](unordered_set<BVHAccel *> &includedInstances, int nodeIdx, int rootIndex) {
-        const LinearBVHNode &node = nodes[nodeIdx];
         for (BVHAccel *instance : nodeInstances[nodeIdx]) {
             auto res = includedInstances.insert(instance);
             if (!res.second) continue;
 
             uint64_t instanceSize = instanceSizes.find(instance)->second;
+            auto impacts = instanceImpacts.find(instance)->second;
             auto inclusions = instanceInclusions.find(instance)->second;
-            unordered_set<int> subtreeUpdates;
-            for (int instanceNode : inclusions) {
-                curNodeSizes[instanceNode] -= instanceSize;
 
-                int updateNode = instanceNode;
-                while (updateNode != rootIndex && subtreeUpdates.count(updateNode) == 0) {
-                    curSubtreeSizes[updateNode] -= instanceSize;
+            for (int updateNode : impacts) {
+                curSubtreeSizes[updateNode] -= instanceSize;
+            }
 
-                    subtreeUpdates.insert(updateNode);
-                    updateNode = nodeParents[updateNode];
-                }
+            for (int updateNode : inclusions) {
+                curNodeSizes[updateNode] -= instanceSize;
             }
         }
     };
@@ -924,18 +921,15 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
     auto UndoUpdateSizes = [this, &curNodeSizes, &curSubtreeSizes](const unordered_set<BVHAccel *> &includedInstances, int rootIndex) {
         for (auto instance : includedInstances) {
             uint64_t instanceSize = instanceSizes.find(instance)->second;
+            auto impacts = instanceImpacts.find(instance)->second;
             auto inclusions = instanceInclusions.find(instance)->second;
-            unordered_set<int> subtreeUpdates;
-            for (int instanceNode : inclusions) {
-                curNodeSizes[instanceNode] += instanceSize;
 
-                int updateNode = instanceNode;
-                while (updateNode != rootIndex && subtreeUpdates.count(updateNode) == 0) {
-                    curSubtreeSizes[updateNode] += instanceSize;
+            for (int updateNode : impacts) {
+                curSubtreeSizes[updateNode] += instanceSize;
+            }
 
-                    subtreeUpdates.insert(updateNode);
-                    updateNode = nodeParents[updateNode];
-                }
+            for (int updateNode : inclusions) {
+                curNodeSizes[updateNode] += instanceSize;
             }
         }
     };
