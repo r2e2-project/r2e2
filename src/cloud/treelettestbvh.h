@@ -123,6 +123,7 @@ class TreeletTestBVH : public BVHAccel {
     std::vector<uint64_t> nodeSizes;
     std::unordered_map<BVHAccel *, uint64_t> instanceSizes;
     std::unordered_map<BVHAccel *, std::list<int>> instanceInclusions;
+    std::unordered_map<BVHAccel *, std::vector<int>> instanceImpacts;
     std::vector<std::vector<BVHAccel *>> nodeInstances;
     std::vector<uint64_t> subtreeSizes;
 };
