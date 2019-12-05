@@ -322,6 +322,7 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
             }
         } else if (nextMiss != 0) {
             // Leaf node, guaranteed move up in the BVH
+            // Add instance support here
             addEdge(curIdx, nextMiss, curProb);
         } else {
             // Termination point for all traversal paths
@@ -872,6 +873,7 @@ TreeletTestBVH::ComputeTreelets(const TraversalGraph &graph,
     uint64_t totalBytes = 0;
     for (int node = 0; node < nodeCount; node++) {
         uint32_t treelet = assignment[node];
+        CHECK_NE(treelet, 0);
         uint64_t bytes = nodeSizes[node];
         sizes[treelet] += bytes;
         totalBytes += bytes;
