@@ -43,8 +43,7 @@ TreeletTestBVH::TreeletTestBVH(vector<shared_ptr<Primitive>> &&p,
         file.write((char *)nodes, nodeCount * sizeof(LinearBVHNode));
         file.close();
     }
-    SetNodeSizes();
-    SetSubtreeSizes();
+    SetNodeInfo();
     AllocateTreelets(maxTreeletBytes);
 }
 
@@ -58,7 +57,7 @@ TreeletTestBVH::TreeletTestBVH(vector<shared_ptr<Primitive>> &&p,
       traversalAlgo(travAlgo),
       partitionAlgo(partAlgo)
 {
-    SetNodeSizes();
+    SetNodeInfo();
     AllocateTreelets(maxTreeletBytes);
 }
 
@@ -136,24 +135,80 @@ shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(
     }
 }
 
-void TreeletTestBVH::SetNodeSizes() {
-    nodeSizes.reserve(nodeCount);
-    for (int i = 0; i < nodeCount; i++) {
-        nodeSizes.push_back(GetNodeSize(i));
-    }
-}
-
-void TreeletTestBVH::SetSubtreeSizes() {
+void TreeletTestBVH::SetNodeInfo() {
+    printf("Building general BVH node information\n");
+    nodeSizes.resize(nodeCount);
     subtreeSizes.resize(nodeCount);
+    nodeParents.resize(nodeCount);
+    for (int nodeIdx = nodeCount - 1; nodeIdx >= 0; nodeIdx--) {
+        const LinearBVHNode &node = nodes[nodeIdx];
 
-    for (int idx = nodeCount - 1; idx >= 0; idx--) {
-        const LinearBVHNode &node = nodes[idx];
-        subtreeSizes[idx] = nodeSizes[idx];
+        const uint64_t nodeSize = sizeof(CloudBVH::TreeletNode);
+        // Assume on average 2 unique vertices, normals etc per triangle
+        const uint64_t triSize = 3 * sizeof(int) + 2 * (sizeof(Point3f) +
+                sizeof(Normal3f) + sizeof(Vector3f) + sizeof(Point2f));
+
+        uint64_t totalSize = nodeSize;
+        uint64_t noInstanceSize = nodeSize;
+        unordered_set<BVHAccel *> instances;
+
+        for (int primIdx = 0; primIdx < node.nPrimitives; primIdx++) {
+            auto &prim  = primitives[node.primitivesOffset + primIdx];
+            if (prim->GetType() == PrimitiveType::Geometric) {
+                totalSize += triSize;
+                noInstanceSize += triSize;
+            } else if (prim->GetType() == PrimitiveType::Transformed) {
+                shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
+                shared_ptr<BVHAccel> instance = dynamic_pointer_cast<BVHAccel>(tp->GetPrimitive());
+
+                CHECK_NOTNULL(instance.get());
+                if (!instanceSizes.count(instance.get())) {
+                    uint64_t instanceSize = 0;
+                    for (int i = 0; i < instance->GetNodeCount(); i++) {
+                        const LinearBVHNode &instanceNode = instance->GetNode(i);
+                        instanceSize += nodeSize + instanceNode.nPrimitives * triSize;
+                    }
+                    instanceSizes.emplace(instance.get(), instanceSize);
+                }
+
+                // Prevent double counting of instances in same node
+                if (instances.count(instance.get()) == 0) {
+                    totalSize += instanceSizes.find(instance.get())->second;
+                    instances.insert(instance.get());
+                    instanceInclusions[instance.get()].push_back(nodeIdx);
+                }
+            }
+        }
+
+        nodeSizes[nodeIdx] = totalSize;
+        subtreeSizes[nodeIdx] = noInstanceSize;
         if (node.nPrimitives == 0) {
-            subtreeSizes[idx] += subtreeSizes[idx + 1] +
-                                 subtreeSizes[node.secondChildOffset];
+            nodeParents[nodeIdx + 1] = nodeIdx;
+            nodeParents[node.secondChildOffset] = nodeIdx;
+
+            subtreeSizes[nodeIdx] += subtreeSizes[nodeIdx + 1] +
+                                     subtreeSizes[node.secondChildOffset];
         }
     }
+
+    // Update subtreeSizes to include one copy of each instance in children
+    for (auto &inclPair : instanceInclusions) {
+        auto instPtr = inclPair.first;
+        uint64_t instanceSize = instanceSizes.find(instPtr)->second;
+        auto instNodes = inclPair.second;
+
+        unordered_set<int> subtreeUpdates;
+        for (int instanceNode : instNodes) {
+            int updateNode = instanceNode;
+            while (updateNode != 0 && subtreeUpdates.count(updateNode) == 0) {
+                subtreeSizes[updateNode] += instanceSize;
+
+                subtreeUpdates.insert(updateNode);
+                updateNode = nodeParents[updateNode];
+            }
+        }
+    }
+    printf("Done building general BVH node information\n");
 }
 
 void TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
@@ -184,8 +239,6 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
     (void)depthReduction;
     IntermediateTraversalGraph g;
     g.depthFirst.reserve(nodeCount);
-    g.predSiblings.resize(nodeCount);
-    g.parents.resize(nodeCount);
     g.outgoing.resize(nodeCount);
 
     vector<float> probabilities(nodeCount);
@@ -230,9 +283,6 @@ TreeletTestBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
                 traversalStack.push_back(node->secondChildOffset);
                 traversalStack.push_back(curIdx + 1);
             }
-            g.predSiblings[*(traversalStack.end() - 1)] = *(traversalStack.end() - 2);
-            g.parents[*(traversalStack.end() - 1)] = curIdx;
-            g.parents[*(traversalStack.end() - 2)] = curIdx;
 
             nextHit = traversalStack.back();
             LinearBVHNode *nextHitNode = &nodes[nextHit];
@@ -280,8 +330,6 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
     (void)depthReduction;
     IntermediateTraversalGraph g;
     g.depthFirst.reserve(nodeCount);
-    g.predSiblings.resize(nodeCount);
-    g.parents.resize(nodeCount);
     g.outgoing.resize(nodeCount);
 
     vector<float> probabilities(nodeCount);
@@ -321,16 +369,13 @@ TreeletTestBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
                 traversalStack.push_back(node->secondChildOffset);
                 traversalStack.push_back(curIdx + 1);
             }
-            g.predSiblings[*(traversalStack.end() - 1)] = *(traversalStack.end() - 2);
-            g.parents[*(traversalStack.end() - 1)] = curIdx;
-            g.parents[*(traversalStack.end() - 2)] = curIdx;
         }
 
         float runningProb = 1.0;
         for (int i = traversalStack.size() - 1; i >= 0; i--) {
             uint64_t nextNode = traversalStack[i];
             LinearBVHNode *nextHitNode = &nodes[nextNode];
-            LinearBVHNode *parentHitNode = &nodes[g.parents[nextNode]];
+            LinearBVHNode *parentHitNode = &nodes[nodeParents[nextNode]];
             
             // FIXME ask Pat about this
             float nextSA = nextHitNode->bounds.SurfaceArea();
@@ -386,8 +431,6 @@ TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction)
     }
 
     graph.depthFirst = move(intermediate.depthFirst);
-    graph.predSiblings = move(intermediate.predSiblings);
-    graph.parents = move(intermediate.parents);
 
     auto adjacencyIter = intermediate.outgoing.begin();
     while (adjacencyIter != intermediate.outgoing.end()) {
@@ -402,16 +445,6 @@ TreeletTestBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction)
            graph.depthFirst.size(), graph.edges.size());
 
     return graph;
-}
-
-uint64_t TreeletTestBVH::GetNodeSize(int nodeIdx) const {
-    const LinearBVHNode * node = &nodes[nodeIdx];
-    const uint64_t nodeSize = sizeof(CloudBVH::TreeletNode);
-    // Assume on average 2 unique vertices, normals etc per triangle
-    const uint64_t primSize = 3 * sizeof(int) + 2 * (sizeof(Point3f) +
-            sizeof(Normal3f) + sizeof(Vector3f) + sizeof(Point2f));
-
-    return nodeSize + node->nPrimitives * primSize;
 }
 
 vector<uint32_t>
@@ -842,11 +875,63 @@ TreeletTestBVH::ComputeTreelets(const TraversalGraph &graph,
 }
 
 vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletBytes) const {
+    vector<uint32_t> labels(nodeCount);
+
     /* pass one */
     std::unique_ptr<float []> best_costs(new float[nodeCount]);
 
     float max_nodes = (float)maxTreeletBytes / sizeof(CloudBVH::TreeletNode);
     const float AREA_EPSILON = nodes[0].bounds.SurfaceArea() * max_nodes / (nodeCount * 10);
+
+    vector<uint64_t> curNodeSizes(nodeSizes);
+    vector<uint64_t> curSubtreeSizes(subtreeSizes);
+
+    auto UpdateSizes = [this, &curNodeSizes, &curSubtreeSizes](unordered_set<BVHAccel *> &includedInstances, int nodeIdx, int rootIndex) {
+        const LinearBVHNode &node = nodes[nodeIdx];
+        for (int i = 0; i < node.nPrimitives; i++) {
+            auto &prim = primitives[node.primitivesOffset + i];
+            if (prim->GetType() == PrimitiveType::Transformed) {
+                shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
+                shared_ptr<BVHAccel> instance = dynamic_pointer_cast<BVHAccel>(tp->GetPrimitive());
+                if (includedInstances.count(instance.get())) continue;
+                includedInstances.insert(instance.get());
+
+                uint64_t instanceSize = instanceSizes.find(instance.get())->second;
+                auto inclusions = instanceInclusions.find(instance.get())->second;
+                unordered_set<int> subtreeUpdates;
+                for (int instanceNode : inclusions) {
+                    curNodeSizes[instanceNode] -= instanceSize;
+
+                    int updateNode = instanceNode;
+                    while (updateNode != rootIndex && subtreeUpdates.count(updateNode) == 0) {
+                        curSubtreeSizes[updateNode] -= instanceSize;
+
+                        subtreeUpdates.insert(updateNode);
+                        updateNode = nodeParents[updateNode];
+                    }
+                }
+            }
+        }
+    };
+
+    auto UndoUpdateSizes = [this, &curNodeSizes, &curSubtreeSizes](const unordered_set<BVHAccel *> &includedInstances, int rootIndex) {
+        for (auto instance : includedInstances) {
+            uint64_t instanceSize = instanceSizes.find(instance)->second;
+            auto inclusions = instanceInclusions.find(instance)->second;
+            unordered_set<int> subtreeUpdates;
+            for (int instanceNode : inclusions) {
+                curNodeSizes[instanceNode] += instanceSize;
+
+                int updateNode = instanceNode;
+                while (updateNode != rootIndex && subtreeUpdates.count(updateNode) == 0) {
+                    curSubtreeSizes[updateNode] += instanceSize;
+
+                    subtreeUpdates.insert(updateNode);
+                    updateNode = nodeParents[updateNode];
+                }
+            }
+        }
+    };
 
     for (int root_index = nodeCount - 1; root_index >= 0; root_index--) {
         const LinearBVHNode & root_node = nodes[root_index];
@@ -855,6 +940,7 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
         cut.insert(root_index);
         uint64_t remaining_size = maxTreeletBytes;
         best_costs[root_index] = std::numeric_limits<float>::max();
+        unordered_set<BVHAccel *> includedInstances;
 
         while (true) {
             int best_node_index = -1;
@@ -863,9 +949,9 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
             if (remaining_size > 0) {
                 for (const auto n : cut) {
                     const float gain = nodes[n].bounds.SurfaceArea() + AREA_EPSILON;
-                    const uint64_t price = std::min(subtreeSizes[n], remaining_size);
+                    const uint64_t price = std::min(curSubtreeSizes[n], remaining_size);
                     const float score = gain / price;
-                    if (score > best_score) {
+                    if (curNodeSizes[n] <= remaining_size && score > best_score) {
                         best_score = score;
                         best_node_index = n;
                     }
@@ -877,8 +963,12 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
             }
 
             const LinearBVHNode & best_node = nodes[best_node_index];
+            // Need to cache this before UpdateSizes potentially reduces it
+            uint64_t bestNodeSize = curNodeSizes[best_node_index];
             cut.erase(best_node_index);
-            if (not best_node.nPrimitives) {
+            if (best_node.nPrimitives) {
+                UpdateSizes(includedInstances, best_node_index, root_index);
+            } else {
                 cut.insert(best_node_index + 1);
                 cut.insert(best_node.secondChildOffset);
             }
@@ -889,9 +979,10 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
             }
             best_costs[root_index] = std::min(best_costs[root_index], this_cost);
 
-            if (remaining_size < nodeSizes[best_node_index]) break;
-            remaining_size -= nodeSizes[best_node_index];
+            remaining_size -= bestNodeSize;
         }
+
+        UndoUpdateSizes(includedInstances, root_index);
     }
 
     auto float_equals = [](const float a, const float b) {
@@ -899,7 +990,6 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
     };
 
 
-    vector<uint32_t> labels(nodeCount);
     uint32_t current_treelet = 0;
 
     std::stack<int> q;
@@ -909,6 +999,7 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
 
     while (not q.empty()) {
         const int root_index = q.top();
+
         q.pop();
 
         current_treelet++;
@@ -921,6 +1012,7 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
         const float best_cost = best_costs[root_index];
 
         float cost = 0;
+        std::unordered_set<BVHAccel *> includedInstances;
         while (true) {
             int best_node_index = -1;
             float best_score = std::numeric_limits<float>::lowest();
@@ -928,9 +1020,9 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
             if (remaining_size > 0) {
                 for (const auto n : cut) {
                     const float gain = nodes[n].bounds.SurfaceArea() + AREA_EPSILON;
-                    const uint64_t price = std::min(subtreeSizes[n], remaining_size);
+                    const uint64_t price = std::min(curSubtreeSizes[n], remaining_size);
                     const float score = gain / price;
-                    if (score > best_score) {
+                    if (curNodeSizes[n] <= remaining_size && score > best_score) {
                         best_score = score;
                         best_node_index = n;
                     }
@@ -942,8 +1034,12 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
             }
 
             const LinearBVHNode & best_node = nodes[best_node_index];
+            uint64_t bestNodeSize = curNodeSizes[best_node_index];
+
             cut.erase(best_node_index);
-            if (not best_node.nPrimitives) {
+            if (best_node.nPrimitives) {
+                UpdateSizes(includedInstances, best_node_index, root_index);
+            } else {
                 cut.insert(best_node_index + 1);
                 cut.insert(best_node.secondChildOffset);
             }
@@ -959,14 +1055,14 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
                 break;
             }
 
-            if (remaining_size < nodeSizes[best_node_index]) break;
-
-            remaining_size -= nodeSizes[best_node_index];
+            remaining_size -= bestNodeSize;
         }
 
         for (const auto n : cut) {
             q.push(n);
         }
+
+        UndoUpdateSizes(includedInstances, root_index);
     }
 
     /* make sure all of the nodes have a treelet */
