@@ -150,6 +150,7 @@ void TreeletTestBVH::SetNodeInfo() {
     nodeSizes.resize(nodeCount);
     subtreeSizes.resize(nodeCount);
     nodeParents.resize(nodeCount);
+    nodeInstances.resize(nodeCount);
     for (int nodeIdx = nodeCount - 1; nodeIdx >= 0; nodeIdx--) {
         const LinearBVHNode &node = nodes[nodeIdx];
 
@@ -181,13 +182,14 @@ void TreeletTestBVH::SetNodeInfo() {
                     instanceSizes.emplace(instance.get(), instanceSize);
                 }
 
-                // Prevent double counting of instances in same node
-                if (instances.count(instance.get()) == 0) {
-                    totalSize += instanceSizes.find(instance.get())->second;
-                    instances.insert(instance.get());
-                    instanceInclusions[instance.get()].push_back(nodeIdx);
-                }
+                instances.insert(instance.get());
             }
+        }
+
+        for (BVHAccel *instance : instances) {
+            instanceInclusions[instance].push_back(nodeIdx);
+            nodeInstances[nodeIdx].push_back(instance);
+            totalSize += instanceSizes.find(instance)->second;
         }
 
         nodeSizes[nodeIdx] = totalSize;
@@ -898,27 +900,22 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
 
     auto UpdateSizes = [this, &curNodeSizes, &curSubtreeSizes](unordered_set<BVHAccel *> &includedInstances, int nodeIdx, int rootIndex) {
         const LinearBVHNode &node = nodes[nodeIdx];
-        for (int i = 0; i < node.nPrimitives; i++) {
-            auto &prim = primitives[node.primitivesOffset + i];
-            if (prim->GetType() == PrimitiveType::Transformed) {
-                shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
-                shared_ptr<BVHAccel> instance = dynamic_pointer_cast<BVHAccel>(tp->GetPrimitive());
-                if (includedInstances.count(instance.get())) continue;
-                includedInstances.insert(instance.get());
+        for (BVHAccel *instance : nodeInstances[nodeIdx]) {
+            auto res = includedInstances.insert(instance);
+            if (!res.second) continue;
 
-                uint64_t instanceSize = instanceSizes.find(instance.get())->second;
-                auto inclusions = instanceInclusions.find(instance.get())->second;
-                unordered_set<int> subtreeUpdates;
-                for (int instanceNode : inclusions) {
-                    curNodeSizes[instanceNode] -= instanceSize;
+            uint64_t instanceSize = instanceSizes.find(instance)->second;
+            auto inclusions = instanceInclusions.find(instance)->second;
+            unordered_set<int> subtreeUpdates;
+            for (int instanceNode : inclusions) {
+                curNodeSizes[instanceNode] -= instanceSize;
 
-                    int updateNode = instanceNode;
-                    while (updateNode != rootIndex && subtreeUpdates.count(updateNode) == 0) {
-                        curSubtreeSizes[updateNode] -= instanceSize;
+                int updateNode = instanceNode;
+                while (updateNode != rootIndex && subtreeUpdates.count(updateNode) == 0) {
+                    curSubtreeSizes[updateNode] -= instanceSize;
 
-                        subtreeUpdates.insert(updateNode);
-                        updateNode = nodeParents[updateNode];
-                    }
+                    subtreeUpdates.insert(updateNode);
+                    updateNode = nodeParents[updateNode];
                 }
             }
         }
