@@ -56,6 +56,7 @@ class TreeletTestBVH : public BVHAccel {
 
     TreeletTestBVH(std::vector<std::shared_ptr<Primitive>> &&p,
                    int maxTreeletBytes,
+                   bool rootBVH,
                    TraversalAlgorithm traversal,
                    PartitionAlgorithm partition,
                    int maxPrimsInNode = 1,
@@ -115,6 +116,7 @@ class TreeletTestBVH : public BVHAccel {
     TreeletMap treeletAllocations{};
     std::vector<uint32_t> origTreeletAllocation{};
 
+    bool rootBVH;
     TraversalAlgorithm traversalAlgo;
     PartitionAlgorithm partitionAlgo;
     std::vector<uint64_t> nodeParents;
