@@ -377,7 +377,7 @@ class LambdaWorker {
     const packet_clock::time_point workStart{packet_clock::now()};
 
     ////////////////////////////////////////////////////////////////////////////
-    // BENCHMARKING                                                           //
+    // LEASES                                                                 //
     ////////////////////////////////////////////////////////////////////////////
 
     struct Lease {
