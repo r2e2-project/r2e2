@@ -47,7 +47,7 @@ TreeletTestBVH::TreeletTestBVH(vector<shared_ptr<Primitive>> &&p,
     }
 
     if (rootBVH) {
-        SetNodeInfo();
+        SetNodeInfo(maxTreeletBytes);
         AllocateTreelets(maxTreeletBytes);
     }
 }
@@ -63,7 +63,7 @@ TreeletTestBVH::TreeletTestBVH(vector<shared_ptr<Primitive>> &&p,
       traversalAlgo(travAlgo),
       partitionAlgo(partAlgo)
 {
-    SetNodeInfo();
+    SetNodeInfo(maxTreeletBytes);
     AllocateTreelets(maxTreeletBytes);
 }
 
@@ -145,7 +145,7 @@ shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(
     }
 }
 
-void TreeletTestBVH::SetNodeInfo() {
+void TreeletTestBVH::SetNodeInfo(int maxTreeletBytes) {
     printf("Building general BVH node information\n");
     nodeSizes.resize(nodeCount);
     subtreeSizes.resize(nodeCount);
@@ -179,6 +179,7 @@ void TreeletTestBVH::SetNodeInfo() {
                         const LinearBVHNode &instanceNode = instance->GetNode(i);
                         instanceSize += nodeSize + instanceNode.nPrimitives * triSize;
                     }
+                    CHECK_LT(instanceSize, maxTreeletBytes);
                     instanceSizes.emplace(instance.get(), instanceSize);
                 }
 

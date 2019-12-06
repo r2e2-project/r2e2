@@ -75,7 +75,7 @@ class TreeletTestBVH : public BVHAccel {
     bool IntersectP(const Ray &ray) const;
 
   private:
-    void SetNodeInfo();
+    void SetNodeInfo(int maxTreeletBytes);
     void AllocateTreelets(int maxTreeletBytes);
 
     IntermediateTraversalGraph CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const;
