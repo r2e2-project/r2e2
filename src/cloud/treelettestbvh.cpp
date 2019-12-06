@@ -151,13 +151,14 @@ void TreeletTestBVH::SetNodeInfo(int maxTreeletBytes) {
     subtreeSizes.resize(nodeCount);
     nodeParents.resize(nodeCount);
     nodeInstances.resize(nodeCount);
-    for (int nodeIdx = nodeCount - 1; nodeIdx >= 0; nodeIdx--) {
+    for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
         const LinearBVHNode &node = nodes[nodeIdx];
 
         const uint64_t nodeSize = sizeof(CloudBVH::TreeletNode);
         // Assume on average 2 unique vertices, normals etc per triangle
         const uint64_t triSize = 3 * sizeof(int) + 2 * (sizeof(Point3f) +
                 sizeof(Normal3f) + sizeof(Vector3f) + sizeof(Point2f));
+        const uint64_t instSize = 32 * sizeof(float) + sizeof(int);
 
         uint64_t totalSize = nodeSize;
         uint64_t noInstanceSize = nodeSize;
@@ -169,6 +170,9 @@ void TreeletTestBVH::SetNodeInfo(int maxTreeletBytes) {
                 totalSize += triSize;
                 noInstanceSize += triSize;
             } else if (prim->GetType() == PrimitiveType::Transformed) {
+                totalSize += instSize;
+                noInstanceSize += instSize;
+
                 shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
                 shared_ptr<BVHAccel> instance = dynamic_pointer_cast<BVHAccel>(tp->GetPrimitive());
 
@@ -198,10 +202,13 @@ void TreeletTestBVH::SetNodeInfo(int maxTreeletBytes) {
         if (node.nPrimitives == 0) {
             nodeParents[nodeIdx + 1] = nodeIdx;
             nodeParents[node.secondChildOffset] = nodeIdx;
-
-            subtreeSizes[nodeIdx] += subtreeSizes[nodeIdx + 1] +
-                                     subtreeSizes[node.secondChildOffset];
         }
+    }
+
+    for (int nodeIdx = nodeCount - 1; nodeIdx >= 0; nodeIdx--) {
+        const LinearBVHNode &node = nodes[nodeIdx];
+        subtreeSizes[nodeIdx] += subtreeSizes[nodeIdx + 1] +
+                                 subtreeSizes[node.secondChildOffset];
     }
 
     // Update subtreeSizes to include one copy of each instance in children
@@ -226,7 +233,8 @@ void TreeletTestBVH::SetNodeInfo(int maxTreeletBytes) {
 }
 
 void TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
-    origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
+    //origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
+    origTreeletAllocation = vector<uint32_t>(nodeCount);
     for (unsigned i = 0; i < 8; i++) {
         Vector3f dir = computeRayDir(i);
         TraversalGraph graph = CreateTraversalGraph(dir, 0);
@@ -653,14 +661,50 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
         depthFirst.pop_front();
         assignment[curNode] = curTreelet;
 
-        uint64_t remainingBytes = maxTreeletBytes - nodeSizes[curNode];
+        // can use cached size (nothing else in treelet)
+        uint64_t remainingBytes = maxTreeletBytes - nodeSizes[curNode]; 
+
         set<OutEdge, EdgeCmp> cut;
         unordered_map<uint64_t, decltype(cut)::iterator> uniqueLookup;
+        unordered_set<BVHAccel *> includedInstances;
+
+        auto getNodeSize = [this, &includedInstances](int nodeIdx) {
+            const LinearBVHNode &node = nodes[nodeIdx];
+
+            const uint64_t nodeSize = sizeof(CloudBVH::TreeletNode);
+            // Assume on average 2 unique vertices, normals etc per triangle
+            const uint64_t triSize = 3 * sizeof(int) + 2 * (sizeof(Point3f) +
+                    sizeof(Normal3f) + sizeof(Vector3f) + sizeof(Point2f));
+            const uint64_t instSize = 32 * sizeof(float) + sizeof(int);
+
+            uint64_t totalSize = nodeSize;
+
+            for (int primIdx = 0; primIdx < node.nPrimitives; primIdx++) {
+                auto &prim  = primitives[node.primitivesOffset + primIdx];
+                if (prim->GetType() == PrimitiveType::Geometric) {
+                    totalSize += triSize;
+                } else if (prim->GetType() == PrimitiveType::Transformed) {
+                    totalSize += instSize;
+
+                    shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
+                    shared_ptr<BVHAccel> instance = dynamic_pointer_cast<BVHAccel>(tp->GetPrimitive());
+                    auto res = includedInstances.insert(instance.get());
+                    if (!res.second) continue;
+
+                    totalSize += instanceSizes.find(instance.get())->second;
+                }
+            }
+
+            return totalSize;
+        };
+
         while (remainingBytes >= sizeof(CloudBVH::TreeletNode)) {
             auto outgoingBounds = graph.outgoing[curNode];
             for (int i = 0; i < outgoingBounds.second; i++) {
                 const Edge *edge = outgoingBounds.first + i;
-                if (nodeSizes[edge->dst] > remainingBytes) break;
+                uint64_t nodeSize = getNodeSize(edge->dst);
+
+                if (nodeSize > remainingBytes) break;
                 auto preexisting = uniqueLookup.find(edge->dst);
                 if (preexisting == uniqueLookup.end()) {
                     auto res = cut.emplace(*edge);
@@ -686,7 +730,7 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
             while (edge != cut.end()) {
                 auto nextEdge = next(edge);
                 uint64_t dst = edge->dst;
-                uint64_t curBytes = nodeSizes[dst];
+                uint64_t curBytes = getNodeSize(dst);
                 float curWeight = edge->weight;
 
                 // This node already belongs to a treelet
@@ -702,6 +746,7 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
 
                 edge = nextEdge;
             }
+
             // Treelet full
             if (bestEdge == cut.end()) {
                 break;
@@ -872,10 +917,40 @@ TreeletTestBVH::ComputeTreelets(const TraversalGraph &graph,
 
     map<uint32_t, uint64_t> sizes;
     uint64_t totalBytes = 0;
-    for (int node = 0; node < nodeCount; node++) {
-        uint32_t treelet = assignment[node];
+    unordered_map<int, unordered_set<BVHAccel *>> instanceTracker;
+    for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
+        uint32_t treelet = assignment[nodeIdx];
         CHECK_NE(treelet, 0);
-        uint64_t bytes = nodeSizes[node];
+        const LinearBVHNode &node = nodes[nodeIdx];
+        uint64_t bytes = 0;
+        if (node.nPrimitives == 0) {
+            bytes = nodeSizes[nodeIdx];
+        } else {
+            const uint64_t nodeSize = sizeof(CloudBVH::TreeletNode);
+            bytes += nodeSize;
+
+            // Assume on average 2 unique vertices, normals etc per triangle
+            const uint64_t triSize = 3 * sizeof(int) + 2 * (sizeof(Point3f) +
+                    sizeof(Normal3f) + sizeof(Vector3f) + sizeof(Point2f));
+            const uint64_t instSize = 32 * sizeof(float) + sizeof(int);
+
+            for (int primIdx = 0; primIdx < node.nPrimitives; primIdx++) {
+                auto &prim  = primitives[node.primitivesOffset + primIdx];
+                if (prim->GetType() == PrimitiveType::Geometric) {
+                    bytes += triSize;
+                } else if (prim->GetType() == PrimitiveType::Transformed) {
+                    bytes += instSize;
+
+                    shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
+                    shared_ptr<BVHAccel> instance = dynamic_pointer_cast<BVHAccel>(tp->GetPrimitive());
+
+                    auto res = instanceTracker[treelet].insert(instance.get());
+                    if (res.second) {
+                        bytes += instanceSizes.find(instance.get())->second;
+                    }
+                }
+            }
+        }
         sizes[treelet] += bytes;
         totalBytes += bytes;
     }
@@ -1094,7 +1169,7 @@ vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
             const uint64_t triSize = 3 * sizeof(int) + 2 * (sizeof(Point3f) +
                     sizeof(Normal3f) + sizeof(Vector3f) + sizeof(Point2f));
 
-            for (int primIdx; primIdx < node.nPrimitives; primIdx++) {
+            for (int primIdx = 0; primIdx < node.nPrimitives; primIdx++) {
                 auto &prim  = primitives[node.primitivesOffset + primIdx];
                 if (prim->GetType() == PrimitiveType::Geometric) {
                     bytes += triSize;
