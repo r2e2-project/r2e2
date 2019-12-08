@@ -34,11 +34,11 @@ LambdaWorker::packet_clock::time_point LambdaWorker::flushLeaseInfo(
     };
 
     if (granted) {
-        flush(grantedLeases, leaseLogs.granted);
+        flush(grantedLeases, leaseInfo.granted);
     }
 
     if (taken) {
-        flush(takenLeases, leaseLogs.taken);
+        flush(takenLeases, leaseInfo.taken);
     }
 
     return now;
@@ -60,7 +60,7 @@ void LambdaWorker::takeLease(const WorkerId workerId, const uint32_t rate) {
     lease.expiresAt = now + INACTIVITY_THRESHOLD;
 
     if (config.logLeases) {
-        leaseLogs.taken[workerId] += lease.allocatedBits(now);
+        leaseInfo.taken[workerId] += lease.allocatedBits(now);
         lease.start = now;
     }
 
@@ -193,6 +193,10 @@ ResultType LambdaWorker::handleUdpSend() {
     }
 
     auto sendRayPacket = [this](Worker& peer, RayPacket&& packet) {
+        if (config.logLeases) {
+            leaseInfo.sent[peer.id] += packet.length();
+        }
+
         peer.pacer.record_send(packet.length());
 
         udpConnection.sendmsg(packet.destination()->second,
@@ -374,6 +378,8 @@ ResultType LambdaWorker::handleUdpReceive() {
             Chunk chunk(message.payload());
             const auto queueSize = chunk.le32();
             grantLease(message.sender_id(), queueSize);
+
+            leaseInfo.received[message.sender_id()] += message.total_length();
         }
     }
 

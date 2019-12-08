@@ -110,26 +110,46 @@ ResultType LambdaWorker::handleLogLease() {
     const auto now = flushLeaseInfo(true, true);
 
     TLOG(GLEASE)
-        << leaseLogs.granted.size() << " "
-        << duration_cast<milliseconds>(leaseLogs.start - workStart).count()
+        << leaseInfo.granted.size() << " "
+        << duration_cast<milliseconds>(leaseInfo.start - workStart).count()
         << " " << duration_cast<milliseconds>(now - workStart).count();
 
-    for (const auto& kv : leaseLogs.granted) {
+    for (const auto& kv : leaseInfo.granted) {
         TLOG(GLEASE) << kv.first << ' ' << kv.second;
     }
 
     TLOG(TLEASE)
-        << leaseLogs.taken.size() << " "
-        << duration_cast<milliseconds>(leaseLogs.start - workStart).count()
+        << leaseInfo.taken.size() << " "
+        << duration_cast<milliseconds>(leaseInfo.start - workStart).count()
         << " " << duration_cast<milliseconds>(now - workStart).count();
 
-    for (const auto& kv : leaseLogs.taken) {
+    for (const auto& kv : leaseInfo.taken) {
         TLOG(TLEASE) << kv.first << ' ' << kv.second;
     }
 
-    leaseLogs.granted.clear();
-    leaseLogs.taken.clear();
-    leaseLogs.start = packet_clock::now();
+    TLOG(BSENT)
+        << leaseInfo.sent.size() << " "
+        << duration_cast<milliseconds>(leaseInfo.start - workStart).count()
+        << " " << duration_cast<milliseconds>(now - workStart).count();
+
+    for (const auto& kv : leaseInfo.sent) {
+        TLOG(BSENT) << kv.first << ' ' << (kv.second * 8);
+    }
+
+    TLOG(BRECV)
+        << leaseInfo.received.size() << " "
+        << duration_cast<milliseconds>(leaseInfo.start - workStart).count()
+        << " " << duration_cast<milliseconds>(now - workStart).count();
+
+    for (const auto& kv : leaseInfo.received) {
+        TLOG(BRECV) << kv.first << ' ' << (kv.second * 8);
+    }
+
+    leaseInfo.granted = {};
+    leaseInfo.taken = {};
+    leaseInfo.sent = {};
+    leaseInfo.received = {};
+    leaseInfo.start = packet_clock::now();
 
     return ResultType::Continue;
 }
