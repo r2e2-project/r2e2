@@ -217,7 +217,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     }
 
     if (config.logLeases) {
-        leaseLogs.start = packet_clock::now();
+        leaseInfo.start = packet_clock::now();
 
         eventAction[Event::LogLeases] = loop.poller().add_action(
             Poller::Action(leaseLogTimer.fd, Direction::In,

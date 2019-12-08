@@ -405,9 +405,12 @@ class LambdaWorker {
 
     struct {
         packet_clock::time_point start{};
+
         std::map<WorkerId, uint64_t> granted{};
         std::map<WorkerId, uint64_t> taken{};
-    } leaseLogs;
+        std::map<WorkerId, uint64_t> sent{};
+        std::map<WorkerId, uint64_t> received{};
+    } leaseInfo;
 
     std::map<TreeletId, std::pair<WorkerId, packet_clock::time_point>>
         workerForTreelet;  // used by the sender
