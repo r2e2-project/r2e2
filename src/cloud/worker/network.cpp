@@ -81,6 +81,7 @@ void LambdaWorker::rebalanceLeases() {
                 trafficShare,
                 max<uint32_t>(DEFAULT_SEND_RATE, 80 * lease.second.queueSize));
             lease.second.small = true;
+            excess += trafficShare - lease.second.allocation;
             bigCount--;
         } else {
             lease.second.small = false;
@@ -91,7 +92,7 @@ void LambdaWorker::rebalanceLeases() {
 
     for (auto& lease : grantedLeases) {
         if (!lease.second.small) {
-            lease.second.allocation += excessShare;
+            lease.second.allocation = trafficShare + excessShare;
         }
     }
 }
