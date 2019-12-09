@@ -75,8 +75,16 @@ class TreeletTestBVH : public BVHAccel {
     bool IntersectP(const Ray &ray) const;
 
   private:
+    struct TreeletInfo {
+        std::list<int> nodes {}; 
+        std::unordered_set<BVHAccel *> instances {};
+        uint64_t noInstanceSize {0};
+        uint64_t instanceSize {0};
+        int dirIdx;
+    };
+
     void SetNodeInfo(int maxTreeletBytes);
-    void AllocateTreelets(int maxTreeletBytes);
+    std::vector<TreeletInfo> AllocateTreelets(int maxTreeletBytes);
 
     IntermediateTraversalGraph CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const;
 
@@ -103,6 +111,8 @@ class TreeletTestBVH : public BVHAccel {
     std::vector<uint32_t> ComputeTreelets(const TraversalGraph &graph,
                                           uint64_t maxTreeletBytes) const;
 
+    void DumpTreelets(const std::vector<TreeletInfo> &treelets) const;
+
     std::vector<uint32_t> OrigAssignTreelets(const uint64_t) const;
 
     bool IntersectSendCheck(const Ray &ray,
@@ -121,6 +131,7 @@ class TreeletTestBVH : public BVHAccel {
     PartitionAlgorithm partitionAlgo;
     std::vector<uint64_t> nodeParents;
     std::vector<uint64_t> nodeSizes;
+    std::vector<uint64_t> nodeNoInstanceSizes;
     std::unordered_map<BVHAccel *, uint64_t> instanceSizes;
     std::unordered_map<BVHAccel *, std::vector<int>> instanceInclusions;
     std::unordered_map<BVHAccel *, std::vector<int>> instanceImpacts;
