@@ -322,6 +322,7 @@ class LambdaWorker {
 
     /* outgoing rays */
     std::map<TreeletId, std::deque<RayPacket>> sendQueue{};
+    size_t sendQueueSize{0};
     std::deque<RayPacket> retransmissionQueue{};
     std::deque<std::pair<packet_clock::time_point, RayPacket>>
         outstandingRayPackets{};

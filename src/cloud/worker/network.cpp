@@ -299,6 +299,7 @@ ResultType LambdaWorker::handleUdpSend() {
 
         peerSeqNo++;
         queue.pop_front();
+        sendQueueSize--;
 
         if (queue.empty()) {
             sendQueue.erase(treeletId);

@@ -80,7 +80,7 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
         << state.CurrentTreelet() << ','
         << outQueueSize << ','
         << (servicePackets.size() + retransmissionQueue.size() +
-            sendQueue.size()) << ','
+            sendQueueSize) << ','
         << outstandingRayPackets.size() << ','
         << duration_cast<microseconds>(
                rays_clock::now().time_since_epoch()).count() << ','
