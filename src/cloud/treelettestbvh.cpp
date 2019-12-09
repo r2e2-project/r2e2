@@ -151,6 +151,7 @@ void TreeletTestBVH::SetNodeInfo(int maxTreeletBytes) {
     subtreeSizes.resize(nodeCount);
     nodeParents.resize(nodeCount);
     nodeInstances.resize(nodeCount);
+    nodeNoInstanceSizes.resize(nodeCount);
     for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
         const LinearBVHNode &node = nodes[nodeIdx];
 
@@ -198,6 +199,7 @@ void TreeletTestBVH::SetNodeInfo(int maxTreeletBytes) {
         }
 
         nodeSizes[nodeIdx] = totalSize;
+        nodeNoInstanceSizes[nodeIdx] = noInstanceSize;
         subtreeSizes[nodeIdx] = noInstanceSize;
         if (node.nPrimitives == 0) {
             nodeParents[nodeIdx + 1] = nodeIdx;
@@ -232,7 +234,7 @@ void TreeletTestBVH::SetNodeInfo(int maxTreeletBytes) {
     printf("Done building general BVH node information\n");
 }
 
-void TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
+vector<TreeletTestBVH::TreeletInfo> TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
     //origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
     origTreeletAllocation = vector<uint32_t>(nodeCount);
     for (unsigned i = 0; i < 8; i++) {
@@ -254,6 +256,94 @@ void TreeletTestBVH::AllocateTreelets(int maxTreeletBytes) {
 
         treeletAllocations[i] = ComputeTreelets(graph, maxTreeletBytes);
     }
+
+    array<unordered_map<uint32_t, TreeletInfo>, 8> intermediateTreelets;
+
+    for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
+        unordered_map<uint32_t, TreeletInfo> &treelets = intermediateTreelets[dirIdx];
+        for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
+            int curTreelet = treeletAllocations[dirIdx][nodeIdx];
+            TreeletInfo &treelet = treelets[curTreelet];
+            treelet.dirIdx = dirIdx;
+            treelet.nodes.push_back(nodeIdx);
+            treelet.noInstanceSize += nodeNoInstanceSizes[nodeIdx];
+            const LinearBVHNode &node = nodes[nodeIdx];
+
+            for (int primIdx = 0; primIdx < node.nPrimitives; primIdx++) {
+                auto &prim = primitives[node.primitivesOffset + primIdx];
+                if (prim->GetType() == PrimitiveType::Transformed) {
+                    shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
+                    shared_ptr<BVHAccel> instance = dynamic_pointer_cast<BVHAccel>(tp->GetPrimitive());
+
+                    CHECK_NOTNULL(instance.get());
+                    auto res = treelet.instances.insert(instance.get());
+                    if (res.second) {
+                        treelet.instanceSize += instanceSizes.find(instance.get())->second;
+                    }
+                }
+            }
+        }
+
+        for (auto iter = treelets.begin(); iter != treelets.end(); iter++) {
+            uint32_t treelet = iter->first;
+            TreeletInfo &info = iter->second;
+            auto candidateIter = next(iter);
+            while (candidateIter != treelets.end()) {
+                auto nextIter = next(candidateIter);
+                uint32_t candidateTreelet = candidateIter->first;
+                TreeletInfo &candidateInfo = candidateIter->second;
+
+                uint64_t noInstSize = info.noInstanceSize + candidateInfo.noInstanceSize;
+                if (noInstSize > maxTreeletBytes) continue;
+
+                unordered_set<BVHAccel *> instanceUnion(info.instances);
+                uint64_t unionInstanceSize = info.instanceSize;
+                for (BVHAccel *inst : candidateInfo.instances) {
+                    auto res = instanceUnion.insert(inst);
+                    if (res.second) {
+                        unionInstanceSize += instanceSizes.find(inst)->second;
+                    }
+                }
+
+                uint64_t totalSize = noInstSize + unionInstanceSize;
+                if (totalSize <= maxTreeletBytes) {
+                    info.instanceSize = unionInstanceSize;
+                    info.noInstanceSize = noInstSize;
+                    info.nodes.splice(info.nodes.end(), move(candidateInfo.nodes));
+                    info.instances = move(instanceUnion);
+                    treelets.erase(candidateIter);
+                }
+
+                candidateIter = nextIter;
+            }
+        }
+    }
+
+    vector<TreeletInfo> finalTreelets;
+    // Assign root treelets to IDs 0 to 8
+    for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
+        // Get the root treelet for this direction
+        auto rootIter = intermediateTreelets[dirIdx].find(treeletAllocations[dirIdx][0]);
+        finalTreelets.push_back(move(rootIter->second));
+        intermediateTreelets[dirIdx].erase(rootIter);
+    }
+
+    // Assign the rest contiguously
+    for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
+        for (auto &p : intermediateTreelets[dirIdx]) {
+            TreeletInfo &treelet = p.second;
+            finalTreelets.push_back(move(treelet));
+        }
+    }
+
+    for (int treeletID = 0; treeletID < finalTreelets.size(); treeletID++) {
+        const TreeletInfo &treelet = finalTreelets[treeletID];
+        for (int nodeIdx : treelet.nodes) {
+            treeletAllocations[treelet.dirIdx][nodeIdx] = treeletID;
+        }
+    }
+
+    return finalTreelets;
 }
 
 TreeletTestBVH::IntermediateTraversalGraph
@@ -993,6 +1083,13 @@ TreeletTestBVH::ComputeTreelets(const TraversalGraph &graph,
     }
 
     return assignment;
+}
+
+void TreeletTestBVH::DumpTreelets(const vector<TreeletTestBVH::TreeletInfo> &treelets) const {
+    for (const TreeletInfo &treelet : treelets) {
+        for (int nodeIdx : treelet.nodes) {
+        }
+    }
 }
 
 vector<uint32_t> TreeletTestBVH::OrigAssignTreelets(const uint64_t maxTreeletBytes) const {
