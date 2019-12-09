@@ -772,7 +772,37 @@ TreeletTestBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
 vector<uint32_t>
 TreeletTestBVH::ComputeTreeletsTopologicalHierarchical(
         const TraversalGraph &graph, uint64_t maxTreeletBytes) const {
-    vector<uint32_t> assignment;
+    vector<uint32_t> assignment(nodeCount);
+    vector<uint32_t> outgoingWeight(nodeCount);
+
+    struct OutEdge {
+        float weight;
+        uint64_t dst;
+
+        OutEdge(const Edge &edge)
+            : weight(edge.weight),
+              dst(edge.dst)
+        {}
+    };
+
+    struct EdgeCmp {
+        bool operator()(const OutEdge &a, const OutEdge &b) const {
+            if (a.weight > b.weight) {
+                return true;
+            }
+
+            if (a.weight < b.weight) {
+                return false;
+            }
+
+            return a.dst < b.dst;
+        }
+    };
+
+    for (auto curNodeIter = graph.depthFirst.rbegin(); curNodeIter != graph.depthFirst.rend(); curNodeIter++) {
+        uint64_t nodeIdx = *curNodeIter;
+    }
+
 
     return assignment;
 }
