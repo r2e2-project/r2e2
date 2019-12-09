@@ -222,6 +222,7 @@ ResultType LambdaWorker::handleOutQueue() {
             }
 
             packetList.emplace_back(move(packet));
+            sendQueueSize++;
 
             if (rayList.empty()) {
                 it = outQueue.erase(it);
