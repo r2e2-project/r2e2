@@ -77,7 +77,7 @@ class TreeletDumpBVH : public BVHAccel {
   private:
     struct TreeletInfo {
         std::list<int> nodes {}; 
-        std::unordered_set<BVHAccel *> instances {};
+        std::unordered_set<TreeletDumpBVH *> instances {};
         uint64_t noInstanceSize {0};
         uint64_t instanceSize {0};
         int dirIdx {-1};
@@ -133,10 +133,10 @@ class TreeletDumpBVH : public BVHAccel {
     std::vector<uint64_t> nodeParents;
     std::vector<uint64_t> nodeSizes;
     std::vector<uint64_t> nodeNoInstanceSizes;
-    std::unordered_map<BVHAccel *, uint64_t> instanceSizes;
-    std::unordered_map<BVHAccel *, std::vector<int>> instanceInclusions;
-    std::unordered_map<BVHAccel *, std::vector<int>> instanceImpacts;
-    std::vector<std::vector<BVHAccel *>> nodeInstances;
+    std::unordered_map<TreeletDumpBVH *, uint64_t> instanceSizes;
+    std::unordered_map<TreeletDumpBVH *, std::vector<int>> instanceInclusions;
+    std::unordered_map<TreeletDumpBVH *, std::vector<int>> instanceImpacts;
+    std::vector<std::vector<TreeletDumpBVH *>> nodeInstances;
     std::vector<uint64_t> subtreeSizes;
 };
 
