@@ -69,6 +69,8 @@ struct TriangleMesh {
     std::vector<int> faceIndices;
 };
 
+class TreeletDumpBVH;
+
 class Triangle : public Shape {
   public:
     // Triangle Public Methods
@@ -116,6 +118,7 @@ class Triangle : public Shape {
     int faceIndex;
 
     friend BVHAccel;
+    friend TreeletDumpBVH;
 };
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
