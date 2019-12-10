@@ -108,9 +108,6 @@ class BVHAccel : public Aggregate {
 
     uint32_t Dump(const size_t max_treelet_nodes) const;
     
-    LinearBVHNode &GetNode(int i) { return nodes[i]; }
-    int GetNodeCount() { return nodeCount; }
-
   protected:
     void assignTreelets(uint32_t * labels, const uint32_t max_nodes) const;
     uint32_t dumpTreelets(uint32_t *labels, const size_t max_treelet_nodes) const;
