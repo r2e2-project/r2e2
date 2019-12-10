@@ -1,5 +1,5 @@
-#ifndef PBRT_ACCELERATORS_TREELET_TEST_BVH_H
-#define PBRT_ACCELERATORS_TREELET_TEST_BVH_H
+#ifndef PBRT_CLOUD_TREELET_DUMP_BVH_H
+#define PBRT_CLOUD_TREELET_DUMP_BVH_H
 
 #include "accelerators/bvh.h"
 #include "cloud/bvh.h"
@@ -13,7 +13,7 @@
 
 namespace pbrt {
 
-class TreeletTestBVH : public BVHAccel {
+class TreeletDumpBVH : public BVHAccel {
   public:
     enum class TraversalAlgorithm {
         CheckSend,
@@ -54,7 +54,7 @@ class TreeletTestBVH : public BVHAccel {
     using TreeletMap = std::array<std::vector<uint32_t>, 8>;
     using RayCountMap = std::vector<std::unordered_map<uint64_t, std::atomic_uint64_t>>;
 
-    TreeletTestBVH(std::vector<std::shared_ptr<Primitive>> &&p,
+    TreeletDumpBVH(std::vector<std::shared_ptr<Primitive>> &&p,
                    int maxTreeletBytes,
                    bool rootBVH,
                    TraversalAlgorithm traversal,
@@ -64,7 +64,7 @@ class TreeletTestBVH : public BVHAccel {
                    bool dumpBVH = false,
                    const std::string &dumpBVHPath = "");
 
-    TreeletTestBVH(std::vector<std::shared_ptr<Primitive>> &&p,
+    TreeletDumpBVH(std::vector<std::shared_ptr<Primitive>> &&p,
                    LinearBVHNode *deserializedNodes,
                    int deserializedNodeCount,
                    int maxTreeletBytes,
@@ -80,7 +80,8 @@ class TreeletTestBVH : public BVHAccel {
         std::unordered_set<BVHAccel *> instances {};
         uint64_t noInstanceSize {0};
         uint64_t instanceSize {0};
-        int dirIdx;
+        int dirIdx {-1};
+        float totalProb {0};
     };
 
     void SetNodeInfo(int maxTreeletBytes);
@@ -139,7 +140,7 @@ class TreeletTestBVH : public BVHAccel {
     std::vector<uint64_t> subtreeSizes;
 };
 
-std::shared_ptr<TreeletTestBVH> CreateTreeletTestBVH(
+std::shared_ptr<TreeletDumpBVH> CreateTreeletDumpBVH(
     std::vector<std::shared_ptr<Primitive>> prims, const ParamSet &ps);
 
 }
