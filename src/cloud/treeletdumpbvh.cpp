@@ -241,8 +241,8 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
     //origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
     origTreeletAllocation = vector<uint32_t>(nodeCount);
     for (unsigned i = 0; i < 8; i++) {
-        Vector3f dir = computeRayDir(i);
-        TraversalGraph graph = CreateTraversalGraph(dir, 0);
+        //Vector3f dir = computeRayDir(i);
+        //TraversalGraph graph = CreateTraversalGraph(dir, 0);
 
         //rayCounts[i].resize(nodeCount);
         //// Init rayCounts so unordered_map isn't modified during intersection
@@ -257,13 +257,17 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
         //    }
         //}
 
-        treeletAllocations[i] = ComputeTreelets(graph, maxTreeletBytes);
+        //treeletAllocations[i] = ComputeTreelets(graph, maxTreeletBytes);
+        treeletAllocations[i] = vector<uint32_t>(nodeCount);
     }
 
-    array<unordered_map<uint32_t, TreeletInfo>, 8> intermediateTreelets;
+    array<map<uint32_t, TreeletInfo>, 8> intermediateTreelets;
 
     for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
-        unordered_map<uint32_t, TreeletInfo> &treelets = intermediateTreelets[dirIdx];
+        map<uint32_t, TreeletInfo> &treelets = intermediateTreelets[dirIdx];
+
+        unordered_set<TreeletDumpBVH *> allInstances;
+
         for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
             int curTreelet = treeletAllocations[dirIdx][nodeIdx];
             TreeletInfo &treelet = treelets[curTreelet];
@@ -280,6 +284,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
 
                     CHECK_NOTNULL(instance.get());
                     auto res = treelet.instances.insert(instance.get());
+                    allInstances.insert(instance.get());
                     if (res.second) {
                         treelet.instanceSize += instanceSizes.find(instance.get())->second;
                     }
@@ -287,11 +292,14 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
             }
         }
 
-        for (auto iter = treelets.begin(); iter != treelets.end(); iter++) {
+        cout << "Total Instances: " << allInstances.size() << endl;
+
+        // Merge treelets together
+        for (auto iter = treelets.rbegin(); iter != treelets.rend(); iter++) {
             uint32_t treelet = iter->first;
             TreeletInfo &info = iter->second;
             auto candidateIter = next(iter);
-            while (candidateIter != treelets.end()) {
+            while (candidateIter != treelets.rend()) {
                 auto nextIter = next(candidateIter);
                 uint32_t candidateTreelet = candidateIter->first;
                 TreeletInfo &candidateInfo = candidateIter->second;
@@ -314,7 +322,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
                     info.noInstanceSize = noInstSize;
                     info.nodes.splice(info.nodes.end(), move(candidateInfo.nodes));
                     info.instances = move(instanceUnion);
-                    treelets.erase(candidateIter);
+                    treelets.erase(next(candidateIter).base());
                 }
 
                 candidateIter = nextIter;
