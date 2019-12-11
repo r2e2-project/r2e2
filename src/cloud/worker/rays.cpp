@@ -193,7 +193,7 @@ ResultType LambdaWorker::handleOutQueue() {
             packet.setTargetTreelet(treeletId);
             packet.setReliable(config.sendReliably);
             packet.setTracked(packetLogBD(randEngine));
-            packet.setQueueLength(10'000'000);
+            packet.setQueueLength(10'000'000ull);
 
             while (!rayList.empty()) {
                 auto& ray = rayList.front();

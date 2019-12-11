@@ -259,10 +259,10 @@ bool LambdaWorker::processMessage(const Message& message) {
 
     case OpCode::SendRays: {
         char const* data = message.payload().data();
-        const uint32_t queueLen = *reinterpret_cast<uint32_t const*>(data);
-        data += sizeof(uint32_t);
+        const uint64_t queueLen = *reinterpret_cast<uint64_t const*>(data);
+        data += sizeof(queueLen);
 
-        const uint32_t dataLen = message.payload().length() - sizeof(uint32_t);
+        const uint32_t dataLen = message.payload().length() - sizeof(queueLen);
         uint32_t offset = 0;
         bool first = true;
 
