@@ -14,11 +14,13 @@ namespace pbrt {
 STAT_COUNTER("BVH/Total Ray Transfers (new)", totalNewRayTransfers);
 STAT_COUNTER("BVH/Total Ray Transfers (old)", totalOldRayTransfers);
 
-// Assume on average 2 unique vertices, normals etc per triangle
 namespace SizeEstimates {
     constexpr uint64_t nodeSize = sizeof(CloudBVH::TreeletNode);
-    constexpr uint64_t triSize = 3 * sizeof(int) + 2 * (sizeof(Point3f) +
-            sizeof(Normal3f) + sizeof(Vector3f) + sizeof(Point2f));
+    // triNum, faceIndex, pointer to mesh, 3 indices for triangle
+    // assume on average 2 unique vertices, normals etc per triangle
+    constexpr uint64_t triSize = sizeof(int) + sizeof(int) + sizeof(uintptr_t) + 
+        3 * sizeof(int) + 2 * (sizeof(Point3f) + sizeof(Normal3f) +
+        sizeof(Vector3f) + sizeof(Point2f));
     constexpr uint64_t instSize = 32 * sizeof(float) + sizeof(int);
 }
 
@@ -1658,6 +1660,23 @@ void TreeletDumpBVH::DumpTreelets(const vector<TreeletDumpBVH::TreeletInfo> &tre
         global::manager.getNextId(ObjectType::Treelet, &treelet);
     }
 
+    vector<unordered_map<int, uint32_t>> treeletNodeLocations(treelets.size());
+    vector<unordered_map<TreeletDumpBVH *, uint32_t>> treeletInstanceStarts(treelets.size());
+    for (int treeletID = 0; treeletID < treelets.size(); treeletID++) {
+        const TreeletInfo &treelet = treelets[treeletID];
+        uint32_t totalInstanceNodes = 0;
+        for (TreeletDumpBVH *inst : treelet.instances) {
+            treeletInstanceStarts[treeletID][inst] = totalInstanceNodes;
+            totalInstanceNodes += inst->nodeCount;
+        }
+
+        int listIdx = 0;
+        for (int nodeIdx : treelet.nodes) {
+            treeletNodeLocations[treeletID][nodeIdx] = totalInstanceNodes + listIdx;
+            listIdx++;
+        }
+    }
+
     for (int treeletID = 0; treeletID < treelets.size(); treeletID++) {
         const TreeletInfo &treelet = treelets[treeletID];
         // Find which triangles / meshes are in treelet
@@ -1804,11 +1823,8 @@ void TreeletDumpBVH::DumpTreelets(const vector<TreeletDumpBVH::TreeletInfo> &tre
             writer->write(tmProto);
         }
 
-        unordered_map<TreeletDumpBVH *, int64_t> instRoots;
-        int64_t sNodeIdx = 0;
         // Write out nodes for instances
         for (TreeletDumpBVH *inst : treelet.instances) {
-            instRoots.emplace(inst, sNodeIdx);
             for (int nodeIdx = 0; nodeIdx < inst->nodeCount; nodeIdx++) {
                 const LinearBVHNode &instNode = inst->nodes[nodeIdx];
 
@@ -1836,11 +1852,6 @@ void TreeletDumpBVH::DumpTreelets(const vector<TreeletDumpBVH::TreeletInfo> &tre
                 }
 
                 writer->write(nodeProto);
-                sNodeIdx++;
-                if (instNode.nPrimitives > 0) {
-                    writer->write_empty();
-                    writer->write_empty();
-                }
             }
         }
 
@@ -1863,7 +1874,10 @@ void TreeletDumpBVH::DumpTreelets(const vector<TreeletDumpBVH::TreeletInfo> &tre
                     CHECK_NOTNULL(bvh.get());
 
                     protobuf::TransformedPrimitive tpProto;
-                    tpProto.set_root_ref(instRoots.at(bvh.get()));
+                    uint64_t instanceRef = treeletID;
+                    instanceRef <<= 32;
+                    instanceRef |= treeletInstanceStarts[treeletID].at(bvh.get());
+                    tpProto.set_root_ref(instanceRef);
                     *tpProto.mutable_transform() = to_protobuf(tp->GetTransform());
 
                     *nodeProto.add_transformed_primitives() = tpProto;
@@ -1886,25 +1900,28 @@ void TreeletDumpBVH::DumpTreelets(const vector<TreeletDumpBVH::TreeletInfo> &tre
                 }
             }
 
-            if (node.nPrimitives > 0) {
-                writer->write(nodeProto);
-                writer->write_empty();
-                writer->write_empty();
-            } else {
+            if (node.nPrimitives == 0) {
                 uint32_t leftTreeletID = treeletAllocations[treelet.dirIdx][nodeIdx + 1];
                 if (leftTreeletID != treeletID) {
-                    nodeProto.set_left_ref(global::manager.getId(&treelets[leftTreeletID]));
-                    writer->write_empty();
+                    uint32_t sTreeletID = global::manager.getId(&treelets[leftTreeletID]);
+                    uint64_t leftRef = sTreeletID;
+                    leftRef <<= 32;
+                    leftRef |=
+                        treeletNodeLocations[leftTreeletID].at(nodeIdx + 1);
+                    nodeProto.set_left_ref(leftRef);
                 }
 
                 uint32_t rightTreeletID = treeletAllocations[treelet.dirIdx][node.secondChildOffset];
                 if (rightTreeletID != treeletID) {
-                    nodeProto.set_right_ref(global::manager.getId(&treelets[rightTreeletID]));
-                    writer->write_empty();
+                    uint32_t sTreeletID = global::manager.getId(&treelets[rightTreeletID]);
+                    uint64_t rightRef = sTreeletID;
+                    rightRef <<= 32;
+                    rightRef |=
+                        treeletNodeLocations[rightTreeletID].at(node.secondChildOffset);
+                    nodeProto.set_right_ref(rightRef);
                 }
-
-                writer->write(nodeProto);
             }
+            writer->write(nodeProto);
         }
     }
 }

@@ -54,11 +54,13 @@ class CloudBVH : public Aggregate {
         Bounds3f bounds;
         uint8_t axis;
 
-        bool leaf{false};
-        bool has[2] = {true, true};
         union {
-            uint32_t child[2] = {0};
             struct {
+                uint16_t child_treelet[2] = {0};
+                uint32_t child_node[2] = {0};
+            };
+            struct {
+                uint32_t leaf_tag;
                 uint32_t primitive_offset;
                 uint32_t primitive_count;
             };
@@ -66,6 +68,8 @@ class CloudBVH : public Aggregate {
 
         TreeletNode(const Bounds3f &bounds, const uint8_t axis)
             : bounds(bounds), axis(axis) {}
+
+        bool is_leaf() const { return leaf_tag == ~0; }
     };
 
   private:
@@ -76,11 +80,26 @@ class CloudBVH : public Aggregate {
         std::vector<std::unique_ptr<Primitive>> primitives{};
     };
 
+    class IncludedInstance : public Aggregate {
+      public:
+        IncludedInstance(const Treelet *treelet, int nodeIdx)
+            : treelet_(treelet), nodeIdx_(nodeIdx)
+        {}
+
+        Bounds3f WorldBound() const;
+        bool Intersect(const Ray &ray, SurfaceInteraction *isect) const;
+        bool IntersectP(const Ray &ray) const;
+
+      private:
+        const Treelet *treelet_;
+        int nodeIdx_;
+    };
+
     const std::string bvh_path_;
     const uint32_t bvh_root_;
 
     mutable std::map<uint32_t, Treelet> treelets_;
-    mutable std::map<uint32_t, std::shared_ptr<Primitive>> bvh_instances_;
+    mutable std::map<uint64_t, std::shared_ptr<Primitive>> bvh_instances_;
     mutable std::vector<std::unique_ptr<Transform>> transforms_;
     mutable std::map<uint32_t, std::shared_ptr<TriangleMesh>> triangle_meshes_;
     mutable std::map<uint32_t, uint32_t> triangle_mesh_material_ids_;
