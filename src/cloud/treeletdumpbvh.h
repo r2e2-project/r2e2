@@ -13,6 +13,70 @@
 
 namespace pbrt {
 
+struct InstanceMask {
+    static constexpr int numInts = 5;
+    uint64_t mask[numInts] {};
+
+    InstanceMask & operator|=(const InstanceMask &o) {
+        for (int i = 0; i < numInts; i++) {
+            mask[i] |= o.mask[i];
+        }
+
+        return *this;
+    }
+    
+    friend InstanceMask operator|(InstanceMask l, const InstanceMask &r) {
+        for (int i = 0; i < numInts; i++) {
+            l.mask[i] |= r.mask[i];
+        }
+
+        return l;
+    }
+
+    friend bool operator==(const InstanceMask &l, const InstanceMask &r) {
+        for (int i = 0; i < numInts; i++) {
+            if (l.mask[i] != r.mask[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool Get(int idx) const {
+        int intIdx = idx >> 6;
+        int bitIdx = idx & 63;
+
+        return mask[intIdx] & (1UL << bitIdx);
+    }
+
+    void Set(int idx) {
+        int intIdx = idx >> 6;
+        int bitIdx = idx & 63;
+
+        mask[intIdx] |= (1UL << bitIdx);
+    }
+};
+
+}
+
+namespace std {
+template <>
+struct hash<pbrt::InstanceMask>
+{
+    size_t operator()(const pbrt::InstanceMask &mask) const {
+        size_t hash = 0;
+        for (int i = 0; i < pbrt::InstanceMask::numInts; i++) {
+            hash ^= std::hash<uint64_t>()(mask.mask[i]);
+        }
+        return hash;
+    }
+};
+}
+
+
+namespace pbrt {
+
 class TreeletDumpBVH : public BVHAccel {
   public:
     enum class TraversalAlgorithm {
@@ -77,7 +141,8 @@ class TreeletDumpBVH : public BVHAccel {
   private:
     struct TreeletInfo {
         std::list<int> nodes {}; 
-        std::unordered_set<TreeletDumpBVH *> instances {};
+        InstanceMask instanceMask;
+        std::vector<TreeletDumpBVH *> instances;
         uint64_t noInstanceSize {0};
         uint64_t instanceSize {0};
         int dirIdx {-1};
@@ -85,6 +150,9 @@ class TreeletDumpBVH : public BVHAccel {
     };
 
     void SetNodeInfo(int maxTreeletBytes);
+
+    uint64_t GetInstancesBytes(const InstanceMask &mask);
+
     std::vector<TreeletInfo> AllocateTreelets(int maxTreeletBytes);
 
     IntermediateTraversalGraph CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const;
@@ -132,12 +200,17 @@ class TreeletDumpBVH : public BVHAccel {
     PartitionAlgorithm partitionAlgo;
     std::vector<uint64_t> nodeParents;
     std::vector<uint64_t> nodeSizes;
-    std::vector<uint64_t> nodeNoInstanceSizes;
-    std::unordered_map<TreeletDumpBVH *, uint64_t> instanceSizes;
-    std::unordered_map<TreeletDumpBVH *, std::vector<int>> instanceInclusions;
-    std::unordered_map<TreeletDumpBVH *, std::vector<int>> instanceImpacts;
-    std::vector<std::vector<TreeletDumpBVH *>> nodeInstances;
     std::vector<uint64_t> subtreeSizes;
+
+    uint64_t totalBytes {0};
+    std::vector<InstanceMask> nodeInstanceMasks;
+    std::array<TreeletDumpBVH *, sizeof(InstanceMask) * 8> uniqueInstances;
+    std::array<uint64_t, sizeof(InstanceMask) * 8> instanceSizes;
+
+    static int numInstances;
+    int instanceID = 0;
+
+    std::unordered_map<InstanceMask, uint64_t> instanceSizeCache;
 };
 
 std::shared_ptr<TreeletDumpBVH> CreateTreeletDumpBVH(
