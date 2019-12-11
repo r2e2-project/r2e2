@@ -73,7 +73,7 @@ TreeletDumpBVH::TreeletDumpBVH(vector<shared_ptr<Primitive>> &&p,
 
         for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
             const LinearBVHNode &node = nodes[nodeIdx];
-            totalBytes = SizeEstimates::nodeSize + node.nPrimitives * SizeEstimates::triSize;
+            totalBytes += SizeEstimates::nodeSize + node.nPrimitives * SizeEstimates::triSize;
         }
     }
 }
@@ -239,8 +239,8 @@ uint64_t TreeletDumpBVH::GetInstancesBytes(const InstanceMask &mask) {
 
 vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTreeletBytes) {
     origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
-    for (unsigned i = 0; i < 8; i++) {
-        Vector3f dir = computeRayDir(i);
+    for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
+        Vector3f dir = computeRayDir(dirIdx);
         TraversalGraph graph = CreateTraversalGraph(dir, 0);
 
         //rayCounts[i].resize(nodeCount);
@@ -256,7 +256,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
         //    }
         //}
 
-        treeletAllocations[i] = ComputeTreelets(graph, maxTreeletBytes);
+        treeletAllocations[dirIdx] = ComputeTreelets(graph, maxTreeletBytes);
     }
 
     array<unordered_map<uint32_t, TreeletInfo>, 8> intermediateTreelets;
@@ -265,7 +265,6 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
         unordered_map<uint32_t, TreeletInfo> treelets;
         for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
             int curTreelet = treeletAllocations[dirIdx][nodeIdx];
-            CHECK_LT(curTreelet, 400000);
             TreeletInfo &treelet = treelets[curTreelet];
             treelet.dirIdx = dirIdx;
             treelet.nodes.push_back(nodeIdx);
@@ -313,6 +312,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
         map<TreeletSortKey, TreeletInfo, TreeletCmp> sortedTreelets;
         for (auto &kv : treelets) {
             CHECK_NE(kv.first, 0);
+            CHECK_LT(kv.second.noInstanceSize + kv.second.instanceSize, maxTreeletBytes);
             sortedTreelets.emplace(piecewise_construct,
                     forward_as_tuple(kv.first, kv.second.noInstanceSize + kv.second.instanceSize),
                     forward_as_tuple(move(kv.second)));
