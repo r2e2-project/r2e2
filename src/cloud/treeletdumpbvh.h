@@ -151,7 +151,7 @@ class TreeletDumpBVH : public BVHAccel {
 
     void SetNodeInfo(int maxTreeletBytes);
 
-    uint64_t GetInstancesBytes(const InstanceMask &mask);
+    uint64_t GetInstancesBytes(const InstanceMask &mask) const;
 
     std::vector<TreeletInfo> AllocateTreelets(int maxTreeletBytes);
 
@@ -203,9 +203,9 @@ class TreeletDumpBVH : public BVHAccel {
     std::vector<uint64_t> subtreeSizes;
 
     uint64_t totalBytes {0};
-    std::vector<InstanceMask> nodeInstanceMasks;
-    std::array<TreeletDumpBVH *, sizeof(InstanceMask) * 8> uniqueInstances;
-    std::array<uint64_t, sizeof(InstanceMask) * 8> instanceSizes;
+    std::vector<InstanceMask> nodeInstanceMasks {};
+    std::array<TreeletDumpBVH *, sizeof(InstanceMask) * 8> uniqueInstances {};
+    std::array<uint64_t, sizeof(InstanceMask) * 8> instanceSizes {};
 
     static int numInstances;
     int instanceID = 0;

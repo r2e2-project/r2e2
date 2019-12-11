@@ -219,7 +219,7 @@ void TreeletDumpBVH::SetNodeInfo(int maxTreeletBytes) {
     printf("Done building general BVH node information\n");
 }
 
-uint64_t TreeletDumpBVH::GetInstancesBytes(const InstanceMask &mask) {
+uint64_t TreeletDumpBVH::GetInstancesBytes(const InstanceMask &mask) const {
     auto iter = instanceSizeCache.find(mask);
     if (iter != instanceSizeCache.end()) {
         return iter->second;
@@ -232,7 +232,9 @@ uint64_t TreeletDumpBVH::GetInstancesBytes(const InstanceMask &mask) {
         }
     }
 
-    instanceSizeCache.emplace(mask, totalInstanceSize);
+    
+
+    const_cast<unordered_map<InstanceMask, uint64_t> *>(&instanceSizeCache)->emplace(mask, totalInstanceSize);
 
     return totalInstanceSize;
 }
@@ -820,7 +822,7 @@ TreeletDumpBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
 
         set<OutEdge, EdgeCmp> cut;
         unordered_map<uint64_t, decltype(cut)::iterator> uniqueLookup;
-        InstanceMask includedInstances;
+        InstanceMask includedInstances {};
 
         // Accounts for size of this node + the size of new instances that would be pulled in
         auto getAdditionalSize = [this, &includedInstances](int nodeIdx) {
@@ -842,7 +844,11 @@ TreeletDumpBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
             return totalSize;
         };
 
-        uint64_t remainingBytes = maxTreeletBytes - getAdditionalSize(curNode);
+        uint64_t rootSize = getAdditionalSize(curNode);
+        // If this is false the node is too big to fit in any treelet
+        CHECK_LE(rootSize, maxTreeletBytes);
+
+        uint64_t remainingBytes = maxTreeletBytes - rootSize;
         includedInstances |= nodeInstanceMasks[curNode];
 
         while (remainingBytes >= sizeof(CloudBVH::TreeletNode)) {
@@ -851,7 +857,7 @@ TreeletDumpBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
                 const Edge *edge = outgoingBounds.first + i;
 
                 uint64_t nodeSize = getAdditionalSize(edge->dst);
-                if (nodeSize > remainingBytes) break;
+                if (nodeSize > remainingBytes) continue;
 
                 auto preexisting = uniqueLookup.find(edge->dst);
                 if (preexisting == uniqueLookup.end()) {
@@ -1128,6 +1134,7 @@ TreeletDumpBVH::ComputeTreelets(const TraversalGraph &graph,
            sizes.size(), totalBytes, nodeCount);
 
     for (auto &sz : sizes) {
+        CHECK_LE(sz.second, maxTreeletBytes);
         printf("Treelet %u: %lu bytes\n", sz.first, sz.second);
     }
 
