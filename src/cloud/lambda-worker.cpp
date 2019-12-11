@@ -77,6 +77,7 @@ struct iovec* LambdaWorker::RayPacket::iov(const WorkerId workerId) {
 
     iov_[0].iov_base = header_;
     iov_[1].iov_base = &queueLength_;
+
     return iov_;
 }
 

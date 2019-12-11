@@ -45,13 +45,13 @@ LambdaWorker::packet_clock::time_point LambdaWorker::flushLeaseInfo(
 }
 
 void LambdaWorker::grantLease(const WorkerId workerId,
-                              const uint32_t queueSize) {
+                              const uint64_t queueSize) {
     auto& lease = grantedLeases[workerId];
     lease.queueSize = queueSize;
     lease.expiresAt = packet_clock::now() + INACTIVITY_THRESHOLD;
 }
 
-void LambdaWorker::takeLease(const WorkerId workerId, const uint32_t rate) {
+void LambdaWorker::takeLease(const WorkerId workerId, const uint64_t rate) {
     auto& peer = peers.at(workerId);
     peer.pacer.set_rate(rate);
 
@@ -68,22 +68,21 @@ void LambdaWorker::takeLease(const WorkerId workerId, const uint32_t rate) {
 }
 
 void LambdaWorker::rebalanceLeases() {
-    const uint32_t trafficShare =
-        max<uint32_t>(DEFAULT_SEND_RATE,
+    const uint64_t trafficShare =
+        max<uint64_t>(DEFAULT_SEND_RATE,
                       config.maxUdpRate / max<size_t>(1, grantedLeases.size()));
 
-    uint32_t excess = 0;
-    uint32_t bigCount = grantedLeases.size();
+    uint64_t excess = 0;
+    uint64_t bigCount = grantedLeases.size();
 
-    const int32_t minTransmitTime = static_cast<int32_t>(
+    const uint64_t minTransmitTime = static_cast<int32_t>(
         duration_cast<milliseconds>(MIN_TRANSMIT_TIME).count());
 
     for (auto& lease : grantedLeases) {
-        if (8000 * lease.second.queueSize / trafficShare < minTransmitTime) {
-            lease.second.allocation = min<uint32_t>(
-                trafficShare,
-                max<uint32_t>(DEFAULT_SEND_RATE,
-                              8000 * lease.second.queueSize / minTransmitTime));
+        if (8000ull * lease.second.queueSize / trafficShare < minTransmitTime) {
+            lease.second.allocation = min<uint64_t>(
+                trafficShare, max<uint64_t>(DEFAULT_SEND_RATE,
+                                            (8000ull / minTransmitTime) * lease.second.queueSize));
             lease.second.small = true;
             excess += trafficShare - lease.second.allocation;
             bigCount--;
@@ -92,7 +91,7 @@ void LambdaWorker::rebalanceLeases() {
         }
     }
 
-    const uint32_t excessShare = (bigCount == 0) ? 0 : (excess / bigCount);
+    const uint64_t excessShare = (bigCount == 0) ? 0 : (excess / bigCount);
 
     for (auto& lease : grantedLeases) {
         if (!lease.second.small) {
@@ -129,6 +128,7 @@ ResultType LambdaWorker::handleRayAcknowledgements() {
 
         /* Let's construct the ack message for this worker */
         string ack{};
+
         ack += put_field(grantedLeases[addressToWorker[addr]].allocation);
         ack += put_field(receivedSeqNos.smallest_not_in_set());
 
@@ -356,12 +356,11 @@ ResultType LambdaWorker::handleUdpReceive() {
             Chunk chunk(message.payload());
             auto& thisReceivedAcks = receivedAcks[datagram.first];
 
-            const auto rate = chunk.be32();
+            const uint64_t rate = chunk.be64();
+            chunk = chunk(sizeof(rate));
 
             auto& peer = peers.at(message.sender_id());
             takeLease(message.sender_id(), rate);
-
-            chunk = chunk(4);
 
             if (message.tracked()) {
                 logPacket(message.sequence_number(), message.attempt(),
@@ -382,7 +381,7 @@ ResultType LambdaWorker::handleUdpReceive() {
             it = messages.erase(it);
         } else if (message.opcode() == OpCode::SendRays) {
             Chunk chunk(message.payload());
-            const auto queueSize = chunk.le32();
+            const uint64_t queueSize = chunk.le64();
             grantLease(message.sender_id(), queueSize);
 
             leaseInfo.received[message.sender_id()] += message.total_length();

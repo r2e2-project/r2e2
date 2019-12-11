@@ -140,7 +140,7 @@ class LambdaWorker {
         void setReliable(const bool reliable) { reliable_ = reliable; }
         void setTracked(const bool tracked) { tracked_ = tracked; }
         void setSequenceNumber(const uint64_t sequenceNumber);
-        void setQueueLength(const uint32_t len) { queueLength_ = len; }
+        void setQueueLength(const uint64_t len) { queueLength_ = len; }
         void recordSendTime() { sentAt_ = packet_clock::now(); }
         void incrementAttempts();
 
@@ -153,7 +153,7 @@ class LambdaWorker {
         size_t attempt() const { return attempt_; }
         size_t length() const { return length_; }
         size_t rayCount() const { return rays_.size(); }
-        uint32_t queueLength() const { return queueLength_; }
+        uint64_t queueLength() const { return queueLength_; }
         const char* header() const { return header_; }
         packet_clock::time_point sentAt() const { return sentAt_; }
 
@@ -170,14 +170,14 @@ class LambdaWorker {
         Optional<std::pair<WorkerId, Address>> destination_{};
         TreeletId targetTreelet_{0};
         uint64_t sequenceNumber_{0};
-        uint32_t queueLength_{0};
+        uint64_t queueLength_{0};
 
         /* packet info */
         bool retransmission_{false};
         bool reliable_{false};
         bool tracked_{false};
         size_t attempt_{0};
-        size_t length_{meow::Message::HEADER_LENGTH + sizeof(uint32_t)};
+        size_t length_{meow::Message::HEADER_LENGTH + sizeof(uint64_t)};
         packet_clock::time_point sentAt_{};
 
         char header_[meow::Message::HEADER_LENGTH];
@@ -185,7 +185,7 @@ class LambdaWorker {
 
         struct iovec iov_[20] = {
             {.iov_base = nullptr, .iov_len = 25},
-            {.iov_base = nullptr, .iov_len = sizeof(uint32_t)}};
+            {.iov_base = nullptr, .iov_len = sizeof(uint64_t)}};
 
         size_t iovCount_{2};
     };
@@ -387,15 +387,15 @@ class LambdaWorker {
         packet_clock::time_point expiresAt{start + INACTIVITY_THRESHOLD};
 
         WorkerId workerId{0};
-        uint32_t allocation{DEFAULT_SEND_RATE};
-        uint32_t queueSize{1'400};
+        uint64_t allocation{DEFAULT_SEND_RATE};
+        uint64_t queueSize{1'400};
         bool small{true};
 
         size_t allocatedBits(const packet_clock::time_point now) const;
     };
 
-    void grantLease(const WorkerId workerId, const uint32_t queueSize);
-    void takeLease(const WorkerId workerId, const uint32_t rate);
+    void grantLease(const WorkerId workerId, const uint64_t queueSize);
+    void takeLease(const WorkerId workerId, const uint64_t rate);
     void rebalanceLeases();
     void expireLeases();
 
