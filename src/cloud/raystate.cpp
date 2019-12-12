@@ -1,4 +1,5 @@
 #include "raystate.h"
+#include "cloud/bvh.h"
 
 #include <lz4.h>
 #include <cstring>
@@ -25,7 +26,9 @@ Point2i RayState::SamplePixel(const Vector2i &extent, const uint32_t spp) {
 void RayState::StartTrace() {
     hit = false;
     toVisitHead = 0;
-    toVisitPush({});
+    TreeletNode head{};
+    head.treelet = ComputeIdx(ray.d);
+    toVisitPush(move(head));
 }
 
 uint32_t RayState::CurrentTreelet() const {
