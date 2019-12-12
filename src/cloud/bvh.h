@@ -126,6 +126,9 @@ class CloudBVH : public Aggregate {
 
 std::shared_ptr<CloudBVH> CreateCloudBVH(const ParamSet &ps);
 
+Vector3f ComputeRayDir(unsigned idx);
+unsigned ComputeIdx(const Vector3f &dir);
+
 }  // namespace pbrt
 
 #endif /* PBRT_ACCELERATORS_CLOUD_BVH_H */

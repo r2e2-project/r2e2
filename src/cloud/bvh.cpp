@@ -40,6 +40,9 @@ CloudBVH::CloudBVH(const uint32_t bvh_root) : bvh_root_(bvh_root) {
 }
 
 Bounds3f CloudBVH::WorldBound() const {
+    // The correctness of this function is only guaranteed for the root treelet
+    CHECK_EQ(bvh_root_, 0); 
+
     loadTreelet(bvh_root_);
     return treelets_[bvh_root_].nodes[0].bounds;
 }
@@ -136,7 +139,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
                         make_shared<IncludedInstance>(&treelet, instance_node);
                 } else {
                     bvh_instances_[instance_ref] =
-                        make_shared<CloudBVH>(instance_ref);
+                        make_shared<CloudBVH>(instance_group);
                 }
             }
 
@@ -254,6 +257,7 @@ void CloudBVH::Trace(RayState &rayState) {
                                 ray.time, &rayState.rayTransform);
 
                             RayState::TreeletNode next;
+                            // FIXME
                             next.treelet = cbvh->bvh_root_;
                             next.node = 0;
                             next.transformed = true;
@@ -434,6 +438,8 @@ bool CloudBVH::IntersectP(const Ray &ray) const {
 
 vector<Bounds3f> CloudBVH::getTreeletNodeBounds(
     const uint32_t treelet_id, const int recursionLimit) const {
+    return vector<Bounds3f>();
+#if 0
     loadTreelet(treelet_id);
 
     vector<Bounds3f> treeletBounds;
@@ -452,6 +458,7 @@ vector<Bounds3f> CloudBVH::getTreeletNodeBounds(
                     treeletBounds);
 
     return treeletBounds;
+#endif
 }
 
 void CloudBVH::recurseBVHNodes(const int depth, const int recursionLimit,
@@ -577,6 +584,20 @@ bool CloudBVH::IncludedInstance::IntersectP(const Ray &ray) const {
     }
 
     return false;
+}
+
+Vector3f ComputeRayDir(unsigned idx) {
+    unsigned x = idx & (1 << 0);
+    unsigned y = idx & (1 << 1);
+    unsigned z = idx & (1 << 2);
+
+    return Vector3f(x ? 1 : -1, y ? 1 : -1, z ? 1 : -1);
+}
+
+unsigned ComputeIdx(const Vector3f &dir) {
+    return (dir.x >= 0 ? 1 : 0) +
+        ((dir.y >= 0 ? 1 : 0) << 1) +
+        ((dir.z >= 0 ? 1 : 0) << 2);
 }
 
 }  // namespace pbrt
