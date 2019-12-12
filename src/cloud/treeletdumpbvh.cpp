@@ -52,7 +52,7 @@ TreeletDumpBVH::TreeletDumpBVH(vector<shared_ptr<Primitive>> &&p,
         SetNodeInfo(maxTreeletBytes);
         allTreelets = AllocateTreelets(maxTreeletBytes);
         if (PbrtOptions.dumpScene) {
-            DumpTreelets();
+            DumpTreelets(true);
         }
     } else {
         instanceID = numInstances++;
@@ -270,12 +270,15 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
                 if (prim->GetType() == PrimitiveType::Transformed) {
                     shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
                     shared_ptr<TreeletDumpBVH> instance = dynamic_pointer_cast<TreeletDumpBVH>(tp->GetPrimitive());
-                    if (!instance->copyable) continue;
-
                     CHECK_NOTNULL(instance.get());
-                    if (!treelet.instanceMask.Get(instance->instanceID)) {
-                        treelet.instanceMask.Set(instance->instanceID);
-                        treelet.instanceSize += instance->totalBytes;
+
+                    if (instance->copyable) {
+                        if (!treelet.instanceMask.Get(instance->instanceID)) {
+                            treelet.instanceMask.Set(instance->instanceID);
+                            treelet.instanceSize += instance->totalBytes;
+                        }
+                    } else {
+                        instanceProbabilities[dirIdx][instance->instanceID] += graph.incomingProb[nodeIdx];
                     }
                 }
             }
@@ -429,12 +432,11 @@ TreeletDumpBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
     IntermediateTraversalGraph g;
     g.depthFirst.reserve(nodeCount);
     g.outgoing.resize(nodeCount);
-
-    vector<float> probabilities(nodeCount);
+    g.incomingProb.resize(nodeCount);
 
     bool dirIsNeg[3] = { rayDir.x < 0, rayDir.y < 0, rayDir.z < 0 };
 
-    auto addEdge = [this, &probabilities, &g](auto src, auto dst, auto prob) {
+    auto addEdge = [this, &g](auto src, auto dst, auto prob) {
         g.edges.emplace_back(src, dst, prob);
 
         if (g.outgoing[src].second == 0) { // No outgoing yet
@@ -442,20 +444,20 @@ TreeletDumpBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
         }
         g.outgoing[src].second++;
 
-        probabilities[dst] += prob;
+        g.incomingProb[dst] += prob;
     };
 
     vector<uint64_t> traversalStack {0};
     traversalStack.reserve(64);
 
-    probabilities[0] = 1.0;
+    g.incomingProb[0] = 1.0;
     while (traversalStack.size() > 0) {
         uint64_t curIdx = traversalStack.back();
         traversalStack.pop_back();
         g.depthFirst.push_back(curIdx);
 
         LinearBVHNode *node = &nodes[curIdx];
-        float curProb = probabilities[curIdx];
+        float curProb = g.incomingProb[curIdx];
         CHECK_GT(curProb, 0.0);
         CHECK_LE(curProb, 1.0001); // FP error (should be 1.0)
 
@@ -505,11 +507,6 @@ TreeletDumpBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
             CHECK_EQ(traversalStack.size(), 0);
             CHECK_GT(curProb, 0.99);
         }
-        probabilities[curIdx] = -10000;
-    }
-
-    for (auto prob : probabilities) {
-        CHECK_EQ(prob, -10000);
     }
 
     return g;
@@ -521,12 +518,12 @@ TreeletDumpBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
     IntermediateTraversalGraph g;
     g.depthFirst.reserve(nodeCount);
     g.outgoing.resize(nodeCount);
-
-    vector<float> probabilities(nodeCount);
+    g.incomingProb.resize(nodeCount);
 
     bool dirIsNeg[3] = { rayDir.x < 0, rayDir.y < 0, rayDir.z < 0 };
 
-    auto addEdge = [this, &probabilities, &g](auto src, auto dst, auto prob) {
+    // FIXME this should just be a graph method
+    auto addEdge = [this, &g](auto src, auto dst, auto prob) {
         g.edges.emplace_back(src, dst, prob);
 
         if (g.outgoing[src].second == 0) { // No outgoing yet
@@ -534,20 +531,20 @@ TreeletDumpBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
         }
         g.outgoing[src].second++;
 
-        probabilities[dst] += prob;
+        g.incomingProb[dst] += prob;
     };
 
     vector<uint64_t> traversalStack {0};
     traversalStack.reserve(64);
 
-    probabilities[0] = 1.0;
+    g.incomingProb[0] = 1.0;
     while (traversalStack.size() > 0) {
         uint64_t curIdx = traversalStack.back();
         traversalStack.pop_back();
         g.depthFirst.push_back(curIdx);
 
         LinearBVHNode *node = &nodes[curIdx];
-        float curProb = probabilities[curIdx];
+        float curProb = g.incomingProb[curIdx];
         CHECK_GE(curProb, 0.0);
         CHECK_LE(curProb, 1.0001); // FP error (should be 1.0)
 
@@ -583,12 +580,6 @@ TreeletDumpBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
         }
         CHECK_LE(runningProb, 1.0);
         CHECK_GE(runningProb, 0.0);
-
-        probabilities[curIdx] = -10000;
-    }
-
-    for (auto prob : probabilities) {
-        CHECK_EQ(prob, -10000);
     }
 
     return g;
@@ -621,6 +612,7 @@ TreeletDumpBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction)
     }
 
     graph.depthFirst = move(intermediate.depthFirst);
+    graph.incomingProb = move(intermediate.incomingProb);
 
     auto adjacencyIter = intermediate.outgoing.begin();
     while (adjacencyIter != intermediate.outgoing.end()) {
@@ -1672,12 +1664,10 @@ bool TreeletDumpBVH::IntersectP(const Ray &ray) const {
     }
 }
 
-array<uint32_t, 8> TreeletDumpBVH::DumpTreelets() const {
-    static ofstream staticAllocOut(global::manager.getScenePath() + "/STATIC0_pre");
+array<uint32_t, 8> TreeletDumpBVH::DumpTreelets(bool root) const {
     // Assign IDs to each treelet
     for (const TreeletInfo &treelet : allTreelets) {
-        uint32_t sTreeletID = global::manager.getNextId(ObjectType::Treelet, &treelet);
-        staticAllocOut << sTreeletID << " " << treelet.totalProb << endl;
+        global::manager.getNextId(ObjectType::Treelet, &treelet);
     }
 
     vector<unordered_map<int, uint32_t>> treeletNodeLocations(allTreelets.size());
@@ -1704,7 +1694,7 @@ array<uint32_t, 8> TreeletDumpBVH::DumpTreelets() const {
     for (int treeletID = 0; treeletID < allTreelets.size(); treeletID++) {
         const TreeletInfo &treelet = allTreelets[treeletID];
         // Find which triangles / meshes are in treelet
-        unordered_map<TriangleMesh *, vector<size_t>> trianglesInTreelet ;
+        unordered_map<TriangleMesh *, vector<size_t>> trianglesInTreelet;
         for (int nodeIdx : treelet.nodes) {
             const LinearBVHNode &node = nodes[nodeIdx];
             for (int primIdx = 0; primIdx < node.nPrimitives; primIdx++) {
@@ -1872,7 +1862,7 @@ array<uint32_t, 8> TreeletDumpBVH::DumpTreelets() const {
                     } else {
                         auto iter = nonCopyableInstanceTreelets.find(instance.get());
                         if (iter == nonCopyableInstanceTreelets.end()) {
-                            auto instanceIDs = instance->DumpTreelets();
+                            auto instanceIDs = instance->DumpTreelets(false);
                             auto res = nonCopyableInstanceTreelets.emplace(instance.get(), move(instanceIDs));
                             CHECK_EQ(res.second, true);
                             iter = res.first;
@@ -1959,6 +1949,23 @@ array<uint32_t, 8> TreeletDumpBVH::DumpTreelets() const {
                 }
 
                 writer->write(nodeProto);
+            }
+        }
+    }
+
+    if (root) {
+        ofstream staticAllocOut(global::manager.getScenePath() + "/STATIC0_pre");
+        for (const TreeletInfo &treelet : allTreelets) {
+            uint32_t sTreeletID = global::manager.getId(&treelet);
+            staticAllocOut << sTreeletID << " " << treelet.totalProb << endl;
+        }
+
+        for (auto &kv : nonCopyableInstanceTreelets) {
+            const TreeletDumpBVH *inst = kv.first;
+            for (const TreeletInfo &treelet : inst->allTreelets) {
+                float instProb = instanceProbabilities[treelet.dirIdx][inst->instanceID];
+                uint32_t sTreeletID = global::manager.getId(&treelet);
+                staticAllocOut << sTreeletID << treelet.totalProb * instProb << endl;
             }
         }
     }
