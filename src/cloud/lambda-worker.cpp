@@ -105,7 +105,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     if (trackRays) {
         TLOG(RAY) << "pathID,hop,shadowRay,workerID,otherPartyID,treeletID,"
-                     "outQueue,udpQueue,outstanding,timestamp,size,action";
+                     "outQueue,sendQueueBytes,udpQueue,outstanding,timestamp,"
+                     "size,action";
     }
 
     if (trackPackets) {
