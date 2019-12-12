@@ -74,6 +74,9 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
     stack<pair<uint32_t, Child>> q;
     while (not reader->eof()) {
         protobuf::BVHNode proto_node;
+        bool success = reader->read(&proto_node);
+        CHECK_EQ(success, true);
+
         TreeletNode node(from_protobuf(proto_node.bounds()), proto_node.axis());
         const uint32_t index = nodes.size();
 
