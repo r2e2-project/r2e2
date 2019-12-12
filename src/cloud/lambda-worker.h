@@ -184,7 +184,7 @@ class LambdaWorker {
         std::deque<std::unique_ptr<RayState>> rays_{};
 
         struct iovec iov_[20] = {
-            {.iov_base = nullptr, .iov_len = 25},
+            {.iov_base = nullptr, .iov_len = meow::Message::HEADER_LENGTH},
             {.iov_base = nullptr, .iov_len = sizeof(uint64_t)}};
 
         size_t iovCount_{2};

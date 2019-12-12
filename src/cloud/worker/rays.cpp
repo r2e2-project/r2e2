@@ -190,6 +190,7 @@ ResultType LambdaWorker::handleOutQueue() {
 
         while (!rayList.empty()) {
             RayPacket packet{};
+
             packet.setTargetTreelet(treeletId);
             packet.setReliable(config.sendReliably);
             packet.setTracked(packetLogBD(randEngine));
@@ -215,11 +216,11 @@ ResultType LambdaWorker::handleOutQueue() {
                 }
 
                 workerStats.recordGeneratedBytes(treeletId, size);
+                qBytes += size;
                 rayList.pop_front();
                 outQueueSize--;
             }
 
-            qBytes += packet.length();
             packetList.emplace_back(move(packet));
             sendQueueSize++;
 
