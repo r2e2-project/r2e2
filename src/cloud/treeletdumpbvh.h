@@ -104,6 +104,7 @@ class TreeletDumpBVH : public BVHAccel {
     struct IntermediateTraversalGraph {
         std::deque<Edge> edges;
         std::vector<uint64_t> depthFirst;
+        std::vector<float> incomingProb;
 
         std::deque<std::pair<uint64_t, uint64_t>> outgoing;
     };
@@ -111,6 +112,7 @@ class TreeletDumpBVH : public BVHAccel {
     struct TraversalGraph {
         std::vector<Edge> edges;
         std::vector<uint64_t> depthFirst;
+        std::vector<float> incomingProb;
 
         std::vector<std::pair<Edge *, uint64_t>> outgoing;
     };
@@ -180,7 +182,7 @@ class TreeletDumpBVH : public BVHAccel {
     std::vector<uint32_t> ComputeTreelets(const TraversalGraph &graph,
                                           uint64_t maxTreeletBytes) const;
 
-    std::array<uint32_t, 8> DumpTreelets() const;
+    std::array<uint32_t, 8> DumpTreelets(bool root) const;
 
     std::vector<uint32_t> OrigAssignTreelets(const uint64_t) const;
 
@@ -208,6 +210,7 @@ class TreeletDumpBVH : public BVHAccel {
     std::vector<InstanceMask> nodeInstanceMasks {};
     std::array<TreeletDumpBVH *, sizeof(InstanceMask) * 8> uniqueInstances {};
     std::array<uint64_t, sizeof(InstanceMask) * 8> instanceSizes {};
+    std::array<std::array<float, sizeof(InstanceMask) * 8>, 8> instanceProbabilities {};
 
     static int numInstances;
     int instanceID = 0;
