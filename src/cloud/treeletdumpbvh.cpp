@@ -234,6 +234,8 @@ uint64_t TreeletDumpBVH::GetInstancesBytes(const InstanceMask &mask) const {
 
 vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTreeletBytes) {
     origTreeletAllocation = OrigAssignTreelets(maxTreeletBytes);
+    array<unordered_map<uint32_t, TreeletInfo>, 8> intermediateTreelets;
+
     for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
         Vector3f dir = ComputeRayDir(dirIdx);
         TraversalGraph graph = CreateTraversalGraph(dir, 0);
@@ -252,14 +254,10 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
         //}
 
         treeletAllocations[dirIdx] = ComputeTreelets(graph, maxTreeletBytes);
-    }
 
-    array<unordered_map<uint32_t, TreeletInfo>, 8> intermediateTreelets;
-
-    for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
         unordered_map<uint32_t, TreeletInfo> treelets;
         for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
-            int curTreelet = treeletAllocations[dirIdx][nodeIdx];
+            uint32_t curTreelet = treeletAllocations[dirIdx][nodeIdx];
             TreeletInfo &treelet = treelets[curTreelet];
             treelet.dirIdx = dirIdx;
             treelet.nodes.push_back(nodeIdx);
@@ -278,6 +276,15 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
                         treelet.instanceMask.Set(instance->instanceID);
                         treelet.instanceSize += instance->totalBytes;
                     }
+                }
+            }
+
+            auto outgoingBounds = graph.outgoing[nodeIdx];
+            for (int edgeIdx = 0; edgeIdx < outgoingBounds.second; edgeIdx++) {
+                Edge *edge = outgoingBounds.first + edgeIdx;
+                uint32_t dstTreelet = treeletAllocations[dirIdx][edge->dst];
+                if (curTreelet == dstTreelet) {
+                    treelet.totalProb += edge->weight;
                 }
             }
         }
@@ -346,6 +353,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
                     info.instanceMask = mergedMask;
                     info.instanceSize = unionInstanceSize;
                     info.noInstanceSize = noInstSize;
+                    info.totalProb += candidateInfo.totalProb;
                     sortedTreelets.erase(candidateIter);
                 }
 
@@ -376,6 +384,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
             }
         }
     }
+
 
     vector<TreeletInfo> finalTreelets;
     // Assign root treelets to IDs 0 to 8
@@ -1663,9 +1672,11 @@ bool TreeletDumpBVH::IntersectP(const Ray &ray) const {
 }
 
 array<uint32_t, 8> TreeletDumpBVH::DumpTreelets(int maxTreeletBytes, const vector<TreeletDumpBVH::TreeletInfo> &treelets) const {
+    static ofstream staticAllocOut(global::manager.getScenePath() + "/STATIC0_pre");
     // Assign IDs to each treelet
     for (const TreeletInfo &treelet : treelets) {
-        global::manager.getNextId(ObjectType::Treelet, &treelet);
+        uint32_t sTreeletID = global::manager.getNextId(ObjectType::Treelet, &treelet);
+        staticAllocOut << sTreeletID << " " << treelet.totalProb << endl;
     }
 
     vector<unordered_map<int, uint32_t>> treeletNodeLocations(treelets.size());
