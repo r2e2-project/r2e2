@@ -67,7 +67,7 @@ void LambdaWorker::RayPacket::incrementAttempts() {
 }
 
 size_t LambdaWorker::RayPacket::raysLength() const {
-    return length_ - (Message::HEADER_LENGTH + sizeof(uint32_t));
+    return length_ - (Message::HEADER_LENGTH + sizeof(uint64_t));
 }
 
 struct iovec* LambdaWorker::RayPacket::iov(const WorkerId workerId) {
