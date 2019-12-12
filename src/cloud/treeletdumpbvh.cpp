@@ -1667,9 +1667,10 @@ void TreeletDumpBVH::DumpTreelets(const vector<TreeletDumpBVH::TreeletInfo> &tre
             listIdx++;
         }
 
-        for (int instIdx = 0; instIdx < treelet.instances.size(); instIdx++) {
-            TreeletDumpBVH *inst = treelet.instances[instIdx];
+        uint32_t instIdx = 0;
+        for (TreeletDumpBVH *inst : treelet.instances) {
             treeletInstanceStarts[treeletID][inst] = instIdx + treelet.nodes.size();
+            instIdx += inst->nodeCount;
         }
     }
 
