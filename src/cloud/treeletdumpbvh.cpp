@@ -52,7 +52,7 @@ TreeletDumpBVH::TreeletDumpBVH(vector<shared_ptr<Primitive>> &&p,
         SetNodeInfo(maxTreeletBytes);
         auto treelets = AllocateTreelets(maxTreeletBytes);
         if (PbrtOptions.dumpScene) {
-            DumpTreelets(treelets);
+            DumpTreelets(maxTreeletBytes, treelets);
         }
     } else {
         instanceID = numInstances++;
@@ -60,6 +60,12 @@ TreeletDumpBVH::TreeletDumpBVH(vector<shared_ptr<Primitive>> &&p,
         for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
             const LinearBVHNode &node = nodes[nodeIdx];
             totalBytes += SizeEstimates::nodeSize + node.nPrimitives * SizeEstimates::triSize;
+        }
+
+        if (totalBytes < maxTreeletBytes / 2) {
+            copyable = true;
+        } else {
+            SetNodeInfo(maxTreeletBytes);
         }
     }
 }
@@ -179,6 +185,7 @@ void TreeletDumpBVH::SetNodeInfo(int maxTreeletBytes) {
 
                 shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
                 shared_ptr<TreeletDumpBVH> instance = dynamic_pointer_cast<TreeletDumpBVH>(tp->GetPrimitive());
+                if (!instance->copyable) continue;
 
                 uniqueInstances[instance->instanceID] = instance.get();
                 instanceSizes[instance->instanceID] = instance->totalBytes;
@@ -264,6 +271,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
                 if (prim->GetType() == PrimitiveType::Transformed) {
                     shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
                     shared_ptr<TreeletDumpBVH> instance = dynamic_pointer_cast<TreeletDumpBVH>(tp->GetPrimitive());
+                    if (!instance->copyable) continue;
 
                     CHECK_NOTNULL(instance.get());
                     if (!treelet.instanceMask.Get(instance->instanceID)) {
@@ -300,7 +308,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
         map<TreeletSortKey, TreeletInfo, TreeletCmp> sortedTreelets;
         for (auto &kv : treelets) {
             CHECK_NE(kv.first, 0);
-            CHECK_LT(kv.second.noInstanceSize + kv.second.instanceSize, maxTreeletBytes);
+            CHECK_LE(kv.second.noInstanceSize + kv.second.instanceSize, maxTreeletBytes);
             sortedTreelets.emplace(piecewise_construct,
                     forward_as_tuple(kv.first, kv.second.noInstanceSize + kv.second.instanceSize),
                     forward_as_tuple(move(kv.second)));
@@ -825,6 +833,8 @@ TreeletDumpBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
                 if (prim->GetType() == PrimitiveType::Transformed) {
                     shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
                     shared_ptr<TreeletDumpBVH> instance = dynamic_pointer_cast<TreeletDumpBVH>(tp->GetPrimitive());
+                    if (!instance->copyable) continue;
+
                     if (!includedInstances.Get(instance->instanceID)) {
                         totalSize += instance->totalBytes;
                     }
@@ -1316,6 +1326,7 @@ vector<uint32_t> TreeletDumpBVH::OrigAssignTreelets(const uint64_t maxTreeletByt
             if (prim->GetType() == PrimitiveType::Transformed) {
                 shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
                 shared_ptr<TreeletDumpBVH> instance = dynamic_pointer_cast<TreeletDumpBVH>(tp->GetPrimitive());
+                if (!instance->copyable) continue;
 
                 auto res = instanceTracker[treelet - 1].insert(instance.get());
                 if (res.second) {
@@ -1651,7 +1662,7 @@ bool TreeletDumpBVH::IntersectP(const Ray &ray) const {
     }
 }
 
-void TreeletDumpBVH::DumpTreelets(const vector<TreeletDumpBVH::TreeletInfo> &treelets) const {
+array<uint32_t, 8> TreeletDumpBVH::DumpTreelets(int maxTreeletBytes, const vector<TreeletDumpBVH::TreeletInfo> &treelets) const {
     // Assign IDs to each treelet
     for (const TreeletInfo &treelet : treelets) {
         global::manager.getNextId(ObjectType::Treelet, &treelet);
@@ -1671,8 +1682,12 @@ void TreeletDumpBVH::DumpTreelets(const vector<TreeletDumpBVH::TreeletInfo> &tre
         for (TreeletDumpBVH *inst : treelet.instances) {
             treeletInstanceStarts[treeletID][inst] = instIdx + treelet.nodes.size();
             instIdx += inst->nodeCount;
+
+            CHECK_EQ(inst->copyable, true);
         }
     }
+
+    unordered_map<TreeletDumpBVH *, array<uint32_t, 8>> nonCopyableInstanceTreelets;
 
     for (int treeletID = 0; treeletID < treelets.size(); treeletID++) {
         const TreeletInfo &treelet = treelets[treeletID];
@@ -1833,15 +1848,30 @@ void TreeletDumpBVH::DumpTreelets(const vector<TreeletDumpBVH::TreeletInfo> &tre
                 if (prim->GetType() == PrimitiveType::Transformed) {
                     shared_ptr<TransformedPrimitive> tp =
                         dynamic_pointer_cast<TransformedPrimitive>(prim);
-                    shared_ptr<TreeletDumpBVH> bvh =
+                    shared_ptr<TreeletDumpBVH> instance =
                         dynamic_pointer_cast<TreeletDumpBVH>(tp->GetPrimitive());
 
-                    CHECK_NOTNULL(bvh.get());
+                    CHECK_NOTNULL(instance.get());
+                    uint64_t instanceRef;
+                    if (instance->copyable) {
+                        instanceRef = treeletID;
+                        instanceRef <<= 32;
+                        instanceRef |= treeletInstanceStarts[treeletID].at(instance.get());
+                    } else {
+                        auto iter = nonCopyableInstanceTreelets.find(instance.get());
+                        if (iter == nonCopyableInstanceTreelets.end()) {
+                            auto instanceTreelets = instance->AllocateTreelets(maxTreeletBytes);
+                            auto instanceIDs = instance->DumpTreelets(maxTreeletBytes, instanceTreelets);
+                            auto res = nonCopyableInstanceTreelets.emplace(instance.get(), move(instanceIDs));
+                            CHECK_EQ(res.second, true);
+                            iter = res.first;
+                        }
+
+                        instanceRef = iter->second[treelet.dirIdx];
+                        instanceRef <<= 32;
+                    }
 
                     protobuf::TransformedPrimitive tpProto;
-                    uint64_t instanceRef = treeletID;
-                    instanceRef <<= 32;
-                    instanceRef |= treeletInstanceStarts[treeletID].at(bvh.get());
                     tpProto.set_root_ref(instanceRef);
                     *tpProto.mutable_transform() = to_protobuf(tp->GetTransform());
 
@@ -1921,6 +1951,13 @@ void TreeletDumpBVH::DumpTreelets(const vector<TreeletDumpBVH::TreeletInfo> &tre
             }
         }
     }
+
+    array<uint32_t, 8> rootTreelets;
+    for (int i = 0; i < 8; i++) {
+        rootTreelets[i] = global::manager.getId(&treelets[i]);
+    }
+
+    return rootTreelets;
 }
 
 
