@@ -83,6 +83,17 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
         TreeletNode node(from_protobuf(proto_node.bounds()), proto_node.axis());
         const uint32_t index = nodes.size();
 
+        if (not q.empty()) {
+            auto parent = q.top();
+            q.pop();
+
+            nodes[parent.first].child_treelet[parent.second] = root_id;
+            nodes[parent.first].child_node[parent.second] = index;
+        }
+
+        bool is_leaf = proto_node.transformed_primitives_size() ||
+            proto_node.triangles_size();
+
         if (proto_node.right_ref()) {
             uint64_t right_ref = proto_node.right_ref();
             uint16_t treeletID = (uint16_t)(right_ref >> 32);
@@ -90,7 +101,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
             node.child_node[RIGHT] = (uint32_t)right_ref;
 
             info.children.insert(node.child_node[RIGHT]);
-        } else {
+        } else if (!is_leaf) {
             q.emplace(index, RIGHT);
         }
 
@@ -101,12 +112,11 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
             node.child_node[LEFT] = (uint32_t)left_ref;
 
             info.children.insert(node.child_node[LEFT]);
-        } else {
+        } else if (!is_leaf) {
             q.emplace(index, LEFT);
         }
 
-        if (proto_node.transformed_primitives_size() ||
-                proto_node.triangles_size()) {
+        if (is_leaf) {
             node.leaf_tag = ~0;
             node.primitive_offset = tree_primitives.size();
             node.primitive_count = proto_node.transformed_primitives_size() +
@@ -177,14 +187,6 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
         }
 
         nodes.emplace_back(move(node));
-
-        if (not q.empty()) {
-            auto parent = q.top();
-            q.pop();
-
-            nodes[parent.first].child_treelet[parent.second] = root_id;
-            nodes[parent.first].child_node[parent.second] = index;
-        }
     }
 
     treelet.nodes = move(nodes);
@@ -505,14 +507,14 @@ Bounds3f CloudBVH::IncludedInstance::WorldBound() const {
 }
 
 bool CloudBVH::IncludedInstance::Intersect(const Ray &ray, SurfaceInteraction *isect) const {
-    const CloudBVH::TreeletNode *nodes = &treelet_->nodes[nodeIdx_];
+    const CloudBVH::TreeletNode *nodes = treelet_->nodes.data();
 
     bool hit = false;
     Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
     int dirIsNeg[3] = {invDir.x < 0, invDir.y < 0, invDir.z < 0};
 
     // Follow ray through BVH nodes to find primitive intersections
-    int toVisitOffset = 0, currentNodeIndex = 0;
+    int toVisitOffset = 0, currentNodeIndex = nodeIdx_;
     int nodesToVisit[64];
     while (true) {
         const CloudBVH::TreeletNode *node = &nodes[currentNodeIndex];
@@ -546,11 +548,11 @@ bool CloudBVH::IncludedInstance::Intersect(const Ray &ray, SurfaceInteraction *i
 }
 
 bool CloudBVH::IncludedInstance::IntersectP(const Ray &ray) const {
-    const CloudBVH::TreeletNode *nodes = &treelet_->nodes[nodeIdx_];
+    const CloudBVH::TreeletNode *nodes = treelet_->nodes.data();
 
     Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
     int dirIsNeg[3] = {invDir.x < 0, invDir.y < 0, invDir.z < 0};
-    int toVisitOffset = 0, currentNodeIndex = 0;
+    int toVisitOffset = 0, currentNodeIndex = nodeIdx_;
     int nodesToVisit[64];
 
     while (true) {
