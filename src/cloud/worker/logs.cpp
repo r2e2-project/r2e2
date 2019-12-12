@@ -67,8 +67,8 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
 
     // clang-format off
 
-    /* pathID,hop,shadowRay,workerID,otherPartyID,treeletID,outQueue,udpQueue,
-       outstanding,timestamp,size,action */
+    /* pathID,hop,shadowRay,workerID,otherPartyID,treeletID,outQueue,
+       sendQueueBytes,udpQueue,outstanding,timestamp,size,action */
 
     oss << state.sample.id << ','
         << state.hop << ','
@@ -79,6 +79,7 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                             : *workerId) << ','
         << state.CurrentTreelet() << ','
         << outQueueSize << ','
+        << outQueueBytes[state.CurrentTreelet()] << ','
         << (servicePackets.size() + retransmissionQueue.size() +
             sendQueueSize) << ','
         << outstandingRayPackets.size() << ','
