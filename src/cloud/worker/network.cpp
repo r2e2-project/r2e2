@@ -81,8 +81,9 @@ void LambdaWorker::rebalanceLeases() {
     for (auto& lease : grantedLeases) {
         if (8000ull * lease.second.queueSize / trafficShare < minTransmitTime) {
             lease.second.allocation = min<uint64_t>(
-                trafficShare, max<uint64_t>(DEFAULT_SEND_RATE,
-                                            (8000ull / minTransmitTime) * lease.second.queueSize));
+                trafficShare,
+                max<uint64_t>(DEFAULT_SEND_RATE, (8000ull / minTransmitTime) *
+                                                     lease.second.queueSize));
             lease.second.small = true;
             excess += trafficShare - lease.second.allocation;
             bigCount--;
@@ -198,6 +199,9 @@ ResultType LambdaWorker::handleUdpSend() {
     }
 
     auto sendRayPacket = [this](Worker& peer, RayPacket&& packet) {
+        /* update queue size for the target treelet */
+        packet.setQueueLength(outQueueBytes[packet.targetTreelet()]);
+
         if (config.logLeases) {
             leaseInfo.sent[peer.id] += packet.length();
         }
@@ -216,7 +220,7 @@ ResultType LambdaWorker::handleUdpSend() {
                                     packet.raysLength());
 
         if (!packet.retransmission()) {
-            outQueueBytes[packet.targetTreelet()] -= packet.length();
+            outQueueBytes[packet.targetTreelet()] -= packet.raysLength();
         }
 
         /* do the necessary logging */
@@ -297,7 +301,6 @@ ResultType LambdaWorker::handleUdpSend() {
 
         packet.setDestination(peer.id, peer.address);
         packet.setSequenceNumber(peerSeqNo);
-        packet.setQueueLength(outQueueBytes[treeletId]);
 
         sendRayPacket(peer, move(packet));
 
