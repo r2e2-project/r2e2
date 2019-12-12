@@ -809,9 +809,9 @@ TreeletDumpBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
     vector<uint32_t> assignment(nodeCount);
     list<uint64_t> depthFirst;
     vector<decltype(depthFirst)::iterator> sortLocs(nodeCount);
-    for (uint64_t vert : graph.depthFirst) {
-        depthFirst.push_back(vert);
-        sortLocs[vert] = --depthFirst.end();
+    for (uint64_t nodeIdx : graph.depthFirst) {
+        depthFirst.push_back(nodeIdx);
+        sortLocs[nodeIdx] = --depthFirst.end();
     }
 
     uint32_t curTreelet = 1;
