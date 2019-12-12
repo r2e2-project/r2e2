@@ -201,8 +201,6 @@ ResultType LambdaWorker::handleOutQueue() {
                 ray->Serialize();
                 const auto size = ray->SerializedSize();
 
-                qBytes += size;
-
                 checkPreviousPacket =
                     checkPreviousPacket &&
                     (packetList.back().length() + size <= UDP_MTU_BYTES);
@@ -221,6 +219,7 @@ ResultType LambdaWorker::handleOutQueue() {
                 outQueueSize--;
             }
 
+            qBytes += packet.length();
             packetList.emplace_back(move(packet));
             sendQueueSize++;
 
