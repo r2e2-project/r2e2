@@ -287,11 +287,14 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
             for (int edgeIdx = 0; edgeIdx < outgoingBounds.second; edgeIdx++) {
                 Edge *edge = outgoingBounds.first + edgeIdx;
                 uint32_t dstTreelet = treeletAllocations[dirIdx][edge->dst];
-                if (curTreelet == dstTreelet) {
-                    treelet.totalProb += edge->weight;
+                if (curTreelet != dstTreelet) {
+                    TreeletInfo &dstTreeletInfo = treelets[dstTreelet];
+                    dstTreeletInfo.totalProb += edge->weight;
                 }
             }
         }
+        TreeletInfo &rootTreelet = treelets.at(treeletAllocations[dirIdx][0]);
+        rootTreelet.totalProb += 1.0;
 
         struct TreeletSortKey {
             uint32_t treeletID;
@@ -499,9 +502,28 @@ TreeletDumpBVH::CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthR
                 addEdge(curIdx, nextMiss, missPathProb);
             }
         } else if (nextMiss != 0) {
+            // If this is a leaf node with a non copyable instance at the end
+            // of the primitive list, the edge from curIdx to nextMiss should
+            // not exist, because in reality there should be an edge from
+            // curIdx to the instance, and from the instance to nextMiss.
+            // nextMiss should still receive the incomingProb since the instance
+            // edges are never represented in the graph.
+            bool skipEdge = false;
+            auto &lastPrim = primitives[node->primitivesOffset + node->nPrimitives - 1];
+            if (lastPrim->GetType() == PrimitiveType::Transformed) {
+                shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(lastPrim);
+                shared_ptr<TreeletDumpBVH> instance = dynamic_pointer_cast<TreeletDumpBVH>(tp->GetPrimitive());
+                if (!instance->copyable) {
+                    skipEdge = true;
+                }
+            }
+
             // Leaf node, guaranteed move up in the BVH
-            // Add instance support here
-            addEdge(curIdx, nextMiss, curProb);
+            if (skipEdge) {
+                g.incomingProb[nextMiss] += curProb;
+            } else {
+                addEdge(curIdx, nextMiss, curProb);
+            }
         } else {
             // Termination point for all traversal paths
             CHECK_EQ(traversalStack.size(), 0);
@@ -558,6 +580,19 @@ TreeletDumpBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
             }
         }
 
+        // refer to SendCheck for explanation
+        bool skipEdge = false;
+        if (node->nPrimitives > 0) {
+            auto &lastPrim = primitives[node->primitivesOffset + node->nPrimitives - 1];
+            if (lastPrim->GetType() == PrimitiveType::Transformed) {
+                shared_ptr<TransformedPrimitive> tp = dynamic_pointer_cast<TransformedPrimitive>(lastPrim);
+                shared_ptr<TreeletDumpBVH> instance = dynamic_pointer_cast<TreeletDumpBVH>(tp->GetPrimitive());
+                if (!instance->copyable) {
+                    skipEdge = true;
+                }
+            }
+        }
+
         float runningProb = 1.0;
         for (int i = traversalStack.size() - 1; i >= 0; i--) {
             uint64_t nextNode = traversalStack[i];
@@ -572,7 +607,11 @@ TreeletDumpBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
             CHECK_LE(condHitProb, 1.0);
             float pathProb = curProb * runningProb * condHitProb;
 
-            addEdge(curIdx, nextNode, pathProb);
+            if (skipEdge) {
+                g.incomingProb[nextNode] += pathProb;
+            } else {
+                addEdge(curIdx, nextNode, pathProb);
+            }
             // runningProb can become 0 here if condHitProb == 1
             // could break, but then edges don't get added and Intersect
             // may crash if it turns out that edge gets taken
@@ -1964,8 +2003,9 @@ array<uint32_t, 8> TreeletDumpBVH::DumpTreelets(bool root) const {
             const TreeletDumpBVH *inst = kv.first;
             for (const TreeletInfo &treelet : inst->allTreelets) {
                 float instProb = instanceProbabilities[treelet.dirIdx][inst->instanceID];
+
                 uint32_t sTreeletID = global::manager.getId(&treelet);
-                staticAllocOut << sTreeletID << treelet.totalProb * instProb << endl;
+                staticAllocOut << sTreeletID << " " << treelet.totalProb * instProb << endl;
             }
         }
     }
