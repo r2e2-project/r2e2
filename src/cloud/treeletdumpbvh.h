@@ -180,7 +180,7 @@ class TreeletDumpBVH : public BVHAccel {
     std::vector<uint32_t> ComputeTreelets(const TraversalGraph &graph,
                                           uint64_t maxTreeletBytes) const;
 
-    std::array<uint32_t, 8> DumpTreelets(int maxTreeletBytes, const std::vector<TreeletInfo> &treelets) const;
+    std::array<uint32_t, 8> DumpTreelets() const;
 
     std::vector<uint32_t> OrigAssignTreelets(const uint64_t) const;
 
@@ -201,6 +201,8 @@ class TreeletDumpBVH : public BVHAccel {
     std::vector<uint64_t> nodeParents;
     std::vector<uint64_t> nodeSizes;
     std::vector<uint64_t> subtreeSizes;
+
+    std::vector<TreeletInfo> allTreelets;
 
     uint64_t totalBytes {0};
     std::vector<InstanceMask> nodeInstanceMasks {};
