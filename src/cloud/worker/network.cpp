@@ -216,7 +216,7 @@ ResultType LambdaWorker::handleUdpSend() {
                                     packet.raysLength());
 
         if (!packet.retransmission()) {
-            outQueueBytes[packet.targetTreelet()] -= packet.raysLength();
+            outQueueBytes[packet.targetTreelet()] -= packet.length();
         }
 
         /* do the necessary logging */
