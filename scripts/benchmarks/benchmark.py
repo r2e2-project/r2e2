@@ -77,7 +77,7 @@ cur_port = args.start_port
 for i, scene in enumerate(scenes):
     cmdprefix = ("{master_path} --ip {ip} --timeout 60"
               " --storage-backend s3://{s3_path}/{scene}?region=us-west-2"
-              " --aws-region us-west-2 -R -f discard -w 5 -d".format(
+              " --aws-region us-west-2 -T auto -R -f discard -w 5 -d".format(
                   master_path=master_path,
                   ip=ip,
                   port=args.start_port + i,
