@@ -44,7 +44,7 @@ constexpr std::chrono::milliseconds INACTIVITY_THRESHOLD{40};
 constexpr std::chrono::milliseconds WORKER_TREELET_TIME{200};
 // constexpr std::chrono::milliseconds TREELET_PEER_TIMEOUT{200};
 constexpr std::chrono::milliseconds RECONNECTS_INTERVAL{2'000};
-constexpr std::chrono::milliseconds LEASE_LOG_INTERVAL{200};
+constexpr std::chrono::milliseconds LEASE_LOG_INTERVAL{5'000};
 constexpr std::chrono::milliseconds MIN_TRANSMIT_TIME{100};
 
 constexpr uint64_t DEFAULT_SEND_RATE{1'400 * 8};
