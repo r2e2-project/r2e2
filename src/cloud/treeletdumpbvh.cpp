@@ -434,6 +434,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
 
         while (!depthFirst.empty()) {
             int nodeIdx = depthFirst.top();
+            depthFirst.pop();
             uint32_t treeletID = treeletAllocations[dirIdx][nodeIdx];
             TreeletInfo &info = finalTreelets[treeletID];
 
