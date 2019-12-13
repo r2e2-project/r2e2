@@ -419,10 +419,48 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateTreelets(int maxTree
         }
     }
 
-    for (int treeletID = 0; treeletID < finalTreelets.size(); treeletID++) {
-        const TreeletInfo &treelet = finalTreelets[treeletID];
+    // Reorder nodes to be depth first (left then right) for serialization
+    for (uint32_t treeletID = 0; treeletID < finalTreelets.size(); treeletID++) {
+        TreeletInfo &treelet = finalTreelets[treeletID];
         for (int nodeIdx : treelet.nodes) {
             treeletAllocations[treelet.dirIdx][nodeIdx] = treeletID;
+        }
+        treelet.nodes.clear();
+    }
+
+    for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
+        stack<int> depthFirst;
+        depthFirst.push(0);
+
+        while (!depthFirst.empty()) {
+            int nodeIdx = depthFirst.top();
+            uint32_t treeletID = treeletAllocations[dirIdx][nodeIdx];
+            TreeletInfo &info = finalTreelets[treeletID];
+
+            info.nodes.push_back(nodeIdx);
+
+            const LinearBVHNode &node = nodes[nodeIdx];
+            if (node.nPrimitives == 0) {
+                depthFirst.push(node.secondChildOffset);
+                depthFirst.push(nodeIdx + 1);
+            }
+        }
+    }
+
+    array<vector<int>, 8> nodeCheck;
+    for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
+        nodeCheck[dirIdx] = vector<int>(nodeCount);
+    }
+
+    for (const TreeletInfo &treelet : finalTreelets) {
+        for (int nodeIdx : treelet.nodes) {
+            nodeCheck[treelet.dirIdx][nodeIdx] += 1;
+        }
+    }
+
+    for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
+        for (int count : nodeCheck[dirIdx]) {
+            CHECK_EQ(count, 1);
         }
     }
 
@@ -1725,6 +1763,57 @@ array<uint32_t, 8> TreeletDumpBVH::DumpTreelets(bool root) const {
             instIdx += inst->nodeCount;
 
             CHECK_EQ(inst->copyable, true);
+        }
+    }
+
+    enum CHILD {
+        LEFT = 0,
+        RIGHT = 1
+    };
+
+    // Sanity Check for deserializing
+    for (uint32_t treeletID = 0; treeletID < allTreelets.size(); treeletID++) {
+        const TreeletInfo &treelet = allTreelets[treeletID];
+        stack<tuple<int, uint32_t, CHILD>> q;
+        uint32_t serializedLoc = 0;
+        for (int nodeIdx : treelet.nodes) {
+            const LinearBVHNode &node = nodes[nodeIdx];
+
+            if (!q.empty()) {
+                auto parent = q.top();
+                q.pop();
+                int parentIdx = get<0>(parent);
+                uint32_t parentLoc = get<1>(parent);
+                CHILD child = get<2>(parent);
+
+                int realParent = nodeParents[nodeIdx];
+
+                CHECK_EQ(parentIdx, realParent);
+                const LinearBVHNode &parentNode = nodes[parentIdx];
+                if (child == LEFT) {
+                    CHECK_EQ(&node - &parentNode, 1);
+                }
+                if (child == RIGHT) {
+                    CHECK_EQ(&node - &nodes[0], parentNode.secondChildOffset);
+                }
+            }
+
+            uint32_t curLocation = treeletNodeLocations[treeletID][nodeIdx];
+            int leftNodeIdx = nodeIdx + 1;
+            int rightNodeIdx = node.secondChildOffset;
+
+            uint32_t leftTreelet = treeletAllocations[treelet.dirIdx][leftNodeIdx];
+            uint32_t rightTreelet = treeletAllocations[treelet.dirIdx][rightNodeIdx];
+
+            if (rightTreelet == treeletID) {
+                q.emplace(nodeIdx, serializedLoc, RIGHT);
+            }
+
+            if (leftTreelet == treeletID) {
+                q.emplace(nodeIdx, serializedLoc, LEFT);
+            }
+
+            serializedLoc++;
         }
     }
 
