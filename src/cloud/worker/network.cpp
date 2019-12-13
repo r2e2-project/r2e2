@@ -79,7 +79,7 @@ void LambdaWorker::rebalanceLeases() {
         duration_cast<milliseconds>(MIN_TRANSMIT_TIME).count());
 
     for (auto& lease : grantedLeases) {
-        if (8000ull * lease.second.queueSize / trafficShare < minTransmitTime) {
+        /* if (8000ull * lease.second.queueSize / trafficShare < minTransmitTime) {
             lease.second.allocation = min<uint64_t>(
                 trafficShare,
                 max<uint64_t>(DEFAULT_SEND_RATE, (8000ull / minTransmitTime) *
@@ -89,7 +89,9 @@ void LambdaWorker::rebalanceLeases() {
             bigCount--;
         } else {
             lease.second.small = false;
-        }
+        } */
+
+        lease.second.small = false;
     }
 
     const uint64_t excessShare = (bigCount == 0) ? 0 : (excess / bigCount);
