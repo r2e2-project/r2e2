@@ -1806,12 +1806,14 @@ array<uint32_t, 8> TreeletDumpBVH::DumpTreelets(bool root) const {
             uint32_t leftTreelet = treeletAllocations[treelet.dirIdx][leftNodeIdx];
             uint32_t rightTreelet = treeletAllocations[treelet.dirIdx][rightNodeIdx];
 
-            if (rightTreelet == treeletID) {
-                q.emplace(nodeIdx, serializedLoc, RIGHT);
-            }
+            if (node.nPrimitives == 0) {
+                if (rightTreelet == treeletID) {
+                    q.emplace(nodeIdx, serializedLoc, RIGHT);
+                }
 
-            if (leftTreelet == treeletID) {
-                q.emplace(nodeIdx, serializedLoc, LEFT);
+                if (leftTreelet == treeletID) {
+                    q.emplace(nodeIdx, serializedLoc, LEFT);
+                }
             }
 
             serializedLoc++;
