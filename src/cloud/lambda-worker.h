@@ -428,22 +428,30 @@ class LambdaWorker {
         struct Action {
             enum Type { Download, Upload };
 
-            Type action;
+            uint64_t id;
+            Type type;
             std::string key;
             std::string data;
+
+            Action(const uint64_t id, const Type type, const std::string& key,
+                   std::string&& data)
+                : id(id), type(type), key(key), data(move(data)) {}
         };
 
       private:
+        uint64_t nextId{1};
+
         S3Client s3Client;
-        std::queue<Action> requests;
-        std::queue<Action> responses;
+        std::queue<Action> requests{};
+        std::queue<Action> responses{};
 
       public:
+        TransferAgent(S3StorageBackend& backend);
         uint64_t requestDownload(const std::string& key);
         uint64_t requestUpload(const std::string& key, std::string&& data);
 
         bool empty();
-        Optional<Action> pop();
+        Action pop();
     };
 
     ////////////////////////////////////////////////////////////////////////////
