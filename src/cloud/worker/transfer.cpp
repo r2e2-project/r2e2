@@ -3,8 +3,17 @@
 using namespace std;
 using namespace pbrt;
 
-LambdaWorker::TransferAgent::TransferAgent(S3StorageBackend& backend)
-    : s3Client(backend.client()) {}
+LambdaWorker::TransferAgent::TransferAgent(const S3StorageBackend& backend) {
+    clientConfig.awsCredentials = backend.client().credentials();
+    clientConfig.region = backend.client().config().region;
+    clientConfig.bucket = backend.bucket();
+    clientConfig.prefix = backend.prefix();
+
+    clientConfig.endpoint =
+        S3::endpoint(clientConfig.region, clientConfig.bucket);
+
+    clientConfig.address = Address{clientConfig.endpoint, "https"};
+}
 
 uint64_t LambdaWorker::TransferAgent::requestDownload(const string& key) {
     requests.emplace(nextId, Action::Download, key, string());

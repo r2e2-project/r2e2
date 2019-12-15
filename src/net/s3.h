@@ -74,6 +74,7 @@ public:
   HTTPRequest create_download_request( const std::string & bucket,
                                        const std::string & object ) const;
 
+  const AWSCredentials & credentials() const { return credentials_; }
   const S3ClientConfig & config() const { return config_; }
 };
 

@@ -28,6 +28,7 @@ public:
 
   const S3Client & client() const { return client_; }
   const std::string & bucket() const { return bucket_; }
+  const std::string & prefix() const { return prefix_; }
 
 };
 

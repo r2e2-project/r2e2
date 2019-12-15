@@ -4,9 +4,11 @@
 #include <cstring>
 #include <deque>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <random>
 #include <string>
+#include <thread>
 #include <tuple>
 
 #include "cloud/bvh.h"
@@ -440,12 +442,25 @@ class LambdaWorker {
       private:
         uint64_t nextId{1};
 
-        S3Client s3Client;
+        struct S3Config {
+            AWSCredentials awsCredentials{};
+            std::string region{};
+            std::string bucket{};
+            std::string prefix{};
+
+            std::string endpoint{};
+            Address address{};
+        } clientConfig;
+
         std::queue<Action> requests{};
         std::queue<Action> responses{};
 
+        std::vector<std::future<void>> runningTasks;
+
+        void processAction(Action&& action);
+
       public:
-        TransferAgent(S3StorageBackend& backend);
+        TransferAgent(const S3StorageBackend& backend);
         uint64_t requestDownload(const std::string& key);
         uint64_t requestUpload(const std::string& key, std::string&& data);
 
