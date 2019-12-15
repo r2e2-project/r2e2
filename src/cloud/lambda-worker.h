@@ -22,6 +22,7 @@
 #include "execution/loop.h"
 #include "execution/meow/message.h"
 #include "net/address.h"
+#include "net/s3.h"
 #include "storage/backend.h"
 #include "util/seq_no_set.h"
 #include "util/temp_dir.h"
@@ -416,6 +417,33 @@ class LambdaWorker {
 
     std::map<TreeletId, std::pair<WorkerId, packet_clock::time_point>>
         workerForTreelet;  // used by the sender
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Transfer Agent                                                         //
+    ////////////////////////////////////////////////////////////////////////////
+
+    class TransferAgent {
+      public:
+        struct Action {
+            enum Type { Download, Upload };
+
+            Type action;
+            std::string key;
+            std::string data;
+        };
+
+      private:
+        S3Client s3Client;
+        std::queue<Action> requests;
+        std::queue<Action> responses;
+
+      public:
+        uint64_t requestDownload(const std::string& key);
+        uint64_t requestUpload(const std::string& key, std::string&& data);
+
+        bool empty();
+        Optional<Action> pop();
+    };
 
     ////////////////////////////////////////////////////////////////////////////
     // BENCHMARKING                                                           //
