@@ -96,6 +96,7 @@ class LambdaMaster {
 
     struct Worker {
         WorkerId id;
+        bool initialized{false};
 
         std::shared_ptr<TCPConnection> connection;
         std::set<ObjectKey> objects;

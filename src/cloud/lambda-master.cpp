@@ -276,7 +276,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaMaster::handleJobStart, this),
-        [this]() { return this->numberOfLambdas == this->currentWorkerId; },
+        [this]() { return this->numberOfLambdas == this->initializedWorkers; },
         []() { throw runtime_error("generate rays failed"); }));
 
     if (config.finishedRayAction == FinishedRayAction::SendBack) {
@@ -517,6 +517,11 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         heyProto.set_job_id(jobId);
         Message msg{0, OpCode::Hey, protoutil::to_string(heyProto)};
         worker.connection->enqueue_write(msg.str());
+
+        if (!worker.initialized) {
+            worker.initialized = true;
+            initializedWorkers++;
+        }
 
         break;
     }
