@@ -237,6 +237,7 @@ class LambdaWorker {
     struct RayBagId {
         TreeletId treeletId;
         BagId bagId;
+        size_t size;
     };
 
     std::string rayBagsKeyPrefix{};

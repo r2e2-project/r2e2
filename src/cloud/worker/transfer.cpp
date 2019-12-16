@@ -20,7 +20,7 @@ ResultType LambdaWorker::handleSendQueue() {
             const auto bagId = currentBagId[treeletId]++;
             const string key = rayBagKey(treeletId, bagId);
             const auto id = transferAgent.requestUpload(key, move(bag.second));
-            pendingRayBags[id] = {treeletId, bagId};
+            pendingRayBags[id] = {treeletId, bagId, bag.first};
 
             queue.pop();
         }
