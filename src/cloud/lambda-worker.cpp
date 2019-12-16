@@ -209,8 +209,8 @@ void usage(const char* argv0, int exitCode) {
          << "  -R --reliable-udp          send ray packets reliably" << endl
          << "  -M --max-udp-rate RATE     maximum UDP rate (Mbps)" << endl
          << "  -S --samples N             number of samples per pixel" << endl
-         << "  -e --log-leases            log leases"
-         << "  -d --diagnostics           collect worker diagnostics"
+         << "  -e --log-leases            log leases" << endl
+         << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
          << "  -P --log-packets RATE      log packets" << endl
          << "  -f --finished-ray ACTION   what to do with finished rays" << endl
