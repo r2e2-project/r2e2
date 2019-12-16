@@ -68,6 +68,8 @@ public:
     const std::vector<HTTPHeader> & headers() const { return headers_; }
     const std::string & body() const { return body_; }
 
+    std::string & body() { return body_; }
+
     /* troll through the headers */
     bool has_header( const std::string & header_name ) const;
     const std::string & get_header_value( const std::string & header_name ) const;

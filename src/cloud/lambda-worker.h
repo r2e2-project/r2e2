@@ -443,7 +443,7 @@ class LambdaWorker {
         uint64_t nextId{1};
 
         struct S3Config {
-            AWSCredentials awsCredentials{};
+            AWSCredentials credentials{};
             std::string region{};
             std::string bucket{};
             std::string prefix{};
@@ -452,12 +452,13 @@ class LambdaWorker {
             Address address{};
         } clientConfig;
 
-        std::queue<Action> requests{};
-        std::queue<Action> responses{};
+        std::queue<Action> results{};
 
-        std::vector<std::future<void>> runningTasks;
+        std::mutex mtx;
+        std::atomic<bool> isEmpty{true};
+        std::map<uint64_t, std::future<void>> runningTasks;
 
-        void processAction(Action&& action);
+        void doAction(Action&& action);
 
       public:
         TransferAgent(const S3StorageBackend& backend);
