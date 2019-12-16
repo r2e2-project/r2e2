@@ -13,22 +13,16 @@ using PollerResult = Poller::Result::Type;
 
 ResultType LambdaWorker::handleMessages() {
     RECORD_INTERVAL("handleMessages");
-    MessageParser unprocessedMessages;
+
     while (!messageParser.empty()) {
-        Message message = move(messageParser.front());
+        processMessage(messageParser.front());
         messageParser.pop();
-
-        if (!processMessage(message)) {
-            unprocessedMessages.push(move(message));
-        }
     }
-
-    swap(messageParser, unprocessedMessages);
 
     return ResultType::Continue;
 }
 
-bool LambdaWorker::processMessage(const Message& message) {
+void LambdaWorker::processMessage(const Message& message) {
     /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
          << "]" << endl; */
 
@@ -47,8 +41,6 @@ bool LambdaWorker::processMessage(const Message& message) {
     }
 
     case OpCode::Ping: {
-        /* Message pong{OpCode::Pong, ""};
-        coordinatorConnection->enqueue_write(pong.str()); */
         break;
     }
 
@@ -75,6 +67,4 @@ bool LambdaWorker::processMessage(const Message& message) {
     default:
         throw runtime_error("unhandled message opcode");
     }
-
-    return true;
 }

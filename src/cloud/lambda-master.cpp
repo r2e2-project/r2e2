@@ -395,6 +395,14 @@ ResultType LambdaMaster::handleJobStart() {
     for (auto &workerkv : workers) {
         if (cameraRaysRemaining()) {
             auto &worker = workerkv.second;
+            protobuf::GetObjects proto;
+            for (const ObjectKey &id : worker.objects) {
+                *proto.add_object_ids() = to_protobuf(id);
+            }
+
+            worker.connection->enqueue_write(Message::str(
+                0, OpCode::GetObjects, protoutil::to_string(proto)));
+
             sendWorkerTile(worker);
         }
     }
@@ -783,9 +791,8 @@ Bounds2i LambdaMaster::nextCameraTile() {
 void LambdaMaster::sendWorkerTile(const Worker &worker) {
     protobuf::GenerateRays proto;
     *proto.mutable_crop_window() = to_protobuf(nextCameraTile());
-    const string genRaysStr =
-        Message::str(0, OpCode::GenerateRays, protoutil::to_string(proto));
-    worker.connection->enqueue_write(genRaysStr);
+    worker.connection->enqueue_write(
+        Message::str(0, OpCode::GenerateRays, protoutil::to_string(proto)));
 }
 
 HTTPRequest LambdaMaster::generateRequest() {

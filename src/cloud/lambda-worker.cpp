@@ -115,6 +115,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
 void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
     vector<storage::GetRequest> requests;
+
     for (const protobuf::ObjectKey& objectKey : objects.object_ids()) {
         const ObjectKey id = from_protobuf(objectKey);
         if (id.type == ObjectType::TriangleMesh) {

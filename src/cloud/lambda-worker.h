@@ -89,7 +89,7 @@ class LambdaWorker {
     // MEMBER FUNCTIONS                                                       //
     ////////////////////////////////////////////////////////////////////////////
 
-    bool processMessage(const meow::Message& message);
+    void processMessage(const meow::Message& message);
 
     void initializeScene();
     void loadCamera();
