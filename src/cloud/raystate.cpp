@@ -60,31 +60,26 @@ size_t RayState::Size() const {
  * SERIALIZATION                                                               *
  ******************************************************************************/
 
-size_t RayState::Serialize(const bool compress) {
+size_t RayState::Serialize(char *data, const bool compress) {
     constexpr size_t upperBound = LZ4_COMPRESSBOUND(sizeof(RayState));
-    thread_local char scratch[upperBound];
     const size_t size = this->Size();
     uint32_t len = size;
 
     if (compress) {
-        len = LZ4_compress_default(reinterpret_cast<char *>(this),
-                                   scratch, size, upperBound);
+        len = LZ4_compress_default(reinterpret_cast<char *>(this), data + 4,
+                                   size, upperBound);
 
         if (len == 0) {
             throw runtime_error("ray compression failed");
         }
-
-        serialized = make_unique<char[]>(len + 4);
-        memcpy(serialized.get() + 4, scratch, len);
     } else {
-        serialized = make_unique<char[]>(size + 4);
-        memcpy(serialized.get() + 4, reinterpret_cast<char *>(this), size);
+        memcpy(data + 4, reinterpret_cast<char *>(this), size);
     }
 
-    memcpy(serialized.get(), &len, 4);
-    serializedSize = len + 4;
+    memcpy(data, &len, 4);
+    len += 4;
 
-    return serializedSize;
+    return len;
 }
 
 void RayState::Deserialize(const char *data, const size_t len,

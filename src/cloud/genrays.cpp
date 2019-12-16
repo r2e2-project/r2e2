@@ -62,6 +62,8 @@ int main(int argc, char const *argv[]) {
         /* Generate all the samples */
         size_t sampleCount = 0;
 
+        char rayBuffer[RayState::MaxCompressedSize()];
+
         for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
             for (Point2i pixel : sampleBounds) {
                 sampleCount++;
@@ -70,8 +72,8 @@ int main(int argc, char const *argv[]) {
                 RayStatePtr statePtr = graphics::GenerateCameraRay(
                     camera, pixel, sample, maxDepth, sampleExtent, sampler);
 
-                const auto len = statePtr->Serialize();
-                rayWriter.write(statePtr->serialized.get() + 4, len - 4);
+                const auto len = statePtr->Serialize(rayBuffer);
+                rayWriter.write(rayBuffer + 4, len - 4);
             }
         }
 

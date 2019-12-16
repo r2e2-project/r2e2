@@ -1,6 +1,7 @@
 #ifndef PBRT_CLOUD_RAYSTATE_H
 #define PBRT_CLOUD_RAYSTATE_H
 
+#include <lz4.h>
 #include <memory>
 
 #include "core/camera.h"
@@ -60,9 +61,6 @@ class RayState {
     /* RayState is serialized up until this point, and the serialized data
        will be stored below */
 
-    size_t serializedSize{0};
-    std::unique_ptr<char[]> serialized{nullptr};
-
     bool IsShadowRay() const { return isShadowRay; }
     bool HasHit() const { return hit; }
 
@@ -82,10 +80,13 @@ class RayState {
 
     /* serialization */
     size_t Size() const;
-    size_t SerializedSize() const { return serializedSize; }
-    size_t Serialize(const bool compress = true);
+    size_t Serialize(char *data, const bool compress = true);
     void Deserialize(const char *data, const size_t len,
                      const bool decompress = true);
+
+    static constexpr size_t MaxCompressedSize() {
+        return 4 + LZ4_COMPRESSBOUND(sizeof(RayState));
+    }
 
     static RayStatePtr Create();
 };
