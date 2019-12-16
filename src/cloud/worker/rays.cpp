@@ -161,14 +161,22 @@ ResultType LambdaWorker::handleOutQueue() {
     while (it != outQueue.end()) {
         const TreeletId treeletId = it->first;
         auto& rayList = it->second;
+        auto& queue = sendQueue[treeletId];
 
         while (!rayList.empty()) {
-            rayList.pop_front();
-
-            if (rayList.empty()) {
-                it = outQueue.erase(it);
-                break;
+            if (queue.empty() ||
+                queue.back().first + RayState::MaxCompressedSize() >
+                    MAX_BAG_SIZE) {
+                queue.emplace(make_pair(0, string(MAX_BAG_SIZE, '\0')));
             }
+
+            auto& bag = queue.back();
+            auto& ray = rayList.front();
+
+            const auto len = ray->Serialize(&bag.second[0] + bag.first);
+            bag.first += len;
+
+            rayList.pop_front();
         }
     }
 

@@ -40,6 +40,8 @@ constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
 constexpr std::chrono::milliseconds LEASE_LOG_INTERVAL{5'000};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
 
+constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024}; // 4 MB
+
 struct WorkerConfiguration {
     bool sendReliably;
     uint64_t maxUdpRate;
@@ -146,6 +148,7 @@ class LambdaWorker {
     Optional<WorkerId> workerId;
     Optional<std::string> jobId;
     std::string outputName;
+    bool terminated{false};
 
     /* Scene Data */
     const uint8_t maxDepth{5};
@@ -168,6 +171,8 @@ class LambdaWorker {
     size_t outQueueSize{0};
     std::deque<uint64_t> finishedPathIds{};
 
+    std::map<TreeletId, std::queue<std::pair<size_t, std::string>>> sendQueue{};
+
     /* Always-on FD */
     FileDescriptor dummyFD{STDOUT_FILENO};
 
@@ -175,8 +180,6 @@ class LambdaWorker {
     TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
     TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
     TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
-
-    bool terminated{false};
 
     const packet_clock::time_point workStart{packet_clock::now()};
 
