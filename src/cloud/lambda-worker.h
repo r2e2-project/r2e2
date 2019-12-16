@@ -35,12 +35,13 @@
 
 namespace pbrt {
 
-constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
-constexpr std::chrono::milliseconds LEASE_LOG_INTERVAL{5'000};
+constexpr std::chrono::milliseconds SEND_QUEUE_INTERVAL{500};
+
+constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
 
-constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024}; // 4 MiB
+constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024};  // 4 MiB
 
 struct WorkerConfiguration {
     bool sendReliably;
@@ -103,6 +104,10 @@ class LambdaWorker {
     Poller::Action::Result::Type handleWorkerStats();
     Poller::Action::Result::Type handleDiagnostics();
 
+    /* transfer.cpp */
+    Poller::Action::Result::Type handleSendQueue();
+    Poller::Action::Result::Type handleTransferResults();
+
     void generateRays(const Bounds2i& cropWindow);
     void getObjects(const protobuf::GetObjects& objects);
 
@@ -138,7 +143,6 @@ class LambdaWorker {
     meow::MessageParser messageParser{};
     Optional<WorkerId> workerId;
     Optional<std::string> jobId;
-    std::string outputName;
     bool terminated{false};
 
     /* Scene Data */
@@ -168,9 +172,10 @@ class LambdaWorker {
     FileDescriptor dummyFD{STDOUT_FILENO};
 
     /* Timers */
+    TimerFD sendQueueTimer{SEND_QUEUE_INTERVAL};
+    TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
     TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
     TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
-    TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
 
     const steady_clock::time_point workStart{steady_clock::now()};
 
@@ -222,6 +227,23 @@ class LambdaWorker {
         bool empty();
         Action pop();
     };
+
+    TransferAgent transferAgent;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Ray Bags                                                               //
+    ////////////////////////////////////////////////////////////////////////////
+
+    struct RayBagId {
+        TreeletId treeletId;
+        BagId bagId;
+    };
+
+    std::string rayBagsKeyPrefix{};
+    std::map<TreeletId, BagId> currentBagId{};
+    std::map<uint64_t, RayBagId> pendingRayBags{};
+
+    std::string rayBagKey(const TreeletId treeletId, BagId bagId);
 };
 
 }  // namespace pbrt

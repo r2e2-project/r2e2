@@ -2,8 +2,46 @@
 
 using namespace std;
 using namespace pbrt;
+using namespace PollerShortNames;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
+
+ResultType LambdaWorker::handleSendQueue() {
+    sendQueueTimer.reset();
+
+    while (!sendQueue.empty()) {
+        auto queuekv = sendQueue.begin();
+        const auto treeletId = queuekv->first;
+        auto& queue = queuekv->second;
+
+        while (!queue.empty()) {
+            auto& bag = queue.front();
+
+            const auto bagId = currentBagId[treeletId]++;
+            const string key = rayBagKey(treeletId, bagId);
+            const auto id = transferAgent.requestUpload(key, move(bag.second));
+            pendingRayBags[id] = {treeletId, bagId};
+
+            queue.pop();
+        }
+    }
+
+    return ResultType::Continue;
+}
+
+ResultType LambdaWorker::handleTransferResults() {
+    while (!transferAgent.empty()) {
+        TransferAgent::Action action = move(transferAgent.pop());
+
+        if (pendingRayBags.count(action.id)) {
+            auto rayBagId = &pendingRayBags[action.id];
+
+            /* tell the master we've finished uploading this */
+        }
+    }
+
+    return ResultType::Continue;
+}
 
 TCPSocket tcp_connection(const Address& address) {
     TCPSocket sock;

@@ -22,9 +22,7 @@ void LambdaWorker::pushTraceQueue(RayStatePtr&& state) {
 RayStatePtr LambdaWorker::popTraceQueue() {
     RayStatePtr state = move(traceQueue.front());
     traceQueue.pop_front();
-
     workerStats.recordProcessedRay(*state);
-
     return state;
 }
 

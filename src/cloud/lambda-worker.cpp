@@ -26,7 +26,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     : config(config),
       coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
-      storageBackend(StorageBackend::create_backend(storageUri)) {
+      storageBackend(StorageBackend::create_backend(storageUri)),
+      transferAgent(*dynamic_cast<S3StorageBackend*>(storageBackend.get())) {
     cerr << "* starting worker in " << workingDirectory.name() << endl;
     roost::chdir(workingDirectory.name());
 
@@ -72,6 +73,18 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         dummyFD, Direction::Out, bind(&LambdaWorker::handleOutQueue, this),
         [this]() { return outQueueSize > 0; },
         []() { throw runtime_error("out queue failed"); }));
+
+    loop.poller().add_action(
+        Poller::Action(sendQueueTimer.fd, Direction::In,
+                       bind(&LambdaWorker::handleSendQueue, this),
+                       [this]() { return !sendQueue.empty(); },
+                       []() { throw runtime_error("send queue failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        dummyFD, Direction::Out,
+        bind(&LambdaWorker::handleTransferResults, this),
+        [this]() { return !transferAgent.empty(); },
+        []() { throw runtime_error("handle transfer results failed"); }));
 
     /* send finished rays */
     /* FIXME we're throwing out finished rays, for now */
