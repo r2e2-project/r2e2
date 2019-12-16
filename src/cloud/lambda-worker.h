@@ -40,7 +40,7 @@ constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
 constexpr std::chrono::milliseconds LEASE_LOG_INTERVAL{5'000};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
 
-constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024}; // 4 MB
+constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024}; // 4 MiB
 
 struct WorkerConfiguration {
     bool sendReliably;
@@ -76,15 +76,6 @@ class LambdaWorker {
         Sent,
         Received,
         Finished
-    };
-
-    enum class PacketAction {
-        Queued,
-        Sent,
-        Received,
-        AckSent,
-        AckReceived,
-        Acked
     };
 
     ////////////////////////////////////////////////////////////////////////////
