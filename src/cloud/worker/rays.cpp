@@ -52,18 +52,10 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             if (treeletIds.count(nextTreelet)) {
                 pushTraceQueue(move(statePtr));
             } else {
-                if (treeletToWorker.count(nextTreelet)) {
-                    logRayAction(*statePtr, RayAction::Queued);
-                    workerStats.recordSendingRay(*statePtr);
-                    outQueue[nextTreelet].push_back(move(statePtr));
-                    outQueueSize++;
-                } else {
-                    logRayAction(*statePtr, RayAction::Pending);
-                    workerStats.recordPendingRay(*statePtr);
-                    neededTreelets.insert(nextTreelet);
-                    pendingQueue[nextTreelet].push_back(move(statePtr));
-                    pendingQueueSize++;
-                }
+                logRayAction(*statePtr, RayAction::Queued);
+                workerStats.recordSendingRay(*statePtr);
+                outQueue[nextTreelet].push_back(move(statePtr));
+                outQueueSize++;
             }
         }
     }
@@ -153,18 +145,10 @@ ResultType LambdaWorker::handleTraceQueue() {
         if (treeletIds.count(nextTreelet)) {
             pushTraceQueue(move(ray));
         } else {
-            if (treeletToWorker.count(nextTreelet)) {
-                logRayAction(*ray, RayAction::Queued);
-                workerStats.recordSendingRay(*ray);
-                outQueue[nextTreelet].push_back(move(ray));
-                outQueueSize++;
-            } else {
-                logRayAction(*ray, RayAction::Pending);
-                workerStats.recordPendingRay(*ray);
-                neededTreelets.insert(nextTreelet);
-                pendingQueue[nextTreelet].push_back(move(ray));
-                pendingQueueSize++;
-            }
+            logRayAction(*ray, RayAction::Queued);
+            workerStats.recordSendingRay(*ray);
+            outQueue[nextTreelet].push_back(move(ray));
+            outQueueSize++;
         }
     }
 
@@ -177,45 +161,9 @@ ResultType LambdaWorker::handleOutQueue() {
     while (it != outQueue.end()) {
         const TreeletId treeletId = it->first;
         auto& rayList = it->second;
-        auto& packetList = sendQueue[treeletId];
-        bool checkPreviousPacket = !packetList.empty();
-        auto& qBytes = outQueueBytes[treeletId];
 
         while (!rayList.empty()) {
-            RayPacket packet{};
-
-            packet.setTargetTreelet(treeletId);
-            packet.setReliable(config.sendReliably);
-            packet.setTracked(packetLogBD(randEngine));
-            packet.setQueueLength(10'000'000ull);
-
-            while (!rayList.empty()) {
-                auto& ray = rayList.front();
-
-                ray->Serialize();
-                const auto size = ray->SerializedSize();
-
-                checkPreviousPacket =
-                    checkPreviousPacket &&
-                    (packetList.back().length() + size <= UDP_MTU_BYTES);
-
-                /* if we have room in an older packet, put it there */
-                if (checkPreviousPacket) {
-                    packetList.back().addRay(move(ray));
-                } else {
-                    /* put it in this new packet */
-                    if (size + packet.length() > UDP_MTU_BYTES) break;
-                    packet.addRay(move(ray));
-                }
-
-                workerStats.recordGeneratedBytes(treeletId, size);
-                qBytes += size;
-                rayList.pop_front();
-                outQueueSize--;
-            }
-
-            packetList.emplace_back(move(packet));
-            sendQueueSize++;
+            rayList.pop_front();
 
             if (rayList.empty()) {
                 it = outQueue.erase(it);

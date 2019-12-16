@@ -98,7 +98,6 @@ class LambdaMaster {
         WorkerId id;
 
         std::shared_ptr<TCPConnection> connection;
-        Optional<Address> udpAddress{};
         std::set<ObjectKey> objects;
         size_t freeSpace{2 * 1000 * 1000 * 1000};
 
@@ -122,15 +121,12 @@ class LambdaMaster {
     };
 
     Poller::Action::Result::Type handleMessages();
-    Poller::Action::Result::Type handleWorkerRequests();
     Poller::Action::Result::Type handleWriteOutput();
     Poller::Action::Result::Type handleWriteWorkerStats();
     Poller::Action::Result::Type handleStatusMessage();
-    Poller::Action::Result::Type handleConnectAll();
     Poller::Action::Result::Type handleJobStart();
 
     bool processMessage(const WorkerId workerId, const meow::Message &message);
-    bool processWorkerRequest(const WorkerRequest &request);
     void loadCamera();
 
     /* Assigning Objects */
@@ -139,9 +135,7 @@ class LambdaMaster {
     void assignTreelet(Worker &worker, const TreeletId treeletId);
 
     void assignBaseSceneObjects(Worker &worker);
-
     void updateObjectUsage(const Worker &worker);
-
     void aggregateQueueStats();
 
     /* AWS Lambda */
@@ -161,7 +155,6 @@ class LambdaMaster {
     std::ofstream statsOstream{};
 
     ExecutionLoop loop{};
-    std::shared_ptr<UDPConnection> udpConnection{};
 
     const std::string jobId{uuid::generate()};
     WorkerId currentWorkerId{1};
@@ -169,9 +162,6 @@ class LambdaMaster {
 
     /* Message Queues */
     std::deque<std::pair<WorkerId, meow::Message>> incomingMessages;
-
-    /* Worker Requests */
-    std::deque<WorkerRequest> pendingWorkerRequests;
 
     /* Scene Data */
     std::vector<std::unique_ptr<Transform>> transformCache{};

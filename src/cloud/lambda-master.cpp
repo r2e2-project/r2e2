@@ -254,43 +254,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         loadStaticAssignment(0, numberOfLambdas);
     }
 
-    udpConnection = loop.make_udp_connection(
-        [&](shared_ptr<UDPConnection>, Address &&addr, string &&data) {
-            Message message{data};
-            if (message.opcode() != OpCode::ConnectionRequest) return true;
-
-            protobuf::ConnectRequest req;
-            protoutil::from_string(message.payload(), req);
-            const WorkerId workerId = req.worker_id();
-
-            if (!workers.count(workerId)) {
-                throw runtime_error("unexpected worker id: " +
-                                    to_string(workerId));
-            }
-
-            auto &worker = workers.at(workerId);
-            if (!worker.udpAddress.initialized()) {
-                initializedWorkers++;
-            }
-
-            worker.udpAddress.reset(move(addr));
-
-            /* create connection response */
-            protobuf::ConnectResponse resp;
-            resp.set_worker_id(0);
-            resp.set_my_seed(121212);
-            resp.set_your_seed(req.my_seed());
-            Message responseMsg{0, OpCode::ConnectionResponse,
-                                protoutil::to_string(resp)};
-            worker.connection->enqueue_write(responseMsg.str());
-
-            return true;
-        },
-        []() { throw runtime_error("udp connection error"); },
-        []() { throw runtime_error("udp connection died"); });
-
-    udpConnection->bind({"0.0.0.0", listenPort});
-
     int spp = loadSampler(config.samplesPerPixel)->samplesPerPixel;
     totalPaths = sampleBounds.Area() * spp;
     const Vector2i sampleExtent = sampleBounds.Diagonal();
@@ -312,22 +275,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         []() { throw runtime_error("messages failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        workerRequestTimer.fd, Direction::In,
-        bind(&LambdaMaster::handleWorkerRequests, this),
-        [this]() { return !pendingWorkerRequests.empty(); },
-        []() { throw runtime_error("worker requests failed"); }));
-
-    loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaMaster::handleConnectAll, this),
-        [this]() { return this->initializedWorkers == this->numberOfLambdas; },
-        []() { throw runtime_error("connectAll failed"); }));
-
-    loop.poller().add_action(Poller::Action(
         dummyFD, Direction::Out, bind(&LambdaMaster::handleJobStart, this),
-        [this]() {
-            return this->numberOfLambdas * this->numberOfLambdas ==
-                   workerStats.queueStats.connected;
-        },
+        [this]() { return this->numberOfLambdas == this->currentWorkerId; },
         []() { throw runtime_error("generate rays failed"); }));
 
     if (config.finishedRayAction == FinishedRayAction::SendBack) {
@@ -443,93 +392,14 @@ ResultType LambdaMaster::handleJobStart() {
 
     generationStart = lastActionTime = now();
 
-    switch (config.task) {
-    case Task::RayTracing:
-        for (auto &workerkv : workers) {
-            if (cameraRaysRemaining()) {
-                auto &worker = workerkv.second;
-                sendWorkerTile(worker);
-            }
-        }
-
-        canSendTiles = true;
-
-        break;
-
-    case Task::NetworkTest: {
-        cerr << "Starting benchmarks... ";
-
-        /* assign pairs randomly */
-        mt19937 g{random_device()()};
-
-        vector<uint32_t> workerPairs(numberOfLambdas);
-        vector<uint32_t> sendToReceiver(numberOfLambdas / 2);
-        iota(sendToReceiver.begin(), sendToReceiver.end(), 0);
-        shuffle(sendToReceiver.begin(), sendToReceiver.end(), g);
-
-        for (size_t i = 0; i < numberOfLambdas / 2; i++) {
-            const size_t sender = 2 * i;
-            const size_t receiver = 2 * sendToReceiver[i] + 1;
-            workerPairs[sender] = receiver;
-            workerPairs[receiver] = sender;
-        }
-
-        for (auto &workerkv : workers) {
-            auto &worker = workerkv.second;
-
-            LOG(INFO) << "[WORKER] " << worker.id << ","
-                      << worker.udpAddress->str();
-
-            const uint32_t destination = workerPairs[worker.id - 1] + 1;
-            const uint32_t duration = 30;
-            const uint32_t rate = (worker.id % 2) ? 0 : 1;
-
-            worker.connection->enqueue_write(
-                Message::str(0, OpCode::StartBenchmark,
-                             put_field(destination) + put_field(duration) +
-                                 put_field(rate)));
-        }
-
-        cerr << "done." << endl;
-    }
-    }
-
-    return ResultType::Cancel;
-}
-
-ResultType LambdaMaster::handleConnectAll() {
-    ostringstream oss;
-    protobuf::ConnectTo proto;
-
-    allToAllConnectStart = lastActionTime = now();
-
-    {
-        protobuf::RecordWriter writer{&oss};
-        for (auto &workerkv : workers) {
-            auto &worker = workerkv.second;
-            proto.set_worker_id(worker.id);
-            proto.set_address(worker.udpAddress->str());
-            writer.write(proto);
-        }
-    }
-
-    const string connectAllStr =
-        Message::str(0, OpCode::MultipleConnect, oss.str());
-
     for (auto &workerkv : workers) {
-        auto &worker = workerkv.second;
-
-        protobuf::GetObjects proto;
-        for (const ObjectKey &id : worker.objects) {
-            *proto.add_object_ids() = to_protobuf(id);
+        if (cameraRaysRemaining()) {
+            auto &worker = workerkv.second;
+            sendWorkerTile(worker);
         }
-
-        const string getDepsStr =
-            Message::str(0, OpCode::GetObjects, protoutil::to_string(proto));
-
-        worker.connection->enqueue_write(getDepsStr);
-        worker.connection->enqueue_write(connectAllStr);
     }
+
+    canSendTiles = true;
 
     return ResultType::Cancel;
 }
@@ -613,28 +483,6 @@ ResultType LambdaMaster::handleMessages() {
     return ResultType::Continue;
 }
 
-ResultType LambdaMaster::handleWorkerRequests() {
-    workerRequestTimer.reset();
-
-    if (initializedWorkers < numberOfLambdas * 0.99) {
-        return ResultType::Continue;
-    }
-
-    deque<WorkerRequest> unprocessedRequests;
-
-    while (!pendingWorkerRequests.empty()) {
-        auto front = move(pendingWorkerRequests.front());
-        pendingWorkerRequests.pop_front();
-
-        if (!processWorkerRequest(front)) {
-            unprocessedRequests.push_back(move(front));
-        }
-    }
-
-    swap(unprocessedRequests, pendingWorkerRequests);
-    return ResultType::Continue;
-}
-
 ResultType LambdaMaster::handleWriteOutput() {
     writeOutputTimer.reset();
 
@@ -643,45 +491,6 @@ ResultType LambdaMaster::handleWriteOutput() {
     filmTile = camera->film->GetFilmTile(sampleBounds);
 
     return ResultType::Continue;
-}
-
-bool LambdaMaster::processWorkerRequest(const WorkerRequest &request) {
-    auto &worker = workers.at(request.worker);
-
-    if (!worker.udpAddress.initialized()) {
-        /* LOG(WARNING) << "No UDP address for " << request.worker << endl; */
-        return false;
-    }
-
-    const auto treeletId = request.treelet;
-
-    /* let's see if we have a worker that has that treelet */
-    const SceneObjectInfo &info =
-        sceneObjects.at(ObjectKey{ObjectType::Treelet, treeletId});
-    if (info.workers.size() == 0) {
-        return false;
-    }
-
-    const auto &workerIdList = info.workers;
-    const auto selectedWorkerId =
-        *random::sample(workerIdList.cbegin(), workerIdList.cend());
-    const auto &selectedWorker = workers.at(selectedWorkerId);
-
-    if (!selectedWorker.udpAddress.initialized()) {
-        return false;
-    }
-
-    auto makeMessage = [](const Worker &worker) {
-        protobuf::ConnectTo proto;
-        proto.set_worker_id(worker.id);
-        proto.set_address(worker.udpAddress->str());
-        return Message::str(0, OpCode::ConnectTo, protoutil::to_string(proto));
-    };
-
-    worker.connection->enqueue_write(makeMessage(selectedWorker));
-    selectedWorker.connection->enqueue_write(makeMessage(worker));
-
-    return true;
 }
 
 bool LambdaMaster::processMessage(const uint64_t workerId,
@@ -695,47 +504,12 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
     case OpCode::Hey: {
         worker.aws.logStream = message.payload();
 
-        {
-            protobuf::Hey heyProto;
-            heyProto.set_worker_id(workerId);
-            heyProto.set_job_id(jobId);
-            Message msg{0, OpCode::Hey, protoutil::to_string(heyProto)};
-            worker.connection->enqueue_write(msg.str());
-        }
-
-        /* {
-            // send the list of assigned objects to the worker
-            protobuf::GetObjects proto;
-            for (const ObjectKey &id : worker.objects) {
-                *proto.add_object_ids() = to_protobuf(id);
-            }
-            Message message{OpCode::GetObjects, protoutil::to_string(proto)};
-            worker.connection->enqueue_write(message.str());
-        }
-
-        if (worker.tile.initialized()) {
-            protobuf::GenerateRays proto;
-            *proto.mutable_crop_window() = to_protobuf(*worker.tile);
-            Message message{OpCode::GenerateRays, protoutil::to_string(proto)};
-            worker.connection->enqueue_write(message.str());
-        } */
-
-        break;
-    }
-
-    case OpCode::GetWorker: {
-        protobuf::GetWorker proto;
-        protoutil::from_string(message.payload(), proto);
-        pendingWorkerRequests.emplace_back(workerId, proto.treelet_id());
-        break;
-    }
-
-    case OpCode::Reconnect: {
-        const auto sender = workerId;
-        const auto target = stoull(message.payload());
-        auto &worker = workers.at(workerId);
-        Message msg{0, OpCode::Reconnect, to_string(sender)};
+        protobuf::Hey heyProto;
+        heyProto.set_worker_id(workerId);
+        heyProto.set_job_id(jobId);
+        Message msg{0, OpCode::Hey, protoutil::to_string(heyProto)};
         worker.connection->enqueue_write(msg.str());
+
         break;
     }
 
