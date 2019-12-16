@@ -65,7 +65,7 @@ class LambdaWorker {
     void uploadLogs();
 
   private:
-    using packet_clock = std::chrono::steady_clock;
+    using steady_clock = std::chrono::steady_clock;
     using rays_clock = std::chrono::system_clock;
 
     enum class RayAction {
@@ -172,7 +172,7 @@ class LambdaWorker {
     TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
     TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
 
-    const packet_clock::time_point workStart{packet_clock::now()};
+    const steady_clock::time_point workStart{steady_clock::now()};
 
     ////////////////////////////////////////////////////////////////////////////
     // Transfer Agent                                                         //
