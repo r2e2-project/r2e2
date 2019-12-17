@@ -900,7 +900,7 @@ std::shared_ptr<Primitive> MakeAccelerator(
         accel = CreateKdTreeAccelerator(std::move(prims), paramSet);
     else if (name == "cloudbvh")
         accel = CreateCloudBVH(paramSet);
-    else if (name == "treelettestbvh")
+    else if (name == "treeletdumpbvh")
         accel = CreateTreeletDumpBVH(std::move(prims), paramSet);
     else
         Warning("Accelerator \"%s\" unknown.", name.c_str());
