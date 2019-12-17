@@ -393,16 +393,16 @@ ResultType LambdaMaster::handleJobStart() {
     generationStart = lastActionTime = now();
 
     for (auto &workerkv : workers) {
+        auto &worker = workerkv.second;
+        protobuf::GetObjects proto;
+        for (const ObjectKey &id : worker.objects) {
+            *proto.add_object_ids() = to_protobuf(id);
+        }
+
+        worker.connection->enqueue_write(
+            Message::str(0, OpCode::GetObjects, protoutil::to_string(proto)));
+
         if (cameraRaysRemaining()) {
-            auto &worker = workerkv.second;
-            protobuf::GetObjects proto;
-            for (const ObjectKey &id : worker.objects) {
-                *proto.add_object_ids() = to_protobuf(id);
-            }
-
-            worker.connection->enqueue_write(Message::str(
-                0, OpCode::GetObjects, protoutil::to_string(proto)));
-
             sendWorkerTile(worker);
         }
     }
