@@ -236,6 +236,7 @@ message InvocationPayload {
     float packets_log_rate = 8;
     bool collect_diagnostics = 9;
     bool log_leases = 10;
+    bool directional_treelets = 11;
 }
 
 message ObjectKey {

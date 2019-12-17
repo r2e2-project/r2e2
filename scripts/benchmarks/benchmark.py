@@ -24,6 +24,7 @@ parser.add_argument('-g', '--generate-static', action='store_true')
 parser.add_argument('-p', '--start-port', default=9900, type=int)
 parser.add_argument('-o', '--out-dir', required=True)
 parser.add_argument('-n', '--run-name', required=True, type=str)
+parser.add_argument('-D', '--directional', action='store_true')
 
 args = parser.parse_args()
 
@@ -88,6 +89,9 @@ for i, scene in enumerate(scenes):
         cmdprefix += " -a uniform"
     else:
         cmdprefix += " -a static"
+
+    if args.directional:
+        cmdprefix += ' --directional'
 
     for nlambdas in args.lambdas:
         for spp in samples:

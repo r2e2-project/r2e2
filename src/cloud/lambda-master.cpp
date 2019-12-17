@@ -1023,6 +1023,7 @@ HTTPRequest LambdaMaster::generateRequest() {
     proto.set_packets_log_rate(config.packetsLogRate);
     proto.set_collect_diagnostics(config.collectDiagnostics);
     proto.set_log_leases(config.logLeases);
+    proto.set_directional_treelets(PbrtOptions.directionalTreelets);
 
     return LambdaInvocationRequest(
                awsCredentials, awsRegion, lambdaFunctionName,
@@ -1169,6 +1170,7 @@ int main(int argc, char *argv[]) {
         {"job-summary", required_argument, nullptr, 'j'},
         {"pix-per-tile", required_argument, nullptr, 'T'},
         {"new-tile-send", required_argument, nullptr, 'n'},
+        {"directional", no_argument, nullptr, 'I'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
@@ -1202,6 +1204,7 @@ int main(int argc, char *argv[]) {
         case 't': timeout = stoul(optarg); break;
         case 'j': jobSummaryPath = optarg; break;
         case 'n': newTileThreshold = stoull(optarg); break;
+        case 'I': PbrtOptions.directionalTreelets = true; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
 
             // clang-format on

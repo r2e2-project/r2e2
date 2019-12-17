@@ -391,6 +391,7 @@ int main(int argc, char* argv[]) {
         {"log-packets", required_argument, nullptr, 'P'},
         {"finished-ray", required_argument, nullptr, 'f'},
         {"max-udp-rate", required_argument, nullptr, 'M'},
+        {"directional", no_argument, nullptr, 'I'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
@@ -414,6 +415,7 @@ int main(int argc, char* argv[]) {
         case 'L': rayActionsLogRate = stof(optarg); break;
         case 'P': packetsLogRate = stof(optarg); break;
         case 'f': finishedRayAction = (FinishedRayAction)stoi(optarg); break;
+        case 'I': PbrtOptions.directionalTreelets = true; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
         default: usage(argv[0], EXIT_FAILURE);
         }

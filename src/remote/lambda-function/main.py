@@ -49,6 +49,9 @@ def handler(event, context):
     if event['collectDiagnostics']:
         command += ['--diagnostics']
 
+    if event['directionalTreelets']:
+        command += ['--directional']
+
     retcode = run_command(command)
     print("retcode={}".format(retcode))
 
