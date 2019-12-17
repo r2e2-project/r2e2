@@ -1504,15 +1504,21 @@ bool TreeletDumpBVH::IntersectSendCheck(const Ray &ray,
             if (node->nPrimitives > 0) {
                 // Intersect ray with primitives in leaf BVH node
                 for (int i = 0; i < node->nPrimitives; ++i) {
-                    if (primitives[node->primitivesOffset + i]->Intersect(
+                    auto &prim = primitives[node->primitivesOffset + i];
+                    if (prim->Intersect(
                             ray, isect)) {
                         hit = true;
                     }
 
-                    auto &prim = primitives[node->primitivesOffset + i];
                     if (prim->GetType() == PrimitiveType::Transformed) {
-                        instanceReturn = true;
-                        totalRayTransfers++;
+                        auto tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
+                        auto inst = dynamic_pointer_cast<TreeletDumpBVH>(tp->GetPrimitive());
+                        if (!inst->copyable) {
+                            if (i == node->nPrimitives - 1) {
+                                instanceReturn = true;
+                            }
+                            totalRayTransfers++;
+                        }
                     }
                 }
                 if (toVisitOffset == 0) break;
@@ -1568,14 +1574,20 @@ bool TreeletDumpBVH::IntersectPSendCheck(const Ray &ray) const {
             // Process BVH node _node_ for traversal
             if (node->nPrimitives > 0) {
                 for (int i = 0; i < node->nPrimitives; ++i) {
-                    if (primitives[node->primitivesOffset + i]->IntersectP(
+                    auto &prim = primitives[node->primitivesOffset + i];
+                    if (prim->IntersectP(
                             ray)) {
                         return true;
                     }
-                    auto &prim = primitives[node->primitivesOffset + i];
                     if (prim->GetType() == PrimitiveType::Transformed) {
-                        totalRayTransfers++;
-                        instanceReturn = true;
+                        auto tp = dynamic_pointer_cast<TransformedPrimitive>(prim);
+                        auto inst = dynamic_pointer_cast<TreeletDumpBVH>(tp->GetPrimitive());
+                        if (!inst->copyable) {
+                            if (i == node->nPrimitives - 1) {
+                                instanceReturn = true;
+                            }
+                            totalRayTransfers++;
+                        }
                     }
                 }
                 if (toVisitOffset == 0) break;
