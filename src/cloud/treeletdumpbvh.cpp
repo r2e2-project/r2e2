@@ -1499,13 +1499,22 @@ bool TreeletDumpBVH::IntersectSendCheck(const Ray &ray,
         const LinearBVHNode *node = &nodes[currentNodeIndex];
         int prevNodeIndex = currentNodeIndex;
         // Check ray against BVH node
+        bool instanceReturn = false;
         if (node->bounds.IntersectP(ray, invDir, dirIsNeg)) {
             if (node->nPrimitives > 0) {
                 // Intersect ray with primitives in leaf BVH node
-                for (int i = 0; i < node->nPrimitives; ++i)
+                for (int i = 0; i < node->nPrimitives; ++i) {
                     if (primitives[node->primitivesOffset + i]->Intersect(
-                            ray, isect))
+                            ray, isect)) {
                         hit = true;
+                    }
+
+                    auto &prim = primitives[node->primitivesOffset + i];
+                    if (prim->GetType() == PrimitiveType::Transformed) {
+                        instanceReturn = true;
+                        totalRayTransfers++;
+                    }
+                }
                 if (toVisitOffset == 0) break;
                 currentNodeIndex = nodesToVisit[--toVisitOffset];
             } else {
@@ -1528,7 +1537,7 @@ bool TreeletDumpBVH::IntersectSendCheck(const Ray &ray,
 
         uint32_t curTreelet = labels[currentNodeIndex];
 
-        if (curTreelet != prevTreelet) {
+        if (curTreelet != prevTreelet && !instanceReturn) {
             totalRayTransfers++;
         }
 
@@ -1553,6 +1562,7 @@ bool TreeletDumpBVH::IntersectPSendCheck(const Ray &ray) const {
     while (true) {
         const LinearBVHNode *node = &nodes[currentNodeIndex];
         int prevNodeIndex = currentNodeIndex;
+        bool instanceReturn = false;
 
         if (node->bounds.IntersectP(ray, invDir, dirIsNeg)) {
             // Process BVH node _node_ for traversal
@@ -1561,6 +1571,11 @@ bool TreeletDumpBVH::IntersectPSendCheck(const Ray &ray) const {
                     if (primitives[node->primitivesOffset + i]->IntersectP(
                             ray)) {
                         return true;
+                    }
+                    auto &prim = primitives[node->primitivesOffset + i];
+                    if (prim->GetType() == PrimitiveType::Transformed) {
+                        totalRayTransfers++;
+                        instanceReturn = true;
                     }
                 }
                 if (toVisitOffset == 0) break;
@@ -1585,7 +1600,7 @@ bool TreeletDumpBVH::IntersectPSendCheck(const Ray &ray) const {
 
         uint32_t curTreelet = labels[currentNodeIndex];
 
-        if (curTreelet != prevTreelet) {
+        if (curTreelet != prevTreelet && !instanceReturn) {
             totalRayTransfers++;
         }
 
@@ -1620,10 +1635,17 @@ bool TreeletDumpBVH::IntersectCheckSend(const Ray &ray,
         // Check ray against BVH node
         if (node->nPrimitives > 0) {
             // Intersect ray with primitives in leaf BVH node
-            for (int i = 0; i < node->nPrimitives; ++i)
+            for (int i = 0; i < node->nPrimitives; ++i) {
                 if (primitives[node->primitivesOffset + i]->Intersect(
-                        ray, isect))
+                        ray, isect)) {
                     hit = true;
+                }
+
+                auto &prim = primitives[node->primitivesOffset + i];
+                if (prim->GetType() == PrimitiveType::Transformed) {
+                    totalRayTransfers++;
+                }
+            }
         } else {
             // Put far BVH node on _nodesToVisit_ stack, advance to near
             // node
@@ -1650,6 +1672,8 @@ bool TreeletDumpBVH::IntersectCheckSend(const Ray &ray,
 
         uint32_t curTreelet = labels[currentNodeIndex];
 
+        // No check for instance returning in Check-Send, because the rays
+        // will likely need to return to the point of entry
         if (curTreelet != prevTreelet) {
             totalRayTransfers++;
         }
@@ -1679,10 +1703,16 @@ bool TreeletDumpBVH::IntersectPCheckSend(const Ray &ray) const {
         // Check ray against BVH node
         if (node->nPrimitives > 0) {
             // Intersect ray with primitives in leaf BVH node
-            for (int i = 0; i < node->nPrimitives; ++i)
+            for (int i = 0; i < node->nPrimitives; ++i) {
                 if (primitives[node->primitivesOffset + i]->IntersectP(
-                        ray))
+                        ray)) {
                     return true;
+                }
+                auto &prim = primitives[node->primitivesOffset + i];
+                if (prim->GetType() == PrimitiveType::Transformed) {
+                    totalRayTransfers++;
+                }
+            }
         } else {
             // Put far BVH node on _nodesToVisit_ stack, advance to near
             // node
@@ -1720,34 +1750,42 @@ bool TreeletDumpBVH::IntersectPCheckSend(const Ray &ray) const {
 }
 
 bool TreeletDumpBVH::Intersect(const Ray &ray, SurfaceInteraction *isect) const {
-    if (!rootBVH) {
-        return BVHAccel::Intersect(ray, isect);
+    if (!rootBVH && !copyable) {
+        totalRayTransfers++;
     }
 
-    switch (traversalAlgo) {
-        case TraversalAlgorithm::SendCheck:
-            return IntersectSendCheck(ray, isect);
-        case TraversalAlgorithm::CheckSend:
-            return IntersectCheckSend(ray, isect);
-        default:
-            CHECK_EQ(true, false);
-            return false;
+    if (rootBVH || !copyable) {
+        switch (traversalAlgo) {
+            case TraversalAlgorithm::SendCheck:
+                return IntersectSendCheck(ray, isect);
+            case TraversalAlgorithm::CheckSend:
+                return IntersectCheckSend(ray, isect);
+            default:
+                CHECK_EQ(true, false);
+                return false;
+        }
+    } else {
+        return BVHAccel::Intersect(ray, isect);
     }
 }
 
 bool TreeletDumpBVH::IntersectP(const Ray &ray) const {
-    if (!rootBVH) {
-        return BVHAccel::IntersectP(ray);
+    if (!rootBVH && !copyable) {
+        totalRayTransfers++;
     }
 
-    switch (traversalAlgo) {
-        case TraversalAlgorithm::SendCheck:
-            return IntersectPSendCheck(ray);
-        case TraversalAlgorithm::CheckSend:
-            return IntersectPCheckSend(ray);
-        default:
-            CHECK_EQ(true, false);
-            return false;
+    if (rootBVH || !copyable) {
+        switch (traversalAlgo) {
+            case TraversalAlgorithm::SendCheck:
+                return IntersectPSendCheck(ray);
+            case TraversalAlgorithm::CheckSend:
+                return IntersectPCheckSend(ray);
+            default:
+                CHECK_EQ(true, false);
+                return false;
+        }
+    } else {
+        return BVHAccel::IntersectP(ray);
     }
 }
 

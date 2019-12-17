@@ -156,6 +156,8 @@ int main(int argc, char *argv[]) {
             global::manager.init(&argv[i][12]);
         } else if (!strcmp(argv[i], "--nomaterial")) {
             options.dumpMaterials = false;
+        } else if (!strcmp(argv[i], "--directional")) {
+            options.directionalTreelets = true;
         } else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-help") ||
                    !strcmp(argv[i], "-h")) {
             usage();

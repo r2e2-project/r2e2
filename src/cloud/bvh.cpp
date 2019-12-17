@@ -348,7 +348,12 @@ bool CloudBVH::Intersect(const Ray &ray, SurfaceInteraction *isect) const {
     pair<uint32_t, uint32_t> toVisit[64];
     uint8_t toVisitOffset = 0;
 
-    pair<uint32_t, uint32_t> current(bvh_root_, 0);
+    uint32_t startTreelet = bvh_root_;
+    if (bvh_root_ == 0) {
+        startTreelet = ComputeIdx(ray.d);
+    }
+
+    pair<uint32_t, uint32_t> current(startTreelet, 0);
 
     while (true) {
         loadTreelet(current.first);
@@ -397,7 +402,12 @@ bool CloudBVH::IntersectP(const Ray &ray) const {
     uint8_t toVisitOffset = 0;
     pair<uint32_t, uint32_t> toVisit[64];
 
-    pair<uint32_t, uint32_t> current(bvh_root_, 0);
+    uint32_t startTreelet = bvh_root_;
+    if (bvh_root_ == 0) {
+        startTreelet = ComputeIdx(ray.d);
+    }
+
+    pair<uint32_t, uint32_t> current(startTreelet, 0);
 
     while (true) {
         loadTreelet(current.first);
@@ -597,9 +607,13 @@ Vector3f ComputeRayDir(unsigned idx) {
 }
 
 unsigned ComputeIdx(const Vector3f &dir) {
-    return (dir.x >= 0 ? 1 : 0) +
-        ((dir.y >= 0 ? 1 : 0) << 1) +
-        ((dir.z >= 0 ? 1 : 0) << 2);
+    if (PbrtOptions.directionalTreelets) {
+        return (dir.x >= 0 ? 1 : 0) +
+            ((dir.y >= 0 ? 1 : 0) << 1) +
+            ((dir.z >= 0 ? 1 : 0) << 2);
+    } else {
+        return 0;
+    }
 }
 
 }  // namespace pbrt
