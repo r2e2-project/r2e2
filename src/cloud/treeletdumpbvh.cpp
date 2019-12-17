@@ -448,7 +448,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateUnspecializedTreelet
         finalTreelets.emplace_back(move(iter->second));
     }
 
-    OrderTreeletNodesDepthFirst(0, finalTreelets);
+    OrderTreeletNodesDepthFirst(1, finalTreelets);
 
     // Check that every node is in one treelet exactly once
     vector<int> nodeCheck(nodeCount);
@@ -1491,7 +1491,7 @@ bool TreeletDumpBVH::IntersectSendCheck(const Ray &ray,
     int toVisitOffset = 0, currentNodeIndex = 0;
     int nodesToVisit[64];
 
-    int dirIdx = ComputeIdx(invDir);
+    int dirIdx = treeletAllocations[7].empty() ? 0 : ComputeIdx(invDir);
     const auto &labels = treeletAllocations[dirIdx];
     uint32_t prevTreelet = labels[currentNodeIndex];
 
@@ -1546,7 +1546,7 @@ bool TreeletDumpBVH::IntersectPSendCheck(const Ray &ray) const {
     int nodesToVisit[64];
     int toVisitOffset = 0, currentNodeIndex = 0;
 
-    int dirIdx = ComputeIdx(invDir);
+    int dirIdx = treeletAllocations[7].empty() ? 0 : ComputeIdx(invDir);
     const auto &labels = treeletAllocations[dirIdx];
     uint32_t prevTreelet = labels[currentNodeIndex];
 
@@ -1606,7 +1606,7 @@ bool TreeletDumpBVH::IntersectCheckSend(const Ray &ray,
     int toVisitOffset = 0, currentNodeIndex = 0;
     int nodesToVisit[64];
 
-    int dirIdx = ComputeIdx(invDir);
+    int dirIdx = treeletAllocations[7].empty() ? 0 : ComputeIdx(invDir);
     const auto &labels = treeletAllocations[dirIdx];
     
     uint32_t prevTreelet = labels[currentNodeIndex];
@@ -1668,7 +1668,7 @@ bool TreeletDumpBVH::IntersectPCheckSend(const Ray &ray) const {
     int nodesToVisit[64];
     int toVisitOffset = 0, currentNodeIndex = 0;
 
-    int dirIdx = ComputeIdx(invDir);
+    int dirIdx = treeletAllocations[7].empty() ? 0 : ComputeIdx(invDir);
     const auto &labels = treeletAllocations[dirIdx];
 
     uint32_t prevTreelet = labels[currentNodeIndex];
@@ -1751,7 +1751,7 @@ bool TreeletDumpBVH::IntersectP(const Ray &ray) const {
     }
 }
 
-array<uint32_t, 8> TreeletDumpBVH::DumpTreelets(bool root) const {
+vector<uint32_t> TreeletDumpBVH::DumpTreelets(bool root) const {
     // Assign IDs to each treelet
     for (const TreeletInfo &treelet : allTreelets) {
         global::manager.getNextId(ObjectType::Treelet, &treelet);
@@ -1829,7 +1829,7 @@ array<uint32_t, 8> TreeletDumpBVH::DumpTreelets(bool root) const {
         }
     }
 
-    unordered_map<TreeletDumpBVH *, array<uint32_t, 8>> nonCopyableInstanceTreelets;
+    unordered_map<TreeletDumpBVH *, vector<uint32_t>> nonCopyableInstanceTreelets;
 
     for (int treeletID = 0; treeletID < allTreelets.size(); treeletID++) {
         const TreeletInfo &treelet = allTreelets[treeletID];
@@ -2111,9 +2111,19 @@ array<uint32_t, 8> TreeletDumpBVH::DumpTreelets(bool root) const {
         }
     }
 
-    array<uint32_t, 8> rootTreelets;
-    for (int i = 0; i < 8; i++) {
-        rootTreelets[i] = global::manager.getId(&allTreelets[i]);
+    bool multiDir = false;
+    for (const TreeletInfo &info : allTreelets) {
+        if (info.dirIdx != 0) {
+            multiDir = true;
+            break;
+        }
+    }
+
+    int numRoots = multiDir ? 8 : 1;
+
+    vector<uint32_t> rootTreelets;
+    for (int i = 0; i < numRoots; i++) {
+        rootTreelets.push_back(global::manager.getId(&allTreelets[i]));
     }
 
     return rootTreelets;
