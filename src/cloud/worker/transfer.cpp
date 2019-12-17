@@ -22,6 +22,7 @@ ResultType LambdaWorker::handleSendQueue() {
         while (!queue.empty()) {
             auto& bag = queue.front();
 
+            bag.second.erase(bag.first);
             const auto bagId = currentBagId[treeletId]++;
             const string key = rayBagKey(treeletId, bagId);
             const auto id = transferAgent.requestUpload(key, move(bag.second));
