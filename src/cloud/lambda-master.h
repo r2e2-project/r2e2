@@ -162,31 +162,39 @@ class LambdaMaster {
     std::map<WorkerId, Worker> workers{};
 
     /* Message Queues */
-    std::deque<std::pair<WorkerId, meow::Message>> incomingMessages;
+    std::deque<std::pair<WorkerId, meow::Message>> incomingMessages{};
 
-    /* Scene Data */
+    ////////////////////////////////////////////////////////////////////////////
+    // Scene Objects                                                          //
+    ////////////////////////////////////////////////////////////////////////////
+
     std::vector<std::unique_ptr<Transform>> transformCache{};
     std::shared_ptr<Camera> camera{};
     std::unique_ptr<FilmTile> filmTile{};
     size_t totalPaths{0};
     SeqNoSet finishedPathIds{};
 
-    /* Scene Objects */
     Bounds2i sampleBounds;
     std::vector<uint32_t> tiles;
     std::map<ObjectKey, SceneObjectInfo> sceneObjects;
-
     std::set<ObjectKey> treeletIds;
     std::stack<ObjectKey> unassignedTreelets;
-
     std::map<ObjectKey, std::set<ObjectKey>> requiredDependentObjects;
     std::map<TreeletId, std::set<ObjectKey>> treeletFlattenDependencies;
     std::map<TreeletId, size_t> treeletTotalSizes;
 
-    /* Always-on FD */
-    FileDescriptor dummyFD{STDOUT_FILENO};
+    ////////////////////////////////////////////////////////////////////////////
+    // Rays                                                                   //
+    ////////////////////////////////////////////////////////////////////////////
 
-    /* Timers */
+    std::map<TreeletId, std::queue<RayBag>> queuedRayBags;
+    std::map<TreeletId, size_t> queueSize;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Timers                                                                 //
+    ////////////////////////////////////////////////////////////////////////////
+
+    FileDescriptor dummyFD{STDOUT_FILENO};
     TimerFD workerRequestTimer;
     TimerFD statusPrintTimer;
     TimerFD writeOutputTimer;

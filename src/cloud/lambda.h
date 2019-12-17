@@ -7,4 +7,10 @@ using WorkerId = uint64_t;
 using TreeletId = uint32_t;
 using BagId = uint64_t;
 
+struct RayBag {
+    TreeletId treeletId;
+    BagId bagId;
+    size_t size;
+};
+
 #endif /* PBRT_CLOUD_LAMBDA_H */
