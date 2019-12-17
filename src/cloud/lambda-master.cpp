@@ -768,7 +768,7 @@ set<ObjectKey> LambdaMaster::getRecursiveDependencies(const ObjectKey &object) {
 void LambdaMaster::assignObject(Worker &worker, const ObjectKey &object) {
     if (worker.objects.count(object) == 0) {
         SceneObjectInfo &info = sceneObjects.at(object);
-        info.workers.insert(worker.id);
+        info.workers.push_back(worker.id);
         worker.objects.insert(object);
         worker.freeSpace -= info.size;
     }

@@ -91,7 +91,7 @@ class LambdaMaster {
         size_t size;
 
         /* the set of workers which have this scene object */
-        std::set<uint64_t> workers;
+        std::vector<WorkerId> workers;
     };
 
     struct Worker {
@@ -184,7 +184,7 @@ class LambdaMaster {
     std::map<TreeletId, size_t> treeletTotalSizes;
 
     ////////////////////////////////////////////////////////////////////////////
-    // Rays                                                                   //
+    // Ray Bags                                                               //
     ////////////////////////////////////////////////////////////////////////////
 
     std::map<TreeletId, std::queue<RayBag>> queuedRayBags;
