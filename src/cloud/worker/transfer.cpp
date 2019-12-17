@@ -77,7 +77,7 @@ void LambdaWorker::TransferAgent::doAction(Action&& action) {
             HTTPRequest outgoingRequest;
 
             switch (action.type) {
-            case Action::Download:
+            case Action::Upload:
                 outgoingRequest =
                     S3PutRequest(config.credentials, config.endpoint,
                                  config.region, action.key, action.data,
@@ -85,7 +85,7 @@ void LambdaWorker::TransferAgent::doAction(Action&& action) {
                         .to_http_request();
                 break;
 
-            case Action::Upload:
+            case Action::Download:
                 outgoingRequest =
                     S3GetRequest(config.credentials, config.endpoint,
                                  config.region, action.key)
@@ -96,13 +96,16 @@ void LambdaWorker::TransferAgent::doAction(Action&& action) {
             responses.new_request_arrived(outgoingRequest);
             s3.write(outgoingRequest.str());
 
-            while (responses.pending_requests()) {
+            size_t responseCount = 0;
+
+            while (responseCount < 1) {
                 responses.parse(s3.read());
 
                 if (!responses.empty()) {
                     if (responses.front().first_line() != "HTTP/1.1 200 OK") {
                         throw runtime_error("TransferAgent::doAction failed ");
                     } else {
+                        responseCount++;
                         action.data = move(responses.front().body());
                         break;
                     }
