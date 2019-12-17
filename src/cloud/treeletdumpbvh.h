@@ -88,7 +88,9 @@ class TreeletDumpBVH : public BVHAccel {
         PseudoAgglomerative,
         OneByOne,
         TopologicalHierarchical,
-        GreedySize
+        GreedySize,
+        Nvidia,
+        MergedGraph
     };
 
     struct Edge {
@@ -122,6 +124,7 @@ class TreeletDumpBVH : public BVHAccel {
 
     TreeletDumpBVH(std::vector<std::shared_ptr<Primitive>> &&p,
                    int maxTreeletBytes,
+                   int copyableThreshold,
                    bool rootBVH,
                    TraversalAlgorithm traversal,
                    PartitionAlgorithm partition,
@@ -134,6 +137,7 @@ class TreeletDumpBVH : public BVHAccel {
                    LinearBVHNode *deserializedNodes,
                    int deserializedNodeCount,
                    int maxTreeletBytes,
+                   int copyableThreshold,
                    TraversalAlgorithm traversal,
                    PartitionAlgorithm partition);
 
@@ -155,6 +159,11 @@ class TreeletDumpBVH : public BVHAccel {
 
     uint64_t GetInstancesBytes(const InstanceMask &mask) const;
 
+    std::unordered_map<uint32_t, TreeletInfo> MergeDisjointTreelets(int dirIdx, int maxTreeletBytes, const TraversalGraph &graph);
+    void OrderTreeletNodesDepthFirst(int numDirs, std::vector<TreeletInfo> &treelets);
+
+    std::vector<TreeletInfo> AllocateUnspecializedTreelets(int maxTreeletBytes);
+    std::vector<TreeletInfo> AllocateDirectionalTreelets(int maxTreeletBytes);
     std::vector<TreeletInfo> AllocateTreelets(int maxTreeletBytes);
 
     IntermediateTraversalGraph CreateTraversalGraphSendCheck(const Vector3f &rayDir, int depthReduction) const;
@@ -195,7 +204,6 @@ class TreeletDumpBVH : public BVHAccel {
     bool IntersectPCheckSend(const Ray &ray) const;
     std::array<RayCountMap, 8> rayCounts;
     TreeletMap treeletAllocations{};
-    std::vector<uint32_t> origTreeletAllocation{};
 
     bool rootBVH;
     TraversalAlgorithm traversalAlgo;
@@ -208,6 +216,7 @@ class TreeletDumpBVH : public BVHAccel {
 
     uint64_t totalBytes {0};
     std::vector<InstanceMask> nodeInstanceMasks {};
+    std::vector<InstanceMask> subtreeInstanceMasks {};
     std::array<TreeletDumpBVH *, sizeof(InstanceMask) * 8> uniqueInstances {};
     std::array<uint64_t, sizeof(InstanceMask) * 8> instanceSizes {};
     std::array<std::array<float, sizeof(InstanceMask) * 8>, 8> instanceProbabilities {};
