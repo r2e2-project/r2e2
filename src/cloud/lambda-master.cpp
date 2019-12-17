@@ -47,7 +47,6 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
-constexpr milliseconds WORKER_REQUEST_INTERVAL{250};
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
@@ -97,7 +96,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
       awsRegion(awsRegion),
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
-      workerRequestTimer(WORKER_REQUEST_INTERVAL),
       statusPrintTimer(STATUS_PRINT_INTERVAL),
       writeOutputTimer(WRITE_OUTPUT_INTERVAL),
       workerStatsInterval(config.workerStatsInterval),
@@ -164,14 +162,14 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         const ObjectType &type = kv.first;
         const vector<SceneManager::Object> &objects = kv.second;
         for (const SceneManager::Object &obj : objects) {
-            ObjectKey id{type, obj.id};
+            ObjectKey key{type, obj.id};
             SceneObjectInfo info{};
             info.id = obj.id;
             info.size = obj.size;
-            sceneObjects.insert({id, info});
+            sceneObjects.insert({key, info});
             if (type == ObjectType::Treelet) {
-                unassignedTreelets.push(id);
-                treeletIds.insert(id);
+                unassignedTreelets.insert(obj.id);
+                treeletIds.insert(key);
             }
         }
     }
@@ -442,7 +440,6 @@ set<ObjectKey> LambdaMaster::getRecursiveDependencies(const ObjectKey &object) {
 void LambdaMaster::assignObject(Worker &worker, const ObjectKey &object) {
     if (worker.objects.count(object) == 0) {
         SceneObjectInfo &info = sceneObjects.at(object);
-        info.workers.push_back(worker.id);
         worker.objects.insert(object);
         worker.freeSpace -= info.size;
     }
@@ -450,6 +447,9 @@ void LambdaMaster::assignObject(Worker &worker, const ObjectKey &object) {
 
 void LambdaMaster::assignTreelet(Worker &worker, const TreeletId treeletId) {
     assignObject(worker, {ObjectType::Treelet, treeletId});
+
+    assignedTreelets[treeletId].push_back(worker.id);
+    unassignedTreelets.erase(treeletId);
 
     for (const auto &obj : treeletFlattenDependencies[treeletId]) {
         assignObject(worker, obj);

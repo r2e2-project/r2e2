@@ -89,9 +89,6 @@ class LambdaMaster {
     struct SceneObjectInfo {
         SceneManager::ObjectID id;
         size_t size;
-
-        /* the set of workers which have this scene object */
-        std::vector<WorkerId> workers;
     };
 
     struct Worker {
@@ -111,14 +108,6 @@ class LambdaMaster {
 
         Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}
-    };
-
-    struct WorkerRequest {
-        WorkerId worker;
-        TreeletId treelet;
-
-        WorkerRequest(const WorkerId worker, const TreeletId treelet)
-            : worker(worker), treelet(treelet) {}
     };
 
     Poller::Action::Result::Type handleMessages();
@@ -178,10 +167,12 @@ class LambdaMaster {
     std::vector<uint32_t> tiles;
     std::map<ObjectKey, SceneObjectInfo> sceneObjects;
     std::set<ObjectKey> treeletIds;
-    std::stack<ObjectKey> unassignedTreelets;
     std::map<ObjectKey, std::set<ObjectKey>> requiredDependentObjects;
     std::map<TreeletId, std::set<ObjectKey>> treeletFlattenDependencies;
     std::map<TreeletId, size_t> treeletTotalSizes;
+
+    std::set<TreeletId> unassignedTreelets;
+    std::map<TreeletId, std::vector<WorkerId>> assignedTreelets;
 
     ////////////////////////////////////////////////////////////////////////////
     // Ray Bags                                                               //
@@ -195,7 +186,6 @@ class LambdaMaster {
     ////////////////////////////////////////////////////////////////////////////
 
     FileDescriptor dummyFD{STDOUT_FILENO};
-    TimerFD workerRequestTimer;
     TimerFD statusPrintTimer;
     TimerFD writeOutputTimer;
     std::unique_ptr<TimerFD> exitTimer;
