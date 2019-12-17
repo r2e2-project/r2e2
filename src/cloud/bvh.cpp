@@ -377,10 +377,12 @@ bool CloudBVH::Intersect(const Ray &ray, SurfaceInteraction *isect) const {
                     if (prim->Intersect(ray, isect)) hit = true;
 
                     if (primitives[i]->GetType() == PrimitiveType::Transformed) {
-                        TransformedPrimitive *tp =
+                        auto tp =
                             dynamic_cast<TransformedPrimitive *>(prim.get());
-                        if (dynamic_cast<CloudBVH *>(tp) != nullptr) {
-                            instanceReturn = true;
+                        if (dynamic_pointer_cast<CloudBVH>(tp->GetPrimitive()) != nullptr) {
+                            if (i == node.primitive_offset + node.primitive_count - 1) {
+                                instanceReturn = true;
+                            }
                             totalRayTransfers++;
                         }
                     }
@@ -428,6 +430,8 @@ bool CloudBVH::IntersectP(const Ray &ray) const {
     uint32_t startTreelet = bvh_root_;
     if (bvh_root_ == 0) {
         startTreelet = ComputeIdx(ray.d);
+    } else {
+        totalRayTransfers++;
     }
 
     pair<uint32_t, uint32_t> current(startTreelet, 0);
@@ -450,10 +454,12 @@ bool CloudBVH::IntersectP(const Ray &ray) const {
                     if (prim->IntersectP(ray)) return true;
 
                     if (primitives[i]->GetType() == PrimitiveType::Transformed) {
-                        TransformedPrimitive *tp =
+                        auto tp =
                             dynamic_cast<TransformedPrimitive *>(prim.get());
-                        if (dynamic_cast<CloudBVH *>(tp) != nullptr) {
-                            instanceReturn = true;
+                        if (dynamic_pointer_cast<CloudBVH>(tp->GetPrimitive()) != nullptr) {
+                            if (i == node.primitive_offset + node.primitive_count - 1) {
+                                instanceReturn = true;
+                            }
                             totalRayTransfers++;
                         }
                     }
