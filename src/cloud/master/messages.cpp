@@ -126,8 +126,13 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         protoutil::from_string(message.payload(), proto);
 
         for (const auto &item : proto.ray_bags()) {
-            queuedRayBags[item.treelet_id()].push(
-                {item.treelet_id(), item.bag_id(), item.size()});
+            if (assignedTreelets.count(item.treelet_id())) {
+                queuedRayBags[item.treelet_id()].push(
+                    {item.treelet_id(), item.bag_id(), item.size()});
+            } else {
+                pendingRayBags[item.treelet_id()].push(
+                    {item.treelet_id(), item.bag_id(), item.size()});
+            }
 
             queueSize[item.treelet_id()] += item.size();
         }
