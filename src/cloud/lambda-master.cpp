@@ -558,12 +558,12 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
                 proto.timestamp_us();
         }
 
-        if (canSendTiles && cameraRaysRemaining() &&
+        /* if (canSendTiles && cameraRaysRemaining() &&
             stats.queueStats.pending + stats.queueStats.out +
                     stats.queueStats.ray <
                 config.newTileThreshold) {
             sendWorkerTile(worker);
-        }
+        } */
 
         break;
     }
