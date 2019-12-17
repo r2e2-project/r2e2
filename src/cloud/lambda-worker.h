@@ -234,7 +234,7 @@ class LambdaWorker {
     // Ray Bags                                                               //
     ////////////////////////////////////////////////////////////////////////////
 
-    struct RayBagId {
+    struct RayBag {
         TreeletId treeletId;
         BagId bagId;
         size_t size;
@@ -242,7 +242,7 @@ class LambdaWorker {
 
     std::string rayBagsKeyPrefix{};
     std::map<TreeletId, BagId> currentBagId{};
-    std::map<uint64_t, RayBagId> pendingRayBags{};
+    std::map<uint64_t, RayBag> pendingRayBags{};
 
     std::string rayBagKey(const TreeletId treeletId, BagId bagId);
 };

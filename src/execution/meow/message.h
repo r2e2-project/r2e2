@@ -22,6 +22,7 @@ class Message {
         WorkerStats,
         FinishedRays,
         FinishedPaths,
+        RayBagEnqueued,
         Bye,
 
         COUNT
@@ -37,6 +38,7 @@ class Message {
         "WorkerStats",
         "FinishedRays",
         "FinishedPaths",
+        "RayBagEnqueued",
         "Bye"};
 
     constexpr static size_t HEADER_LENGTH = 25;

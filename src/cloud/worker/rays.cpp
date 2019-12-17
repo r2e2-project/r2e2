@@ -154,9 +154,8 @@ ResultType LambdaWorker::handleTraceQueue() {
 }
 
 ResultType LambdaWorker::handleOutQueue() {
-    auto it = outQueue.begin();
-
-    while (it != outQueue.end()) {
+    for (auto it = outQueue.begin(); it != outQueue.end();
+         it = outQueue.erase(it)) {
         const TreeletId treeletId = it->first;
         auto& rayList = it->second;
         auto& queue = sendQueue[treeletId];

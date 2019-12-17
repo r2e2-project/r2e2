@@ -460,3 +460,15 @@ message JobSummary {
     uint64 finished_paths = 6;
     uint64 finished_rays = 7;
 }
+
+// Ray Bags
+
+message RayBag {
+    uint32 treelet_id = 1;
+    uint64 bag_id = 2;
+    uint64 size = 3;
+}
+
+message RayBagEnqueued {
+    repeated RayBag ray_bags = 1;
+}

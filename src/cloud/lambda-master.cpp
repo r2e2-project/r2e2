@@ -595,6 +595,10 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         break;
     }
 
+    case OpCode::RayBagEnqueued:
+        cerr << "GOT RAY BAG ENQUEUED" << endl;
+        break;
+
     default:
         throw runtime_error("unhandled message opcode: " +
                             to_string(to_underlying(message.opcode())));

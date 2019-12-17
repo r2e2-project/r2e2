@@ -1,18 +1,23 @@
 #include "cloud/lambda-worker.h"
 
+#include "messages/utils.h"
+
 using namespace std;
 using namespace pbrt;
+using namespace meow;
 using namespace PollerShortNames;
+
+using OpCode = Message::OpCode;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
 ResultType LambdaWorker::handleSendQueue() {
     sendQueueTimer.reset();
 
-    while (!sendQueue.empty()) {
-        auto queuekv = sendQueue.begin();
-        const auto treeletId = queuekv->first;
-        auto& queue = queuekv->second;
+    for (auto it = sendQueue.begin(); it != sendQueue.end();
+         it = sendQueue.erase(it)) {
+        const auto treeletId = it->first;
+        auto& queue = it->second;
 
         while (!queue.empty()) {
             auto& bag = queue.front();
@@ -30,14 +35,30 @@ ResultType LambdaWorker::handleSendQueue() {
 }
 
 ResultType LambdaWorker::handleTransferResults() {
+    protobuf::RayBagEnqueued proto;
+    size_t count = 0;
+
     while (!transferAgent.empty()) {
         TransferAgent::Action action = move(transferAgent.pop());
 
-        if (pendingRayBags.count(action.id)) {
-            auto rayBagId = &pendingRayBags[action.id];
+        auto rayBagIt = pendingRayBags.find(action.id);
+        if (rayBagIt != pendingRayBags.end()) {
+            const auto& rayBag = rayBagIt->second;
 
             /* tell the master we've finished uploading this */
+            protobuf::RayBag& item = *proto.add_ray_bags();
+            item.set_treelet_id(rayBag.treeletId);
+            item.set_bag_id(rayBag.bagId);
+            item.set_size(rayBag.size);
+            count++;
+
+            pendingRayBags.erase(rayBagIt);
         }
+    }
+
+    if (count) {
+        coordinatorConnection->enqueue_write(Message::str(
+            *workerId, OpCode::RayBagEnqueued, protoutil::to_string(proto)));
     }
 
     return ResultType::Continue;
