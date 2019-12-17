@@ -238,7 +238,8 @@ class LambdaWorker {
     std::map<TreeletId, BagId> currentBagId{};
     std::map<uint64_t, RayBag> pendingRayBags{};
 
-    std::string rayBagKey(const TreeletId treeletId, BagId bagId);
+    std::string rayBagKey(const WorkerId workerId, const TreeletId treeletId,
+                          BagId bagId);
 };
 
 }  // namespace pbrt

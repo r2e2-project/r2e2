@@ -34,8 +34,7 @@ void LambdaWorker::processMessage(const Message& message) {
         jobId.reset(proto.job_id());
 
         logPrefix = "logs/" + (*jobId) + "/";
-        rayBagsKeyPrefix =
-            "jobs/" + (*jobId) + "/rays/" + to_string(*workerId) + "-";
+        rayBagsKeyPrefix = "jobs/" + (*jobId) + "/rays/";
 
         cerr << "worker-id=" << *workerId << endl;
         break;

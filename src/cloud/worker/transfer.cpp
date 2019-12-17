@@ -24,9 +24,9 @@ ResultType LambdaWorker::handleSendQueue() {
 
             bag.second.erase(bag.first);
             const auto bagId = currentBagId[treeletId]++;
-            const string key = rayBagKey(treeletId, bagId);
+            const string key = rayBagKey(*workerId, treeletId, bagId);
             const auto id = transferAgent.requestUpload(key, move(bag.second));
-            pendingRayBags[id] = {treeletId, bagId, bag.first};
+            pendingRayBags[id] = {*workerId, treeletId, bagId, bag.first};
 
             queue.pop();
         }
@@ -36,7 +36,7 @@ ResultType LambdaWorker::handleSendQueue() {
 }
 
 ResultType LambdaWorker::handleTransferResults() {
-    protobuf::RayBagEnqueued proto;
+    protobuf::RayBags proto;
     size_t count = 0;
 
     while (!transferAgent.empty()) {

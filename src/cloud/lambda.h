@@ -8,6 +8,7 @@ using TreeletId = uint32_t;
 using BagId = uint64_t;
 
 struct RayBag {
+    WorkerId workerId;
     TreeletId treeletId;
     BagId bagId;
     size_t size;
