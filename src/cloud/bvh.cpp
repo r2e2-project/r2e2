@@ -43,7 +43,7 @@ CloudBVH::CloudBVH(const uint32_t bvh_root) : bvh_root_(bvh_root) {
 
 Bounds3f CloudBVH::WorldBound() const {
     // The correctness of this function is only guaranteed for the root treelet
-    CHECK_EQ(bvh_root_, 0); 
+    CHECK_EQ(bvh_root_, 0);
 
     loadTreelet(bvh_root_);
     return treelets_[bvh_root_].nodes[0].bounds;
@@ -162,7 +162,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
 
             info.instances.insert(proto_tp.root_ref());
         }
-        
+
         for (int i = 0; i < proto_node.triangles_size(); i++) {
             auto &proto_t = proto_node.triangles(i);
             const auto tm_id = proto_t.mesh_id();
@@ -194,7 +194,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
     treelet.nodes = move(nodes);
 }
 
-void CloudBVH::Trace(RayState &rayState) {
+void CloudBVH::Trace(RayState &rayState) const {
     SurfaceInteraction isect;
 
     RayDifferential ray = rayState.ray;
