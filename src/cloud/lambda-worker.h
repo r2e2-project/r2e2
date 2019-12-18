@@ -100,7 +100,7 @@ class LambdaWorker {
     // Graphics                                                               //
     ////////////////////////////////////////////////////////////////////////////
 
-    /* Scene Information */
+    /*** Scene Information ****************************************************/
 
     struct SceneData {
       public:
@@ -128,7 +128,7 @@ class LambdaWorker {
 
     std::set<uint32_t> treeletIds{};
 
-    /* Ray Tracing */
+    /*** Ray Tracing **********************************************************/
 
     Poller::Action::Result::Type handleTraceQueue();
 
@@ -179,9 +179,7 @@ class LambdaWorker {
     std::map<TreeletId, std::queue<std::pair<size_t, std::string>>> sendQueue{};
     std::deque<uint64_t> finishedPathIds{};
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Transfer Agent                                                         //
-    ////////////////////////////////////////////////////////////////////////////
+    /*** Transfer Agent *******************************************************/
 
     class TransferAgent {
       public:
@@ -230,9 +228,7 @@ class LambdaWorker {
 
     TransferAgent transferAgent;
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Ray Bags                                                               //
-    ////////////////////////////////////////////////////////////////////////////
+    /*** Ray Bags *************************************************************/
 
     std::string rayBagsKeyPrefix{};
     std::map<TreeletId, BagId> currentBagId{};
