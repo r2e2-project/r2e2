@@ -82,6 +82,8 @@ class SceneManager {
 
     std::vector<double> getTreeletProbs() const;
 
+    size_t treeletCount();
+
   private:
     void loadManifest();
 

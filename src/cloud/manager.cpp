@@ -185,6 +185,20 @@ void SceneManager::loadManifest() {
     dependencies[ObjectKey{ObjectType::Sampler, 0}];
 }
 
+size_t SceneManager::treeletCount() {
+    size_t idx = 0;
+
+    auto objects = listObjects()[ObjectType::Treelet];
+
+    for (auto & object : objects) {
+        if (object.id > idx) {
+            idx = object.id;
+        }
+    }
+
+    return idx + 1;
+}
+
 vector<double> SceneManager::getTreeletProbs() const {
     vector<double> result;
 
