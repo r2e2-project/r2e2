@@ -1,6 +1,6 @@
 #include "cloud/lambda-worker.h"
 
-#include "cloud/integrator.h"
+#include "cloud/r2t2.h"
 #include "messages/utils.h"
 #include "net/util.h"
 
@@ -8,6 +8,7 @@ using namespace std;
 using namespace meow;
 using namespace std::chrono;
 using namespace pbrt;
+using namespace r2t2;
 using namespace pbrt::global;
 using namespace PollerShortNames;
 
@@ -106,7 +107,7 @@ ResultType LambdaWorker::handleTraceQueue() {
 
         if (!ray.toVisitEmpty()) {
             const uint32_t rayTreelet = ray.toVisitTop().treelet;
-            auto newRayPtr = CloudIntegrator::Trace(move(rayPtr), *bvh);
+            auto newRayPtr = graphics::TraceRay(move(rayPtr), *bvh);
             auto& newRay = *newRayPtr;
 
             const bool hit = newRay.hit;
@@ -132,13 +133,13 @@ ResultType LambdaWorker::handleTraceQueue() {
             }
         } else if (ray.hit) {
             RayStatePtr bounceRay, shadowRay;
-            tie(bounceRay, shadowRay) = CloudIntegrator::Shade(
+            tie(bounceRay, shadowRay) = graphics::ShadeRay(
                 move(rayPtr), *bvh, lights, sampleExtent, sampler, arena);
 
             if (bounceRay != nullptr) {
                 logRayAction(*bounceRay, RayAction::Generated);
                 processedRays.push_back(move(bounceRay));
-            } else {  /* this was the last bounce in this path */
+            } else { /* this was the last bounce in this path */
                 recordFinishedPath(pathId);
             }
 
