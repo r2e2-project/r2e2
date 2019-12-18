@@ -38,4 +38,22 @@ RayStatePtr GenerateCameraRay(const shared_ptr<Camera> &camera,
     return statePtr;
 }
 
+void AccumulateImage(const shared_ptr<Camera> &camera,
+                     const vector<RayStatePtr> &rays) {
+    const Bounds2i sampleBounds = camera->film->GetSampleBounds();
+    unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
+
+    for (const auto &ray : rays) {
+        Spectrum L{ray->Ld * ray->beta};
+
+        if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
+            L = Spectrum(0.f);
+        }
+
+        filmTile->AddSample(ray->sample.pFilm, L, ray->sample.weight);
+    }
+
+    camera->film->MergeFilmTile(move(filmTile));
+}
+
 }  // namespace pbrt::graphics
