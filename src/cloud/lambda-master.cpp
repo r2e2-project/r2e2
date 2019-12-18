@@ -238,8 +238,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
             ostringstream message;
             message << "worker died: " << ID;
 
-            if (!worker.aws.logStream.empty()) {
-                message << " (" << worker.aws.logStream << ")";
+            if (!worker.awsLogStream.empty()) {
+                message << " (" << worker.awsLogStream << ")";
             }
 
             LOG(INFO) << "dead worker stats: "
@@ -421,7 +421,6 @@ void LambdaMaster::assignObject(Worker &worker, const ObjectKey &object) {
     if (worker.objects.count(object) == 0) {
         SceneObjectInfo &info = sceneObjects.at(object);
         worker.objects.insert(object);
-        worker.freeSpace -= info.size;
     }
 }
 

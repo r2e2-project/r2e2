@@ -39,7 +39,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 
     switch (message.opcode()) {
     case OpCode::Hey: {
-        worker.aws.logStream = message.payload();
+        worker.awsLogStream = message.payload();
 
         protobuf::Hey heyProto;
         heyProto.set_worker_id(workerId);

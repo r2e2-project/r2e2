@@ -117,17 +117,11 @@ class LambdaMaster {
     struct Worker {
         WorkerId id;
         bool initialized{false};
-
         std::shared_ptr<TCPConnection> connection;
-        std::set<ObjectKey> objects;
-        size_t freeSpace{2 * 1000 * 1000 * 1000};
-
-        WorkerStats stats;
+        std::set<ObjectKey> objects{};
+        WorkerStats stats{};
         uint64_t nextStatusLogTimestamp{0};
-
-        struct {
-            std::string logStream;
-        } aws;
+        std::string awsLogStream{};
 
         Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}
