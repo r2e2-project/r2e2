@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "cloud/manager.h"
+#include "cloud/r2t2.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/transform.h"
@@ -67,25 +68,14 @@ int main(int argc, char const *argv[]) {
 
         for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
             for (Point2i pixel : sampleBounds) {
-                sampler->StartPixel(pixel);
                 if (!InsideExclusive(pixel, sampleBounds)) continue;
-                sampler->SetSampleNumber(sample);
+
+                RayStatePtr statePtr = graphics::GenerateCameraRay(
+                    camera, pixel, sample, maxDepth, sampleExtent, sampler);
 
                 CloudIntegrator::SampleData sampleData;
-                sampleData.sample = sampler->GetCameraSample(pixel);
-
-                RayStatePtr statePtr = RayState::Create();
-                RayState &state = *statePtr;
-
-                state.sample.id =
-                    (pixel.x + pixel.y * sampleExtent.x) * samplesPerPixel +
-                    sample;
-                state.sample.dim = sampler->GetCurrentDimension();
-                state.remainingBounces = maxDepth;
-                sampleData.weight = camera->GenerateRayDifferential(
-                    sampleData.sample, &state.ray);
-                state.ray.ScaleDifferentials(rayScale);
-                state.StartTrace();
+                sampleData.pFilm = statePtr->sample.pFilm;
+                sampleData.weight = statePtr->sample.weight;
 
                 const auto len = statePtr->Serialize();
                 rayWriter.write(statePtr->serialized.get() + 4, len - 4);

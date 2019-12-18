@@ -80,7 +80,7 @@ int main(int argc, char const *argv[]) {
         unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
         for (const auto &sampleData : cameraSamples) {
-            filmTile->AddSample(sampleData.sample.pFilm, sampleData.L,
+            filmTile->AddSample(sampleData.pFilm, sampleData.L,
                                 sampleData.weight);
         }
 

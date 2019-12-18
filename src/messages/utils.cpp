@@ -187,7 +187,7 @@ protobuf::TriangleMesh to_protobuf(const TriangleMesh& tm) {
 
 protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample) {
     protobuf::SampleData proto_sample;
-    *proto_sample.mutable_p_film() = to_protobuf(sample.sample.pFilm);
+    *proto_sample.mutable_p_film() = to_protobuf(sample.pFilm);
     proto_sample.set_weight(sample.weight);
     return proto_sample;
 }
@@ -485,7 +485,7 @@ TriangleMesh from_protobuf(const protobuf::TriangleMesh& proto_tm) {
 
 CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& proto_s) {
     CloudIntegrator::SampleData sample;
-    sample.sample.pFilm = from_protobuf(proto_s.p_film());
+    sample.pFilm = from_protobuf(proto_s.p_film());
     sample.weight = proto_s.weight();
     return sample;
 }

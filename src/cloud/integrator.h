@@ -15,7 +15,7 @@ namespace pbrt {
 class CloudIntegrator : public Integrator {
   public:
     struct SampleData {
-        CameraSample sample;
+        Point2f pFilm;
         Spectrum L{0.f};
         Float weight{1.f};
     };
