@@ -346,7 +346,6 @@ class LambdaWorker {
     std::vector<std::shared_ptr<Light>> lights{};
     std::shared_ptr<CloudBVH> bvh;
     std::set<uint32_t> treeletIds{};
-    MemoryArena arena;
 
     /* Rays */
     std::deque<RayStatePtr> traceQueue{};

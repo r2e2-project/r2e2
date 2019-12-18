@@ -94,6 +94,7 @@ ResultType LambdaWorker::handleTraceQueue() {
     deque<RayStatePtr> processedRays;
 
     constexpr size_t MAX_RAYS = 5'000;
+    MemoryArena arena;
 
     for (size_t i = 0; i < MAX_RAYS && !traceQueue.empty(); i++) {
         RayStatePtr rayPtr = popTraceQueue();
