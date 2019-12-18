@@ -1,9 +1,11 @@
 #ifndef PBRT_CLOUD_R2T2_H
 #define PBRT_CLOUD_R2T2_H
 
+#include <memory>
+
 #include "cloud/integrator.h"
 
-namespace r2t2 {
+namespace pbrt {
 
 namespace graphics {
 
@@ -21,8 +23,14 @@ constexpr auto TraceRay = &pbrt::CloudIntegrator::Trace;
                                         MemoryArena &arena); */
 constexpr auto ShadeRay = &pbrt::CloudIntegrator::Shade;
 
+RayStatePtr GenerateCameraRay(const std::shared_ptr<Camera> &camera,
+                              const Point2i &pixel, const uint32_t sample_num,
+                              const uint8_t maxDepth,
+                              const Vector2i &sampleExtent,
+                              std::shared_ptr<GlobalSampler> &sampler);
+
 }  // namespace graphics
 
-}  // namespace r2t2
+}  // namespace pbrt
 
 #endif /* PBRT_CLOUD_GRAPHICS_H */

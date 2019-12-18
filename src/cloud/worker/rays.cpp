@@ -8,7 +8,6 @@ using namespace std;
 using namespace meow;
 using namespace std::chrono;
 using namespace pbrt;
-using namespace r2t2;
 using namespace pbrt::global;
 using namespace PollerShortNames;
 
@@ -31,50 +30,36 @@ RayStatePtr LambdaWorker::popTraceQueue() {
 
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
     const Bounds2i sampleBounds = camera->film->GetSampleBounds();
-    const auto samplesPerPixel = sampler->samplesPerPixel;
-    const Float rayScale = 1 / sqrt((Float)samplesPerPixel);
+    const uint8_t maxDepth = 5;
 
     /* for ray tracking */
     bernoulli_distribution bd{config.rayActionsLogRate};
 
     for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
         for (const Point2i pixel : bounds) {
-            sampler->StartPixel(pixel);
             if (!InsideExclusive(pixel, sampleBounds)) continue;
-            sampler->SetSampleNumber(sample);
 
-            CameraSample cameraSample = sampler->GetCameraSample(pixel);
+            RayStatePtr statePtr = graphics::GenerateCameraRay(
+                camera, pixel, sample, maxDepth, sampleExtent, sampler);
 
-            RayStatePtr statePtr = RayState::Create();
-            RayState& state = *statePtr;
+            statePtr->trackRay = trackRays ? bd(randEngine) : false;
 
-            state.trackRay = trackRays ? bd(randEngine) : false;
-            state.sample.id =
-                (pixel.x + pixel.y * sampleExtent.x) * config.samplesPerPixel +
-                sample;
-            state.sample.pFilm = cameraSample.pFilm;
-            state.sample.weight =
-                camera->GenerateRayDifferential(cameraSample, &state.ray);
-            state.ray.ScaleDifferentials(rayScale);
-            state.remainingBounces = maxDepth;
-            state.StartTrace();
+            logRayAction(*statePtr, RayAction::Generated);
+            workerStats.recordDemandedRay(*statePtr);
 
-            logRayAction(state, RayAction::Generated);
-            workerStats.recordDemandedRay(state);
-
-            const auto nextTreelet = state.CurrentTreelet();
+            const auto nextTreelet = statePtr->CurrentTreelet();
 
             if (treeletIds.count(nextTreelet)) {
                 pushTraceQueue(move(statePtr));
             } else {
                 if (treeletToWorker.count(nextTreelet)) {
-                    logRayAction(state, RayAction::Queued);
-                    workerStats.recordSendingRay(state);
+                    logRayAction(*statePtr, RayAction::Queued);
+                    workerStats.recordSendingRay(*statePtr);
                     outQueue[nextTreelet].push_back(move(statePtr));
                     outQueueSize++;
                 } else {
-                    logRayAction(state, RayAction::Pending);
-                    workerStats.recordPendingRay(state);
+                    logRayAction(*statePtr, RayAction::Pending);
+                    workerStats.recordPendingRay(*statePtr);
                     neededTreelets.insert(nextTreelet);
                     pendingQueue[nextTreelet].push_back(move(statePtr));
                     pendingQueueSize++;
