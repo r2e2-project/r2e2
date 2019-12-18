@@ -86,11 +86,35 @@ class LambdaMaster {
     void dumpJobSummary() const;
 
   private:
+    ////////////////////////////////////////////////////////////////////////////
+    // Job Information                                                        //
+    ////////////////////////////////////////////////////////////////////////////
+
     const MasterConfiguration config;
+    const TempDirectory sceneDir{"/tmp/pbrt-lambda-master"};
+    const std::string jobId{uuid::generate()};
+
+    const uint32_t numberOfLambdas;
+    size_t initializedWorkers{0};
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Cloud                                                                  //
+    ////////////////////////////////////////////////////////////////////////////
+
+    const std::string publicAddress;
+    const std::string storageBackendUri;
+    const std::unique_ptr<StorageBackend> storageBackend;
+    const Address awsAddress;
+    const std::string awsRegion;
+    const AWSCredentials awsCredentials{};
+    const std::string lambdaFunctionName{
+        safe_getenv_or("PBRT_LAMBDA_FUNCTION", "pbrt-lambda-function")};
 
     ////////////////////////////////////////////////////////////////////////////
     // Scene Objects                                                          //
     ////////////////////////////////////////////////////////////////////////////
+
+    /*** Scene Information ****************************************************/
 
     struct SceneData {
       public:
@@ -147,20 +171,8 @@ class LambdaMaster {
     /* AWS Lambda */
     HTTPRequest generateRequest();
 
-    const std::string lambdaFunctionName{
-        safe_getenv_or("PBRT_LAMBDA_FUNCTION", "pbrt-lambda-function")};
-
-    const TempDirectory sceneDir{"/tmp/pbrt-lambda-master"};
-    const uint32_t numberOfLambdas;
-    const std::string publicAddress;
-    const std::string storageBackendUri;
-    const std::unique_ptr<StorageBackend> storageBackend;
-    const Address awsAddress;
-    const std::string awsRegion;
-    const AWSCredentials awsCredentials{};
     std::ofstream statsOstream{};
 
-    const std::string jobId{uuid::generate()};
     WorkerId currentWorkerId{1};
     std::map<WorkerId, Worker> workers{};
 
@@ -205,7 +217,6 @@ class LambdaMaster {
     /* Worker stats */
     WorkerStats workerStats{};
     std::chrono::seconds workerStatsInterval;
-    size_t initializedWorkers{0};
 
     /* Static Assignments */
     void loadStaticAssignment(const uint32_t assignmentId,
