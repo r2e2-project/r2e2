@@ -34,7 +34,7 @@ class CloudIntegrator : public Integrator {
     static RayStatePtr Trace(RayStatePtr &&rayState,
                              const std::shared_ptr<CloudBVH> &treelet);
 
-    static std::pair<std::vector<RayStatePtr>, bool> Shade(
+    static std::pair<RayStatePtr, RayStatePtr> Shade(
         RayStatePtr &&rayState, const std::shared_ptr<CloudBVH> &treelet,
         const std::vector<std::shared_ptr<Light>> &lights,
         const Vector2i &sampleExtent, std::shared_ptr<GlobalSampler> &sampler,

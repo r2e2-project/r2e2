@@ -128,11 +128,14 @@ int main(int argc, char const *argv[]) {
             } else if (rayState.hit) {
                 auto newRays =
                     CloudIntegrator::Shade(move(rayStatePtr), treelet, lights,
-                                           sampleExtent, sampler, arena)
-                        .first;
+                                           sampleExtent, sampler, arena);
 
-                for (auto &newRay : newRays) {
-                    outputRays.push_back(move(newRay));
+                if (newRays.first != nullptr) {
+                    outputRays.push_back(move(newRays.first));
+                }
+
+                if (newRays.second != nullptr) {
+                    outputRays.push_back(move(newRays.second));
                 }
             }
         }

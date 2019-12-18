@@ -25,15 +25,16 @@ RayStatePtr CloudIntegrator::Trace(RayStatePtr &&rayState,
     return move(rayState);
 }
 
-pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
+pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
     RayStatePtr &&rayStatePtr, const shared_ptr<CloudBVH> &treelet,
     const vector<shared_ptr<Light>> &lights, const Vector2i &sampleExtent,
     shared_ptr<GlobalSampler> &sampler, MemoryArena &arena) {
-    vector<RayStatePtr> newRays;
-    RayStatePtr bouncePtr = nullptr;
-    auto &rayState = *rayStatePtr;
+    pair<RayStatePtr, RayStatePtr> result;
 
-    bool pathFinished = false;
+    RayStatePtr bouncePtr = nullptr;
+    RayStatePtr shadowRayPtr = nullptr;
+
+    auto &rayState = *rayStatePtr;
 
     SurfaceInteraction it;
     rayState.ray.tMax = Infinity;
@@ -72,22 +73,14 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
             newRay.StartTrace();
 
             ++nIntersectionTests;
-        } else {
-            pathFinished = true;
         }
-    } else {
-        /* we're done with this path */
-        pathFinished = true;
     }
 
-    if (it.bsdf->NumComponents(bsdfFlags) > 0) {
+    if (it.bsdf->NumComponents(bsdfFlags) > 0 && lights.size() > 0) {
         /* Let's pick a light at random */
         int nLights = (int)lights.size();
         int lightNum;
         Float lightSelectPdf;
-        if (nLights == 0) {
-            return {move(newRays), pathFinished};
-        }
 
         lightSelectPdf = Float(1) / nLights;
         lightNum = min((int)(sampler->Get1D() * nLights), nLights - 1);
@@ -105,15 +98,13 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
 
             if (!f.IsBlack()) {
                 /* now we have to shoot the ray to the light source */
-                RayStatePtr shadowRayPtr = move(rayStatePtr);
+                shadowRayPtr = move(rayStatePtr);
                 auto &shadowRay = *shadowRayPtr;
 
                 shadowRay.ray = visibility.P0().SpawnRayTo(visibility.P1());
                 shadowRay.Ld = (f * Li / lightPdf) / lightSelectPdf;
                 shadowRay.isShadowRay = true;
                 shadowRay.StartTrace();
-
-                newRays.push_back(move(shadowRayPtr));
 
                 ++nShadowTests;
             }
@@ -122,10 +113,9 @@ pair<vector<RayStatePtr>, bool> CloudIntegrator::Shade(
 
     if (bouncePtr) {
         bouncePtr->sample.dim = sampler->GetCurrentDimension();
-        newRays.push_back(move(bouncePtr));
     }
 
-    return {move(newRays), pathFinished};
+    return {move(bouncePtr), move(shadowRayPtr)};
 }
 
 void CloudIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
@@ -206,10 +196,14 @@ void CloudIntegrator::Render(const Scene &scene) {
             }
         } else if (state.hit) {
             auto newRays = Shade(move(statePtr), bvh, scene.lights,
-                                 sampleExtent, sampler, arena)
-                               .first;
-            for (auto &newRay : newRays) {
-                rayQueue.push_back(move(newRay));
+                                 sampleExtent, sampler, arena);
+
+            if (newRays.first != nullptr) {
+                rayQueue.push_back(move(newRays.first));
+            }
+
+            if (newRays.second != nullptr) {
+                rayQueue.push_back(move(newRays.second));
             }
         } else {
             throw runtime_error("unexpected ray state");

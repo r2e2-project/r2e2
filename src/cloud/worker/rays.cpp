@@ -130,17 +130,23 @@ ResultType LambdaWorker::handleTraceQueue() {
                 recordFinishedPath(pathId);
             }
         } else if (ray.hit) {
-            auto newRays = CloudIntegrator::Shade(move(rayPtr), bvh, lights,
-                                                  sampleExtent, sampler, arena);
+            RayStatePtr bounceRay, shadowRay;
+            tie(bounceRay, shadowRay) = CloudIntegrator::Shade(
+                move(rayPtr), bvh, lights, sampleExtent, sampler, arena);
 
-            for (auto& newRay : newRays.first) {
-                logRayAction(*newRay, RayAction::Generated);
-                processedRays.push_back(move(newRay));
+            if (bounceRay != nullptr) {
+                logRayAction(*bounceRay, RayAction::Generated);
+                processedRays.push_back(move(bounceRay));
+            } else {  /* this was the last bounce in this path */
+                recordFinishedPath(pathId);
             }
 
-            if (newRays.second) recordFinishedPath(pathId);
+            if (shadowRay != nullptr) {
+                logRayAction(*bounceRay, RayAction::Generated);
+                processedRays.push_back(move(bounceRay));
+            }
 
-            if (newRays.first.empty()) {
+            if (bounceRay == nullptr && shadowRay == nullptr) {
                 /* rayPtr is not touched if if Shade() returned nothing */
                 workerStats.recordFinishedRay(*rayPtr);
                 logRayAction(*rayPtr, RayAction::Finished);
