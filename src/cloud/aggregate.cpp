@@ -62,7 +62,7 @@ int main(int argc, char const *argv[]) {
 
                 string rayStr;
                 finishedReader.read(&rayStr);
-                RayStatePtr rayStatePtr = make_unique<RayState>();
+                RayStatePtr rayStatePtr = RayState::Create();
                 auto &rayState = *rayStatePtr;
                 rayState.Deserialize(rayStr.data(), rayStr.length());
 

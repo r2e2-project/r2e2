@@ -61,7 +61,7 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
                                        BSDF_ALL, &flags);
 
         if (!f.IsBlack() && pdf > 0.f) {
-            bouncePtr = make_unique<RayState>();
+            bouncePtr = RayState::Create();
             auto &newRay = *bouncePtr;
 
             newRay.trackRay = rayState.trackRay;
@@ -145,7 +145,7 @@ void CloudIntegrator::Render(const Scene &scene) {
         do {
             CameraSample cameraSample = sampler->GetCameraSample(pixel);
 
-            RayStatePtr statePtr = make_unique<RayState>();
+            RayStatePtr statePtr = RayState::Create();
             auto &state = *statePtr;
 
             state.sample.id = (pixel.x + pixel.y * sampleExtent.x) *

@@ -270,7 +270,7 @@ bool LambdaWorker::processMessage(const Message& message) {
             const auto len = *reinterpret_cast<const uint32_t*>(data + offset);
             offset += 4;
 
-            RayStatePtr ray = make_unique<RayState>();
+            RayStatePtr ray = RayState::Create();
             ray->Deserialize(data + offset, len);
             ray->hop++;
             offset += len;

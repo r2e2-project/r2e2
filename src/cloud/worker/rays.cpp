@@ -44,7 +44,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
             CameraSample cameraSample = sampler->GetCameraSample(pixel);
 
-            RayStatePtr statePtr = make_unique<RayState>();
+            RayStatePtr statePtr = RayState::Create();
             RayState& state = *statePtr;
 
             state.trackRay = trackRays ? bd(randEngine) : false;

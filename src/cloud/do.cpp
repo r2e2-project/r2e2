@@ -84,7 +84,7 @@ int main(int argc, char const *argv[]) {
             while (!reader.eof()) {
                 string rayStr;
                 if (reader.read(&rayStr)) {
-                    auto rayStatePtr = make_unique<RayState>();
+                    auto rayStatePtr = RayState::Create();
                     rayStatePtr->Deserialize(rayStr.data(), rayStr.length());
                     rayStates.push_back(move(rayStatePtr));
                 }

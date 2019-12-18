@@ -16,6 +16,10 @@ constexpr int offset_of(T const &t, U T::*a) {
 // sample.id =
 //  (pixel.x + pixel.y * sampleExtent.x) * config.samplesPerPixel + sample;
 
+RayStatePtr RayState::Create() {
+    return make_unique<RayState>();
+}
+
 int64_t RayState::SampleNum(const uint32_t spp) { return sample.id % spp; }
 
 Point2i RayState::SamplePixel(const Vector2i &extent, const uint32_t spp) {

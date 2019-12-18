@@ -74,7 +74,7 @@ int main(int argc, char const *argv[]) {
                 CloudIntegrator::SampleData sampleData;
                 sampleData.sample = sampler->GetCameraSample(pixel);
 
-                RayStatePtr statePtr = make_unique<RayState>();
+                RayStatePtr statePtr = RayState::Create();
                 RayState &state = *statePtr;
 
                 state.sample.id =

@@ -15,7 +15,8 @@ namespace pbrt {
 struct RayState;
 using RayStatePtr = std::unique_ptr<RayState>;
 
-struct RayState {
+class RayState {
+  public:
     struct __attribute__((packed)) TreeletNode {
         uint32_t treelet{0};
         uint32_t node{0};
@@ -82,6 +83,8 @@ struct RayState {
     size_t Serialize(const bool compress = true);
     void Deserialize(const char *data, const size_t len,
                      const bool decompress = true);
+
+    static RayStatePtr Create();
 };
 
 }  // namespace pbrt
