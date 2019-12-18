@@ -153,10 +153,38 @@ class LambdaMaster {
         void loadSampler(const int samplesPerPixel);
     } scene;
 
-    struct SceneObjectInfo {
-        SceneManager::ObjectID id;
-        size_t size;
-    };
+    /*** Object Assignment ****************************************************/
+
+    class ObjectManager {
+      public:
+        void initialize(const uint32_t numWorkers, const bool staticAssignment);
+        void assignBaseObjects(Worker &worker, const int assignment);
+        void assignTreelet(Worker &worker, const TreeletId treeletId);
+
+        std::set<TreeletId> unassignedTreelets{};
+        std::map<TreeletId, std::vector<WorkerId>> assignedTreelets{};
+
+      private:
+        struct SceneObjectInfo {
+            SceneManager::ObjectID id;
+            size_t size;
+        };
+
+        bool initialized{false};
+
+        std::set<ObjectKey> getRecursiveDependencies(const ObjectKey &object);
+        void assignObject(Worker &worker, const ObjectKey &object);
+
+        void loadStaticAssignment(const uint32_t assignmentId,
+                                  const uint32_t numWorkers);
+
+        std::set<ObjectKey> treeletIds{};
+        std::map<ObjectKey, SceneObjectInfo> sceneObjects{};
+        std::map<ObjectKey, std::set<ObjectKey>> requiredDependentObjects{};
+        std::map<TreeletId, std::set<ObjectKey>> treeletFlattenDependencies{};
+
+        std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
+    } objectManager;
 
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleWriteOutput();
@@ -166,12 +194,6 @@ class LambdaMaster {
 
     bool processMessage(const WorkerId workerId, const meow::Message &message);
 
-    /* Assigning Objects */
-    std::set<ObjectKey> getRecursiveDependencies(const ObjectKey &object);
-    void assignObject(Worker &worker, const ObjectKey &object);
-    void assignTreelet(Worker &worker, const TreeletId treeletId);
-
-    void assignBaseSceneObjects(Worker &worker);
     void aggregateQueueStats();
 
     std::ofstream statsOstream{};
@@ -185,15 +207,6 @@ class LambdaMaster {
 
     size_t totalPaths{0};
     SeqNoSet finishedPathIds{};
-
-    std::set<ObjectKey> treeletIds;
-    std::map<ObjectKey, SceneObjectInfo> sceneObjects;
-    std::map<ObjectKey, std::set<ObjectKey>> requiredDependentObjects;
-    std::map<TreeletId, std::set<ObjectKey>> treeletFlattenDependencies;
-    std::map<TreeletId, size_t> treeletTotalSizes;
-
-    std::set<TreeletId> unassignedTreelets;
-    std::map<TreeletId, std::vector<WorkerId>> assignedTreelets;
 
     ////////////////////////////////////////////////////////////////////////////
     // Ray Bags                                                               //
@@ -217,12 +230,6 @@ class LambdaMaster {
     /* Worker stats */
     WorkerStats workerStats{};
     std::chrono::seconds workerStatsInterval;
-
-    /* Static Assignments */
-    void loadStaticAssignment(const uint32_t assignmentId,
-                              const uint32_t numWorkers);
-
-    std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
 
     /* Camera tile allocation */
     bool cameraRaysRemaining() const;

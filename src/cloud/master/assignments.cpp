@@ -5,8 +5,8 @@
 using namespace std;
 using namespace pbrt;
 
-void LambdaMaster::loadStaticAssignment(const uint32_t assignmentId,
-                                        const uint32_t numWorkers) {
+void LambdaMaster::ObjectManager::loadStaticAssignment(
+    const uint32_t assignmentId, const uint32_t numWorkers) {
     ifstream fin{global::manager.getScenePath() + "/" +
                  global::manager.getFileName(ObjectType::StaticAssignment,
                                              assignmentId)};

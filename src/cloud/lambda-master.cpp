@@ -136,6 +136,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     /* and initialize the necessary scene objects */
     scene.initialize(config.samplesPerPixel, config.cropWindow);
+    objectManager.initialize(numberOfLambdas,
+                             config.assignment & Assignment::Static);
 
     /* are we logging anything? */
     if (config.collectDebugLogs || config.collectDiagnostics ||
@@ -149,42 +151,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                           ios::out | ios::trunc);
 
         statsOstream << "workers " << numberOfLambdas << '\n';
-    }
-
-    /* get the list of all objects and create entries for tracking their
-     * assignment to workers for each */
-    for (auto &kv : global::manager.listObjects()) {
-        const ObjectType &type = kv.first;
-        const vector<SceneManager::Object> &objects = kv.second;
-        for (const SceneManager::Object &obj : objects) {
-            ObjectKey key{type, obj.id};
-            SceneObjectInfo info{};
-            info.id = obj.id;
-            info.size = obj.size;
-            sceneObjects.insert({key, info});
-            if (type == ObjectType::Treelet) {
-                unassignedTreelets.insert(obj.id);
-                treeletIds.insert(key);
-            }
-        }
-    }
-
-    requiredDependentObjects = global::manager.listObjectDependencies();
-
-    for (const auto &treeletId : treeletIds) {
-        treeletFlattenDependencies[treeletId.id] =
-            getRecursiveDependencies(treeletId);
-
-        auto &treeletSize = treeletTotalSizes[treeletId.id];
-        treeletSize = sceneObjects.at(treeletId).size;
-
-        for (const auto &obj : treeletFlattenDependencies[treeletId.id]) {
-            treeletSize += sceneObjects.at(obj).size;
-        }
-    }
-
-    if (config.assignment & Assignment::Static) {
-        loadStaticAssignment(0, numberOfLambdas);
     }
 
     totalPaths = scene.sampleBounds.Area() * scene.sampler->samplesPerPixel;
@@ -265,53 +231,18 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
             },
             failure_handler, failure_handler);
 
-        auto workerIt =
-            workers
-                .emplace(piecewise_construct, forward_as_tuple(currentWorkerId),
-                         forward_as_tuple(currentWorkerId, move(connection)))
-                .first;
+        auto &worker =
+            (*workers
+                  .emplace(piecewise_construct,
+                           forward_as_tuple(currentWorkerId),
+                           forward_as_tuple(currentWorkerId, move(connection)))
+                  .first)
+                .second;
 
         /* assigns the minimal necessary scene objects for working with a
          * scene
          */
-        this->assignBaseSceneObjects(workerIt->second);
-
-        auto doUniformAssign = [this](Worker &worker) {
-            assignTreelet(worker, (worker.id - 1) % treeletIds.size());
-        };
-
-        auto doStaticAssign = [this](Worker &worker) {
-            for (const auto t : staticAssignments[worker.id - 1]) {
-                assignTreelet(worker, t);
-            }
-        };
-
-        auto doAllAssign = [this](Worker &worker) {
-            for (const auto &t : treeletIds) {
-                assignTreelet(worker, t.id);
-            }
-        };
-
-        auto doDebugAssign = [this](Worker &worker) {
-            if (worker.id == this->numberOfLambdas) {
-                assignTreelet(worker, 0);
-            }
-        };
-
-        /* assign treelet to worker based on most in-demand treelets */
-        const auto assignment = this->config.assignment;
-
-        if (assignment & Assignment::Static) {
-            doStaticAssign(workerIt->second);
-        } else if (assignment & Assignment::Uniform) {
-            doUniformAssign(workerIt->second);
-        } else if (assignment & Assignment::All) {
-            doAllAssign(workerIt->second);
-        } else if (assignment & Assignment::Debug) {
-            doDebugAssign(workerIt->second);
-        } else {
-            throw runtime_error("unrecognized assignment type");
-        }
+        this->objectManager.assignBaseObjects(worker, this->config.assignment);
 
         currentWorkerId++;
         return true;
@@ -427,41 +358,6 @@ void LambdaMaster::run() {
         storageBackend->get(getRequests);
         cerr << "done." << endl;
     }
-}
-
-set<ObjectKey> LambdaMaster::getRecursiveDependencies(const ObjectKey &object) {
-    set<ObjectKey> allDeps;
-    for (const ObjectKey &id : requiredDependentObjects[object]) {
-        allDeps.insert(id);
-        auto deps = getRecursiveDependencies(id);
-        allDeps.insert(deps.begin(), deps.end());
-    }
-    return allDeps;
-}
-
-void LambdaMaster::assignObject(Worker &worker, const ObjectKey &object) {
-    if (worker.objects.count(object) == 0) {
-        SceneObjectInfo &info = sceneObjects.at(object);
-        worker.objects.insert(object);
-    }
-}
-
-void LambdaMaster::assignTreelet(Worker &worker, const TreeletId treeletId) {
-    assignObject(worker, {ObjectType::Treelet, treeletId});
-
-    assignedTreelets[treeletId].push_back(worker.id);
-    unassignedTreelets.erase(treeletId);
-
-    for (const auto &obj : treeletFlattenDependencies[treeletId]) {
-        assignObject(worker, obj);
-    }
-}
-
-void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
-    assignObject(worker, ObjectKey{ObjectType::Scene, 0});
-    assignObject(worker, ObjectKey{ObjectType::Camera, 0});
-    assignObject(worker, ObjectKey{ObjectType::Sampler, 0});
-    assignObject(worker, ObjectKey{ObjectType::Lights, 0});
 }
 
 bool LambdaMaster::cameraRaysRemaining() const {
