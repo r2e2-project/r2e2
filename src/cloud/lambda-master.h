@@ -160,8 +160,6 @@ class LambdaMaster {
     const AWSCredentials awsCredentials{};
     std::ofstream statsOstream{};
 
-    ExecutionLoop loop{};
-
     const std::string jobId{uuid::generate()};
     WorkerId currentWorkerId{1};
     std::map<WorkerId, Worker> workers{};
@@ -176,9 +174,8 @@ class LambdaMaster {
     size_t totalPaths{0};
     SeqNoSet finishedPathIds{};
 
-    std::vector<uint32_t> tiles;
-    std::map<ObjectKey, SceneObjectInfo> sceneObjects;
     std::set<ObjectKey> treeletIds;
+    std::map<ObjectKey, SceneObjectInfo> sceneObjects;
     std::map<ObjectKey, std::set<ObjectKey>> requiredDependentObjects;
     std::map<TreeletId, std::set<ObjectKey>> treeletFlattenDependencies;
     std::map<TreeletId, size_t> treeletTotalSizes;
@@ -197,11 +194,6 @@ class LambdaMaster {
     ////////////////////////////////////////////////////////////////////////////
     // Timers                                                                 //
     ////////////////////////////////////////////////////////////////////////////
-
-    FileDescriptor alwaysOnFd{STDOUT_FILENO};
-    TimerFD statusPrintTimer;
-    TimerFD writeOutputTimer;
-    std::unique_ptr<TimerFD> exitTimer;
 
     const timepoint_t startTime{now()};
 
@@ -229,6 +221,19 @@ class LambdaMaster {
     int tileSize;
     Point2i nTiles{};
     bool canSendTiles{false};
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Other Stuff                                                            //
+    ////////////////////////////////////////////////////////////////////////////
+
+    ExecutionLoop loop{};
+
+    FileDescriptor alwaysOnFd{STDOUT_FILENO};
+
+    /* Timers */
+    TimerFD statusPrintTimer;
+    TimerFD writeOutputTimer;
+    std::unique_ptr<TimerFD> exitTimer;
 };
 
 class Schedule {
