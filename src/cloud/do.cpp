@@ -3,8 +3,8 @@
 #include <vector>
 
 #include "cloud/bvh.h"
-#include "cloud/integrator.h"
 #include "cloud/manager.h"
+#include "cloud/r2t2.h"
 #include "cloud/raystate.h"
 #include "messages/serialization.h"
 #include "messages/utils.h"
@@ -126,16 +126,17 @@ int main(int argc, char const *argv[]) {
                     finishedRays.push_back(move(rayStatePtr));
                 }
             } else if (rayState.hit) {
-                auto newRays =
-                    CloudIntegrator::Shade(move(rayStatePtr), *treelet, lights,
-                                           sampleExtent, sampler, arena);
+                RayStatePtr bounceRay, shadowRay;
+                tie(bounceRay, shadowRay) =
+                    graphics::ShadeRay(move(rayStatePtr), *treelet, lights,
+                                       sampleExtent, sampler, arena);
 
-                if (newRays.first != nullptr) {
-                    outputRays.push_back(move(newRays.first));
+                if (bounceRay != nullptr) {
+                    outputRays.push_back(move(bounceRay));
                 }
 
-                if (newRays.second != nullptr) {
-                    outputRays.push_back(move(newRays.second));
+                if (shadowRay != nullptr) {
+                    outputRays.push_back(move(shadowRay));
                 }
             }
         }
