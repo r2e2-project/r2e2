@@ -86,6 +86,29 @@ class LambdaMaster {
     void dumpJobSummary() const;
 
   private:
+    const MasterConfiguration config;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Scene Objects                                                          //
+    ////////////////////////////////////////////////////////////////////////////
+
+    struct SceneData {
+      public:
+        Bounds2i sampleBounds{};
+        Vector2i sampleExtent{};
+        std::shared_ptr<Camera> camera{};
+        std::shared_ptr<Sampler> sampler{};
+        std::vector<std::unique_ptr<Transform>> transformCache{};
+
+        void initialize(const int samplesPerPixel,
+                        const Optional<Bounds2i> &cropWindow);
+
+      private:
+        bool initialized{false};
+        void loadCamera(const Optional<Bounds2i> &cropWindow);
+        void loadSampler(const int samplesPerPixel);
+    } scene;
+
     struct SceneObjectInfo {
         SceneManager::ObjectID id;
         size_t size;
@@ -117,7 +140,6 @@ class LambdaMaster {
     Poller::Action::Result::Type handleJobStart();
 
     bool processMessage(const WorkerId workerId, const meow::Message &message);
-    void loadCamera();
 
     /* Assigning Objects */
     std::set<ObjectKey> getRecursiveDependencies(const ObjectKey &object);
@@ -157,13 +179,9 @@ class LambdaMaster {
     // Scene Objects                                                          //
     ////////////////////////////////////////////////////////////////////////////
 
-    std::vector<std::unique_ptr<Transform>> transformCache{};
-    std::shared_ptr<Camera> camera{};
-    std::unique_ptr<FilmTile> filmTile{};
     size_t totalPaths{0};
     SeqNoSet finishedPathIds{};
 
-    Bounds2i sampleBounds;
     std::vector<uint32_t> tiles;
     std::map<ObjectKey, SceneObjectInfo> sceneObjects;
     std::set<ObjectKey> treeletIds;
@@ -217,8 +235,6 @@ class LambdaMaster {
     int tileSize;
     Point2i nTiles{};
     bool canSendTiles{false};
-
-    const MasterConfiguration config;
 };
 
 class Schedule {

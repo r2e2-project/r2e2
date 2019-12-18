@@ -50,13 +50,6 @@ using PollerResult = Poller::Result::Type;
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
-shared_ptr<Sampler> loadSampler(const int samplesPerPixel) {
-    auto reader = global::manager.GetReader(ObjectType::Sampler);
-    protobuf::Sampler proto_sampler;
-    reader->read(&proto_sampler);
-    return sampler::from_protobuf(proto_sampler, samplesPerPixel);
-}
-
 int defaultTileSize(int spp) {
     int bytesPerSec = 30e+6;
     int avgRayBytes = 500;
@@ -108,6 +101,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     roost::create_directories(scenePath);
 
+    /* download required scene objects from the bucket */
     auto getSceneObjectRequest = [&scenePath](const ObjectType type) {
         return storage::GetRequest{
             SceneManager::getFileName(type, 0),
@@ -120,6 +114,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         getSceneObjectRequest(ObjectType::Sampler),
     };
 
+    /* download the static assignment file if necessary */
     if ((config.assignment & Assignment::Static)) {
         if (config.assignmentFile.empty()) {
             sceneObjReqs.emplace_back(
@@ -136,9 +131,13 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     storageBackend->get(sceneObjReqs);
     cerr << "done." << endl;
 
+    /* now we can initialize the SceneManager */
     global::manager.init(scenePath);
-    loadCamera();
 
+    /* and initialize the necessary scene objects */
+    scene.initialize(config.samplesPerPixel, config.cropWindow);
+
+    /* are we logging anything? */
     if (config.collectDebugLogs || config.collectDiagnostics ||
         config.workerStatsInterval > 0 || config.rayActionsLogRate > 0 ||
         config.packetsLogRate > 0) {
@@ -150,10 +149,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                           ios::out | ios::trunc);
 
         statsOstream << "workers " << numberOfLambdas << '\n';
-    }
-
-    if (config.cropWindow.initialized()) {
-        sampleBounds = *config.cropWindow;
     }
 
     /* get the list of all objects and create entries for tracking their
@@ -192,20 +187,18 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         loadStaticAssignment(0, numberOfLambdas);
     }
 
-    int spp = loadSampler(config.samplesPerPixel)->samplesPerPixel;
-    totalPaths = sampleBounds.Area() * spp;
-    const Vector2i sampleExtent = sampleBounds.Diagonal();
+    totalPaths = scene.sampleBounds.Area() * scene.sampler->samplesPerPixel;
 
     if (tileSize == 0) {
-        tileSize = defaultTileSize(spp);
+        tileSize = defaultTileSize(scene.sampler->samplesPerPixel);
     } else if (tileSize == numeric_limits<typeof(tileSize)>::max()) {
-        tileSize = autoTileSize(sampleBounds, numberOfLambdas);
+        tileSize = autoTileSize(scene.sampleBounds, numberOfLambdas);
     }
 
     cout << "Tile size is " << tileSize << "\u00d7" << tileSize << '.' << endl;
 
-    nTiles = Point2i((sampleExtent.x + tileSize - 1) / tileSize,
-                     (sampleExtent.y + tileSize - 1) / tileSize);
+    nTiles = Point2i((scene.sampleExtent.x + tileSize - 1) / tileSize,
+                     (scene.sampleExtent.y + tileSize - 1) / tileSize);
 
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleMessages, this),
@@ -352,11 +345,7 @@ ResultType LambdaMaster::handleJobStart() {
 
 ResultType LambdaMaster::handleWriteOutput() {
     writeOutputTimer.reset();
-
-    camera->film->MergeFilmTile(move(filmTile));
-    camera->film->WriteImage();
-    filmTile = camera->film->GetFilmTile(sampleBounds);
-
+    scene.camera->film->WriteImage();
     return ResultType::Continue;
 }
 
@@ -418,15 +407,6 @@ void LambdaMaster::run() {
     }
 }
 
-void LambdaMaster::loadCamera() {
-    auto reader = global::manager.GetReader(ObjectType::Camera);
-    protobuf::Camera proto_camera;
-    reader->read(&proto_camera);
-    camera = camera::from_protobuf(proto_camera, transformCache);
-    sampleBounds = camera->film->GetSampleBounds();
-    filmTile = camera->film->GetFilmTile(sampleBounds);
-}
-
 set<ObjectKey> LambdaMaster::getRecursiveDependencies(const ObjectKey &object) {
     set<ObjectKey> allDeps;
     for (const ObjectKey &id : requiredDependentObjects[object]) {
@@ -472,10 +452,10 @@ bool LambdaMaster::cameraRaysRemaining() const {
 Bounds2i LambdaMaster::nextCameraTile() {
     const int tileX = curTile % nTiles.x;
     const int tileY = curTile / nTiles.x;
-    const int x0 = this->sampleBounds.pMin.x + tileX * tileSize;
-    const int x1 = min(x0 + tileSize, this->sampleBounds.pMax.x);
-    const int y0 = this->sampleBounds.pMin.y + tileY * tileSize;
-    const int y1 = min(y0 + tileSize, this->sampleBounds.pMax.y);
+    const int x0 = scene.sampleBounds.pMin.x + tileX * tileSize;
+    const int x1 = min(x0 + tileSize, scene.sampleBounds.pMax.x);
+    const int y0 = scene.sampleBounds.pMin.y + tileY * tileSize;
+    const int y1 = min(y0 + tileSize, scene.sampleBounds.pMax.y);
 
     curTile++;
     return Bounds2i(Point2i{x0, y0}, Point2i{x1, y1});

@@ -2,6 +2,7 @@
 
 #include <chrono>
 
+#include "cloud/r2t2.h"
 #include "execution/meow/message.h"
 #include "messages/utils.h"
 
@@ -98,14 +99,16 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
 
     case OpCode::FinishedRays: {
         protobuf::RecordReader finishedReader{istringstream(message.payload())};
+        vector<FinishedRay> finishedRays;
 
         while (!finishedReader.eof()) {
             protobuf::FinishedRay proto;
             if (finishedReader.read(&proto)) {
-                filmTile->AddSample(from_protobuf(proto.p_film()),
-                                    from_protobuf(proto.l()), proto.weight());
+                finishedRays.push_back(from_protobuf(proto));
             }
         }
+
+        graphics::AccumulateImage(scene.camera, finishedRays);
 
         break;
     }

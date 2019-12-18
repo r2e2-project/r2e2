@@ -106,13 +106,13 @@ class LambdaWorker {
       public:
         bool initialized{false};
 
-        int samplesPerPixel{1};
         const uint8_t maxDepth{5};
-        std::vector<std::unique_ptr<Transform>> transformCache{};
+        int samplesPerPixel{1};
+        Vector2i sampleExtent{};
         std::shared_ptr<Camera> camera{};
         std::unique_ptr<FilmTile> filmTile{};
         std::shared_ptr<GlobalSampler> sampler{};
-        Vector2i sampleExtent{};
+        std::vector<std::unique_ptr<Transform>> transformCache{};
         std::unique_ptr<Scene> fakeScene{};
         std::vector<std::shared_ptr<Light>> lights{};
         std::shared_ptr<CloudBVH> bvh{nullptr};
