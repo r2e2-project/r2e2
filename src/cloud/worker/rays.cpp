@@ -106,7 +106,7 @@ ResultType LambdaWorker::handleTraceQueue() {
 
         if (!ray.toVisitEmpty()) {
             const uint32_t rayTreelet = ray.toVisitTop().treelet;
-            auto newRayPtr = CloudIntegrator::Trace(move(rayPtr), bvh);
+            auto newRayPtr = CloudIntegrator::Trace(move(rayPtr), *bvh);
             auto& newRay = *newRayPtr;
 
             const bool hit = newRay.hit;
@@ -133,7 +133,7 @@ ResultType LambdaWorker::handleTraceQueue() {
         } else if (ray.hit) {
             RayStatePtr bounceRay, shadowRay;
             tie(bounceRay, shadowRay) = CloudIntegrator::Shade(
-                move(rayPtr), bvh, lights, sampleExtent, sampler, arena);
+                move(rayPtr), *bvh, lights, sampleExtent, sampler, arena);
 
             if (bounceRay != nullptr) {
                 logRayAction(*bounceRay, RayAction::Generated);

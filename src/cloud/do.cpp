@@ -116,7 +116,7 @@ int main(int argc, char const *argv[]) {
 
             if (!rayState.toVisitEmpty()) {
                 auto newRayPtr =
-                    CloudIntegrator::Trace(move(rayStatePtr), treelet);
+                    CloudIntegrator::Trace(move(rayStatePtr), *treelet);
 
                 if (!newRayPtr->isShadowRay || !newRayPtr->hit) {
                     outputRays.push_back(move(newRayPtr));
@@ -127,7 +127,7 @@ int main(int argc, char const *argv[]) {
                 }
             } else if (rayState.hit) {
                 auto newRays =
-                    CloudIntegrator::Shade(move(rayStatePtr), treelet, lights,
+                    CloudIntegrator::Shade(move(rayStatePtr), *treelet, lights,
                                            sampleExtent, sampler, arena);
 
                 if (newRays.first != nullptr) {

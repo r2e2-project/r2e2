@@ -20,13 +20,13 @@ STAT_COUNTER("Intersections/Shadow ray intersection tests", nShadowTests);
 STAT_INT_DISTRIBUTION("Integrator/Path length", pathLength);
 
 RayStatePtr CloudIntegrator::Trace(RayStatePtr &&rayState,
-                                   const shared_ptr<CloudBVH> &treelet) {
-    treelet->Trace(*rayState);
+                                   const CloudBVH &treelet) {
+    treelet.Trace(*rayState);
     return move(rayState);
 }
 
 pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
-    RayStatePtr &&rayStatePtr, const shared_ptr<CloudBVH> &treelet,
+    RayStatePtr &&rayStatePtr, const CloudBVH &treelet,
     const vector<shared_ptr<Light>> &lights, const Vector2i &sampleExtent,
     shared_ptr<GlobalSampler> &sampler, MemoryArena &arena) {
     pair<RayStatePtr, RayStatePtr> result;
@@ -38,7 +38,7 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
 
     SurfaceInteraction it;
     rayState.ray.tMax = Infinity;
-    treelet->Intersect(rayState, &it);
+    treelet.Intersect(rayState, &it);
 
     it.ComputeScatteringFunctions(rayState.ray, arena, true);
     if (!it.bsdf) {
@@ -173,7 +173,7 @@ void CloudIntegrator::Render(const Scene &scene) {
         rayQueue.pop_back();
 
         if (!state.toVisitEmpty()) {
-            auto newRayPtr = Trace(move(statePtr), bvh);
+            auto newRayPtr = Trace(move(statePtr), *bvh);
             auto &newRay = *newRayPtr;
             const bool hit = newRay.hit;
             const bool emptyVisit = newRay.toVisitEmpty();
@@ -195,7 +195,7 @@ void CloudIntegrator::Render(const Scene &scene) {
                 finishedRays.push_back(move(newRayPtr));
             }
         } else if (state.hit) {
-            auto newRays = Shade(move(statePtr), bvh, scene.lights,
+            auto newRays = Shade(move(statePtr), *bvh, scene.lights,
                                  sampleExtent, sampler, arena);
 
             if (newRays.first != nullptr) {
