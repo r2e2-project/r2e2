@@ -172,11 +172,7 @@ class LambdaMaster {
     void assignTreelet(Worker &worker, const TreeletId treeletId);
 
     void assignBaseSceneObjects(Worker &worker);
-    void updateObjectUsage(const Worker &worker);
     void aggregateQueueStats();
-
-    /* AWS Lambda */
-    HTTPRequest generateRequest();
 
     std::ofstream statsOstream{};
 

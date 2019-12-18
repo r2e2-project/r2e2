@@ -350,8 +350,30 @@ ResultType LambdaMaster::handleWriteOutput() {
 }
 
 void LambdaMaster::run() {
-    /* request launching the lambdas */
     StatusBar::get();
+
+    /* request launching the lambdas */
+    auto generateRequest = [this]() -> HTTPRequest {
+        protobuf::InvocationPayload proto;
+        proto.set_storage_backend(storageBackendUri);
+        proto.set_coordinator(publicAddress);
+        proto.set_send_reliably(config.sendReliably);
+        proto.set_max_udp_rate(config.maxUdpRate);
+        proto.set_samples_per_pixel(config.samplesPerPixel);
+        proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
+        proto.set_ray_actions_log_rate(config.rayActionsLogRate);
+        proto.set_packets_log_rate(config.packetsLogRate);
+        proto.set_collect_diagnostics(config.collectDiagnostics);
+        proto.set_log_leases(config.logLeases);
+        proto.set_directional_treelets(PbrtOptions.directionalTreelets);
+
+        return LambdaInvocationRequest(
+                   awsCredentials, awsRegion, lambdaFunctionName,
+                   protoutil::to_json(proto),
+                   LambdaInvocationRequest::InvocationType::EVENT,
+                   LambdaInvocationRequest::LogType::NONE)
+            .to_http_request();
+    };
 
     /* Ask for 10% more lambdas */
     const size_t EXTRA_LAMBDAS = numberOfLambdas * 0.1;
@@ -442,8 +464,6 @@ void LambdaMaster::assignBaseSceneObjects(Worker &worker) {
     assignObject(worker, ObjectKey{ObjectType::Lights, 0});
 }
 
-void LambdaMaster::updateObjectUsage(const Worker &worker) {}
-
 bool LambdaMaster::cameraRaysRemaining() const {
     return curTile < nTiles.x * nTiles.y;
 }
@@ -465,28 +485,6 @@ void LambdaMaster::sendWorkerTile(const Worker &worker) {
     *proto.mutable_crop_window() = to_protobuf(nextCameraTile());
     worker.connection->enqueue_write(
         Message::str(0, OpCode::GenerateRays, protoutil::to_string(proto)));
-}
-
-HTTPRequest LambdaMaster::generateRequest() {
-    protobuf::InvocationPayload proto;
-    proto.set_storage_backend(storageBackendUri);
-    proto.set_coordinator(publicAddress);
-    proto.set_send_reliably(config.sendReliably);
-    proto.set_max_udp_rate(config.maxUdpRate);
-    proto.set_samples_per_pixel(config.samplesPerPixel);
-    proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
-    proto.set_ray_actions_log_rate(config.rayActionsLogRate);
-    proto.set_packets_log_rate(config.packetsLogRate);
-    proto.set_collect_diagnostics(config.collectDiagnostics);
-    proto.set_log_leases(config.logLeases);
-    proto.set_directional_treelets(PbrtOptions.directionalTreelets);
-
-    return LambdaInvocationRequest(
-               awsCredentials, awsRegion, lambdaFunctionName,
-               protoutil::to_json(proto),
-               LambdaInvocationRequest::InvocationType::EVENT,
-               LambdaInvocationRequest::LogType::NONE)
-        .to_http_request();
 }
 
 void LambdaMaster::aggregateQueueStats() {
