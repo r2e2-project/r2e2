@@ -1,4 +1,5 @@
 #include <iostream>
+#include <queue>
 #include <string>
 #include <vector>
 
@@ -14,7 +15,7 @@ using namespace std;
 using namespace pbrt;
 
 void usage(const char *argv0) {
-    cerr << argv0 << " SCENE-DATA RAYSTATES OUTPUT OUTPUT-FINISHED" << endl;
+    cerr << argv0 << " SCENE-DATA CAMERA-RAYS" << endl;
 }
 
 vector<shared_ptr<Light>> loadLights() {
@@ -59,7 +60,7 @@ int main(int argc, char const *argv[]) {
             abort();
         }
 
-        if (argc != 5) {
+        if (argc != 3) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
@@ -69,13 +70,10 @@ int main(int argc, char const *argv[]) {
 
         const string scenePath{argv[1]};
         const string raysPath{argv[2]};
-        const string outputPath{argv[3]};
-        const string finishedPath{argv[4]};
 
         global::manager.init(scenePath);
 
-        vector<RayStatePtr> rayStates;
-        vector<RayStatePtr> outputRays;
+        queue<RayStatePtr> rayList;
         vector<FinishedRay> finishedRays;
 
         /* loading all the rays */
@@ -83,93 +81,89 @@ int main(int argc, char const *argv[]) {
             protobuf::RecordReader reader{raysPath};
             while (!reader.eof()) {
                 string rayStr;
+
                 if (reader.read(&rayStr)) {
                     auto rayStatePtr = RayState::Create();
                     rayStatePtr->Deserialize(rayStr.data(), rayStr.length());
-                    rayStates.push_back(move(rayStatePtr));
+                    rayList.push(move(rayStatePtr));
                 }
             }
         }
 
-        cerr << rayStates.size() << " RayState(s) loaded." << endl;
+        cerr << rayList.size() << " RayState(s) loaded." << endl;
 
-        if (!rayStates.size()) {
+        if (!rayList.size()) {
             return EXIT_SUCCESS;
         }
 
+        /* prepare the scene */
         MemoryArena arena;
         vector<unique_ptr<Transform>> transformCache;
         auto camera = loadCamera(transformCache);
-        auto treelet = make_shared<CloudBVH>();
         auto sampler = loadSampler();
         auto lights = loadLights();
         auto fakeScene = loadFakeScene();
 
-        const auto sampleExtent = camera->film->GetSampleBounds().Diagonal();
+        vector<unique_ptr<CloudBVH>> treelets;
+        treelets.resize(global::manager.treeletCount());
+
+        /* let's load all the treelets */
+        for (size_t i = 0; i < treelets.size(); i++) {
+            treelets[i] = make_unique<CloudBVH>(i);
+        }
 
         for (auto &light : lights) {
             light->Preprocess(fakeScene);
         }
 
-        for (auto &rayPtr : rayStates) {
-            RayState &ray = *rayPtr;
+        const auto sampleExtent = camera->film->GetSampleBounds().Diagonal();
 
-            if (!ray.toVisitEmpty()) {
-                const uint32_t rayTreelet = ray.toVisitTop().treelet;
-                auto newRayPtr = graphics::TraceRay(move(rayPtr), *treelet);
+        while (!rayList.empty()) {
+            RayStatePtr theRayPtr = move(rayList.front());
+            RayState &theRay = *theRayPtr;
+            rayList.pop();
+
+            const TreeletId rayTreeletId = theRay.CurrentTreelet();
+
+            if (!theRay.toVisitEmpty()) {
+                auto newRayPtr = graphics::TraceRay(move(theRayPtr),
+                                                    *treelets[rayTreeletId]);
                 auto &newRay = *newRayPtr;
 
-                const bool hit = newRay.hit;
+                const bool hit = newRay.HasHit();
                 const bool emptyVisit = newRay.toVisitEmpty();
 
-                if (newRay.isShadowRay) {
+                if (newRay.IsShadowRay()) {
                     if (hit || emptyVisit) {
                         newRay.Ld = hit ? 0.f : newRay.Ld;
                         finishedRays.emplace_back(*newRayPtr);
                     } else {
-                        outputRays.push_back(move(newRayPtr));
+                        rayList.push(move(newRayPtr));
                     }
                 } else if (!emptyVisit || hit) {
-                    outputRays.push_back(move(newRayPtr));
+                    rayList.push(move(newRayPtr));
                 } else if (emptyVisit) {
                     newRay.Ld = 0.f;
                     finishedRays.emplace_back(*newRayPtr);
                 }
-            } else if (ray.hit) {
+            } else if (theRay.HasHit()) {
                 RayStatePtr bounceRay, shadowRay;
                 tie(bounceRay, shadowRay) =
-                    graphics::ShadeRay(move(rayPtr), *treelet, lights,
-                                       sampleExtent, sampler, arena);
+                    graphics::ShadeRay(move(theRayPtr), *treelets[rayTreeletId],
+                                       lights, sampleExtent, sampler, arena);
 
                 if (bounceRay != nullptr) {
-                    outputRays.push_back(move(bounceRay));
+                    rayList.push(move(bounceRay));
                 }
 
                 if (shadowRay != nullptr) {
-                    outputRays.push_back(move(shadowRay));
+                    rayList.push(move(shadowRay));
                 }
             }
         }
 
-        /* writing all the output rays */
-        {
-            protobuf::RecordWriter writer{outputPath};
-            for (auto &rayState : outputRays) {
-                const auto len = rayState->Serialize();
-                writer.write(rayState->serialized.get() + 4, len - 4);
-            }
-        }
-
-        /* writing all the finished rays */
-        {
-            protobuf::RecordWriter writer{finishedPath};
-            for (auto &finished : finishedRays) {
-                writer.write(to_protobuf(finished));
-            }
-        }
-
-        cerr << outputRays.size() << " output ray(s) and "
-             << finishedRays.size() << " finished ray(s) were written." << endl;
+        graphics::AccumulateImage(camera, finishedRays);
+        camera->film->WriteImage();
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;
