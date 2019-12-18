@@ -54,6 +54,23 @@ struct WorkerConfiguration {
     bool logLeases;
 };
 
+/* Relationship between different queues in LambdaWorker:
+
+                                  +------------+
+                    +------------->  FINISHED  +------------+
+                    |             +------------+            |
+                    |                                       |
+                    |                                       |
+               +---------+   rays   +-------+   rays   +----v---+
+            +-->  TRACE  +---------->  OUT  +---------->  SEND  +--+
+            |  +---------+          +-------+          +--------+  |
+            |                                                      |
+            |                                                      |
+            |                                                      |
+            |  ray bags                                  ray bags  |
+            +---------------------+  network  <--------------------+
+*/
+
 class LambdaWorker {
   public:
     LambdaWorker(const std::string& coordinatorIP,
