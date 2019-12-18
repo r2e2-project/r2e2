@@ -27,18 +27,19 @@ RayStatePtr LambdaWorker::popTraceQueue() {
 }
 
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
-    const Bounds2i sampleBounds = camera->film->GetSampleBounds();
+    const Bounds2i sampleBounds = scene.camera->film->GetSampleBounds();
     const uint8_t maxDepth = 5;
 
     /* for ray tracking */
     bernoulli_distribution bd{config.rayActionsLogRate};
 
-    for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
+    for (size_t sample = 0; sample < scene.sampler->samplesPerPixel; sample++) {
         for (const Point2i pixel : bounds) {
             if (!InsideExclusive(pixel, sampleBounds)) continue;
 
             RayStatePtr statePtr = graphics::GenerateCameraRay(
-                camera, pixel, sample, maxDepth, sampleExtent, sampler);
+                scene.camera, pixel, sample, scene.maxDepth, scene.sampleExtent,
+                scene.sampler);
 
             statePtr->trackRay = trackRays ? bd(randEngine) : false;
 
@@ -82,7 +83,7 @@ ResultType LambdaWorker::handleTraceQueue() {
 
         if (!ray.toVisitEmpty()) {
             const uint32_t rayTreelet = ray.toVisitTop().treelet;
-            auto newRayPtr = graphics::TraceRay(move(rayPtr), *bvh);
+            auto newRayPtr = graphics::TraceRay(move(rayPtr), *scene.bvh);
             auto& newRay = *newRayPtr;
 
             const bool hit = newRay.hit;
@@ -103,13 +104,14 @@ ResultType LambdaWorker::handleTraceQueue() {
                 newRay.Ld = 0.f;
                 logRayAction(*newRayPtr, RayAction::Finished);
                 workerStats.recordFinishedRay(*newRayPtr);
-                finishedQueue.emplace_back(*newRayPtr) ;
+                finishedQueue.emplace_back(*newRayPtr);
                 recordFinishedPath(pathId);
             }
         } else if (ray.hit) {
             RayStatePtr bounceRay, shadowRay;
-            tie(bounceRay, shadowRay) = graphics::ShadeRay(
-                move(rayPtr), *bvh, lights, sampleExtent, sampler, arena);
+            tie(bounceRay, shadowRay) =
+                graphics::ShadeRay(move(rayPtr), *scene.bvh, scene.lights,
+                                   scene.sampleExtent, scene.sampler, arena);
 
             if (bounceRay != nullptr) {
                 logRayAction(*bounceRay, RayAction::Generated);

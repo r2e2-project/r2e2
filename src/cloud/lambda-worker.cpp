@@ -49,7 +49,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     }
 
     PbrtOptions.nThreads = 1;
-    bvh = make_shared<CloudBVH>();
+    scene.bvh = make_shared<CloudBVH>();
+    scene.samplesPerPixel = config.samplesPerPixel;
     manager.init(".");
 
     coordinatorConnection = loop.make_connection<TCPConnection>(
@@ -150,53 +151,6 @@ void LambdaWorker::run() {
         auto res = loop.loop_once(-1).result;
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
-}
-
-void LambdaWorker::loadCamera() {
-    auto reader = manager.GetReader(ObjectType::Camera);
-    protobuf::Camera proto_camera;
-    reader->read(&proto_camera);
-    camera = camera::from_protobuf(proto_camera, transformCache);
-    filmTile = camera->film->GetFilmTile(camera->film->GetSampleBounds());
-    sampleExtent = camera->film->GetSampleBounds().Diagonal();
-}
-
-void LambdaWorker::loadSampler() {
-    auto reader = manager.GetReader(ObjectType::Sampler);
-    protobuf::Sampler proto_sampler;
-    reader->read(&proto_sampler);
-    sampler = sampler::from_protobuf(proto_sampler, config.samplesPerPixel);
-}
-
-void LambdaWorker::loadLights() {
-    auto reader = manager.GetReader(ObjectType::Lights);
-    while (!reader->eof()) {
-        protobuf::Light proto_light;
-        reader->read(&proto_light);
-        lights.push_back(move(light::from_protobuf(proto_light)));
-    }
-}
-
-void LambdaWorker::loadFakeScene() {
-    auto reader = manager.GetReader(ObjectType::Scene);
-    protobuf::Scene proto_scene;
-    reader->read(&proto_scene);
-    fakeScene = make_unique<Scene>(from_protobuf(proto_scene));
-}
-
-void LambdaWorker::initializeScene() {
-    if (initialized) return;
-
-    loadCamera();
-    loadSampler();
-    loadLights();
-    loadFakeScene();
-
-    for (auto& light : lights) {
-        light->Preprocess(*fakeScene);
-    }
-
-    initialized = true;
 }
 
 void usage(const char* argv0, int exitCode) {

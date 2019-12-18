@@ -80,16 +80,41 @@ class LambdaWorker {
     };
 
     ////////////////////////////////////////////////////////////////////////////
+    // Graphics                                                               //
+    ////////////////////////////////////////////////////////////////////////////
+
+    /* Scene Information */
+    struct SceneData {
+      public:
+        bool initialized{false};
+
+        int samplesPerPixel{1};
+        const uint8_t maxDepth{5};
+        std::vector<std::unique_ptr<Transform>> transformCache{};
+        std::shared_ptr<Camera> camera{};
+        std::unique_ptr<FilmTile> filmTile{};
+        std::shared_ptr<GlobalSampler> sampler{};
+        Vector2i sampleExtent{};
+        std::unique_ptr<Scene> fakeScene{};
+        std::vector<std::shared_ptr<Light>> lights{};
+        std::shared_ptr<CloudBVH> bvh{nullptr};
+
+        void initialize();
+
+      private:
+        void loadCamera();
+        void loadSampler();
+        void loadLights();
+        void loadFakeScene();
+    } scene;
+
+    std::set<uint32_t> treeletIds{};
+
+    ////////////////////////////////////////////////////////////////////////////
     // MEMBER FUNCTIONS                                                       //
     ////////////////////////////////////////////////////////////////////////////
 
     void processMessage(const meow::Message& message);
-
-    void initializeScene();
-    void loadCamera();
-    void loadSampler();
-    void loadLights();
-    void loadFakeScene();
 
     /* rays.cpp */
     Poller::Action::Result::Type handleTraceQueue();
@@ -144,19 +169,6 @@ class LambdaWorker {
     Optional<WorkerId> workerId;
     Optional<std::string> jobId;
     bool terminated{false};
-
-    /* Scene Data */
-    const uint8_t maxDepth{5};
-    bool initialized{false};
-    std::vector<std::unique_ptr<Transform>> transformCache{};
-    std::shared_ptr<Camera> camera{};
-    std::unique_ptr<FilmTile> filmTile{};
-    std::shared_ptr<GlobalSampler> sampler{};
-    Vector2i sampleExtent{};
-    std::unique_ptr<Scene> fakeScene{};
-    std::vector<std::shared_ptr<Light>> lights{};
-    std::shared_ptr<CloudBVH> bvh;
-    std::set<uint32_t> treeletIds{};
 
     /* Rays */
     std::deque<RayStatePtr> traceQueue{};

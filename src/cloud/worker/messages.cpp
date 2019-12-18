@@ -48,7 +48,7 @@ void LambdaWorker::processMessage(const Message& message) {
         protobuf::GetObjects proto;
         protoutil::from_string(message.payload(), proto);
         getObjects(proto);
-        initializeScene();
+        scene.initialize();
         break;
     }
 
