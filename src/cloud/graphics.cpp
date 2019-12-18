@@ -27,7 +27,7 @@ RayStatePtr GenerateCameraRay(const shared_ptr<Camera> &camera,
 
     state.sample.id =
         (pixel.x + pixel.y * sampleExtent.x) * samplesPerPixel + sample;
-
+    state.sample.dim = sampler->GetCurrentDimension();
     state.sample.pFilm = cameraSample.pFilm;
     state.sample.weight =
         camera->GenerateRayDifferential(cameraSample, &state.ray);
