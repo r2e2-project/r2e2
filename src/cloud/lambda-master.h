@@ -111,6 +111,26 @@ class LambdaMaster {
         safe_getenv_or("PBRT_LAMBDA_FUNCTION", "pbrt-lambda-function")};
 
     ////////////////////////////////////////////////////////////////////////////
+    // Workers                                                                //
+    ////////////////////////////////////////////////////////////////////////////
+
+    struct Worker {
+        WorkerId id;
+        bool initialized{false};
+        std::shared_ptr<TCPConnection> connection;
+        std::set<ObjectKey> objects{};
+        WorkerStats stats{};
+        uint64_t nextStatusLogTimestamp{0};
+        std::string awsLogStream{};
+
+        Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
+            : id(id), connection(std::move(connection)) {}
+    };
+
+    WorkerId currentWorkerId{1};
+    std::map<WorkerId, Worker> workers{};
+
+    ////////////////////////////////////////////////////////////////////////////
     // Scene Objects                                                          //
     ////////////////////////////////////////////////////////////////////////////
 
@@ -138,19 +158,6 @@ class LambdaMaster {
         size_t size;
     };
 
-    struct Worker {
-        WorkerId id;
-        bool initialized{false};
-        std::shared_ptr<TCPConnection> connection;
-        std::set<ObjectKey> objects{};
-        WorkerStats stats{};
-        uint64_t nextStatusLogTimestamp{0};
-        std::string awsLogStream{};
-
-        Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
-            : id(id), connection(std::move(connection)) {}
-    };
-
     Poller::Action::Result::Type handleMessages();
     Poller::Action::Result::Type handleWriteOutput();
     Poller::Action::Result::Type handleWriteWorkerStats();
@@ -172,9 +179,6 @@ class LambdaMaster {
     HTTPRequest generateRequest();
 
     std::ofstream statsOstream{};
-
-    WorkerId currentWorkerId{1};
-    std::map<WorkerId, Worker> workers{};
 
     /* Message Queues */
     std::deque<std::pair<WorkerId, meow::Message>> incomingMessages{};
