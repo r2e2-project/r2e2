@@ -32,7 +32,7 @@ void LambdaWorker::logRayAction(const RayState& state, const RayAction action,
                                             : *workerId) << ','
         << state.CurrentTreelet() << ','
         << outQueueSize << ','
-        << outQueueBytes[state.CurrentTreelet()] << ','
+        << "" << ','
         << ','
         << ','
         << duration_cast<microseconds>(

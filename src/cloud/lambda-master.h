@@ -186,7 +186,7 @@ class LambdaMaster {
     // Timers                                                                 //
     ////////////////////////////////////////////////////////////////////////////
 
-    FileDescriptor dummyFD{STDOUT_FILENO};
+    FileDescriptor alwaysOnFd{STDOUT_FILENO};
     TimerFD statusPrintTimer;
     TimerFD writeOutputTimer;
     std::unique_ptr<TimerFD> exitTimer;

@@ -69,21 +69,22 @@ class LambdaWorker {
     using steady_clock = std::chrono::steady_clock;
     using rays_clock = std::chrono::system_clock;
 
-    enum class RayAction {
-        Generated,
-        Traced,
-        Pending,
-        Queued,
-        Sent,
-        Received,
-        Finished
-    };
+    ////////////////////////////////////////////////////////////////////////////
+    // Job Information                                                        //
+    ////////////////////////////////////////////////////////////////////////////
+
+    const WorkerConfiguration config;
+    const UniqueDirectory workingDirectory;
+    Optional<WorkerId> workerId;
+    Optional<std::string> jobId;
+    bool terminated{false};
 
     ////////////////////////////////////////////////////////////////////////////
     // Graphics                                                               //
     ////////////////////////////////////////////////////////////////////////////
 
     /* Scene Information */
+
     struct SceneData {
       public:
         bool initialized{false};
@@ -110,86 +111,56 @@ class LambdaWorker {
 
     std::set<uint32_t> treeletIds{};
 
-    ////////////////////////////////////////////////////////////////////////////
-    // MEMBER FUNCTIONS                                                       //
-    ////////////////////////////////////////////////////////////////////////////
+    /* Ray Tracing */
 
-    void processMessage(const meow::Message& message);
-
-    /* rays.cpp */
     Poller::Action::Result::Type handleTraceQueue();
-    Poller::Action::Result::Type handleOutQueue();
-    Poller::Action::Result::Type handleFinishedQueue();
-    Poller::Action::Result::Type handleFinishedPaths();
-
-    /* messages.cpp */
-    Poller::Action::Result::Type handleMessages();
-
-    /* logs.cpp */
-    Poller::Action::Result::Type handleWorkerStats();
-    Poller::Action::Result::Type handleDiagnostics();
-
-    /* transfer.cpp */
-    Poller::Action::Result::Type handleSendQueue();
-    Poller::Action::Result::Type handleTransferResults();
 
     void generateRays(const Bounds2i& cropWindow);
-    void getObjects(const protobuf::GetObjects& objects);
-
     void pushTraceQueue(RayStatePtr&& state);
     RayStatePtr popTraceQueue();
 
-    void logRayAction(const RayState& state, const RayAction action,
-                      const WorkerId otherParty = -1);
-
-    ////////////////////////////////////////////////////////////////////////////
-    // MEMBER VARIABLES                                                       //
-    ////////////////////////////////////////////////////////////////////////////
-
-    const WorkerConfiguration config;
-
-    /* Logging & Diagnostics */
-    const std::string logBase{"pbrt-worker"};
-    const std::string infoLogName{logBase + ".INFO"};
-    std::string logPrefix{"logs/"};
-    const bool trackRays{config.rayActionsLogRate > 0};
-
-    std::bernoulli_distribution coin{0.5};
-    std::mt19937 randEngine{std::random_device{}()};
-
-    WorkerStats workerStats;
-    WorkerDiagnostics lastDiagnostics;
-
-    const Address coordinatorAddr;
-    const UniqueDirectory workingDirectory;
-    ExecutionLoop loop{};
-    std::unique_ptr<StorageBackend> storageBackend;
-    std::shared_ptr<TCPConnection> coordinatorConnection;
-    meow::MessageParser messageParser{};
-    Optional<WorkerId> workerId;
-    Optional<std::string> jobId;
-    bool terminated{false};
-
-    /* Rays */
     std::deque<RayStatePtr> traceQueue{};
     std::deque<FinishedRay> finishedQueue{};
     std::map<TreeletId, std::deque<RayStatePtr>> outQueue{};
-    std::map<TreeletId, size_t> outQueueBytes{};
     size_t outQueueSize{0};
-    std::deque<uint64_t> finishedPathIds{};
 
+    ////////////////////////////////////////////////////////////////////////////
+    // Communication                                                          //
+    ////////////////////////////////////////////////////////////////////////////
+
+    /* the coordinator and storage backend */
+
+    const Address coordinatorAddr;
+    std::shared_ptr<TCPConnection> coordinatorConnection;
+    std::unique_ptr<StorageBackend> storageBackend;
+    meow::MessageParser messageParser{};
+
+    /* processes incoming messages; called by handleMessages */
+    void processMessage(const meow::Message& message);
+
+    /* downloads the necessary scene objects */
+    void getObjects(const protobuf::GetObjects& objects);
+
+    /* process incoming messages */
+    Poller::Action::Result::Type handleMessages();
+
+    /* process rays supposed to be sent out */
+    Poller::Action::Result::Type handleOutQueue();
+
+    /* sending the rays out */
+    Poller::Action::Result::Type handleSendQueue();
+
+    /* handle finished rays (the samples) */
+    Poller::Action::Result::Type handleFinishedQueue();
+
+    /* tell the master about the finished paths, for bookkeeping */
+    Poller::Action::Result::Type handleFinishedPaths();
+
+    Poller::Action::Result::Type handleTransferResults();
+
+    /* queues */
     std::map<TreeletId, std::queue<std::pair<size_t, std::string>>> sendQueue{};
-
-    /* Always-on FD */
-    FileDescriptor dummyFD{STDOUT_FILENO};
-
-    /* Timers */
-    TimerFD sendQueueTimer{SEND_QUEUE_INTERVAL};
-    TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
-    TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
-    TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
-
-    const steady_clock::time_point workStart{steady_clock::now()};
+    std::deque<uint64_t> finishedPathIds{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Transfer Agent                                                         //
@@ -252,6 +223,57 @@ class LambdaWorker {
 
     std::string rayBagKey(const WorkerId workerId, const TreeletId treeletId,
                           BagId bagId);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Stats & Diagnostics                                                    //
+    ////////////////////////////////////////////////////////////////////////////
+
+    Poller::Action::Result::Type handleWorkerStats();
+    Poller::Action::Result::Type handleDiagnostics();
+
+    WorkerStats workerStats;
+    WorkerDiagnostics lastDiagnostics;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Logging                                                                //
+    ////////////////////////////////////////////////////////////////////////////
+
+    enum class RayAction {
+        Generated,
+        Traced,
+        Pending,
+        Queued,
+        Sent,
+        Received,
+        Finished
+    };
+
+    void logRayAction(const RayState& state, const RayAction action,
+                      const WorkerId otherParty = -1);
+
+    const std::string logBase{"pbrt-worker"};
+    const std::string infoLogName{logBase + ".INFO"};
+    std::string logPrefix{"logs/"};
+    const bool trackRays{config.rayActionsLogRate > 0};
+
+    std::bernoulli_distribution coin{0.5};
+    std::mt19937 randEngine{std::random_device{}()};
+
+    const steady_clock::time_point workStart{steady_clock::now()};
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Other ℭ𝔯𝔞𝔭
+    ////////////////////////////////////////////////////////////////////////////
+
+    ExecutionLoop loop{};
+
+    FileDescriptor alwaysOnFd{STDOUT_FILENO};
+
+    /* Timers */
+    TimerFD sendQueueTimer{SEND_QUEUE_INTERVAL};
+    TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
+    TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
+    TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
 };
 
 }  // namespace pbrt

@@ -208,12 +208,12 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                      (sampleExtent.y + tileSize - 1) / tileSize);
 
     loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaMaster::handleMessages, this),
+        alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleMessages, this),
         [this]() { return !incomingMessages.empty(); },
         []() { throw runtime_error("messages failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaMaster::handleJobStart, this),
+        alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleJobStart, this),
         [this]() { return this->numberOfLambdas == this->initializedWorkers; },
         []() { throw runtime_error("generate rays failed"); }));
 

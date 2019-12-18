@@ -65,13 +65,13 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     /* trace rays */
     loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaWorker::handleTraceQueue, this),
+        alwaysOnFd, Direction::Out, bind(&LambdaWorker::handleTraceQueue, this),
         [this]() { return !traceQueue.empty(); },
         []() { throw runtime_error("ray queue failed"); }));
 
     /* create ray packets */
     loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaWorker::handleOutQueue, this),
+        alwaysOnFd, Direction::Out, bind(&LambdaWorker::handleOutQueue, this),
         [this]() { return outQueueSize > 0; },
         []() { throw runtime_error("out queue failed"); }));
 
@@ -82,7 +82,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                        []() { throw runtime_error("send queue failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out,
+        alwaysOnFd, Direction::Out,
         bind(&LambdaWorker::handleTransferResults, this),
         [this]() { return !transferAgent.empty(); },
         []() { throw runtime_error("handle transfer results failed"); }));
@@ -90,7 +90,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     /* send finished rays */
     /* FIXME we're throwing out finished rays, for now */
     loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
+        alwaysOnFd, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
         [this]() {
             // clang-format off
             switch (this->config.finishedRayAction) {
@@ -104,7 +104,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     /* handle received messages */
     loop.poller().add_action(Poller::Action(
-        dummyFD, Direction::Out, bind(&LambdaWorker::handleMessages, this),
+        alwaysOnFd, Direction::Out, bind(&LambdaWorker::handleMessages, this),
         [this]() { return !messageParser.empty(); },
         []() { throw runtime_error("messages failed"); }));
 
