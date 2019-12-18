@@ -64,7 +64,7 @@ int main(int argc, char const *argv[]) {
             return EXIT_FAILURE;
         }
 
-        /* CloudBVH checks this */
+        /* CloudBVH requires this */
         PbrtOptions.nThreads = 1;
 
         const string scenePath{argv[1]};
@@ -111,24 +111,34 @@ int main(int argc, char const *argv[]) {
             light->Preprocess(fakeScene);
         }
 
-        for (auto &rayStatePtr : rayStates) {
-            auto &rayState = *rayStatePtr;
+        for (auto &rayPtr : rayStates) {
+            RayState &ray = *rayPtr;
 
-            if (!rayState.toVisitEmpty()) {
-                auto newRayPtr =
-                    CloudIntegrator::Trace(move(rayStatePtr), *treelet);
+            if (!ray.toVisitEmpty()) {
+                const uint32_t rayTreelet = ray.toVisitTop().treelet;
+                auto newRayPtr = graphics::TraceRay(move(rayPtr), *treelet);
+                auto &newRay = *newRayPtr;
 
-                if (!newRayPtr->isShadowRay || !newRayPtr->hit) {
+                const bool hit = newRay.hit;
+                const bool emptyVisit = newRay.toVisitEmpty();
+
+                if (newRay.isShadowRay) {
+                    if (hit || emptyVisit) {
+                        newRay.Ld = hit ? 0.f : newRay.Ld;
+                        finishedRays.push_back(move(newRayPtr));
+                    } else {
+                        outputRays.push_back(move(newRayPtr));
+                    }
+                } else if (!emptyVisit || hit) {
                     outputRays.push_back(move(newRayPtr));
+                } else if (emptyVisit) {
+                    newRay.Ld = 0.f;
+                    finishedRays.push_back(move(newRayPtr));
                 }
-            } else if (rayState.isShadowRay) {
-                if (!rayState.hit) {
-                    finishedRays.push_back(move(rayStatePtr));
-                }
-            } else if (rayState.hit) {
+            } else if (ray.hit) {
                 RayStatePtr bounceRay, shadowRay;
                 tie(bounceRay, shadowRay) =
-                    graphics::ShadeRay(move(rayStatePtr), *treelet, lights,
+                    graphics::ShadeRay(move(rayPtr), *treelet, lights,
                                        sampleExtent, sampler, arena);
 
                 if (bounceRay != nullptr) {

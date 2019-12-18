@@ -14,9 +14,7 @@
 using namespace std;
 using namespace pbrt;
 
-void usage(const char *argv0) {
-    cerr << argv0 << " SCENE-DATA OUTPUT OUTPUT-SAMPLES" << endl;
-}
+void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA OUTPUT" << endl; }
 
 shared_ptr<Camera> loadCamera(const string &scenePath,
                               vector<unique_ptr<Transform>> &transformCache) {
@@ -39,14 +37,13 @@ int main(int argc, char const *argv[]) {
             abort();
         }
 
-        if (argc != 4) {
+        if (argc != 3) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
 
         const string scenePath{argv[1]};
         const string outputPath{argv[2]};
-        const string samplesPath{argv[3]};
 
         global::manager.init(scenePath);
 
@@ -61,29 +58,25 @@ int main(int argc, char const *argv[]) {
         const float rayScale = 1 / sqrt((Float)sampler->samplesPerPixel);
 
         protobuf::RecordWriter rayWriter{outputPath};
-        protobuf::RecordWriter sampleWriter{samplesPath};
 
         /* Generate all the samples */
-        size_t i = 0;
+        size_t sampleCount = 0;
 
         for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
             for (Point2i pixel : sampleBounds) {
+                sampleCount++;
                 if (!InsideExclusive(pixel, sampleBounds)) continue;
 
                 RayStatePtr statePtr = graphics::GenerateCameraRay(
                     camera, pixel, sample, maxDepth, sampleExtent, sampler);
 
-                CloudIntegrator::SampleData sampleData;
-                sampleData.pFilm = statePtr->sample.pFilm;
-                sampleData.weight = statePtr->sample.weight;
-
                 const auto len = statePtr->Serialize();
                 rayWriter.write(statePtr->serialized.get() + 4, len - 4);
-                sampleWriter.write(to_protobuf(sampleData));
             }
         }
 
-        cerr << i << " sample(s) were generated." << endl;
+        cerr << sampleCount << " sample(s) were generated and written to "
+             << outputPath << endl;
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;

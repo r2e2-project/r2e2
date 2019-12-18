@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "cloud/manager.h"
+#include "cloud/r2t2.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/transform.h"
@@ -13,9 +14,7 @@
 using namespace std;
 using namespace pbrt;
 
-void usage(const char *argv0) {
-    cerr << argv0 << " SCENE-DATA SAMPLES-INDEX" << endl;
-}
+void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA" << endl; }
 
 shared_ptr<Camera> loadCamera(const string &scenePath,
                               vector<unique_ptr<Transform>> &transformCache) {
@@ -31,27 +30,18 @@ int main(int argc, char const *argv[]) {
             abort();
         }
 
-        if (argc != 3) {
+        if (argc != 2) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
 
         const string scenePath{argv[1]};
-        const string samplesPath{argv[2]};
+        vector<RayStatePtr> finishedRays;
 
         global::manager.init(scenePath);
 
         vector<unique_ptr<Transform>> transformCache;
         shared_ptr<Camera> camera = loadCamera(scenePath, transformCache);
-
-        /* load all the camera samples */
-        vector<CloudIntegrator::SampleData> cameraSamples;
-        protobuf::RecordReader samplesReader{samplesPath};
-        while (!samplesReader.eof()) {
-            protobuf::SampleData proto_sample;
-            samplesReader.read(&proto_sample);
-            cameraSamples.push_back(from_protobuf(proto_sample));
-        }
 
         size_t finishedRayCount = 0;
         for (string line; getline(cin, line);) {
@@ -63,29 +53,15 @@ int main(int argc, char const *argv[]) {
                 string rayStr;
                 finishedReader.read(&rayStr);
                 RayStatePtr rayStatePtr = RayState::Create();
-                auto &rayState = *rayStatePtr;
-                rayState.Deserialize(rayStr.data(), rayStr.length());
+                rayStatePtr->Deserialize(rayStr.data(), rayStr.length());
 
-                Spectrum L{rayState.Ld * rayState.beta};
-
-                if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
-                    L = Spectrum(0.f);
-                }
-
-                cameraSamples[rayState.sample.id].L += L;
+                finishedRays.emplace_back(move(rayStatePtr));
             }
         }
 
-        const Bounds2i sampleBounds = camera->film->GetSampleBounds();
-        unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
-
-        for (const auto &sampleData : cameraSamples) {
-            filmTile->AddSample(sampleData.pFilm, sampleData.L,
-                                sampleData.weight);
-        }
+        graphics::AccumulateImage(camera, finishedRays);
 
         /* Create the final output */
-        camera->film->MergeFilmTile(move(filmTile));
         camera->film->WriteImage();
 
         cerr << finishedRayCount << " finished ray(s)." << endl;
