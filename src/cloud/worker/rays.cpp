@@ -103,7 +103,7 @@ ResultType LambdaWorker::handleTraceQueue() {
                     newRay.Ld = hit ? 0.f : newRay.Ld;
                     logRayAction(*newRayPtr, RayAction::Finished);
                     workerStats.recordFinishedRay(*newRayPtr);
-                    finishedQueue.push_back(move(newRayPtr));
+                    finishedQueue.emplace_back(*newRayPtr);
                 } else {
                     processedRays.push_back(move(newRayPtr));
                 }
@@ -113,7 +113,7 @@ ResultType LambdaWorker::handleTraceQueue() {
                 newRay.Ld = 0.f;
                 logRayAction(*newRayPtr, RayAction::Finished);
                 workerStats.recordFinishedRay(*newRayPtr);
-                finishedQueue.push_back(move(newRayPtr));
+                finishedQueue.emplace_back(*newRayPtr) ;
                 recordFinishedPath(pathId);
             }
         } else if (ray.hit) {
@@ -247,17 +247,6 @@ ResultType LambdaWorker::handleFinishedPaths() {
 ResultType LambdaWorker::handleFinishedQueue() {
     RECORD_INTERVAL("handleFinishedQueue");
 
-    auto createFinishedRay = [](const size_t sampleId, const Point2f& pFilm,
-                                const Float weight,
-                                const Spectrum L) -> protobuf::FinishedRay {
-        protobuf::FinishedRay proto;
-        proto.set_sample_id(sampleId);
-        *proto.mutable_p_film() = to_protobuf(pFilm);
-        proto.set_weight(weight);
-        *proto.mutable_l() = to_protobuf(L);
-        return proto;
-    };
-
     switch (config.finishedRayAction) {
     case FinishedRayAction::Discard:
         finishedQueue.clear();
@@ -270,18 +259,8 @@ ResultType LambdaWorker::handleFinishedQueue() {
             protobuf::RecordWriter writer{&oss};
 
             while (!finishedQueue.empty()) {
-                RayStatePtr rayPtr = move(finishedQueue.front());
-                RayState& ray = *rayPtr;
+                writer.write(to_protobuf(finishedQueue.front()));
                 finishedQueue.pop_front();
-
-                Spectrum L{ray.beta * ray.Ld};
-
-                if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
-                    L = Spectrum(0.f);
-                }
-
-                writer.write(createFinishedRay(ray.sample.id, ray.sample.pFilm,
-                                               ray.sample.weight, L));
             }
         }
 

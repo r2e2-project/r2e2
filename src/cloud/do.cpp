@@ -76,7 +76,7 @@ int main(int argc, char const *argv[]) {
 
         vector<RayStatePtr> rayStates;
         vector<RayStatePtr> outputRays;
-        vector<RayStatePtr> finishedRays;
+        vector<FinishedRay> finishedRays;
 
         /* loading all the rays */
         {
@@ -125,7 +125,7 @@ int main(int argc, char const *argv[]) {
                 if (newRay.isShadowRay) {
                     if (hit || emptyVisit) {
                         newRay.Ld = hit ? 0.f : newRay.Ld;
-                        finishedRays.push_back(move(newRayPtr));
+                        finishedRays.emplace_back(*newRayPtr);
                     } else {
                         outputRays.push_back(move(newRayPtr));
                     }
@@ -133,7 +133,7 @@ int main(int argc, char const *argv[]) {
                     outputRays.push_back(move(newRayPtr));
                 } else if (emptyVisit) {
                     newRay.Ld = 0.f;
-                    finishedRays.push_back(move(newRayPtr));
+                    finishedRays.emplace_back(*newRayPtr);
                 }
             } else if (ray.hit) {
                 RayStatePtr bounceRay, shadowRay;
@@ -164,8 +164,7 @@ int main(int argc, char const *argv[]) {
         {
             protobuf::RecordWriter writer{finishedPath};
             for (auto &finished : finishedRays) {
-                const auto len = finished->Serialize();
-                writer.write(finished->serialized.get() + 4, len - 4);
+                writer.write(to_protobuf(finished));
             }
         }
 

@@ -30,7 +30,7 @@ RayStatePtr GenerateCameraRay(const std::shared_ptr<Camera> &camera,
                               std::shared_ptr<GlobalSampler> &sampler);
 
 void AccumulateImage(const std::shared_ptr<Camera> &camera,
-                     const std::vector<RayStatePtr> &rays);
+                     const std::vector<FinishedRay> &rays);
 
 }  // namespace graphics
 

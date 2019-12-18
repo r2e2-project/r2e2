@@ -349,7 +349,7 @@ class LambdaWorker {
 
     /* Rays */
     std::deque<RayStatePtr> traceQueue{};
-    std::deque<RayStatePtr> finishedQueue{};
+    std::deque<FinishedRay> finishedQueue{};
     std::map<TreeletId, std::deque<RayStatePtr>> pendingQueue{};
     std::map<TreeletId, std::deque<RayStatePtr>> outQueue{};
     std::map<TreeletId, size_t> outQueueBytes{};

@@ -36,7 +36,7 @@ int main(int argc, char const *argv[]) {
         }
 
         const string scenePath{argv[1]};
-        vector<RayStatePtr> finishedRays;
+        vector<FinishedRay> finishedRays;
 
         global::manager.init(scenePath);
 
@@ -46,16 +46,13 @@ int main(int argc, char const *argv[]) {
         size_t finishedRayCount = 0;
         for (string line; getline(cin, line);) {
             protobuf::RecordReader finishedReader{line};
+            protobuf::FinishedRay proto;
 
             while (!finishedReader.eof()) {
                 ++finishedRayCount;
-
-                string rayStr;
-                finishedReader.read(&rayStr);
-                RayStatePtr rayStatePtr = RayState::Create();
-                rayStatePtr->Deserialize(rayStr.data(), rayStr.length());
-
-                finishedRays.emplace_back(move(rayStatePtr));
+                if (finishedReader.read(&proto)) {
+                    finishedRays.push_back(from_protobuf(proto));
+                }
             }
         }
 

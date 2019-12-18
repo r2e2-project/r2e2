@@ -39,18 +39,12 @@ RayStatePtr GenerateCameraRay(const shared_ptr<Camera> &camera,
 }
 
 void AccumulateImage(const shared_ptr<Camera> &camera,
-                     const vector<RayStatePtr> &rays) {
+                     const vector<FinishedRay> &rays) {
     const Bounds2i sampleBounds = camera->film->GetSampleBounds();
     unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
     for (const auto &ray : rays) {
-        Spectrum L{ray->Ld * ray->beta};
-
-        if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
-            L = Spectrum(0.f);
-        }
-
-        filmTile->AddSample(ray->sample.pFilm, L, ray->sample.weight);
+        filmTile->AddSample(ray.pFilm, ray.L, ray.weight);
     }
 
     camera->film->MergeFilmTile(move(filmTile));
