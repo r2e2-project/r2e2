@@ -63,6 +63,9 @@ class RayState {
     size_t serializedSize{0};
     std::unique_ptr<char[]> serialized{nullptr};
 
+    bool IsShadowRay() const { return isShadowRay; }
+    bool HasHit() const { return hit; }
+
     int64_t SampleNum(const uint32_t spp);
     Point2i SamplePixel(const Vector2i &extent, const uint32_t spp);
 
