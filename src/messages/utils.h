@@ -67,11 +67,12 @@ protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 protobuf::Scene to_protobuf(const Scene& scene);
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
 protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey);
-protobuf::RayStats to_protobuf(const RayStats& state);
+protobuf::RayStats to_protobuf(const RayStats& stats);
 protobuf::QueueStats to_protobuf(const QueueStats& stats);
 protobuf::NetStats to_protobuf(const NetStats& stats);
-protobuf::WorkerStats to_protobuf(const WorkerStats& state);
+protobuf::WorkerStats to_protobuf(const WorkerStats& stats);
 protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics);
+protobuf::FinishedRay to_protobuf(const FinishedRay& finishedRay);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
@@ -98,6 +99,7 @@ ObjectKey from_protobuf(const protobuf::ObjectKey& ObjectKey);
 RayStats from_protobuf(const protobuf::RayStats& state);
 WorkerStats from_protobuf(const protobuf::WorkerStats& state);
 WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& diagnostics);
+FinishedRay from_protobuf(const protobuf::FinishedRay& finishedRay);
 
 namespace light {
 
@@ -110,7 +112,7 @@ protobuf::Light to_protobuf(const std::string& name, const ParamSet& params,
 namespace sampler {
 
 std::shared_ptr<GlobalSampler> from_protobuf(const protobuf::Sampler& sampler,
-                                       const int samplesPerPixel = 0);
+                                             const int samplesPerPixel = 0);
 protobuf::Sampler to_protobuf(const std::string& name, const ParamSet& params,
                               const Bounds2i& sampleBounds);
 

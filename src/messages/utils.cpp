@@ -349,6 +349,15 @@ protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics) {
     return proto;
 }
 
+protobuf::FinishedRay to_protobuf(const FinishedRay& finishedRay) {
+    protobuf::FinishedRay proto;
+    proto.set_sample_id(finishedRay.sampleId);
+    *proto.mutable_p_film() = to_protobuf(finishedRay.pFilm);
+    proto.set_weight(finishedRay.weight);
+    *proto.mutable_l() = to_protobuf(finishedRay.L);
+    return proto;
+}
+
 template <class ValueType, class ProtoItem>
 unique_ptr<ValueType[]> p2v(const ProtoItem& item) {
     auto values = make_unique<ValueType[]>(item.values_size());
@@ -583,6 +592,15 @@ TextureParams from_protobuf(
 
 ObjectKey from_protobuf(const protobuf::ObjectKey& objectKey) {
     return ObjectKey{static_cast<ObjectType>(objectKey.type()), objectKey.id()};
+}
+
+FinishedRay from_protobuf(const protobuf::FinishedRay& proto) {
+    FinishedRay result;
+    result.sampleId = proto.sample_id();
+    result.pFilm = from_protobuf(proto.p_film());
+    result.weight = proto.weight();
+    result.L = from_protobuf(proto.l());
+    return result;
 }
 
 protobuf::Light light::to_protobuf(const string& name, const ParamSet& params,

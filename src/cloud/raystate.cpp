@@ -16,9 +16,7 @@ constexpr int offset_of(T const &t, U T::*a) {
 // sample.id =
 //  (pixel.x + pixel.y * sampleExtent.x) * config.samplesPerPixel + sample;
 
-RayStatePtr RayState::Create() {
-    return make_unique<RayState>();
-}
+RayStatePtr RayState::Create() { return make_unique<RayState>(); }
 
 int64_t RayState::SampleNum(const uint32_t spp) { return sample.id % spp; }
 
@@ -99,5 +97,15 @@ void RayState::Deserialize(const char *data, const size_t len,
     } else {
         memcpy(reinterpret_cast<char *>(this), data,
                min(sizeof(RayState), len));
+    }
+}
+
+FinishedRay::FinishedRay(const RayState &rayState)
+    : sampleId(rayState.sample.id),
+      pFilm(rayState.sample.pFilm),
+      weight(rayState.sample.weight),
+      L(rayState.Ld * rayState.beta) {
+    if (L.HasNaNs() || L.y() < -1e-5 || isinf(L.y())) {
+        L = Spectrum(0.f);
     }
 }

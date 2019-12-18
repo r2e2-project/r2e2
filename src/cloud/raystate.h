@@ -87,6 +87,23 @@ class RayState {
     static RayStatePtr Create();
 };
 
+class FinishedRay {
+  public:
+    uint64_t sampleId{};
+    Point2f pFilm{};
+    Float weight{};
+    Spectrum L{};
+
+    /* FinishedRay is serialized up to this point */
+    FinishedRay() = default;
+    FinishedRay(const RayState &rayState);
+    FinishedRay(FinishedRay &&) = default;
+
+    /* disallow copying */
+    FinishedRay(const FinishedRay &) = delete;
+    FinishedRay &operator=(const FinishedRay &) = delete;
+};
+
 }  // namespace pbrt
 
 #endif /* PBRT_CLOUD_RAYSTATE_H */
