@@ -16,6 +16,7 @@
 #include "cloud/lambda.h"
 #include "cloud/raystate.h"
 #include "cloud/stats.h"
+#include "cloud/transfer.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/light.h"
@@ -198,51 +199,6 @@ class LambdaWorker {
     std::map<uint64_t, std::pair<Task, RayBagKey>> pendingRayBags{};
 
     /*** Transfer Agent *******************************************************/
-
-    class TransferAgent {
-      public:
-        struct Action {
-            enum Type { Download, Upload };
-
-            uint64_t id;
-            Type type;
-            std::string key;
-            std::string data;
-
-            Action(const uint64_t id, const Type type, const std::string& key,
-                   std::string&& data)
-                : id(id), type(type), key(key), data(move(data)) {}
-        };
-
-      private:
-        uint64_t nextId{1};
-
-        struct S3Config {
-            AWSCredentials credentials{};
-            std::string region{};
-            std::string bucket{};
-            std::string prefix{};
-
-            std::string endpoint{};
-            Address address{};
-        } clientConfig;
-
-        std::queue<Action> results{};
-
-        std::mutex mtx;
-        std::atomic<bool> isEmpty{true};
-        std::map<uint64_t, std::future<void>> runningTasks;
-
-        void doAction(Action&& action);
-
-      public:
-        TransferAgent(const S3StorageBackend& backend);
-        uint64_t requestDownload(const std::string& key);
-        uint64_t requestUpload(const std::string& key, std::string&& data);
-
-        bool empty();
-        Action pop();
-    };
 
     TransferAgent transferAgent;
 

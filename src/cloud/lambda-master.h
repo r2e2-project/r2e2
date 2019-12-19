@@ -264,7 +264,7 @@ class LambdaMaster {
         size_t curTile{0};
     } tiles{};
 
-    /*** Accumulation**********************************************************/
+    /*** Accumulation *********************************************************/
 
     Poller::Action::Result::Type handleWriteOutput();
 
