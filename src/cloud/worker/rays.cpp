@@ -155,33 +155,6 @@ ResultType LambdaWorker::handleTraceQueue() {
     return ResultType::Continue;
 }
 
-ResultType LambdaWorker::handleOutQueue() {
-    for (auto it = outQueue.begin(); it != outQueue.end();
-         it = outQueue.erase(it)) {
-        const TreeletId treeletId = it->first;
-        auto& rayList = it->second;
-        auto& queue = sendQueue[treeletId];
-
-        while (!rayList.empty()) {
-            if (queue.empty() ||
-                queue.back().first + RayState::MaxCompressedSize() >
-                    MAX_BAG_SIZE) {
-                queue.emplace(make_pair(0, string(MAX_BAG_SIZE, '\0')));
-            }
-
-            auto& bag = queue.back();
-            auto& ray = rayList.front();
-
-            const auto len = ray->Serialize(&bag.second[0] + bag.first);
-            bag.first += len;
-
-            rayList.pop_front();
-        }
-    }
-
-    return ResultType::Continue;
-}
-
 ResultType LambdaWorker::handleFinishedPaths() {
     RECORD_INTERVAL("handleFinishedPaths");
     finishedPathsTimer.reset();

@@ -167,6 +167,9 @@ class LambdaWorker {
     /* sending the rays out */
     Poller::Action::Result::Type handleSendQueue();
 
+    /* opening up received ray bags */
+    Poller::Action::Result::Type handleReceiveQueue();
+
     /* handle finished rays (the samples) */
     Poller::Action::Result::Type handleFinishedQueue();
 

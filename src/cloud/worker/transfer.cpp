@@ -11,6 +11,33 @@ using OpCode = Message::OpCode;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
+ResultType LambdaWorker::handleOutQueue() {
+    for (auto it = outQueue.begin(); it != outQueue.end();
+         it = outQueue.erase(it)) {
+        const TreeletId treeletId = it->first;
+        auto& rayList = it->second;
+        auto& queue = sendQueue[treeletId];
+
+        while (!rayList.empty()) {
+            if (queue.empty() ||
+                queue.back().first + RayState::MaxCompressedSize() >
+                    MAX_BAG_SIZE) {
+                queue.emplace(make_pair(0, string(MAX_BAG_SIZE, '\0')));
+            }
+
+            auto& bag = queue.back();
+            auto& ray = rayList.front();
+
+            const auto len = ray->Serialize(&bag.second[0] + bag.first);
+            bag.first += len;
+
+            rayList.pop_front();
+        }
+    }
+
+    return ResultType::Continue;
+}
+
 ResultType LambdaWorker::handleSendQueue() {
     sendQueueTimer.reset();
 
@@ -31,6 +58,32 @@ ResultType LambdaWorker::handleSendQueue() {
 
             pendingRayBags[id] = make_pair(Task::Upload, key);
             queue.pop();
+        }
+    }
+
+    return ResultType::Continue;
+}
+
+ResultType LambdaWorker::handleReceiveQueue() {
+    while (!receiveQueue.empty()) {
+        RayBag bag = move(receiveQueue.front());
+        receiveQueue.pop();
+
+        /* (1) XXX do we have this treelet? */
+
+        /* (2) let's unpack this treelet and add the rays to the trace queue */
+        const char* data = bag.data.data();
+
+        for (size_t offset = 0; offset < bag.data.size();) {
+            const auto len = *reinterpret_cast<const uint32_t*>(data + offset);
+            offset += 4;
+
+            RayStatePtr ray = RayState::Create();
+            ray->Deserialize(data + offset, len);
+            ray->hop++;
+            offset += len;
+
+            pushTraceQueue(move(ray));
         }
     }
 

@@ -81,6 +81,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                        [this]() { return !sendQueue.empty(); },
                        []() { throw runtime_error("send queue failed"); }));
 
+    loop.poller().add_action(
+        Poller::Action(alwaysOnFd, Direction::Out,
+                       bind(&LambdaWorker::handleReceiveQueue, this),
+                       [this]() { return !receiveQueue.empty(); },
+                       []() { throw runtime_error("receive queue failed"); }));
+
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out,
         bind(&LambdaWorker::handleTransferResults, this),
@@ -89,8 +95,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     /* send finished rays */
     /* FIXME we're throwing out finished rays, for now */
-    loop.poller().add_action(Poller::Action(
-        alwaysOnFd, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
+    /* loop.poller().add_action(Poller::Action(
+        fd, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
         [this]() {
             // clang-format off
             switch (this->config.finishedRayAction) {
@@ -100,7 +106,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             }
             // clang-format on
         },
-        []() { throw runtime_error("finished queue failed"); }));
+        []() { throw runtime_error("finished queue failed"); })); */
 
     /* handle received messages */
     loop.poller().add_action(Poller::Action(
