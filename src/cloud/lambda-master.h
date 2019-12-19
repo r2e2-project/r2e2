@@ -280,7 +280,7 @@ class LambdaMaster {
     FileDescriptor alwaysOnFd{STDOUT_FILENO};
 
     /* Timers */
-    TimerFD queuedRayBagsInterval{QUEUED_RAY_BAGS_INTERVAL};
+    TimerFD queuedRayBagsTimer{QUEUED_RAY_BAGS_INTERVAL};
     TimerFD statusPrintTimer{STATUS_PRINT_INTERVAL};
     TimerFD writeOutputTimer{WRITE_OUTPUT_INTERVAL};
     std::unique_ptr<TimerFD> exitTimer;

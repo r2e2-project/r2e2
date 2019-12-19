@@ -144,7 +144,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         []() { throw runtime_error("generate rays failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        queuedRayBagsInterval.fd, Direction::In,
+        queuedRayBagsTimer.fd, Direction::In,
         bind(&LambdaMaster::handleQueuedRayBags, this),
         [this]() { return queuedRayBags.size() > 0; },
         []() { throw runtime_error("queued ray bags failed"); }));

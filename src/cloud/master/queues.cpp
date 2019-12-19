@@ -11,6 +11,8 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 
 ResultType LambdaMaster::handleQueuedRayBags() {
+    queuedRayBagsTimer.reset();
+
     map<WorkerId, queue<RayBagKey>> assignedBags;
 
     for (auto& treeletRayBags : queuedRayBags) {
