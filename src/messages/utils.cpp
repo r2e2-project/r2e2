@@ -308,7 +308,8 @@ protobuf::RayBagKey to_protobuf(const RayBagKey& rayBagKey) {
     proto.set_worker_id(rayBagKey.workerId);
     proto.set_treelet_id(rayBagKey.treeletId);
     proto.set_bag_id(rayBagKey.bagId);
-    proto.set_size(rayBagKey.size);
+    proto.set_ray_count(rayBagKey.rayCount);
+    proto.set_bag_size(rayBagKey.bagSize);
     return proto;
 }
 
@@ -842,7 +843,7 @@ WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& proto) {
 
 RayBagKey from_protobuf(const protobuf::RayBagKey& proto) {
     return {proto.worker_id(), proto.treelet_id(), proto.bag_id(),
-            proto.size()};
+            proto.ray_count(), proto.bag_size()};
 }
 
 }  // namespace pbrt

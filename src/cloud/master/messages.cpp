@@ -95,7 +95,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
                 pendingRayBags[key.treeletId].push(key);
             }
 
-            queueSize[key.treeletId] += key.size;
+            queueSize[key.treeletId] += key.bagSize;
         }
 
         break;
@@ -107,7 +107,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
 
         for (const auto &item : proto.keys()) {
             const RayBagKey key = from_protobuf(item);
-            queueSize[key.treeletId] -= key.size;
+            queueSize[key.treeletId] -= key.bagSize;
         }
     }
 

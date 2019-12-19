@@ -10,16 +10,29 @@ using TreeletId = uint32_t;
 using BagId = uint64_t;
 
 struct RayBagKey {
-    WorkerId workerId;
-    TreeletId treeletId;
-    BagId bagId;
-    size_t size;
+    WorkerId workerId{};
+    TreeletId treeletId{};
+    BagId bagId{};
+    size_t rayCount{};
+    size_t bagSize{};
 
     std::string str(const std::string& prefix) const {
         std::ostringstream oss;
-        oss << prefix << workerId << '-' << treeletId << '-' << bagId;
+        oss << prefix << 'T' << treeletId << '-' << workerId << '_' << bagId;
         return oss.str();
     }
+
+    RayBagKey(const WorkerId workerId, const TreeletId treeletId,
+              const BagId bagId, const size_t rayCount, const size_t bagSize)
+        : workerId(workerId),
+          treeletId(treeletId),
+          bagId(bagId),
+          rayCount(rayCount),
+          bagSize(bagSize) {}
+
+    RayBagKey() = default;
+    RayBagKey(const RayBagKey&) = default;
+    RayBagKey& operator=(const RayBagKey&) = default;
 };
 
 struct RayBag {
