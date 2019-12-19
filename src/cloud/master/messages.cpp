@@ -15,22 +15,16 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 
 ResultType LambdaMaster::handleMessages() {
-    deque<pair<WorkerId, Message>> unprocessedMessages;
-
     while (!incomingMessages.empty()) {
         auto front = move(incomingMessages.front());
         incomingMessages.pop_front();
-
-        if (!processMessage(front.first, front.second)) {
-            unprocessedMessages.push_back(move(front));
-        }
+        processMessage(front.first, front.second);
     }
 
-    swap(unprocessedMessages, incomingMessages);
     return ResultType::Continue;
 }
 
-bool LambdaMaster::processMessage(const uint64_t workerId,
+void LambdaMaster::processMessage(const uint64_t workerId,
                                   const meow::Message &message) {
     /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
          << "] from worker " << workerId << endl; */
@@ -61,7 +55,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         auto stats = from_protobuf(proto);
 
         if (stats.finishedRays() != 0) {
-            lastFinishedRay = lastActionTime = now();
+            lastFinishedRay = lastActionTime = steady_clock::now();
         }
 
         /* merge into global worker stats */
@@ -71,7 +65,7 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         auto &worker = workers.at(workerId);
         worker.stats.merge(stats);
 
-        if (config.workerStatsInterval > 0 &&
+        if (config.workerStatsWriteInterval > 0 &&
             worker.nextStatusLogTimestamp < proto.timestamp_us()) {
             if (worker.nextStatusLogTimestamp == 0) {
                 statsOstream << "start " << worker.id << ' '
@@ -83,15 +77,15 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
                          << '\n';
 
             worker.nextStatusLogTimestamp =
-                duration_cast<microseconds>(workerStatsInterval).count() +
+                duration_cast<microseconds>(workerStatsWriteInterval).count() +
                 proto.timestamp_us();
         }
 
-        /* if (canSendTiles && cameraRaysRemaining() &&
+        /* if (tiles.canSendTiles && tiles.cameraRaysRemaining() &&
             stats.queueStats.pending + stats.queueStats.out +
                     stats.queueStats.ray <
                 config.newTileThreshold) {
-            sendWorkerTile(worker);
+            tiles.sendWorkerTile(worker);
         } */
 
         break;
@@ -149,6 +143,4 @@ bool LambdaMaster::processMessage(const uint64_t workerId,
         throw runtime_error("unhandled message opcode: " +
                             to_string(to_underlying(message.opcode())));
     }
-
-    return true;
 }

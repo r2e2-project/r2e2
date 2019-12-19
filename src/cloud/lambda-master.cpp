@@ -50,26 +50,6 @@ using PollerResult = Poller::Result::Type;
 constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
-int defaultTileSize(int spp) {
-    int bytesPerSec = 30e+6;
-    int avgRayBytes = 500;
-    int raysPerSec = bytesPerSec / avgRayBytes;
-
-    return ceil(sqrt(raysPerSec / spp));
-}
-
-int autoTileSize(const Bounds2i &bounds, const size_t N) {
-    int tileSize = ceil(sqrt(bounds.Area() / N));
-    const Vector2i extent = bounds.Diagonal();
-
-    while (ceil(1.0 * extent.x / tileSize) * ceil(1.0 * extent.y / tileSize) >
-           N) {
-        tileSize++;
-    }
-
-    return tileSize;
-}
-
 LambdaMaster::~LambdaMaster() {
     try {
         roost::empty_directory(sceneDir.name());
@@ -91,8 +71,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
       statusPrintTimer(STATUS_PRINT_INTERVAL),
       writeOutputTimer(WRITE_OUTPUT_INTERVAL),
-      workerStatsInterval(config.workerStatsInterval),
-      tileSize(config.tileSize),
+      workerStatsWriteInterval(config.workerStatsWriteInterval),
       config(config) {
     LOG(INFO) << "job-id=" << jobId;
 
@@ -139,30 +118,25 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     objectManager.initialize(numberOfLambdas,
                              config.assignment & Assignment::Static);
 
+    tiles = Tiles{config.tileSize, scene.sampleBounds,
+                  scene.sampler->samplesPerPixel, numberOfLambdas};
+
     /* are we logging anything? */
     if (config.collectDebugLogs || config.collectDiagnostics ||
-        config.workerStatsInterval > 0 || config.rayActionsLogRate > 0 ||
+        config.workerStatsWriteInterval > 0 || config.rayActionsLogRate > 0 ||
         config.packetsLogRate > 0) {
         roost::create_directories(config.logsDirectory);
     }
 
-    if (config.workerStatsInterval > 0) {
+    if (config.workerStatsWriteInterval > 0) {
         statsOstream.open(this->config.logsDirectory + "/" + "STATS",
                           ios::out | ios::trunc);
 
         statsOstream << "workers " << numberOfLambdas << '\n';
     }
 
-    if (tileSize == 0) {
-        tileSize = defaultTileSize(scene.sampler->samplesPerPixel);
-    } else if (tileSize == numeric_limits<typeof(tileSize)>::max()) {
-        tileSize = autoTileSize(scene.sampleBounds, numberOfLambdas);
-    }
-
-    cout << "Tile size is " << tileSize << "\u00d7" << tileSize << '.' << endl;
-
-    nTiles = Point2i((scene.sampleExtent.x + tileSize - 1) / tileSize,
-                     (scene.sampleExtent.y + tileSize - 1) / tileSize);
+    cout << "Tile size is " << tiles.tileSize << "\u00d7" << tiles.tileSize
+         << '.' << endl;
 
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleMessages, this),
@@ -250,7 +224,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 ResultType LambdaMaster::handleJobStart() {
     set<uint32_t> paired{0};
 
-    generationStart = lastActionTime = now();
+    generationStart = lastActionTime = steady_clock::now();
 
     for (auto &workerkv : workers) {
         auto &worker = workerkv.second;
@@ -262,12 +236,12 @@ ResultType LambdaMaster::handleJobStart() {
         worker.connection->enqueue_write(
             Message::str(0, OpCode::GetObjects, protoutil::to_string(proto)));
 
-        if (cameraRaysRemaining()) {
-            sendWorkerTile(worker);
+        if (tiles.cameraRaysRemaining()) {
+            tiles.sendWorkerTile(worker);
         }
     }
 
-    canSendTiles = true;
+    tiles.canSendTiles = true;
 
     return ResultType::Cancel;
 }
@@ -358,29 +332,6 @@ void LambdaMaster::run() {
     }
 }
 
-bool LambdaMaster::cameraRaysRemaining() const {
-    return curTile < nTiles.x * nTiles.y;
-}
-
-Bounds2i LambdaMaster::nextCameraTile() {
-    const int tileX = curTile % nTiles.x;
-    const int tileY = curTile / nTiles.x;
-    const int x0 = scene.sampleBounds.pMin.x + tileX * tileSize;
-    const int x1 = min(x0 + tileSize, scene.sampleBounds.pMax.x);
-    const int y0 = scene.sampleBounds.pMin.y + tileY * tileSize;
-    const int y1 = min(y0 + tileSize, scene.sampleBounds.pMax.y);
-
-    curTile++;
-    return Bounds2i(Point2i{x0, y0}, Point2i{x1, y1});
-}
-
-void LambdaMaster::sendWorkerTile(const Worker &worker) {
-    protobuf::GenerateRays proto;
-    *proto.mutable_crop_window() = to_protobuf(nextCameraTile());
-    worker.connection->enqueue_write(
-        Message::str(0, OpCode::GenerateRays, protoutil::to_string(proto)));
-}
-
 void LambdaMaster::aggregateQueueStats() {
     workerStats.queueStats = QueueStats();
 
@@ -401,7 +352,7 @@ void LambdaMaster::aggregateQueueStats() {
 }
 
 void usage(const char *argv0, int exitCode) {
-    cerr << "Usage: " << argv0 << " [OPTION]... [TASK]" << endl
+    cerr << "Usage: " << argv0 << " [OPTION]..." << endl
          << endl
          << "Options:" << endl
          << "  -p --port PORT             port to use" << endl
@@ -476,7 +427,7 @@ int main(int argc, char *argv[]) {
     string region{"us-west-2"};
     bool sendReliably = false;
     uint64_t maxUdpRate = 200;
-    uint64_t workerStatsInterval = 0;
+    uint64_t workerStatsWriteInterval = 0;
     bool collectDiagnostics = false;
     bool collectDebugLogs = false;
     bool logLeases = false;
@@ -484,7 +435,6 @@ int main(int argc, char *argv[]) {
     float packetsLogRate = 0.0;
     string logsDirectory = "logs/";
     Optional<Bounds2i> cropWindow;
-    Task task = Task::RayTracing;
     uint32_t timeout = 0;
     uint32_t pixelsPerTile = 0;
     uint64_t newTileThreshold = 10000;
@@ -543,7 +493,7 @@ int main(int argc, char *argv[]) {
         case 'l': numLambdas = stoul(optarg); break;
         case 'g': collectDebugLogs = true; break;
         case 'e': logLeases = true; break;
-        case 'w': workerStatsInterval = stoul(optarg); break;
+        case 'w': workerStatsWriteInterval = stoul(optarg); break;
         case 'd': collectDiagnostics = true; break;
         case 'D': logsDirectory = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
@@ -626,17 +576,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (optind < argc) {
-        const string taskStr{argv[optind++]};
-        if (taskStr == "raytrace") {
-            task = Task::RayTracing;
-        } else if (taskStr == "netbench") {
-            task = Task::NetworkTest;
-        } else {
-            usage(argv[0], EXIT_FAILURE);
-        }
-    }
-
     if (listenPort == 0 || numLambdas < 0 || samplesPerPixel < 0 ||
         rayActionsLogRate < 0 || rayActionsLogRate > 1.0 ||
         packetsLogRate < 0 || packetsLogRate > 1.0 || publicIp.empty() ||
@@ -652,25 +591,15 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
-    MasterConfiguration config = {task,
-                                  assignment,
-                                  assignmentFile,
-                                  finishedRayAction,
-                                  sendReliably,
-                                  maxUdpRate,
-                                  samplesPerPixel,
-                                  collectDebugLogs,
-                                  collectDiagnostics,
-                                  logLeases,
-                                  workerStatsInterval,
-                                  rayActionsLogRate,
-                                  packetsLogRate,
-                                  logsDirectory,
-                                  cropWindow,
-                                  tileSize,
-                                  chrono::seconds{timeout},
-                                  jobSummaryPath,
-                                  newTileThreshold};
+    MasterConfiguration config = {assignment,        assignmentFile,
+                                  finishedRayAction, sendReliably,
+                                  maxUdpRate,        samplesPerPixel,
+                                  collectDebugLogs,  collectDiagnostics,
+                                  logLeases,         workerStatsWriteInterval,
+                                  rayActionsLogRate, packetsLogRate,
+                                  logsDirectory,     cropWindow,
+                                  tileSize,          seconds{timeout},
+                                  jobSummaryPath,    newTileThreshold};
 
     try {
         master = make_unique<LambdaMaster>(listenPort, numLambdas,

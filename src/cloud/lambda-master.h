@@ -34,22 +34,16 @@ namespace pbrt {
 
 struct Assignment {
     // clang-format off
-    static constexpr int All        = (1 << 0);
-    static constexpr int Static     = (1 << 1);
-    static constexpr int Uniform    = (1 << 2);
-    static constexpr int Debug      = (1 << 3); /* only assigns T0 to one worker */
+    static constexpr int All     = (1 << 0);
+    static constexpr int Static  = (1 << 1);
+    static constexpr int Uniform = (1 << 2);
+    static constexpr int Debug   = (1 << 3); /* only assigns T0 to one worker */
     // clang-format on
 };
 
 enum class FinishedRayAction { Discard, SendBack, Upload };
 
-enum class Task {
-    RayTracing,
-    NetworkTest,
-};
-
 struct MasterConfiguration {
-    Task task;
     int assignment; /* look at `struct Assignment` */
     std::string assignmentFile;
     FinishedRayAction finishedRayAction;
@@ -59,7 +53,7 @@ struct MasterConfiguration {
     bool collectDebugLogs;
     bool collectDiagnostics;
     bool logLeases;
-    uint64_t workerStatsInterval;
+    uint64_t workerStatsWriteInterval;
     float rayActionsLogRate;
     float packetsLogRate;
     std::string logsDirectory;
@@ -86,6 +80,8 @@ class LambdaMaster {
     void dumpJobSummary() const;
 
   private:
+    using steady_clock = std::chrono::steady_clock;
+
     ////////////////////////////////////////////////////////////////////////////
     // Job Information                                                        //
     ////////////////////////////////////////////////////////////////////////////
@@ -189,52 +185,79 @@ class LambdaMaster {
         std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
     } objectManager;
 
-    Poller::Action::Result::Type handleMessages();
+    /*** Tiles ****************************************************************/
+
+    class Tiles {
+      public:
+        Bounds2i nextCameraTile();
+        bool cameraRaysRemaining() const;
+        void sendWorkerTile(const Worker &worker);
+
+        Tiles() = default;
+        Tiles(const int tileSize, const Bounds2i &bounds, const long int spp,
+              const uint32_t numWorkers);
+
+        int tileSize{0};
+        bool canSendTiles{false};
+
+      private:
+        Bounds2i sampleBounds{};
+        Point2i nTiles{};
+        size_t curTile{0};
+    } tiles{};
+
+    /*** Accumulation**********************************************************/
+
     Poller::Action::Result::Type handleWriteOutput();
-    Poller::Action::Result::Type handleWriteWorkerStats();
-    Poller::Action::Result::Type handleStatusMessage();
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Communication                                                          //
+    ////////////////////////////////////////////////////////////////////////////
+
+    /*** Messages *************************************************************/
+
+    /* processes incoming messages; called by handleMessages */
+    void processMessage(const WorkerId workerId, const meow::Message &message);
+
+    /* process incoming messages */
+    Poller::Action::Result::Type handleMessages();
+
+    /* tell the workers to fetch base objects and generate rays */
     Poller::Action::Result::Type handleJobStart();
 
-    bool processMessage(const WorkerId workerId, const meow::Message &message);
-
-    void aggregateQueueStats();
-
-    std::ofstream statsOstream{};
-
-    /* Message Queues */
+    /* a queue for incoming messages */
     std::deque<std::pair<WorkerId, meow::Message>> incomingMessages{};
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Ray Bags                                                               //
-    ////////////////////////////////////////////////////////////////////////////
+    /*** Ray Bags *************************************************************/
 
     std::map<TreeletId, std::queue<RayBag>> queuedRayBags;
     std::map<TreeletId, std::queue<RayBag>> pendingRayBags;
     std::map<TreeletId, size_t> queueSize;
 
     ////////////////////////////////////////////////////////////////////////////
-    // Timers                                                                 //
+    // Stats                                                                  //
     ////////////////////////////////////////////////////////////////////////////
 
-    const timepoint_t startTime{now()};
+    /* logs the worker stats to disk for later processing */
+    Poller::Action::Result::Type handleWriteWorkerStats();
 
-    timepoint_t lastActionTime{startTime};
-    timepoint_t allToAllConnectStart{};
-    timepoint_t generationStart{};
-    timepoint_t lastFinishedRay{};
+    /* prints the status message every second */
+    Poller::Action::Result::Type handleStatusMessage();
 
-    /* Worker stats */
+    void aggregateQueueStats();
+
     WorkerStats workerStats{};
-    std::chrono::seconds workerStatsInterval;
+    std::ofstream statsOstream{};
+    std::chrono::seconds workerStatsWriteInterval{1};
 
-    /* Camera tile allocation */
-    bool cameraRaysRemaining() const;
-    Bounds2i nextCameraTile();
-    void sendWorkerTile(const Worker &worker);
-    size_t curTile{0};
-    int tileSize;
-    Point2i nTiles{};
-    bool canSendTiles{false};
+    /*** Timepoints ***********************************************************/
+
+    const steady_clock::time_point startTime{steady_clock::now()};
+
+    steady_clock::time_point lastActionTime{startTime};
+    steady_clock::time_point allToAllConnectStart{};
+    steady_clock::time_point generationStart{};
+    steady_clock::time_point lastFinishedRay{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Other Stuff                                                            //
@@ -248,11 +271,6 @@ class LambdaMaster {
     TimerFD statusPrintTimer;
     TimerFD writeOutputTimer;
     std::unique_ptr<TimerFD> exitTimer;
-};
-
-class Schedule {
-  public:
-  private:
 };
 
 }  // namespace pbrt

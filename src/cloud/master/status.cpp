@@ -14,7 +14,8 @@ constexpr milliseconds EXIT_GRACE_PERIOD{10'000};
 ResultType LambdaMaster::handleStatusMessage() {
     statusPrintTimer.reset();
 
-    if (config.timeout.count() && now() - lastActionTime >= config.timeout) {
+    if (config.timeout.count() &&
+        steady_clock::now() - lastActionTime >= config.timeout) {
         cerr << "Job terminated due to inactivity." << endl;
         return ResultType::Exit;
     } else if (exitTimer == nullptr &&
@@ -37,7 +38,7 @@ ResultType LambdaMaster::handleStatusMessage() {
 
     aggregateQueueStats();
 
-    const auto elapsedTime = now() - startTime;
+    const auto elapsedTime = steady_clock::now() - startTime;
     const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
 
     const auto rayThroughput =
