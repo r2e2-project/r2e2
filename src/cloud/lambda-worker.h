@@ -36,8 +36,8 @@
 
 namespace pbrt {
 
-constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
 constexpr std::chrono::milliseconds SEND_QUEUE_INTERVAL{500};
+constexpr std::chrono::milliseconds FINISHED_SEND_QUEUE_INTERVAL{2'000};
 
 constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{5'000};
@@ -174,15 +174,15 @@ class LambdaWorker {
     /* handle finished rays (the samples) */
     Poller::Action::Result::Type handleFinishedQueue();
 
-    /* tell the master about the finished paths, for bookkeeping */
-    Poller::Action::Result::Type handleFinishedPaths();
-
     Poller::Action::Result::Type handleTransferResults();
 
     /* queues */
 
     /* ray bags ready to be sent out */
     std::map<TreeletId, std::queue<RayBag>> sendQueue{};
+
+    /* finished ray bags ready to be sent out */
+    std::queue<RayBag> finishedSendQueue{};
 
     /* ray bags that are received, but not yet unpacked */
     std::queue<RayBag> receiveQueue{};
@@ -234,7 +234,7 @@ class LambdaWorker {
 
     /* Timers */
     TimerFD sendQueueTimer{SEND_QUEUE_INTERVAL};
-    TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
+    TimerFD finishedSendQueueTimer{FINISHED_SEND_QUEUE_INTERVAL};
     TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
 };
 

@@ -131,23 +131,6 @@ ResultType LambdaWorker::handleTraceQueue() {
     return ResultType::Continue;
 }
 
-ResultType LambdaWorker::handleFinishedPaths() {
-    RECORD_INTERVAL("handleFinishedPaths");
-    finishedPathsTimer.reset();
-
-    string payload;
-    for (const auto pathId : finishedPathIds) {
-        payload += put_field(pathId);
-    }
-
-    finishedPathIds.clear();
-
-    coordinatorConnection->enqueue_write(
-        Message::str(*workerId, OpCode::FinishedPaths, payload));
-
-    return ResultType::Continue;
-}
-
 ResultType LambdaWorker::handleFinishedQueue() {
     RECORD_INTERVAL("handleFinishedQueue");
 
