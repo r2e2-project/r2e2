@@ -127,6 +127,55 @@ class LambdaMaster {
     std::map<WorkerId, Worker> workers{};
 
     ////////////////////////////////////////////////////////////////////////////
+    // Communication                                                          //
+    ////////////////////////////////////////////////////////////////////////////
+
+    /*** Messages *************************************************************/
+
+    /* processes incoming messages; called by handleMessages */
+    void processMessage(const WorkerId workerId, const meow::Message &message);
+
+    /* process incoming messages */
+    Poller::Action::Result::Type handleMessages();
+
+    /* tell the workers to fetch base objects and generate rays */
+    Poller::Action::Result::Type handleJobStart();
+
+    /* a queue for incoming messages */
+    std::deque<std::pair<WorkerId, meow::Message>> incomingMessages{};
+
+    /*** Ray Bags *************************************************************/
+
+    std::map<TreeletId, std::queue<RayBag>> queuedRayBags;
+    std::map<TreeletId, std::queue<RayBag>> pendingRayBags;
+    std::map<TreeletId, size_t> queueSize;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Stats                                                                  //
+    ////////////////////////////////////////////////////////////////////////////
+
+    /* logs the worker stats to disk for later processing */
+    Poller::Action::Result::Type handleWriteWorkerStats();
+
+    /* prints the status message every second */
+    Poller::Action::Result::Type handleStatusMessage();
+
+    void aggregateQueueStats();
+
+    WorkerStats workerStats{};
+    std::ofstream statsOstream{};
+    std::chrono::seconds workerStatsWriteInterval{1};
+
+    /*** Timepoints ***********************************************************/
+
+    const steady_clock::time_point startTime{steady_clock::now()};
+
+    steady_clock::time_point lastActionTime{startTime};
+    steady_clock::time_point allToAllConnectStart{};
+    steady_clock::time_point generationStart{};
+    steady_clock::time_point lastFinishedRay{};
+
+    ////////////////////////////////////////////////////////////////////////////
     // Scene Objects                                                          //
     ////////////////////////////////////////////////////////////////////////////
 
@@ -209,55 +258,6 @@ class LambdaMaster {
     /*** Accumulation**********************************************************/
 
     Poller::Action::Result::Type handleWriteOutput();
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Communication                                                          //
-    ////////////////////////////////////////////////////////////////////////////
-
-    /*** Messages *************************************************************/
-
-    /* processes incoming messages; called by handleMessages */
-    void processMessage(const WorkerId workerId, const meow::Message &message);
-
-    /* process incoming messages */
-    Poller::Action::Result::Type handleMessages();
-
-    /* tell the workers to fetch base objects and generate rays */
-    Poller::Action::Result::Type handleJobStart();
-
-    /* a queue for incoming messages */
-    std::deque<std::pair<WorkerId, meow::Message>> incomingMessages{};
-
-    /*** Ray Bags *************************************************************/
-
-    std::map<TreeletId, std::queue<RayBag>> queuedRayBags;
-    std::map<TreeletId, std::queue<RayBag>> pendingRayBags;
-    std::map<TreeletId, size_t> queueSize;
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Stats                                                                  //
-    ////////////////////////////////////////////////////////////////////////////
-
-    /* logs the worker stats to disk for later processing */
-    Poller::Action::Result::Type handleWriteWorkerStats();
-
-    /* prints the status message every second */
-    Poller::Action::Result::Type handleStatusMessage();
-
-    void aggregateQueueStats();
-
-    WorkerStats workerStats{};
-    std::ofstream statsOstream{};
-    std::chrono::seconds workerStatsWriteInterval{1};
-
-    /*** Timepoints ***********************************************************/
-
-    const steady_clock::time_point startTime{steady_clock::now()};
-
-    steady_clock::time_point lastActionTime{startTime};
-    steady_clock::time_point allToAllConnectStart{};
-    steady_clock::time_point generationStart{};
-    steady_clock::time_point lastFinishedRay{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Other Stuff                                                            //
