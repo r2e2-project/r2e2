@@ -113,6 +113,12 @@ ResultType LambdaWorker::handleTraceQueue() {
                 graphics::ShadeRay(move(rayPtr), *scene.bvh, scene.lights,
                                    scene.sampleExtent, scene.sampler, arena);
 
+            if (bounceRay == nullptr && shadowRay == nullptr) {
+                /* rayPtr is not touched if if Shade() returned nothing */
+                workerStats.recordFinishedRay(*rayPtr);
+                logRayAction(*rayPtr, RayAction::Finished);
+            }
+
             if (bounceRay != nullptr) {
                 logRayAction(*bounceRay, RayAction::Generated);
                 processedRays.push_back(move(bounceRay));
@@ -121,14 +127,8 @@ ResultType LambdaWorker::handleTraceQueue() {
             }
 
             if (shadowRay != nullptr) {
-                logRayAction(*bounceRay, RayAction::Generated);
-                processedRays.push_back(move(bounceRay));
-            }
-
-            if (bounceRay == nullptr && shadowRay == nullptr) {
-                /* rayPtr is not touched if if Shade() returned nothing */
-                workerStats.recordFinishedRay(*rayPtr);
-                logRayAction(*rayPtr, RayAction::Finished);
+                logRayAction(*shadowRay, RayAction::Generated);
+                processedRays.push_back(move(shadowRay));
             }
         } else {
             throw runtime_error("invalid ray in ray queue");
