@@ -103,7 +103,6 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         }
 
         graphics::AccumulateImage(scene.camera, finishedRays);
-
         break;
     }
 

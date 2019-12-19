@@ -47,9 +47,6 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
-constexpr milliseconds STATUS_PRINT_INTERVAL{1'000};
-constexpr milliseconds WRITE_OUTPUT_INTERVAL{10'000};
-
 LambdaMaster::~LambdaMaster() {
     try {
         roost::empty_directory(sceneDir.name());
@@ -63,16 +60,14 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                            const string &storageBackendUri,
                            const string &awsRegion,
                            const MasterConfiguration &config)
-    : numberOfLambdas(numberOfLambdas),
+    : config(config),
+      numberOfLambdas(numberOfLambdas),
       publicAddress(publicAddress),
       storageBackendUri(storageBackendUri),
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
       awsRegion(awsRegion),
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
-      statusPrintTimer(STATUS_PRINT_INTERVAL),
-      writeOutputTimer(WRITE_OUTPUT_INTERVAL),
-      workerStatsWriteInterval(config.workerStatsWriteInterval),
-      config(config) {
+      workerStatsWriteInterval(config.workerStatsWriteInterval) {
     LOG(INFO) << "job-id=" << jobId;
 
     const string scenePath = sceneDir.name();
@@ -171,17 +166,13 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         }
 
         auto failure_handler = [this, ID = currentWorkerId]() {
-            const auto &worker = workers.at(ID);
-
             ostringstream message;
+            const auto &worker = workers.at(ID);
             message << "worker died: " << ID;
 
             if (!worker.awsLogStream.empty()) {
                 message << " (" << worker.awsLogStream << ")";
             }
-
-            LOG(INFO) << "dead worker stats: "
-                      << protoutil::to_json(to_protobuf(worker.stats));
 
             throw runtime_error(message.str());
         };
@@ -211,11 +202,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                   .first)
                 .second;
 
-        /* assigns the minimal necessary scene objects for working with a
-         * scene
-         */
         this->objectManager.assignBaseObjects(worker, this->config.assignment);
-
         currentWorkerId++;
         return true;
     });
