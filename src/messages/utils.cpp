@@ -358,6 +358,15 @@ protobuf::FinishedRay to_protobuf(const FinishedRay& finishedRay) {
     return proto;
 }
 
+protobuf::RayBagKey to_protobuf(const RayBagKey& rayBagKey) {
+    protobuf::RayBagKey proto;
+    proto.set_worker_id(rayBagKey.workerId);
+    proto.set_treelet_id(rayBagKey.treeletId);
+    proto.set_bag_id(rayBagKey.bagId);
+    proto.set_size(rayBagKey.size);
+    return proto;
+}
+
 template <class ValueType, class ProtoItem>
 unique_ptr<ValueType[]> p2v(const ProtoItem& item) {
     auto values = make_unique<ValueType[]>(item.values_size());
@@ -651,7 +660,7 @@ protobuf::Sampler sampler::to_protobuf(const string& name,
 }
 
 shared_ptr<GlobalSampler> sampler::from_protobuf(const protobuf::Sampler& ps,
-                                           const int samplesPerPixel) {
+                                                 const int samplesPerPixel) {
     GlobalSampler* sampler;
 
     const string& name = ps.name();
@@ -665,20 +674,20 @@ shared_ptr<GlobalSampler> sampler::from_protobuf(const protobuf::Sampler& ps,
     }
 
     if (name == "lowdiscrepancy" || name == "02sequence") {
-        //sampler = CreateZeroTwoSequenceSampler(paramSet);
+        // sampler = CreateZeroTwoSequenceSampler(paramSet);
         throw runtime_error("Unsupported sampler");
     } else if (name == "maxmindist") {
-        //sampler = CreateMaxMinDistSampler(paramSet);
+        // sampler = CreateMaxMinDistSampler(paramSet);
         throw runtime_error("Unsupported sampler");
     } else if (name == "halton") {
         sampler = CreateHaltonSampler(paramSet, sampleBounds);
     } else if (name == "sobol") {
         sampler = CreateSobolSampler(paramSet, sampleBounds);
     } else if (name == "random") {
-        //sampler = CreateRandomSampler(paramSet);
+        // sampler = CreateRandomSampler(paramSet);
         throw runtime_error("Unsupported sampler");
     } else if (name == "stratified") {
-        //sampler = CreateStratifiedSampler(paramSet);
+        // sampler = CreateStratifiedSampler(paramSet);
         throw runtime_error("Unsupported sampler");
     } else {
         throw runtime_error("unknown sampler name");
@@ -935,6 +944,11 @@ WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& proto) {
     }
 
     return diagnostics;
+}
+
+RayBagKey from_protobuf(const protobuf::RayBagKey& proto) {
+    return {proto.worker_id(), proto.treelet_id(), proto.bag_id(),
+            proto.size()};
 }
 
 }  // namespace pbrt

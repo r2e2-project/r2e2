@@ -60,6 +60,20 @@ void LambdaWorker::processMessage(const Message& message) {
         break;
     }
 
+    case OpCode::ProcessRayBag: {
+        protobuf::RayBagKeys proto;
+
+        for (const protobuf::RayBagKey& item : proto.keys()) {
+            RayBagKey key{from_protobuf(item)};
+            const auto id =
+                transferAgent.requestDownload(key.str(rayBagsKeyPrefix));
+
+            pendingRayBags[id] = make_pair(Task::Download, key);
+        }
+
+        break;
+    }
+
     case OpCode::Bye:
         terminate();
         break;

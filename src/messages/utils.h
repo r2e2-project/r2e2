@@ -73,6 +73,7 @@ protobuf::NetStats to_protobuf(const NetStats& stats);
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats);
 protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics);
 protobuf::FinishedRay to_protobuf(const FinishedRay& finishedRay);
+protobuf::RayBagKey to_protobuf(const RayBagKey& rayBagKey);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
@@ -100,6 +101,7 @@ RayStats from_protobuf(const protobuf::RayStats& state);
 WorkerStats from_protobuf(const protobuf::WorkerStats& state);
 WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& diagnostics);
 FinishedRay from_protobuf(const protobuf::FinishedRay& finishedRay);
+RayBagKey from_protobuf(const protobuf::RayBagKey& rayBagKey);
 
 namespace light {
 

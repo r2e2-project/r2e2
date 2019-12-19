@@ -118,18 +118,14 @@ void LambdaMaster::processMessage(const uint64_t workerId,
     }
 
     case OpCode::RayBagEnqueued: {
-        protobuf::RayBags proto;
+        protobuf::RayBagKeys proto;
         protoutil::from_string(message.payload(), proto);
 
-        for (const auto &item : proto.ray_bags()) {
+        for (const auto &item : proto.keys()) {
             if (objectManager.assignedTreelets.count(item.treelet_id())) {
-                queuedRayBags[item.treelet_id()].push(
-                    {item.worker_id(), item.treelet_id(), item.bag_id(),
-                     item.size()});
+                queuedRayBags[item.treelet_id()].push(from_protobuf(item));
             } else {
-                pendingRayBags[item.treelet_id()].push(
-                    {item.worker_id(), item.treelet_id(), item.bag_id(),
-                     item.size()});
+                pendingRayBags[item.treelet_id()].push(from_protobuf(item));
             }
 
             queueSize[item.treelet_id()] += item.size();

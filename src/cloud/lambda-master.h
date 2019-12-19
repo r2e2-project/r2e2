@@ -149,8 +149,8 @@ class LambdaMaster {
 
     /*** Ray Bags *************************************************************/
 
-    std::map<TreeletId, std::queue<RayBag>> queuedRayBags;
-    std::map<TreeletId, std::queue<RayBag>> pendingRayBags;
+    std::map<TreeletId, std::queue<RayBagKey>> queuedRayBags;
+    std::map<TreeletId, std::queue<RayBagKey>> pendingRayBags;
     std::map<TreeletId, size_t> queueSize;
 
     ////////////////////////////////////////////////////////////////////////////

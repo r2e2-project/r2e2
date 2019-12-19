@@ -176,8 +176,23 @@ class LambdaWorker {
     Poller::Action::Result::Type handleTransferResults();
 
     /* queues */
+
+    /* ray bags ready to be sent out */
     std::map<TreeletId, std::queue<std::pair<size_t, std::string>>> sendQueue{};
+
+    /* ray bags that are received, but not yet unpacked */
+    std::queue<RayBag> receiveQueue{};
+
+    /* id of the paths that are finished (for bookkeeping) */
     std::deque<uint64_t> finishedPathIds{};
+
+    /*** Ray Bags *************************************************************/
+
+    enum class Task { Download, Upload };
+
+    std::string rayBagsKeyPrefix{};
+    std::map<TreeletId, BagId> currentBagId{};
+    std::map<uint64_t, std::pair<Task, RayBagKey>> pendingRayBags{};
 
     /*** Transfer Agent *******************************************************/
 
@@ -227,15 +242,6 @@ class LambdaWorker {
     };
 
     TransferAgent transferAgent;
-
-    /*** Ray Bags *************************************************************/
-
-    std::string rayBagsKeyPrefix{};
-    std::map<TreeletId, BagId> currentBagId{};
-    std::map<uint64_t, RayBag> pendingRayBags{};
-
-    std::string rayBagKey(const WorkerId workerId, const TreeletId treeletId,
-                          BagId bagId);
 
     ////////////////////////////////////////////////////////////////////////////
     // Stats & Diagnostics                                                    //
