@@ -18,16 +18,19 @@ ResultType LambdaWorker::handleOutQueue() {
 
         while (!rayList.empty()) {
             if (queue.empty() ||
-                queue.back().first + RayState::MaxCompressedSize() >
+                queue.back().key.bagSize + RayState::MaxCompressedSize() >
                     MAX_BAG_SIZE) {
-                queue.emplace(make_pair(0, string(MAX_BAG_SIZE, '\0')));
+                /* let's create an empty bag */
+                const auto bagId = currentBagId[treeletId]++;
+                queue.emplace(*workerId, treeletId, bagId, MAX_BAG_SIZE);
             }
 
             auto& bag = queue.back();
             auto& ray = rayList.front();
 
-            const auto len = ray->Serialize(&bag.second[0] + bag.first);
-            bag.first += len;
+            const auto len = ray->Serialize(&bag.data[0] + bag.key.bagSize);
+            bag.key.rayCount++;
+            bag.key.bagSize += len;
 
             rayList.pop_front();
         }
@@ -45,16 +48,13 @@ ResultType LambdaWorker::handleSendQueue() {
         auto& queue = it->second;
 
         while (!queue.empty()) {
-            pair<size_t, string>& item = queue.front();
-            item.second.erase(item.first);
-
-            const auto bagId = currentBagId[treeletId]++;
-            const RayBagKey key{*workerId, treeletId, bagId, 0, item.first};
+            auto& bag = queue.front();
+            bag.data.erase(bag.key.bagSize);
 
             const auto id = transferAgent.requestUpload(
-                key.str(rayBagsKeyPrefix), move(item.second));
+                bag.key.str(rayBagsKeyPrefix), move(bag.data));
 
-            pendingRayBags[id] = make_pair(Task::Upload, key);
+            pendingRayBags[id] = make_pair(Task::Upload, bag.key);
             queue.pop();
         }
     }

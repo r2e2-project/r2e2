@@ -39,6 +39,10 @@ struct RayBag {
     RayBagKey key;
     std::string data;
 
+    RayBag(const WorkerId workerId, const TreeletId treeletId,
+           const BagId bagId, const size_t maxBagLen)
+        : key(workerId, treeletId, bagId, 0, 0), data(maxBagLen, '\0') {}
+
     RayBag(const RayBagKey& key, std::string&& data)
         : key(key), data(std::move(data)) {}
 };

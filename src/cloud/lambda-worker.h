@@ -182,7 +182,7 @@ class LambdaWorker {
     /* queues */
 
     /* ray bags ready to be sent out */
-    std::map<TreeletId, std::queue<std::pair<size_t, std::string>>> sendQueue{};
+    std::map<TreeletId, std::queue<RayBag>> sendQueue{};
 
     /* ray bags that are received, but not yet unpacked */
     std::queue<RayBag> receiveQueue{};
