@@ -32,6 +32,7 @@
 
 namespace pbrt {
 
+constexpr std::chrono::milliseconds QUEUED_RAY_BAGS_INTERVAL{500};
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
@@ -148,6 +149,8 @@ class LambdaMaster {
     std::deque<std::pair<WorkerId, meow::Message>> incomingMessages{};
 
     /*** Ray Bags *************************************************************/
+
+    Poller::Action::Result::Type handleQueuedRayBags();
 
     /* ray bags that are going to be assigned to workers */
     std::map<TreeletId, std::queue<RayBagKey>> queuedRayBags;
@@ -274,6 +277,7 @@ class LambdaMaster {
     FileDescriptor alwaysOnFd{STDOUT_FILENO};
 
     /* Timers */
+    TimerFD queuedRayBagsInterval{QUEUED_RAY_BAGS_INTERVAL};
     TimerFD statusPrintTimer{STATUS_PRINT_INTERVAL};
     TimerFD writeOutputTimer{WRITE_OUTPUT_INTERVAL};
     std::unique_ptr<TimerFD> exitTimer;
