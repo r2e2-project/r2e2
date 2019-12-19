@@ -39,7 +39,7 @@ constexpr std::chrono::milliseconds FINISHED_PATHS_INTERVAL{2'500};
 constexpr std::chrono::milliseconds SEND_QUEUE_INTERVAL{500};
 
 constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
-constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
+constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{5'000};
 
 constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024};  // 4 MiB
 
