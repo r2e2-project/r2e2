@@ -49,3 +49,25 @@ ResultType LambdaMaster::handleQueuedRayBags() {
 
     return ResultType::Continue;
 }
+
+template <class T>
+void moveFromTo(queue<T>& from, queue<T>& to) {
+    while (!from.empty()) {
+        to.emplace(move(from.front()));
+        from.pop();
+    }
+}
+
+void LambdaMaster::moveFromPendingToQueued(const TreeletId treeletId) {
+    if (pendingRayBags.count(treeletId) > 0) {
+        moveFromTo(pendingRayBags[treeletId], queuedRayBags[treeletId]);
+        pendingRayBags.erase(treeletId);
+    }
+}
+
+void LambdaMaster::moveFromQueuedToPending(const TreeletId treeletId) {
+    if (queuedRayBags.count(treeletId) > 0) {
+        moveFromTo(queuedRayBags[treeletId], pendingRayBags[treeletId]);
+        queuedRayBags.erase(treeletId);
+    }
+}

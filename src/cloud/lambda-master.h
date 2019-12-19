@@ -158,6 +158,9 @@ class LambdaMaster {
     /* ray bags that there are no workers for them */
     std::map<TreeletId, std::queue<RayBagKey>> pendingRayBags;
 
+    void moveFromPendingToQueued(const TreeletId treeletId);
+    void moveFromQueuedToPending(const TreeletId treeletId);
+
     std::map<TreeletId, size_t> queueSize;
 
     ////////////////////////////////////////////////////////////////////////////
@@ -204,9 +207,10 @@ class LambdaMaster {
 
       private:
         bool initialized{false};
+
         void loadCamera(const Optional<Bounds2i> &cropWindow);
         void loadSampler(const int samplesPerPixel);
-    } scene;
+    } scene{};
 
     SeqNoSet finishedPathIds{};
 
@@ -239,9 +243,8 @@ class LambdaMaster {
         std::map<ObjectKey, SceneObjectInfo> sceneObjects{};
         std::map<ObjectKey, std::set<ObjectKey>> requiredDependentObjects{};
         std::map<TreeletId, std::set<ObjectKey>> treeletFlattenDependencies{};
-
-        std::map<WorkerId, std::vector<TreeletId>> staticAssignments;
-    } objectManager;
+        std::map<WorkerId, std::vector<TreeletId>> staticAssignments{};
+    } objectManager{};
 
     /*** Tiles ****************************************************************/
 
