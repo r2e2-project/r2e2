@@ -122,16 +122,28 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         protoutil::from_string(message.payload(), proto);
 
         for (const auto &item : proto.keys()) {
-            if (objectManager.assignedTreelets.count(item.treelet_id())) {
-                queuedRayBags[item.treelet_id()].push(from_protobuf(item));
+            const RayBagKey key = from_protobuf(item);
+
+            if (objectManager.assignedTreelets.count(key.treeletId)) {
+                queuedRayBags[key.treeletId].push(key);
             } else {
-                pendingRayBags[item.treelet_id()].push(from_protobuf(item));
+                pendingRayBags[key.treeletId].push(key);
             }
 
-            queueSize[item.treelet_id()] += item.size();
+            queueSize[key.treeletId] += key.size;
         }
 
         break;
+    }
+
+    case OpCode::RayBagDequeued: {
+        protobuf::RayBagKeys proto;
+        protoutil::from_string(message.payload(), proto);
+
+        for (const auto &item : proto.keys()) {
+            const RayBagKey key = from_protobuf(item);
+            queueSize[key.treeletId] -= key.size;
+        }
     }
 
     default:

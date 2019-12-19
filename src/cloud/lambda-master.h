@@ -149,8 +149,12 @@ class LambdaMaster {
 
     /*** Ray Bags *************************************************************/
 
+    /* ray bags that are going to be assigned to workers */
     std::map<TreeletId, std::queue<RayBagKey>> queuedRayBags;
+
+    /* ray bags that there are no workers for them */
     std::map<TreeletId, std::queue<RayBagKey>> pendingRayBags;
+
     std::map<TreeletId, size_t> queueSize;
 
     ////////////////////////////////////////////////////////////////////////////
