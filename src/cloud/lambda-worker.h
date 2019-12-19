@@ -196,7 +196,7 @@ class LambdaWorker {
 
     std::string rayBagsKeyPrefix{};
     std::map<TreeletId, BagId> currentBagId{};
-    std::map<uint64_t, std::pair<Task, RayBagKey>> pendingRayBags{};
+    std::map<uint64_t, std::pair<Task, RayBagInfo>> pendingRayBags{};
 
     /*** Transfer Agent *******************************************************/
 

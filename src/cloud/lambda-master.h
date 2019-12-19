@@ -152,10 +152,10 @@ class LambdaMaster {
     Poller::Action::Result::Type handleQueuedRayBags();
 
     /* ray bags that are going to be assigned to workers */
-    std::map<TreeletId, std::queue<RayBagKey>> queuedRayBags;
+    std::map<TreeletId, std::queue<RayBagInfo>> queuedRayBags;
 
     /* ray bags that there are no workers for them */
-    std::map<TreeletId, std::queue<RayBagKey>> pendingRayBags;
+    std::map<TreeletId, std::queue<RayBagInfo>> pendingRayBags;
 
     void moveFromPendingToQueued(const TreeletId treeletId);
     void moveFromQueuedToPending(const TreeletId treeletId);

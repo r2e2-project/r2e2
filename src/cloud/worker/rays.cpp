@@ -56,10 +56,6 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 ResultType LambdaWorker::handleTraceQueue() {
     RECORD_INTERVAL("handleTraceQueue");
 
-    auto recordFinishedPath = [this](const uint64_t pathId) {
-        this->finishedPathIds.push_back(pathId);
-    };
-
     deque<RayStatePtr> processedRays;
 
     constexpr size_t MAX_RAYS = 5'000;
@@ -91,7 +87,7 @@ ResultType LambdaWorker::handleTraceQueue() {
             } else if (emptyVisit) {
                 newRay.Ld = 0.f;
                 finishedQueue.emplace_back(*newRayPtr);
-                recordFinishedPath(pathId);
+                finishedPathIds.push_back(pathId);
             }
         } else if (ray.hit) {
             RayStatePtr bounceRay, shadowRay;
@@ -107,7 +103,7 @@ ResultType LambdaWorker::handleTraceQueue() {
             if (bounceRay != nullptr) {
                 processedRays.push_back(move(bounceRay));
             } else { /* this was the last bounce in this path */
-                recordFinishedPath(pathId);
+                finishedPathIds.push_back(pathId);
             }
 
             if (shadowRay != nullptr) {

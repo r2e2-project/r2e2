@@ -400,14 +400,15 @@ message JobSummary {
 
 // Ray Bags
 
-message RayBagKey {
+message RayBagInfo {
     uint64 worker_id = 1;
     uint32 treelet_id = 2;
     uint64 bag_id = 3;
     uint64 ray_count = 4;
     uint64 bag_size = 5;
+    bool finished_rays = 6;
 }
 
-message RayBagKeys {
-    repeated RayBagKey keys = 1;
+message RayBags {
+    repeated RayBagInfo items = 1;
 }

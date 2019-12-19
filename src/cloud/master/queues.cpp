@@ -13,11 +13,11 @@ using OpCode = Message::OpCode;
 ResultType LambdaMaster::handleQueuedRayBags() {
     queuedRayBagsTimer.reset();
 
-    map<WorkerId, queue<RayBagKey>> assignedBags;
+    map<WorkerId, queue<RayBagInfo>> assignedBags;
 
     for (auto& treeletRayBags : queuedRayBags) {
         const TreeletId treeletId = treeletRayBags.first;
-        queue<RayBagKey>& bags = treeletRayBags.second;
+        queue<RayBagInfo>& bags = treeletRayBags.second;
 
         /* assigning ray bags to workers */
         while (!bags.empty()) {
@@ -34,11 +34,11 @@ ResultType LambdaMaster::handleQueuedRayBags() {
     }
 
     for (auto& item : assignedBags) {
-        queue<RayBagKey>& bags = item.second;
-        protobuf::RayBagKeys proto;
+        queue<RayBagInfo>& bags = item.second;
+        protobuf::RayBags proto;
 
         while (!bags.empty()) {
-            *proto.add_keys() = to_protobuf(bags.front());
+            *proto.add_items() = to_protobuf(bags.front());
             bags.pop();
         }
 

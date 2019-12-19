@@ -83,11 +83,11 @@ void LambdaMaster::processMessage(const uint64_t workerId,
     }
 
     case OpCode::RayBagEnqueued: {
-        protobuf::RayBagKeys proto;
+        protobuf::RayBags proto;
         protoutil::from_string(message.payload(), proto);
 
-        for (const auto &item : proto.keys()) {
-            const RayBagKey key = from_protobuf(item);
+        for (const auto &item : proto.items()) {
+            const RayBagInfo key = from_protobuf(item);
 
             if (objectManager.assignedTreelets.count(key.treeletId)) {
                 queuedRayBags[key.treeletId].push(key);
@@ -102,11 +102,11 @@ void LambdaMaster::processMessage(const uint64_t workerId,
     }
 
     case OpCode::RayBagDequeued: {
-        protobuf::RayBagKeys proto;
+        protobuf::RayBags proto;
         protoutil::from_string(message.payload(), proto);
 
-        for (const auto &item : proto.keys()) {
-            const RayBagKey key = from_protobuf(item);
+        for (const auto &item : proto.items()) {
+            const RayBagInfo key = from_protobuf(item);
             queueSize[key.treeletId] -= key.bagSize;
         }
     }

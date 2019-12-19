@@ -303,13 +303,14 @@ protobuf::FinishedRay to_protobuf(const FinishedRay& finishedRay) {
     return proto;
 }
 
-protobuf::RayBagKey to_protobuf(const RayBagKey& rayBagKey) {
-    protobuf::RayBagKey proto;
-    proto.set_worker_id(rayBagKey.workerId);
-    proto.set_treelet_id(rayBagKey.treeletId);
-    proto.set_bag_id(rayBagKey.bagId);
-    proto.set_ray_count(rayBagKey.rayCount);
-    proto.set_bag_size(rayBagKey.bagSize);
+protobuf::RayBagInfo to_protobuf(const RayBagInfo& RayBagInfo) {
+    protobuf::RayBagInfo proto;
+    proto.set_worker_id(RayBagInfo.workerId);
+    proto.set_treelet_id(RayBagInfo.treeletId);
+    proto.set_bag_id(RayBagInfo.bagId);
+    proto.set_ray_count(RayBagInfo.rayCount);
+    proto.set_bag_size(RayBagInfo.bagSize);
+    proto.set_finished_rays(RayBagInfo.finishedRays);
     return proto;
 }
 
@@ -841,9 +842,9 @@ WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& proto) {
     return diagnostics;
 }
 
-RayBagKey from_protobuf(const protobuf::RayBagKey& proto) {
+RayBagInfo from_protobuf(const protobuf::RayBagInfo& proto) {
     return {proto.worker_id(), proto.treelet_id(), proto.bag_id(),
-            proto.ray_count(), proto.bag_size()};
+            proto.ray_count(), proto.bag_size(), proto.finished_rays()};
 }
 
 }  // namespace pbrt

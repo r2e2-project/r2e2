@@ -61,10 +61,10 @@ void LambdaWorker::processMessage(const Message& message) {
     }
 
     case OpCode::ProcessRayBag: {
-        protobuf::RayBagKeys proto;
+        protobuf::RayBags proto;
 
-        for (const protobuf::RayBagKey& item : proto.keys()) {
-            RayBagKey key{from_protobuf(item)};
+        for (const protobuf::RayBagInfo& item : proto.items()) {
+            RayBagInfo key{from_protobuf(item)};
             const auto id =
                 transferAgent.requestDownload(key.str(rayBagsKeyPrefix));
 
