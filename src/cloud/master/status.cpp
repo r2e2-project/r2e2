@@ -18,7 +18,7 @@ ResultType LambdaMaster::handleStatusMessage() {
         cerr << "Job terminated due to inactivity." << endl;
         return ResultType::Exit;
     } else if (exitTimer == nullptr &&
-               totalPaths == workerStats.finishedPaths()) {
+               scene.totalPaths == workerStats.finishedPaths()) {
         cerr << "Terminating the job in "
              << duration_cast<seconds>(EXIT_GRACE_PERIOD).count() << "s..."
              << endl;
@@ -57,9 +57,9 @@ ResultType LambdaMaster::handleStatusMessage() {
     ostringstream oss;
     oss << "\033[0m" << BG_DARK_GREEN << " \u21af " << finishedPathIds.size()
         << " (" << fixed << setprecision(2)
-        << percentage(finishedPathIds.size(), totalPaths) << "%) ["
+        << percentage(finishedPathIds.size(), scene.totalPaths) << "%) ["
         << setprecision(2)
-        << percentage(workerStats.finishedPaths(), totalPaths) << "%] "
+        << percentage(workerStats.finishedPaths(), scene.totalPaths) << "%] "
         << BG_LIGHT_GREEN << " \u03bb " << workers.size() << " ("
         << initializedWorkers << ") " << BG_DARK_GREEN << " \u21c4 "
         << workerStats.queueStats.connected << " ("

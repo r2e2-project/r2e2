@@ -27,7 +27,7 @@ void LambdaMaster::dumpJobSummary() const {
         1000.0);
 
     proto.set_num_lambdas(numberOfLambdas);
-    proto.set_total_paths(totalPaths);
+    proto.set_total_paths(scene.totalPaths);
     proto.set_finished_paths(workerStats.finishedPaths());
     proto.set_finished_rays(workerStats.finishedRays());
 

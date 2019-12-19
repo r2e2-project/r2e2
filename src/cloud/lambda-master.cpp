@@ -153,8 +153,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         statsOstream << "workers " << numberOfLambdas << '\n';
     }
 
-    totalPaths = scene.sampleBounds.Area() * scene.sampler->samplesPerPixel;
-
     if (tileSize == 0) {
         tileSize = defaultTileSize(scene.sampler->samplesPerPixel);
     } else if (tileSize == numeric_limits<typeof(tileSize)>::max()) {

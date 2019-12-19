@@ -145,6 +145,7 @@ void LambdaMaster::SceneData::initialize(const int samplesPerPixel,
 
     loadCamera(cropWindow);
     loadSampler(samplesPerPixel);
+    totalPaths = sampleBounds.Area() * sampler->samplesPerPixel;
 
     initialized = true;
 }

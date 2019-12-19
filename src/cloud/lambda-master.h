@@ -138,6 +138,7 @@ class LambdaMaster {
 
     struct SceneData {
       public:
+        size_t totalPaths{0};
         Bounds2i sampleBounds{};
         Vector2i sampleExtent{};
         std::shared_ptr<Camera> camera{};
@@ -152,6 +153,8 @@ class LambdaMaster {
         void loadCamera(const Optional<Bounds2i> &cropWindow);
         void loadSampler(const int samplesPerPixel);
     } scene;
+
+    SeqNoSet finishedPathIds{};
 
     /*** Object Assignment ****************************************************/
 
@@ -200,13 +203,6 @@ class LambdaMaster {
 
     /* Message Queues */
     std::deque<std::pair<WorkerId, meow::Message>> incomingMessages{};
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Scene Objects                                                          //
-    ////////////////////////////////////////////////////////////////////////////
-
-    size_t totalPaths{0};
-    SeqNoSet finishedPathIds{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Ray Bags                                                               //
