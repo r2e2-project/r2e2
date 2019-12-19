@@ -23,6 +23,7 @@ class Message {
         FinishedRays,
         FinishedPaths,
         RayBagEnqueued,
+        RayBagDequeued,
         ProcessRayBag,
         Bye,
 
@@ -40,6 +41,7 @@ class Message {
         "FinishedRays",
         "FinishedPaths",
         "RayBagEnqueued",
+        "RayBagDequeued",
         "ProcessRayBag",
         "Bye"};
 

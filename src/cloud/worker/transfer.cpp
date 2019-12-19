@@ -92,28 +92,27 @@ ResultType LambdaWorker::handleReceiveQueue() {
 
 ResultType LambdaWorker::handleTransferResults() {
     protobuf::RayBagKeys enqueuedProto;
+    protobuf::RayBagKeys dequeuedProto;
 
     while (!transferAgent.empty()) {
         TransferAgent::Action action = move(transferAgent.pop());
 
         auto keyIt = pendingRayBags.find(action.id);
         if (keyIt != pendingRayBags.end()) {
-            const auto& bag = keyIt->second.second;
+            const auto& key = keyIt->second.second;
 
             switch (keyIt->second.first) {
             case Task::Upload: {
                 /* we have to tell the master that we uploaded this */
-                protobuf::RayBagKey& item = *enqueuedProto.add_keys();
-                item.set_worker_id(bag.workerId);
-                item.set_treelet_id(bag.treeletId);
-                item.set_bag_id(bag.bagId);
-                item.set_size(bag.size);
+                *enqueuedProto.add_keys() = to_protobuf(key);
                 break;
             }
 
             case Task::Download:
-                /* we have to put the received bag on the receive queue */
-                receiveQueue.emplace(keyIt->second.second, move(action.data));
+                /* we have to put the received bag on the receive queue,
+                   and tell the master */
+                receiveQueue.emplace(key, move(action.data));
+                *dequeuedProto.add_keys() = to_protobuf(key);
                 break;
             }
 
@@ -127,6 +126,12 @@ ResultType LambdaWorker::handleTransferResults() {
         coordinatorConnection->enqueue_write(
             Message::str(*workerId, OpCode::RayBagEnqueued,
                          protoutil::to_string(enqueuedProto)));
+    }
+
+    if (dequeuedProto.keys_size() > 0) {
+        coordinatorConnection->enqueue_write(
+            Message::str(*workerId, OpCode::RayBagDequeued,
+                         protoutil::to_string(dequeuedProto)));
     }
 
     return ResultType::Continue;
