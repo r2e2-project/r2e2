@@ -178,7 +178,6 @@ class LambdaMaster {
     const steady_clock::time_point startTime{steady_clock::now()};
 
     steady_clock::time_point lastActionTime{startTime};
-    steady_clock::time_point allToAllConnectStart{};
     steady_clock::time_point generationStart{};
     steady_clock::time_point lastFinishedRay{};
 

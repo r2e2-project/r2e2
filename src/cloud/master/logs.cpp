@@ -16,11 +16,8 @@ void LambdaMaster::dumpJobSummary() const {
         1000.0);
 
     proto.set_launch_time(
-        duration_cast<milliseconds>(generationStart - allToAllConnectStart)
-                .count() /
-            1000.0 +
-        duration_cast<milliseconds>(allToAllConnectStart - startTime).count() /
-            1000.0);
+        duration_cast<milliseconds>(generationStart - startTime).count() /
+        1000.0);
 
     proto.set_ray_time(
         duration_cast<milliseconds>(lastFinishedRay - generationStart).count() /
@@ -49,17 +46,8 @@ void LambdaMaster::printJobSummary() const {
              1000.0)
          << " seconds" << endl;
 
-    cerr << "      - Launching lambdas & downloading the scene: " << fixed
-         << setprecision(2)
-         << (duration_cast<milliseconds>(allToAllConnectStart - startTime)
-                 .count() /
-             1000.0)
-         << " seconds" << endl;
-
-    cerr << "      - Making all-to-all connections: " << fixed
-         << setprecision(2)
-         << (duration_cast<milliseconds>(generationStart - allToAllConnectStart)
-                 .count() /
+    cerr << "      - Launching lambdas: " << fixed << setprecision(2)
+         << (duration_cast<milliseconds>(generationStart - startTime).count() /
              1000.0)
          << " seconds" << endl;
 
