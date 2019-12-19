@@ -14,6 +14,13 @@ using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 
+/* if (tiles.canSendTiles && tiles.cameraRaysRemaining() &&
+    stats.queueStats.pending + stats.queueStats.out +
+            stats.queueStats.ray <
+        config.newTileThreshold) {
+    tiles.sendWorkerTile(worker);
+} */
+
 ResultType LambdaMaster::handleMessages() {
     while (!incomingMessages.empty()) {
         auto front = move(incomingMessages.front());
@@ -45,48 +52,6 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             worker.initialized = true;
             initializedWorkers++;
         }
-
-        break;
-    }
-
-    case OpCode::WorkerStats: {
-        protobuf::WorkerStats proto;
-        protoutil::from_string(message.payload(), proto);
-        auto stats = from_protobuf(proto);
-
-        if (stats.finishedRays() != 0) {
-            lastFinishedRay = lastActionTime = steady_clock::now();
-        }
-
-        /* merge into global worker stats */
-        workerStats.merge(stats);
-
-        /* merge into local worker stats */
-        auto &worker = workers.at(workerId);
-        worker.stats.merge(stats);
-
-        if (config.workerStatsWriteInterval > 0 &&
-            worker.nextStatusLogTimestamp < proto.timestamp_us()) {
-            if (worker.nextStatusLogTimestamp == 0) {
-                statsOstream << "start " << worker.id << ' '
-                             << proto.worker_start_us() << '\n';
-            }
-
-            statsOstream << worker.id << ' ' << proto.timestamp_us() << ' '
-                         << protoutil::to_json(to_protobuf(worker.stats))
-                         << '\n';
-
-            worker.nextStatusLogTimestamp =
-                duration_cast<microseconds>(workerStatsWriteInterval).count() +
-                proto.timestamp_us();
-        }
-
-        /* if (tiles.canSendTiles && tiles.cameraRaysRemaining() &&
-            stats.queueStats.pending + stats.queueStats.out +
-                    stats.queueStats.ray <
-                config.newTileThreshold) {
-            tiles.sendWorkerTile(worker);
-        } */
 
         break;
     }

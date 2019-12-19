@@ -119,7 +119,6 @@ class LambdaMaster {
         bool initialized{false};
         std::shared_ptr<TCPConnection> connection;
         std::set<ObjectKey> objects{};
-        WorkerStats stats{};
         uint64_t nextStatusLogTimestamp{0};
         std::string awsLogStream{};
 
@@ -167,17 +166,9 @@ class LambdaMaster {
     // Stats                                                                  //
     ////////////////////////////////////////////////////////////////////////////
 
-    /* logs the worker stats to disk for later processing */
-    Poller::Action::Result::Type handleWriteWorkerStats();
-
     /* prints the status message every second */
+
     Poller::Action::Result::Type handleStatusMessage();
-
-    void aggregateQueueStats();
-
-    WorkerStats workerStats{};
-    std::ofstream statsOstream{};
-    std::chrono::seconds workerStatsWriteInterval{1};
 
     /*** Timepoints ***********************************************************/
 

@@ -114,12 +114,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return !messageParser.empty(); },
         []() { throw runtime_error("messages failed"); }));
 
-    /* send updated stats */
-    loop.poller().add_action(Poller::Action(
-        workerStatsTimer.fd, Direction::In,
-        bind(&LambdaWorker::handleWorkerStats, this), [this]() { return true; },
-        []() { throw runtime_error("worker stats failed"); }));
-
     /* record diagnostics */
     if (config.collectDiagnostics) {
         loop.poller().add_action(Poller::Action(

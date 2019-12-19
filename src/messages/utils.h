@@ -67,10 +67,6 @@ protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 protobuf::Scene to_protobuf(const Scene& scene);
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
 protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey);
-protobuf::RayStats to_protobuf(const RayStats& stats);
-protobuf::QueueStats to_protobuf(const QueueStats& stats);
-protobuf::NetStats to_protobuf(const NetStats& stats);
-protobuf::WorkerStats to_protobuf(const WorkerStats& stats);
 protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics);
 protobuf::FinishedRay to_protobuf(const FinishedRay& finishedRay);
 protobuf::RayBagKey to_protobuf(const RayBagKey& rayBagKey);
@@ -97,9 +93,6 @@ TextureParams from_protobuf(
     std::map<std::string, std::shared_ptr<Texture<Float>>>& fTex,
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex);
 ObjectKey from_protobuf(const protobuf::ObjectKey& ObjectKey);
-RayStats from_protobuf(const protobuf::RayStats& state);
-WorkerStats from_protobuf(const protobuf::WorkerStats& state);
-WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& diagnostics);
 FinishedRay from_protobuf(const protobuf::FinishedRay& finishedRay);
 RayBagKey from_protobuf(const protobuf::RayBagKey& rayBagKey);
 

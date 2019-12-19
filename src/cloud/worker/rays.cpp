@@ -15,14 +15,12 @@ using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
 void LambdaWorker::pushTraceQueue(RayStatePtr&& state) {
-    workerStats.recordWaitingRay(*state);
     traceQueue.push_back(move(state));
 }
 
 RayStatePtr LambdaWorker::popTraceQueue() {
     RayStatePtr state = move(traceQueue.front());
     traceQueue.pop_front();
-    workerStats.recordProcessedRay(*state);
     return state;
 }
 
@@ -43,16 +41,11 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
             statePtr->trackRay = trackRays ? bd(randEngine) : false;
 
-            logRayAction(*statePtr, RayAction::Generated);
-            workerStats.recordDemandedRay(*statePtr);
-
             const auto nextTreelet = statePtr->CurrentTreelet();
 
             if (treeletIds.count(nextTreelet)) {
                 pushTraceQueue(move(statePtr));
             } else {
-                logRayAction(*statePtr, RayAction::Queued);
-                workerStats.recordSendingRay(*statePtr);
                 outQueue[nextTreelet].push_back(move(statePtr));
                 outQueueSize++;
             }
@@ -64,7 +57,6 @@ ResultType LambdaWorker::handleTraceQueue() {
     RECORD_INTERVAL("handleTraceQueue");
 
     auto recordFinishedPath = [this](const uint64_t pathId) {
-        this->workerStats.recordFinishedPath();
         this->finishedPathIds.push_back(pathId);
     };
 
@@ -79,8 +71,6 @@ ResultType LambdaWorker::handleTraceQueue() {
 
         const uint64_t pathId = ray.PathID();
 
-        logRayAction(ray, RayAction::Traced);
-
         if (!ray.toVisitEmpty()) {
             const uint32_t rayTreelet = ray.toVisitTop().treelet;
             auto newRayPtr = graphics::TraceRay(move(rayPtr), *scene.bvh);
@@ -92,8 +82,6 @@ ResultType LambdaWorker::handleTraceQueue() {
             if (newRay.isShadowRay) {
                 if (hit || emptyVisit) {
                     newRay.Ld = hit ? 0.f : newRay.Ld;
-                    logRayAction(*newRayPtr, RayAction::Finished);
-                    workerStats.recordFinishedRay(*newRayPtr);
                     finishedQueue.emplace_back(*newRayPtr);
                 } else {
                     processedRays.push_back(move(newRayPtr));
@@ -102,8 +90,6 @@ ResultType LambdaWorker::handleTraceQueue() {
                 processedRays.push_back(move(newRayPtr));
             } else if (emptyVisit) {
                 newRay.Ld = 0.f;
-                logRayAction(*newRayPtr, RayAction::Finished);
-                workerStats.recordFinishedRay(*newRayPtr);
                 finishedQueue.emplace_back(*newRayPtr);
                 recordFinishedPath(pathId);
             }
@@ -115,19 +101,16 @@ ResultType LambdaWorker::handleTraceQueue() {
 
             if (bounceRay == nullptr && shadowRay == nullptr) {
                 /* rayPtr is not touched if if Shade() returned nothing */
-                workerStats.recordFinishedRay(*rayPtr);
-                logRayAction(*rayPtr, RayAction::Finished);
+                // XXX logging
             }
 
             if (bounceRay != nullptr) {
-                logRayAction(*bounceRay, RayAction::Generated);
                 processedRays.push_back(move(bounceRay));
             } else { /* this was the last bounce in this path */
                 recordFinishedPath(pathId);
             }
 
             if (shadowRay != nullptr) {
-                logRayAction(*shadowRay, RayAction::Generated);
                 processedRays.push_back(move(shadowRay));
             }
         } else {
@@ -139,14 +122,11 @@ ResultType LambdaWorker::handleTraceQueue() {
         RayStatePtr ray = move(processedRays.front());
         processedRays.pop_front();
 
-        workerStats.recordDemandedRay(*ray);
         const TreeletId nextTreelet = ray->CurrentTreelet();
 
         if (treeletIds.count(nextTreelet)) {
             pushTraceQueue(move(ray));
         } else {
-            logRayAction(*ray, RayAction::Queued);
-            workerStats.recordSendingRay(*ray);
             outQueue[nextTreelet].push_back(move(ray));
             outQueueSize++;
         }

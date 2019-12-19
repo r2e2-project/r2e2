@@ -19,7 +19,7 @@ ResultType LambdaMaster::handleStatusMessage() {
         cerr << "Job terminated due to inactivity." << endl;
         return ResultType::Exit;
     } else if (exitTimer == nullptr &&
-               scene.totalPaths == workerStats.finishedPaths()) {
+               scene.totalPaths == 0) {
         cerr << "Terminating the job in "
              << duration_cast<seconds>(EXIT_GRACE_PERIOD).count() << "s..."
              << endl;
@@ -36,17 +36,14 @@ ResultType LambdaMaster::handleStatusMessage() {
                            []() { throw runtime_error("job finish"); }));
     }
 
-    aggregateQueueStats();
-
     const auto elapsedTime = steady_clock::now() - startTime;
     const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
 
     const auto rayThroughput =
-        1.0 * workerStats.finishedRays() / numberOfLambdas /
+        1.0 * 0 / numberOfLambdas /
         duration_cast<seconds>(lastFinishedRay - generationStart).count();
 
-    const float rtt = 1.0 * workerStats.netStats.rtt.count() /
-                      workerStats.netStats.packetsSent;
+    const float rtt = 0.f;
 
     auto percentage = [](const int n, const int total) -> double {
         return total ? (((int)(100 * (100.0 * n / total))) / 100.0) : 0.0;
@@ -60,11 +57,11 @@ ResultType LambdaMaster::handleStatusMessage() {
         << " (" << fixed << setprecision(2)
         << percentage(finishedPathIds.size(), scene.totalPaths) << "%) ["
         << setprecision(2)
-        << percentage(workerStats.finishedPaths(), scene.totalPaths) << "%] "
+        << percentage(0, scene.totalPaths) << "%] "
         << BG_LIGHT_GREEN << " \u03bb " << workers.size() << " ("
         << initializedWorkers << ") " << BG_DARK_GREEN << " \u21c4 "
-        << workerStats.queueStats.connected << " ("
-        << workerStats.queueStats.connecting << ") " << BG_LIGHT_GREEN << " T "
+        << 0 << " ("
+        << 0 << ") " << BG_LIGHT_GREEN << " T "
         << rayThroughput << " " << BG_DARK_GREEN << " \u21ba "
         << setprecision(2) << rtt << " ms " << BG_LIGHT_GREEN << " "
         << setfill('0') << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)

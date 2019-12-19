@@ -66,8 +66,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       storageBackendUri(storageBackendUri),
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
       awsRegion(awsRegion),
-      awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
-      workerStatsWriteInterval(config.workerStatsWriteInterval) {
+      awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https") {
     LOG(INFO) << "job-id=" << jobId;
 
     const string scenePath = sceneDir.name();
@@ -118,16 +117,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     /* are we logging anything? */
     if (config.collectDebugLogs || config.collectDiagnostics ||
-        config.workerStatsWriteInterval > 0 || config.rayActionsLogRate > 0 ||
-        config.packetsLogRate > 0) {
+        config.rayActionsLogRate > 0 || config.packetsLogRate > 0) {
         roost::create_directories(config.logsDirectory);
-    }
-
-    if (config.workerStatsWriteInterval > 0) {
-        statsOstream.open(this->config.logsDirectory + "/" + "STATS",
-                          ios::out | ios::trunc);
-
-        statsOstream << "workers " << numberOfLambdas << '\n';
     }
 
     cout << "Tile size is " << tiles.tileSize << "\u00d7" << tiles.tileSize
@@ -292,8 +283,6 @@ void LambdaMaster::run() {
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 
-    statsOstream.close();
-
     vector<storage::GetRequest> getRequests;
     const string logPrefix = "logs/" + jobId + "/";
 
@@ -322,25 +311,6 @@ void LambdaMaster::run() {
         this_thread::sleep_for(10s);
         storageBackend->get(getRequests);
         cerr << "done." << endl;
-    }
-}
-
-void LambdaMaster::aggregateQueueStats() {
-    workerStats.queueStats = QueueStats();
-
-    for (const auto &kv : workers) {
-        const auto &worker = kv.second;
-        workerStats.queueStats.ray += worker.stats.queueStats.ray;
-        workerStats.queueStats.finished += worker.stats.queueStats.finished;
-        workerStats.queueStats.pending += worker.stats.queueStats.pending;
-        workerStats.queueStats.out += worker.stats.queueStats.out;
-        workerStats.queueStats.connecting += worker.stats.queueStats.connecting;
-        workerStats.queueStats.connected += worker.stats.queueStats.connected;
-        workerStats.queueStats.outstandingUdp +=
-            worker.stats.queueStats.outstandingUdp;
-
-        workerStats.netStats.rtt += worker.stats.netStats.rtt;
-        workerStats.netStats.packetsSent += worker.stats.netStats.packetsSent;
     }
 }
 

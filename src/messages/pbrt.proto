@@ -257,28 +257,6 @@ message GenerateRays {
     Bounds2i crop_window = 1;
 }
 
-message GetWorker {
-    uint32 treelet_id = 1;
-}
-
-message ConnectTo {
-    uint64 worker_id = 1;
-    string address = 2;
-}
-
-message ConnectRequest {
-    uint64 worker_id = 1;
-    int32 my_seed = 2;
-    int32 your_seed = 3;
-}
-
-message ConnectResponse {
-    uint64 worker_id = 1;
-    int32 my_seed = 2;
-    int32 your_seed = 3;
-    repeated uint32 treelet_ids = 4;
-}
-
 message RayStats {
     uint64 sent_bytes = 1;
     uint64 received_bytes = 2;
@@ -302,11 +280,6 @@ message QueueStats {
     uint64 connected = 6;
     uint64 outstanding_udp = 7;
     uint64 queued_udp = 8;
-}
-
-message NetStats {
-    uint64 packets_sent = 1;
-    int64 rtt = 2;
 }
 
 message ObjectRayStats {
@@ -337,16 +310,6 @@ message MetricPoint {
 message Metrics {
     string name = 1;
     repeated MetricPoint points = 2;
-}
-
-message WorkerStats {
-    uint64 finished_paths = 1;
-    RayStats aggregate_stats = 2;
-    QueueStats queue_stats = 3;
-    NetStats net_stats = 4;
-    repeated ObjectRayStats object_stats = 5;
-    uint64 worker_start_us = 6;
-    uint64 timestamp_us = 7;
 }
 
 message TrafficData {
@@ -381,32 +344,6 @@ message TreeletStatsTrace {
 message SingleTreeletStatsTrace {
     double demand = 1;
     uint32 allocations = 2;
-}
-
-message WorkerStatsTrace {
-    map<uint32, SingleWorkerStatsTrace> map = 1;
-}
-
-message SingleWorkerStatsTrace {
-    // in [0,1]
-    double cpu_fraction = 1;
-    // rays/s
-    double rays_processed = 2;
-    // rays/s
-    double rays_received = 3;
-    QueueStats queue_stats = 4;
-    // b/s
-    double ingress = 5;
-    // b/s
-    double outgress = 6;
-    uint32 treelet_id = 7;
-}
-
-message StatsTrace {
-    oneof data {
-        WorkerStatsTrace worker_stats = 2;
-        TreeletStatsTrace treelet_stats = 3;
-    }
 }
 
 // Materials & Textures

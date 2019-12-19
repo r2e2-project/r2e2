@@ -206,28 +206,13 @@ class LambdaWorker {
     // Stats & Diagnostics                                                    //
     ////////////////////////////////////////////////////////////////////////////
 
-    Poller::Action::Result::Type handleWorkerStats();
     Poller::Action::Result::Type handleDiagnostics();
 
-    WorkerStats workerStats;
     WorkerDiagnostics lastDiagnostics;
 
     ////////////////////////////////////////////////////////////////////////////
     // Logging                                                                //
     ////////////////////////////////////////////////////////////////////////////
-
-    enum class RayAction {
-        Generated,
-        Traced,
-        Pending,
-        Queued,
-        Sent,
-        Received,
-        Finished
-    };
-
-    void logRayAction(const RayState& state, const RayAction action,
-                      const WorkerId otherParty = -1);
 
     const std::string logBase{"pbrt-worker"};
     const std::string infoLogName{logBase + ".INFO"};
@@ -250,7 +235,6 @@ class LambdaWorker {
     /* Timers */
     TimerFD sendQueueTimer{SEND_QUEUE_INTERVAL};
     TimerFD finishedPathsTimer{FINISHED_PATHS_INTERVAL};
-    TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
     TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
 };
 

@@ -256,61 +256,6 @@ protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey) {
     return proto;
 }
 
-protobuf::RayStats to_protobuf(const RayStats& stats) {
-    protobuf::RayStats proto;
-    proto.set_sent_bytes(stats.sentBytes);
-    proto.set_received_bytes(stats.receivedBytes);
-    proto.set_generated_bytes(stats.generatedBytes);
-    proto.set_acknowledged_bytes(stats.acknowledgedBytes);
-    proto.set_waiting_rays(stats.waitingRays);
-    proto.set_processed_rays(stats.processedRays);
-    proto.set_demanded_rays(stats.demandedRays);
-    proto.set_sending_rays(stats.sendingRays);
-    proto.set_pending_rays(stats.pendingRays);
-    proto.set_finished_rays(stats.finishedRays);
-    return proto;
-}
-
-protobuf::QueueStats to_protobuf(const QueueStats& stats) {
-    protobuf::QueueStats proto;
-    proto.set_ray(stats.ray);
-    proto.set_finished(stats.finished);
-    proto.set_pending(stats.pending);
-    proto.set_out(stats.out);
-    proto.set_connecting(stats.connecting);
-    proto.set_connected(stats.connected);
-    proto.set_outstanding_udp(stats.outstandingUdp);
-    proto.set_queued_udp(stats.queuedUdp);
-    return proto;
-}
-
-protobuf::NetStats to_protobuf(const NetStats& stats) {
-    protobuf::NetStats proto;
-    proto.set_packets_sent(stats.packetsSent);
-    proto.set_rtt(stats.rtt.count());
-    return proto;
-}
-
-protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
-    protobuf::WorkerStats proto;
-    proto.set_finished_paths(stats._finishedPaths);
-    (*proto.mutable_aggregate_stats()) = to_protobuf(stats.aggregateStats);
-    (*proto.mutable_queue_stats()) = to_protobuf(stats.queueStats);
-    (*proto.mutable_net_stats()) = to_protobuf(stats.netStats);
-
-    for (const auto& kv : stats.objectStats) {
-        protobuf::ObjectRayStats* ray_stats = proto.add_object_stats();
-        (*ray_stats->mutable_id()) = to_protobuf(kv.first);
-        (*ray_stats->mutable_stats()) = to_protobuf(kv.second);
-    }
-
-    proto.set_worker_start_us(
-        duration_cast<microseconds>(stats.startTime.time_since_epoch())
-            .count());
-
-    return proto;
-}
-
 protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics) {
     protobuf::WorkerDiagnostics proto;
 
@@ -865,57 +810,6 @@ protobuf::SpectrumTexture spectrum_texture::to_protobuf(
         pbrt::to_protobuf(tex2world.GetMatrix()));
     texture.mutable_texture_params()->CopyFrom(pbrt::to_protobuf(tp));
     return texture;
-}
-
-RayStats from_protobuf(const protobuf::RayStats& proto) {
-    RayStats stats;
-    stats.sentBytes = proto.sent_bytes();
-    stats.receivedBytes = proto.received_bytes();
-    stats.generatedBytes = proto.generated_bytes();
-    stats.acknowledgedBytes = proto.acknowledged_bytes();
-    stats.waitingRays = proto.waiting_rays();
-    stats.processedRays = proto.processed_rays();
-    stats.demandedRays = proto.demanded_rays();
-    stats.sendingRays = proto.sending_rays();
-    stats.pendingRays = proto.pending_rays();
-    stats.finishedRays = proto.finished_rays();
-
-    return stats;
-}
-
-QueueStats from_protobuf(const protobuf::QueueStats& proto) {
-    QueueStats stats;
-    stats.ray = proto.ray();
-    stats.finished = proto.finished();
-    stats.pending = proto.pending();
-    stats.out = proto.out();
-    stats.connecting = proto.connecting();
-    stats.connected = proto.connected();
-    stats.outstandingUdp = proto.outstanding_udp();
-    stats.queuedUdp = proto.queued_udp();
-    return stats;
-}
-
-NetStats from_protobuf(const protobuf::NetStats& proto) {
-    NetStats stats;
-    stats.packetsSent = proto.packets_sent();
-    stats.rtt = chrono::milliseconds{proto.rtt()};
-    return stats;
-}
-
-WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
-    WorkerStats stats;
-    stats._finishedPaths = proto.finished_paths();
-    stats.aggregateStats = from_protobuf(proto.aggregate_stats());
-    stats.queueStats = from_protobuf(proto.queue_stats());
-    stats.netStats = from_protobuf(proto.net_stats());
-
-    for (const protobuf::ObjectRayStats& object_stats : proto.object_stats()) {
-        auto id = from_protobuf(object_stats.id());
-        stats.objectStats[id] = from_protobuf(object_stats.stats());
-    }
-
-    return stats;
 }
 
 WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& proto) {
