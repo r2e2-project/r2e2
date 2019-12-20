@@ -32,12 +32,13 @@ struct RayBagInfo {
 
     RayBagInfo(const WorkerId workerId, const TreeletId treeletId,
                const BagId bagId, const size_t rayCount, const size_t bagSize,
-               const bool finsihed)
+               const bool finishedRays)
         : workerId(workerId),
           treeletId(treeletId),
           bagId(bagId),
           rayCount(rayCount),
-          bagSize(bagSize) {}
+          bagSize(bagSize),
+          finishedRays(finishedRays) {}
 
     RayBagInfo() = default;
     RayBagInfo(const RayBagInfo&) = default;
@@ -50,7 +51,7 @@ struct RayBag {
 
     RayBag(const WorkerId workerId, const TreeletId treeletId,
            const BagId bagId, const bool finished, const size_t maxBagLen)
-        : info(workerId, treeletId, bagId, 0, 0, false),
+        : info(workerId, treeletId, bagId, 0, 0, finished),
           data(maxBagLen, '\0') {}
 
     RayBag(const RayBagInfo& info, std::string&& data)
