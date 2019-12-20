@@ -191,6 +191,7 @@ class TreeletDumpBVH : public BVHAccel {
     std::vector<uint32_t> ComputeTreelets(const TraversalGraph &graph,
                                           uint64_t maxTreeletBytes) const;
 
+    void DumpSanityCheck(const std::vector<std::unordered_map<int, uint32_t>> &treeletNodeLocations) const;
     std::vector<uint32_t> DumpTreelets(bool root) const;
 
     std::vector<uint32_t> OrigAssignTreelets(const uint64_t) const;

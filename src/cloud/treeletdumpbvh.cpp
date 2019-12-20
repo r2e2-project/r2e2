@@ -400,17 +400,34 @@ void TreeletDumpBVH::OrderTreeletNodesDepthFirst(int numDirs, vector<TreeletInfo
         depthFirst.push(0);
 
         while (!depthFirst.empty()) {
-            int nodeIdx = depthFirst.top();
+            int start = depthFirst.top();
             depthFirst.pop();
-            uint32_t treeletID = treeletAllocations[dirIdx][nodeIdx];
+
+            uint32_t treeletID = treeletAllocations[dirIdx][start];
             TreeletInfo &info = treelets[treeletID];
 
-            info.nodes.push_back(nodeIdx);
+            stack<int> depthFirstInTreelet;
+            depthFirstInTreelet.push(start);
+            while (!depthFirstInTreelet.empty()) {
+                int nodeIdx = depthFirstInTreelet.top();
+                depthFirstInTreelet.pop();
+                info.nodes.push_back(nodeIdx);
+                const LinearBVHNode &node = nodes[nodeIdx];
+                if (node.nPrimitives == 0) {
+                    uint32_t rightTreeletID = treeletAllocations[dirIdx][node.secondChildOffset];
+                    if (rightTreeletID == treeletID) {
+                        depthFirstInTreelet.push(node.secondChildOffset);
+                    } else {
+                        depthFirst.push(node.secondChildOffset);
+                    }
 
-            const LinearBVHNode &node = nodes[nodeIdx];
-            if (node.nPrimitives == 0) {
-                depthFirst.push(node.secondChildOffset);
-                depthFirst.push(nodeIdx + 1);
+                    uint32_t leftTreeletID = treeletAllocations[dirIdx][nodeIdx + 1];
+                    if (leftTreeletID == treeletID) {
+                        depthFirstInTreelet.push(nodeIdx + 1);
+                    } else {
+                        depthFirst.push(nodeIdx + 1);
+                    }
+                }
             }
         }
     }
@@ -418,14 +435,41 @@ void TreeletDumpBVH::OrderTreeletNodesDepthFirst(int numDirs, vector<TreeletInfo
 
 vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateUnspecializedTreelets(int maxTreeletBytes) {
     TraversalGraph graph;
-    graph.depthFirst.reserve(nodeCount);
     graph.outgoing.resize(nodeCount);
     graph.incomingProb.resize(nodeCount);
+
     if (partitionAlgo == PartitionAlgorithm::MergedGraph) {
+        vector<unordered_map<uint64_t, float>> mergedEdges;
+        mergedEdges.resize(nodeCount);
         for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
             Vector3f dir = ComputeRayDir(dirIdx);
             TraversalGraph g = CreateTraversalGraph(dir, 0);
-            // FIXME merge g 
+            if (dirIdx == 0) {
+                graph.depthFirst = move(g.depthFirst);
+            }
+            for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
+                graph.incomingProb[nodeIdx] += g.incomingProb[nodeIdx];
+
+                const auto bounds = g.outgoing[nodeIdx];
+                for (Edge *edge = bounds.first; edge < bounds.first + bounds.second; edge++) {
+                    mergedEdges[edge->src][edge->dst] += edge->weight;
+                    mergedEdges[edge->dst][edge->src] += edge->weight;
+                }
+            }
+        }
+
+        uint64_t totalEdges = 0;
+        for (auto &outgoing : mergedEdges) {
+            totalEdges += outgoing.size();
+        }
+        graph.edges.reserve(totalEdges);
+        for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
+            auto &outgoing = mergedEdges[nodeIdx];
+            size_t start = graph.edges.size();
+            for (auto &kv : outgoing) {
+                graph.edges.emplace_back(nodeIdx, kv.first, kv.second);
+            }
+            graph.outgoing[nodeIdx] = make_pair(graph.edges.data() + start, outgoing.size());
         }
     }
 
@@ -1801,31 +1845,7 @@ bool TreeletDumpBVH::IntersectP(const Ray &ray) const {
     }
 }
 
-vector<uint32_t> TreeletDumpBVH::DumpTreelets(bool root) const {
-    // Assign IDs to each treelet
-    for (const TreeletInfo &treelet : allTreelets) {
-        global::manager.getNextId(ObjectType::Treelet, &treelet);
-    }
-
-    vector<unordered_map<int, uint32_t>> treeletNodeLocations(allTreelets.size());
-    vector<unordered_map<TreeletDumpBVH *, uint32_t>> treeletInstanceStarts(allTreelets.size());
-    for (int treeletID = 0; treeletID < allTreelets.size(); treeletID++) {
-        const TreeletInfo &treelet = allTreelets[treeletID];
-        int listIdx = 0;
-        for (int nodeIdx : treelet.nodes) {
-            treeletNodeLocations[treeletID][nodeIdx] = listIdx;
-            listIdx++;
-        }
-
-        uint32_t instIdx = 0;
-        for (TreeletDumpBVH *inst : treelet.instances) {
-            treeletInstanceStarts[treeletID][inst] = instIdx + treelet.nodes.size();
-            instIdx += inst->nodeCount;
-
-            CHECK_EQ(inst->copyable, true);
-        }
-    }
-
+void TreeletDumpBVH::DumpSanityCheck(const vector<unordered_map<int, uint32_t>> &treeletNodeLocations) const {
     enum CHILD {
         LEFT = 0,
         RIGHT = 1
@@ -1858,7 +1878,7 @@ vector<uint32_t> TreeletDumpBVH::DumpTreelets(bool root) const {
                 }
             }
 
-            uint32_t curLocation = treeletNodeLocations[treeletID][nodeIdx];
+            uint32_t curLocation = treeletNodeLocations[treeletID].at(nodeIdx);
             int leftNodeIdx = nodeIdx + 1;
             int rightNodeIdx = node.secondChildOffset;
 
@@ -1878,6 +1898,35 @@ vector<uint32_t> TreeletDumpBVH::DumpTreelets(bool root) const {
             serializedLoc++;
         }
     }
+
+}
+
+vector<uint32_t> TreeletDumpBVH::DumpTreelets(bool root) const {
+    // Assign IDs to each treelet
+    for (const TreeletInfo &treelet : allTreelets) {
+        global::manager.getNextId(ObjectType::Treelet, &treelet);
+    }
+
+    vector<unordered_map<int, uint32_t>> treeletNodeLocations(allTreelets.size());
+    vector<unordered_map<TreeletDumpBVH *, uint32_t>> treeletInstanceStarts(allTreelets.size());
+    for (int treeletID = 0; treeletID < allTreelets.size(); treeletID++) {
+        const TreeletInfo &treelet = allTreelets[treeletID];
+        int listIdx = 0;
+        for (int nodeIdx : treelet.nodes) {
+            treeletNodeLocations[treeletID][nodeIdx] = listIdx;
+            listIdx++;
+        }
+
+        uint32_t instIdx = 0;
+        for (TreeletDumpBVH *inst : treelet.instances) {
+            treeletInstanceStarts[treeletID][inst] = instIdx + treelet.nodes.size();
+            instIdx += inst->nodeCount;
+
+            CHECK_EQ(inst->copyable, true);
+        }
+    }
+
+    DumpSanityCheck(treeletNodeLocations);
 
     unordered_map<TreeletDumpBVH *, vector<uint32_t>> nonCopyableInstanceTreelets;
 
