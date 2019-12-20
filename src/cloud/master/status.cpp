@@ -19,7 +19,7 @@ ResultType LambdaMaster::handleStatusMessage() {
         cerr << "Job terminated due to inactivity." << endl;
         return ResultType::Exit;
     } else if (exitTimer == nullptr &&
-               scene.totalPaths == 0) {
+               scene.totalPaths == workerStats.finishedPaths) {
         cerr << "Terminating the job in "
              << duration_cast<seconds>(EXIT_GRACE_PERIOD).count() << "s..."
              << endl;
@@ -39,12 +39,6 @@ ResultType LambdaMaster::handleStatusMessage() {
     const auto elapsedTime = steady_clock::now() - startTime;
     const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
 
-    const auto rayThroughput =
-        1.0 * 0 / numberOfLambdas /
-        duration_cast<seconds>(lastFinishedRay - generationStart).count();
-
-    const float rtt = 0.f;
-
     auto percentage = [](const int n, const int total) -> double {
         return total ? (((int)(100 * (100.0 * n / total))) / 100.0) : 0.0;
     };
@@ -53,17 +47,13 @@ ResultType LambdaMaster::handleStatusMessage() {
     constexpr char const *BG_LIGHT_GREEN = "\033[48;5;028m";
 
     ostringstream oss;
-    oss << "\033[0m" << BG_DARK_GREEN << " \u21af " << finishedPathIds.size()
+    oss << "\033[0m" << BG_DARK_GREEN << " \u21af " << workerStats.finishedPaths
         << " (" << fixed << setprecision(2)
-        << percentage(workerStats.finishedPaths, scene.totalPaths) << "%) ["
-        << setprecision(2) << percentage(0, scene.totalPaths) << "%] "
-        << BG_LIGHT_GREEN << " \u03bb " << workers.size() << " ("
-        << initializedWorkers << ") " << BG_DARK_GREEN << " \u21c4 " << 0
-        << " (" << 0 << ") " << BG_LIGHT_GREEN << " T " << rayThroughput << " "
-        << BG_DARK_GREEN << " \u21ba " << setprecision(2) << rtt << " ms "
-        << BG_LIGHT_GREEN << " " << setfill('0') << setw(2)
-        << (elapsedSeconds / 60) << ":" << setw(2) << (elapsedSeconds % 60)
-        << " " << BG_DARK_GREEN;
+        << percentage(workerStats.finishedPaths, scene.totalPaths) << "%) "
+        << BG_LIGHT_GREEN << " \u03bb " << workers.size() << "/"
+        << numberOfLambdas << " " << BG_DARK_GREEN << " " << setfill('0')
+        << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
+        << (elapsedSeconds % 60) << " " << BG_LIGHT_GREEN;
 
     StatusBar::set_text(oss.str());
 
