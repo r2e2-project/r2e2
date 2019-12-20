@@ -21,14 +21,14 @@ ResultType LambdaMaster::handleQueuedRayBags() {
 
         /* assigning ray bags to workers */
         while (!bags.empty()) {
-            auto& item = bags.front();
+            auto& bag = bags.front();
 
             /* picking a random worker */
             const auto& candidates = objectManager.assignedTreelets[treeletId];
             const auto workerId =
                 *random::sample(candidates.begin(), candidates.end());
 
-            assignedBags[workerId].push(move(item));
+            assignedBags[workerId].push(move(bag));
             bags.pop();
         }
     }

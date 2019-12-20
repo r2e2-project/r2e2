@@ -89,6 +89,8 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             const RayBagInfo info = from_protobuf(item);
             queueSize[info.treeletId] -= info.bagSize;
         }
+
+        break;
     }
 
     default:

@@ -62,12 +62,12 @@ void LambdaWorker::processMessage(const Message& message) {
 
     case OpCode::ProcessRayBag: {
         protobuf::RayBags proto;
+        protoutil::from_string(message.payload(), proto);
 
         for (const protobuf::RayBagInfo& item : proto.items()) {
             RayBagInfo info{from_protobuf(item)};
             const auto id =
                 transferAgent.requestDownload(info.str(rayBagsKeyPrefix));
-
             pendingRayBags[id] = make_pair(Task::Download, info);
         }
 
