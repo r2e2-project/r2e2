@@ -70,6 +70,7 @@ protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey);
 protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics);
 protobuf::FinishedRay to_protobuf(const FinishedRay& finishedRay);
 protobuf::RayBagInfo to_protobuf(const RayBagInfo& RayBagInfo);
+protobuf::WorkerStats to_protobuf(const WorkerStats& stats);
 
 Point2i from_protobuf(const protobuf::Point2i& point);
 Point2f from_protobuf(const protobuf::Point2f& point);
@@ -92,9 +93,10 @@ TextureParams from_protobuf(
     ParamSet& material_params,
     std::map<std::string, std::shared_ptr<Texture<Float>>>& fTex,
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex);
-ObjectKey from_protobuf(const protobuf::ObjectKey& ObjectKey);
+ObjectKey from_protobuf(const protobuf::ObjectKey& objectKey);
 FinishedRay from_protobuf(const protobuf::FinishedRay& finishedRay);
-RayBagInfo from_protobuf(const protobuf::RayBagInfo& RayBagInfo);
+RayBagInfo from_protobuf(const protobuf::RayBagInfo& rayBagInfo);
+WorkerStats from_protobuf(const protobuf::WorkerStats& statsProto);
 
 namespace light {
 

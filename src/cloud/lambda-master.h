@@ -166,8 +166,9 @@ class LambdaMaster {
     // Stats                                                                  //
     ////////////////////////////////////////////////////////////////////////////
 
-    /* prints the status message every second */
+    WorkerStats workerStats;
 
+    /* prints the status message every second */
     Poller::Action::Result::Type handleStatusMessage();
 
     /*** Timepoints ***********************************************************/

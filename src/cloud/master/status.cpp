@@ -55,17 +55,15 @@ ResultType LambdaMaster::handleStatusMessage() {
     ostringstream oss;
     oss << "\033[0m" << BG_DARK_GREEN << " \u21af " << finishedPathIds.size()
         << " (" << fixed << setprecision(2)
-        << percentage(finishedPathIds.size(), scene.totalPaths) << "%) ["
-        << setprecision(2)
-        << percentage(0, scene.totalPaths) << "%] "
+        << percentage(workerStats.finishedPaths, scene.totalPaths) << "%) ["
+        << setprecision(2) << percentage(0, scene.totalPaths) << "%] "
         << BG_LIGHT_GREEN << " \u03bb " << workers.size() << " ("
-        << initializedWorkers << ") " << BG_DARK_GREEN << " \u21c4 "
-        << 0 << " ("
-        << 0 << ") " << BG_LIGHT_GREEN << " T "
-        << rayThroughput << " " << BG_DARK_GREEN << " \u21ba "
-        << setprecision(2) << rtt << " ms " << BG_LIGHT_GREEN << " "
-        << setfill('0') << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
-        << (elapsedSeconds % 60) << " " << BG_DARK_GREEN;
+        << initializedWorkers << ") " << BG_DARK_GREEN << " \u21c4 " << 0
+        << " (" << 0 << ") " << BG_LIGHT_GREEN << " T " << rayThroughput << " "
+        << BG_DARK_GREEN << " \u21ba " << setprecision(2) << rtt << " ms "
+        << BG_LIGHT_GREEN << " " << setfill('0') << setw(2)
+        << (elapsedSeconds / 60) << ":" << setw(2) << (elapsedSeconds % 60)
+        << " " << BG_DARK_GREEN;
 
     StatusBar::set_text(oss.str());
 

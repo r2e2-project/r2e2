@@ -64,8 +64,6 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             const RayBagInfo info = from_protobuf(item);
 
             if (info.finishedRays) {
-                cout << "Received a bag of finished rays: " << info.rayCount
-                     << endl;
                 continue;
             }
 
@@ -89,6 +87,16 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             const RayBagInfo info = from_protobuf(item);
             queueSize[info.treeletId] -= info.bagSize;
         }
+
+        break;
+    }
+
+    case OpCode::WorkerStats: {
+        protobuf::WorkerStats proto;
+        protoutil::from_string(message.payload(), proto);
+
+        WorkerStats stats = from_protobuf(proto);
+        workerStats.merge(stats);
 
         break;
     }

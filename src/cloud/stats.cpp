@@ -11,6 +11,10 @@ namespace global {
 WorkerDiagnostics workerDiagnostics;
 }  // namespace global
 
+void WorkerStats::merge(const WorkerStats &other) {
+    finishedPaths += other.finishedPaths;
+}
+
 /* WorkerDiagnostics */
 
 WorkerDiagnostics::Recorder::Recorder(WorkerDiagnostics& diagnostics,

@@ -412,3 +412,7 @@ message RayBagInfo {
 message RayBags {
     repeated RayBagInfo items = 1;
 }
+
+message WorkerStats {
+    uint64 finished_paths = 1;
+}

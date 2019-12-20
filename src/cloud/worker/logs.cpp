@@ -12,6 +12,20 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
+ResultType LambdaWorker::handleWorkerStats() {
+    workerStatsTimer.reset();
+
+    WorkerStats stats;
+    stats.finishedPaths = finishedPathIds.size();
+
+    protobuf::WorkerStats proto = to_protobuf(stats);
+    coordinatorConnection->enqueue_write(Message::str(
+        *workerId, OpCode::WorkerStats, protoutil::to_string(proto)));
+
+    finishedPathIds = {};
+    return ResultType::Continue;
+}
+
 ResultType LambdaWorker::handleDiagnostics() {
     RECORD_INTERVAL("handleDiagnostics");
     workerDiagnosticsTimer.reset();

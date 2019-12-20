@@ -314,6 +314,12 @@ protobuf::RayBagInfo to_protobuf(const RayBagInfo& RayBagInfo) {
     return proto;
 }
 
+protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
+    protobuf::WorkerStats proto;
+    proto.set_finished_paths(stats.finishedPaths);
+    return proto;
+}
+
 template <class ValueType, class ProtoItem>
 unique_ptr<ValueType[]> p2v(const ProtoItem& item) {
     auto values = make_unique<ValueType[]>(item.values_size());
@@ -846,5 +852,10 @@ RayBagInfo from_protobuf(const protobuf::RayBagInfo& proto) {
     return {proto.worker_id(), proto.treelet_id(), proto.bag_id(),
             proto.ray_count(), proto.bag_size(), proto.finished_rays()};
 }
+
+WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
+    return {proto.finished_paths()};
+}
+
 
 }  // namespace pbrt

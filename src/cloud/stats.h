@@ -15,6 +15,12 @@ namespace pbrt {
 using timepoint_t = std::chrono::time_point<std::chrono::system_clock>;
 inline timepoint_t now() { return std::chrono::system_clock::now(); };
 
+struct WorkerStats {
+    uint64_t finishedPaths{0};
+
+    void merge(const WorkerStats& other);
+};
+
 // #define RECORD_INTERVALS
 
 struct WorkerDiagnostics {

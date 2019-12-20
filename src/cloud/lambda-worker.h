@@ -208,6 +208,8 @@ class LambdaWorker {
     // Stats & Diagnostics                                                    //
     ////////////////////////////////////////////////////////////////////////////
 
+    Poller::Action::Result::Type handleWorkerStats();
+
     Poller::Action::Result::Type handleDiagnostics();
 
     WorkerDiagnostics lastDiagnostics;
@@ -237,6 +239,7 @@ class LambdaWorker {
     /* Timers */
     TimerFD sendQueueTimer{SEND_QUEUE_INTERVAL};
     TimerFD finishedQueueTimer{FINISH_QUEUE_INTERVAL};
+    TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
     TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
 };
 
