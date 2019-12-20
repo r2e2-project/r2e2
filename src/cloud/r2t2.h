@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "cloud/raystate.h"
 #include "cloud/integrator.h"
 
 namespace pbrt {
