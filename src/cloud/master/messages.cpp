@@ -87,15 +87,21 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         protoutil::from_string(message.payload(), proto);
 
         for (const auto &item : proto.items()) {
-            const RayBagInfo key = from_protobuf(item);
+            const RayBagInfo info = from_protobuf(item);
 
-            if (objectManager.assignedTreelets.count(key.treeletId)) {
-                queuedRayBags[key.treeletId].push(key);
-            } else {
-                pendingRayBags[key.treeletId].push(key);
+            if (info.finishedRays) {
+                cout << "Received a bag of finished rays: " << info.rayCount
+                     << endl;
+                continue;
             }
 
-            queueSize[key.treeletId] += key.bagSize;
+            if (objectManager.assignedTreelets.count(info.treeletId)) {
+                queuedRayBags[info.treeletId].push(info);
+            } else {
+                pendingRayBags[info.treeletId].push(info);
+            }
+
+            queueSize[info.treeletId] += info.bagSize;
         }
 
         break;
@@ -106,8 +112,8 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         protoutil::from_string(message.payload(), proto);
 
         for (const auto &item : proto.items()) {
-            const RayBagInfo key = from_protobuf(item);
-            queueSize[key.treeletId] -= key.bagSize;
+            const RayBagInfo info = from_protobuf(item);
+            queueSize[info.treeletId] -= info.bagSize;
         }
     }
 

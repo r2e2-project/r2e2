@@ -37,7 +37,7 @@
 namespace pbrt {
 
 constexpr std::chrono::milliseconds SEND_QUEUE_INTERVAL{500};
-constexpr std::chrono::milliseconds FINISHED_SEND_QUEUE_INTERVAL{2'000};
+constexpr std::chrono::milliseconds FINISH_QUEUE_INTERVAL{2'000};
 
 constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{5'000};
@@ -138,8 +138,8 @@ class LambdaWorker {
     RayStatePtr popTraceQueue();
 
     std::deque<RayStatePtr> traceQueue{};
-    std::deque<FinishedRay> finishedQueue{};
     std::map<TreeletId, std::deque<RayStatePtr>> outQueue{};
+    std::queue<FinishedRay> finishedRays{};
     size_t outQueueSize{0};
 
     ////////////////////////////////////////////////////////////////////////////
@@ -171,7 +171,10 @@ class LambdaWorker {
     /* opening up received ray bags */
     Poller::Action::Result::Type handleReceiveQueue();
 
-    /* handle finished rays (the samples) */
+    /* turning finished rays into ray bags */
+    Poller::Action::Result::Type handleFinishedRays();
+
+    /* sending finished ray bags out */
     Poller::Action::Result::Type handleFinishedQueue();
 
     Poller::Action::Result::Type handleTransferResults();
@@ -182,7 +185,7 @@ class LambdaWorker {
     std::map<TreeletId, std::queue<RayBag>> sendQueue{};
 
     /* finished ray bags ready to be sent out */
-    std::queue<RayBag> finishedSendQueue{};
+    std::queue<RayBag> finishedQueue{};
 
     /* ray bags that are received, but not yet unpacked */
     std::queue<RayBag> receiveQueue{};
@@ -197,6 +200,7 @@ class LambdaWorker {
     std::string rayBagsKeyPrefix{};
     std::map<TreeletId, BagId> currentBagId{};
     std::map<uint64_t, std::pair<Task, RayBagInfo>> pendingRayBags{};
+    BagId currentFinishedBagId{0};
 
     /*** Transfer Agent *******************************************************/
 
@@ -234,7 +238,7 @@ class LambdaWorker {
 
     /* Timers */
     TimerFD sendQueueTimer{SEND_QUEUE_INTERVAL};
-    TimerFD finishedSendQueueTimer{FINISHED_SEND_QUEUE_INTERVAL};
+    TimerFD finishedQueueTimer{FINISH_QUEUE_INTERVAL};
     TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
 };
 

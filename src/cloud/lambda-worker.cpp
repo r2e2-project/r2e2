@@ -70,10 +70,22 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("out queue failed"); }));
 
     loop.poller().add_action(
+        Poller::Action(alwaysOnFd, Direction::Out,
+                       bind(&LambdaWorker::handleFinishedRays, this),
+                       [this]() { return !finishedRays.empty(); },
+                       []() { throw runtime_error("send queue failed"); }));
+
+    loop.poller().add_action(
         Poller::Action(sendQueueTimer.fd, Direction::In,
                        bind(&LambdaWorker::handleSendQueue, this),
                        [this]() { return !sendQueue.empty(); },
                        []() { throw runtime_error("send queue failed"); }));
+
+    loop.poller().add_action(
+        Poller::Action(finishedQueueTimer.fd, Direction::In,
+                       bind(&LambdaWorker::handleFinishedQueue, this),
+                       [this]() { return !finishedQueue.empty(); },
+                       []() { throw runtime_error("finished queue failed"); }));
 
     loop.poller().add_action(
         Poller::Action(alwaysOnFd, Direction::Out,
@@ -86,21 +98,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         bind(&LambdaWorker::handleTransferResults, this),
         [this]() { return !transferAgent.empty(); },
         []() { throw runtime_error("handle transfer results failed"); }));
-
-    /* send finished rays */
-    /* FIXME we're throwing out finished rays, for now */
-    /* loop.poller().add_action(Poller::Action(
-        fd, Direction::Out, bind(&LambdaWorker::handleFinishedQueue, this),
-        [this]() {
-            // clang-format off
-            switch (this->config.finishedRayAction) {
-            case FinishedRayAction::Discard: return finishedQueue.size() > 5000;
-            case FinishedRayAction::SendBack: return !finishedQueue.empty();
-            default: return false;
-            }
-            // clang-format on
-        },
-        []() { throw runtime_error("finished queue failed"); })); */
 
     /* handle received messages */
     loop.poller().add_action(Poller::Action(

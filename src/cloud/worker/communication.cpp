@@ -21,8 +21,8 @@ ResultType LambdaWorker::handleOutQueue() {
                 queue.back().info.bagSize + RayState::MaxCompressedSize() >
                     MAX_BAG_SIZE) {
                 /* let's create an empty bag */
-                const auto bagId = currentBagId[treeletId]++;
-                queue.emplace(*workerId, treeletId, bagId, false, MAX_BAG_SIZE);
+                queue.emplace(*workerId, treeletId, currentBagId[treeletId]++,
+                              false, MAX_BAG_SIZE);
             }
 
             auto& bag = queue.back();
@@ -34,6 +34,33 @@ ResultType LambdaWorker::handleOutQueue() {
 
             rayList.pop_front();
         }
+    }
+
+    return ResultType::Continue;
+}
+
+ResultType LambdaWorker::handleFinishedRays() {
+    auto& out = finishedQueue;
+
+    if (out.empty()) {
+        out.emplace(*workerId, 0, currentFinishedBagId++, true, MAX_BAG_SIZE);
+    }
+
+    while (!finishedRays.empty()) {
+        auto& ray = finishedRays.front();
+
+        if (out.back().info.bagSize + FinishedRay::MaxCompressedSize() >
+            MAX_BAG_SIZE) {
+            out.emplace(*workerId, 0, currentFinishedBagId++, true,
+                        MAX_BAG_SIZE);
+        }
+
+        auto& bag = out.back();
+        const auto len = ray.Serialize(&bag.data[0] + bag.info.bagSize);
+        bag.info.rayCount++;
+        bag.info.bagSize += len;
+
+        finishedRays.pop();
     }
 
     return ResultType::Continue;
@@ -57,6 +84,23 @@ ResultType LambdaWorker::handleSendQueue() {
             pendingRayBags[id] = make_pair(Task::Upload, bag.info);
             queue.pop();
         }
+    }
+
+    return ResultType::Continue;
+}
+
+ResultType LambdaWorker::handleFinishedQueue() {
+    finishedQueueTimer.reset();
+
+    while (!finishedQueue.empty()) {
+        RayBag& bag = finishedQueue.front();
+        bag.data.erase(bag.info.bagSize);
+
+        const auto id = transferAgent.requestUpload(
+            bag.info.str(rayBagsKeyPrefix), move(bag.data));
+
+        pendingRayBags[id] = make_pair(Task::Upload, bag.info);
+        finishedQueue.pop();
     }
 
     return ResultType::Continue;

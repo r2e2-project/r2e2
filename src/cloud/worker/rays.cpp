@@ -78,7 +78,7 @@ ResultType LambdaWorker::handleTraceQueue() {
             if (newRay.isShadowRay) {
                 if (hit || emptyVisit) {
                     newRay.Ld = hit ? 0.f : newRay.Ld;
-                    finishedQueue.emplace_back(*newRayPtr);
+                    finishedRays.emplace(*newRayPtr);
                 } else {
                     processedRays.push_back(move(newRayPtr));
                 }
@@ -86,7 +86,7 @@ ResultType LambdaWorker::handleTraceQueue() {
                 processedRays.push_back(move(newRayPtr));
             } else if (emptyVisit) {
                 newRay.Ld = 0.f;
-                finishedQueue.emplace_back(*newRayPtr);
+                finishedRays.emplace(*newRayPtr);
                 finishedPathIds.push_back(pathId);
             }
         } else if (ray.hit) {
@@ -126,43 +126,6 @@ ResultType LambdaWorker::handleTraceQueue() {
             outQueue[nextTreelet].push_back(move(ray));
             outQueueSize++;
         }
-    }
-
-    return ResultType::Continue;
-}
-
-ResultType LambdaWorker::handleFinishedQueue() {
-    RECORD_INTERVAL("handleFinishedQueue");
-
-    switch (config.finishedRayAction) {
-    case FinishedRayAction::Discard:
-        finishedQueue.clear();
-        break;
-
-    case FinishedRayAction::SendBack: {
-        ostringstream oss;
-
-        {
-            protobuf::RecordWriter writer{&oss};
-
-            while (!finishedQueue.empty()) {
-                writer.write(to_protobuf(finishedQueue.front()));
-                finishedQueue.pop_front();
-            }
-        }
-
-        oss.flush();
-        coordinatorConnection->enqueue_write(
-            Message::str(*workerId, OpCode::FinishedRays, oss.str()));
-
-        break;
-    }
-
-    case FinishedRayAction::Upload:
-        break;
-
-    default:
-        throw runtime_error("invalid finished ray action");
     }
 
     return ResultType::Continue;
