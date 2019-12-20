@@ -106,6 +106,15 @@ class FinishedRay {
     /* disallow copying */
     FinishedRay(const FinishedRay &) = delete;
     FinishedRay &operator=(const FinishedRay &) = delete;
+
+    size_t Size() const;
+    size_t Serialize(char *data, const bool compress = true);
+    void Deserialize(const char *data, const size_t len,
+                     const bool decompress = true);
+
+    static constexpr size_t MaxCompressedSize() {
+        return 4 + LZ4_COMPRESSBOUND(sizeof(FinishedRay));
+    }
 };
 
 }  // namespace pbrt
