@@ -36,7 +36,7 @@ void LambdaWorker::processMessage(const Message& message) {
         logPrefix = "logs/" + (*jobId) + "/";
         rayBagsKeyPrefix = "jobs/" + (*jobId) + "/rays/";
 
-        cerr << "worker-id=" << *workerId << endl;
+        cerr << protoutil::to_json(proto) << endl;
         break;
     }
 

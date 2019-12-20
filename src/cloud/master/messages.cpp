@@ -42,41 +42,15 @@ void LambdaMaster::processMessage(const uint64_t workerId,
     case OpCode::Hey: {
         worker.awsLogStream = message.payload();
 
-        protobuf::Hey heyProto;
-        heyProto.set_worker_id(workerId);
-        heyProto.set_job_id(jobId);
-        Message msg{0, OpCode::Hey, protoutil::to_string(heyProto)};
-        worker.connection->enqueue_write(msg.str());
+        protobuf::Hey proto;
+        proto.set_worker_id(workerId);
+        proto.set_job_id(jobId);
+        worker.connection->enqueue_write(
+            Message::str(0, OpCode::Hey, protoutil::to_string(proto)));
 
         if (!worker.initialized) {
             worker.initialized = true;
             initializedWorkers++;
-        }
-
-        break;
-    }
-
-    case OpCode::FinishedRays: {
-        protobuf::RecordReader finishedReader{istringstream(message.payload())};
-        vector<FinishedRay> finishedRays;
-
-        while (!finishedReader.eof()) {
-            protobuf::FinishedRay proto;
-            if (finishedReader.read(&proto)) {
-                finishedRays.push_back(from_protobuf(proto));
-            }
-        }
-
-        graphics::AccumulateImage(scene.camera, finishedRays);
-        break;
-    }
-
-    case OpCode::FinishedPaths: {
-        Chunk chunk{message.payload()};
-
-        while (chunk.size()) {
-            finishedPathIds.insert(chunk.be64());
-            chunk = chunk(8);
         }
 
         break;
