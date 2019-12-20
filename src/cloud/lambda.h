@@ -15,16 +15,16 @@ struct RayBagInfo {
     BagId bagId{};
     size_t rayCount{};
     size_t bagSize{};
-    bool finishedRays{false};
+    bool sampleBag{false};
 
     std::string str(const std::string& prefix) const {
         std::ostringstream oss;
 
-        if (!finishedRays) {
+        if (!sampleBag) {
             oss << prefix << 'T' << treeletId << '-' << workerId << '_'
                 << bagId;
         } else {
-            oss << prefix << "finished-" << workerId << "_" << bagId;
+            oss << prefix << "samples-" << workerId << "_" << bagId;
         }
 
         return oss.str();
@@ -32,13 +32,13 @@ struct RayBagInfo {
 
     RayBagInfo(const WorkerId workerId, const TreeletId treeletId,
                const BagId bagId, const size_t rayCount, const size_t bagSize,
-               const bool finishedRays)
+               const bool sampleBag)
         : workerId(workerId),
           treeletId(treeletId),
           bagId(bagId),
           rayCount(rayCount),
           bagSize(bagSize),
-          finishedRays(finishedRays) {}
+          sampleBag(sampleBag) {}
 
     RayBagInfo() = default;
     RayBagInfo(const RayBagInfo&) = default;

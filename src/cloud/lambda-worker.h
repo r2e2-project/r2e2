@@ -37,7 +37,7 @@
 namespace pbrt {
 
 constexpr std::chrono::milliseconds SEND_QUEUE_INTERVAL{500};
-constexpr std::chrono::milliseconds FINISH_QUEUE_INTERVAL{2'000};
+constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL{2'000};
 
 constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{5'000};
@@ -58,7 +58,7 @@ struct WorkerConfiguration {
 /* Relationship between different queues in LambdaWorker:
 
                                   +------------+
-                    +------------->  FINISHED  +------------+
+                    +------------->   SAMPLE   +------------+
                     |             +------------+            |
                     |                                       |
                     |                                       |
@@ -137,7 +137,7 @@ class LambdaWorker {
 
     std::queue<RayStatePtr> traceQueue{};
     std::map<TreeletId, std::queue<RayStatePtr>> outQueue{};
-    std::queue<FinishedRay> finishedRays{};
+    std::queue<Sample> samples{};
     size_t outQueueSize{0};
 
     ////////////////////////////////////////////////////////////////////////////
@@ -169,11 +169,11 @@ class LambdaWorker {
     /* opening up received ray bags */
     Poller::Action::Result::Type handleReceiveQueue();
 
-    /* turning finished rays into ray bags */
-    Poller::Action::Result::Type handleFinishedRays();
+    /* turning samples into sample bags */
+    Poller::Action::Result::Type handleSamples();
 
-    /* sending finished ray bags out */
-    Poller::Action::Result::Type handleFinishedQueue();
+    /* sending sample bags out */
+    Poller::Action::Result::Type handleSampleBags();
 
     Poller::Action::Result::Type handleTransferResults();
 
@@ -182,8 +182,8 @@ class LambdaWorker {
     /* ray bags ready to be sent out */
     std::map<TreeletId, std::queue<RayBag>> sendQueue{};
 
-    /* finished ray bags ready to be sent out */
-    std::queue<RayBag> finishedQueue{};
+    /* sample bags ready to be sent out */
+    std::queue<RayBag> sampleBags{};
 
     /* ray bags that are received, but not yet unpacked */
     std::queue<RayBag> receiveQueue{};
@@ -198,7 +198,7 @@ class LambdaWorker {
     std::string rayBagsKeyPrefix{};
     std::map<TreeletId, BagId> currentBagId{};
     std::map<uint64_t, std::pair<Task, RayBagInfo>> pendingRayBags{};
-    BagId currentFinishedBagId{0};
+    BagId currentSampleBagId{0};
 
     /*** Transfer Agent *******************************************************/
 
@@ -238,7 +238,7 @@ class LambdaWorker {
 
     /* Timers */
     TimerFD sendQueueTimer{SEND_QUEUE_INTERVAL};
-    TimerFD finishedQueueTimer{FINISH_QUEUE_INTERVAL};
+    TimerFD sampleBagsTimer{SAMPLE_BAGS_INTERVAL};
     TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
     TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
 };

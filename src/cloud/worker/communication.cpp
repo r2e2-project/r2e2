@@ -39,20 +39,19 @@ ResultType LambdaWorker::handleOutQueue() {
     return ResultType::Continue;
 }
 
-ResultType LambdaWorker::handleFinishedRays() {
-    auto& out = finishedQueue;
+ResultType LambdaWorker::handleSamples() {
+    auto& out = sampleBags;
 
     if (out.empty()) {
-        out.emplace(*workerId, 0, currentFinishedBagId++, true, MAX_BAG_SIZE);
+        out.emplace(*workerId, 0, currentSampleBagId++, true, MAX_BAG_SIZE);
     }
 
-    while (!finishedRays.empty()) {
-        auto& ray = finishedRays.front();
+    while (!samples.empty()) {
+        auto& ray = samples.front();
 
-        if (out.back().info.bagSize + FinishedRay::MaxCompressedSize() >
+        if (out.back().info.bagSize + Sample::MaxCompressedSize() >
             MAX_BAG_SIZE) {
-            out.emplace(*workerId, 0, currentFinishedBagId++, true,
-                        MAX_BAG_SIZE);
+            out.emplace(*workerId, 0, currentSampleBagId++, true, MAX_BAG_SIZE);
         }
 
         auto& bag = out.back();
@@ -60,7 +59,7 @@ ResultType LambdaWorker::handleFinishedRays() {
         bag.info.rayCount++;
         bag.info.bagSize += len;
 
-        finishedRays.pop();
+        samples.pop();
     }
 
     return ResultType::Continue;
@@ -89,18 +88,18 @@ ResultType LambdaWorker::handleSendQueue() {
     return ResultType::Continue;
 }
 
-ResultType LambdaWorker::handleFinishedQueue() {
-    finishedQueueTimer.reset();
+ResultType LambdaWorker::handleSampleBags() {
+    sampleBagsTimer.reset();
 
-    while (!finishedQueue.empty()) {
-        RayBag& bag = finishedQueue.front();
+    while (!sampleBags.empty()) {
+        RayBag& bag = sampleBags.front();
         bag.data.erase(bag.info.bagSize);
 
         const auto id = transferAgent.requestUpload(
             bag.info.str(rayBagsKeyPrefix), move(bag.data));
 
         pendingRayBags[id] = make_pair(Task::Upload, bag.info);
-        finishedQueue.pop();
+        sampleBags.pop();
     }
 
     return ResultType::Continue;

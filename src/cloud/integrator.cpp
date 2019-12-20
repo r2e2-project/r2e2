@@ -132,7 +132,7 @@ void CloudIntegrator::Render(const Scene &scene) {
     unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
     deque<RayStatePtr> rayQueue;
-    deque<RayStatePtr> finishedRays;
+    deque<RayStatePtr> samples;
 
     /* Generate all the samples */
     size_t i = 0;
@@ -181,10 +181,10 @@ void CloudIntegrator::Render(const Scene &scene) {
             if (newRay.isShadowRay) {
                 if (hit) {
                     newRay.Ld = 0.f;
-                    finishedRays.push_back(move(newRayPtr));
+                    samples.push_back(move(newRayPtr));
                     continue; /* discard */
                 } else if (emptyVisit) {
-                    finishedRays.push_back(move(newRayPtr));
+                    samples.push_back(move(newRayPtr));
                 } else {
                     rayQueue.push_back(move(newRayPtr));
                 }
@@ -192,7 +192,7 @@ void CloudIntegrator::Render(const Scene &scene) {
                 rayQueue.push_back(move(newRayPtr));
             } else {
                 newRay.Ld = 0.f;
-                finishedRays.push_back(move(newRayPtr));
+                samples.push_back(move(newRayPtr));
             }
         } else if (state.hit) {
             auto newRays = Shade(move(statePtr), *bvh, scene.lights,
@@ -218,7 +218,7 @@ void CloudIntegrator::Render(const Scene &scene) {
 
     unordered_map<size_t, CSample> allSamples;
 
-    for (const auto &statePtr : finishedRays) {
+    for (const auto &statePtr : samples) {
         const auto &state = *statePtr;
 
         if (allSamples.count(state.sample.id) == 0) {

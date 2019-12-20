@@ -63,7 +63,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         for (const auto &item : proto.items()) {
             const RayBagInfo info = from_protobuf(item);
 
-            if (info.finishedRays) {
+            if (info.sampleBag) {
                 continue;
             }
 

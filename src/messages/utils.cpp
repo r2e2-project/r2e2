@@ -294,12 +294,12 @@ protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics) {
     return proto;
 }
 
-protobuf::FinishedRay to_protobuf(const FinishedRay& finishedRay) {
-    protobuf::FinishedRay proto;
-    proto.set_sample_id(finishedRay.sampleId);
-    *proto.mutable_p_film() = to_protobuf(finishedRay.pFilm);
-    proto.set_weight(finishedRay.weight);
-    *proto.mutable_l() = to_protobuf(finishedRay.L);
+protobuf::Sample to_protobuf(const Sample& sample) {
+    protobuf::Sample proto;
+    proto.set_sample_id(sample.sampleId);
+    *proto.mutable_p_film() = to_protobuf(sample.pFilm);
+    proto.set_weight(sample.weight);
+    *proto.mutable_l() = to_protobuf(sample.L);
     return proto;
 }
 
@@ -310,7 +310,7 @@ protobuf::RayBagInfo to_protobuf(const RayBagInfo& RayBagInfo) {
     proto.set_bag_id(RayBagInfo.bagId);
     proto.set_ray_count(RayBagInfo.rayCount);
     proto.set_bag_size(RayBagInfo.bagSize);
-    proto.set_finished_rays(RayBagInfo.finishedRays);
+    proto.set_sample_bag(RayBagInfo.sampleBag);
     return proto;
 }
 
@@ -556,8 +556,8 @@ ObjectKey from_protobuf(const protobuf::ObjectKey& objectKey) {
     return ObjectKey{static_cast<ObjectType>(objectKey.type()), objectKey.id()};
 }
 
-FinishedRay from_protobuf(const protobuf::FinishedRay& proto) {
-    FinishedRay result;
+Sample from_protobuf(const protobuf::Sample& proto) {
+    Sample result;
     result.sampleId = proto.sample_id();
     result.pFilm = from_protobuf(proto.p_film());
     result.weight = proto.weight();
@@ -850,7 +850,7 @@ WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& proto) {
 
 RayBagInfo from_protobuf(const protobuf::RayBagInfo& proto) {
     return {proto.worker_id(), proto.treelet_id(), proto.bag_id(),
-            proto.ray_count(), proto.bag_size(), proto.finished_rays()};
+            proto.ray_count(), proto.bag_size(), proto.sample_bag()};
 }
 
 WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {

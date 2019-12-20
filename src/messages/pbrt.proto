@@ -138,7 +138,7 @@ message RayState {
     bool is_shadow_ray = 13;
 }
 
-message FinishedRay {
+message Sample {
     uint64 sample_id = 1;
     Point2f p_film = 2;
     float weight = 3;
@@ -406,7 +406,7 @@ message RayBagInfo {
     uint64 bag_id = 3;
     uint64 ray_count = 4;
     uint64 bag_size = 5;
-    bool finished_rays = 6;
+    bool sample_bag = 6;
 }
 
 message RayBags {

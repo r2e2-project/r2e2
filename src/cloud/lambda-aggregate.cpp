@@ -48,7 +48,7 @@ int main(int argc, char const *argv[]) {
 
         protobuf::RecordReader finishedReader{samplesPath};
         while (!finishedReader.eof()) {
-            protobuf::FinishedRay proto;
+            protobuf::Sample proto;
             if (finishedReader.read(&proto)) {
                 filmTile->AddSample(from_protobuf(proto.p_film()),
                                     from_protobuf(proto.l()), proto.weight());

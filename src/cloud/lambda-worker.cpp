@@ -71,8 +71,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     loop.poller().add_action(
         Poller::Action(alwaysOnFd, Direction::Out,
-                       bind(&LambdaWorker::handleFinishedRays, this),
-                       [this]() { return !finishedRays.empty(); },
+                       bind(&LambdaWorker::handleSamples, this),
+                       [this]() { return !samples.empty(); },
                        []() { throw runtime_error("send queue failed"); }));
 
     loop.poller().add_action(
@@ -82,10 +82,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                        []() { throw runtime_error("send queue failed"); }));
 
     loop.poller().add_action(
-        Poller::Action(finishedQueueTimer.fd, Direction::In,
-                       bind(&LambdaWorker::handleFinishedQueue, this),
-                       [this]() { return !finishedQueue.empty(); },
-                       []() { throw runtime_error("finished queue failed"); }));
+        Poller::Action(sampleBagsTimer.fd, Direction::In,
+                       bind(&LambdaWorker::handleSampleBags, this),
+                       [this]() { return !sampleBags.empty(); },
+                       []() { throw runtime_error("sample bags failed"); }));
 
     loop.poller().add_action(
         Poller::Action(alwaysOnFd, Direction::Out,

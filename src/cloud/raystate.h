@@ -91,21 +91,21 @@ class RayState {
     static RayStatePtr Create();
 };
 
-class FinishedRay {
+class Sample {
   public:
     uint64_t sampleId{};
     Point2f pFilm{};
     Float weight{};
     Spectrum L{};
 
-    /* FinishedRay is serialized up to this point */
-    FinishedRay() = default;
-    FinishedRay(const RayState &rayState);
-    FinishedRay(FinishedRay &&) = default;
+    /* Sample is serialized up to this point */
+    Sample() = default;
+    Sample(const RayState &rayState);
+    Sample(Sample &&) = default;
 
     /* disallow copying */
-    FinishedRay(const FinishedRay &) = delete;
-    FinishedRay &operator=(const FinishedRay &) = delete;
+    Sample(const Sample &) = delete;
+    Sample &operator=(const Sample &) = delete;
 
     size_t Size() const;
     size_t Serialize(char *data, const bool compress = true);
@@ -113,7 +113,7 @@ class FinishedRay {
                      const bool decompress = true);
 
     static constexpr size_t MaxCompressedSize() {
-        return 4 + LZ4_COMPRESSBOUND(sizeof(FinishedRay));
+        return 4 + LZ4_COMPRESSBOUND(sizeof(Sample));
     }
 };
 

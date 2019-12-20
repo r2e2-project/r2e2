@@ -39,7 +39,7 @@ RayStatePtr GenerateCameraRay(const shared_ptr<Camera> &camera,
 }
 
 void AccumulateImage(const shared_ptr<Camera> &camera,
-                     const vector<FinishedRay> &rays) {
+                     const vector<Sample> &rays) {
     const Bounds2i sampleBounds = camera->film->GetSampleBounds();
     unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 

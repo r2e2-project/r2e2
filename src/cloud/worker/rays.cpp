@@ -70,7 +70,7 @@ ResultType LambdaWorker::handleTraceQueue() {
             if (newRay.isShadowRay) {
                 if (hit || emptyVisit) {
                     newRay.Ld = hit ? 0.f : newRay.Ld;
-                    finishedRays.emplace(*newRayPtr);
+                    samples.emplace(*newRayPtr);
                 } else {
                     processedRays.push(move(newRayPtr));
                 }
@@ -78,7 +78,7 @@ ResultType LambdaWorker::handleTraceQueue() {
                 processedRays.push(move(newRayPtr));
             } else if (emptyVisit) {
                 newRay.Ld = 0.f;
-                finishedRays.emplace(*newRayPtr);
+                samples.emplace(*newRayPtr);
                 finishedPathIds.push(pathId);
             }
         } else if (ray.hit) {

@@ -68,7 +68,7 @@ protobuf::Scene to_protobuf(const Scene& scene);
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
 protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey);
 protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics);
-protobuf::FinishedRay to_protobuf(const FinishedRay& finishedRay);
+protobuf::Sample to_protobuf(const Sample& sample);
 protobuf::RayBagInfo to_protobuf(const RayBagInfo& RayBagInfo);
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats);
 
@@ -94,7 +94,7 @@ TextureParams from_protobuf(
     std::map<std::string, std::shared_ptr<Texture<Float>>>& fTex,
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex);
 ObjectKey from_protobuf(const protobuf::ObjectKey& objectKey);
-FinishedRay from_protobuf(const protobuf::FinishedRay& finishedRay);
+Sample from_protobuf(const protobuf::Sample& sample);
 RayBagInfo from_protobuf(const protobuf::RayBagInfo& rayBagInfo);
 WorkerStats from_protobuf(const protobuf::WorkerStats& statsProto);
 

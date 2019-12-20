@@ -95,9 +95,9 @@ void RayState::Deserialize(const char *data, const size_t len,
     }
 }
 
-/* FinishedRay */
+/* Sample */
 
-FinishedRay::FinishedRay(const RayState &rayState)
+Sample::Sample(const RayState &rayState)
     : sampleId(rayState.sample.id),
       pFilm(rayState.sample.pFilm),
       weight(rayState.sample.weight),
@@ -107,12 +107,12 @@ FinishedRay::FinishedRay(const RayState &rayState)
     }
 }
 
-size_t FinishedRay::Size() const {
-    return offset_of(*this, &FinishedRay::L) + sizeof(FinishedRay::L);
+size_t Sample::Size() const {
+    return offset_of(*this, &Sample::L) + sizeof(Sample::L);
 }
 
-size_t FinishedRay::Serialize(char *data, const bool compress) {
-    constexpr size_t upperBound = LZ4_COMPRESSBOUND(sizeof(FinishedRay));
+size_t Sample::Serialize(char *data, const bool compress) {
+    constexpr size_t upperBound = LZ4_COMPRESSBOUND(sizeof(Sample));
     const size_t size = this->Size();
     uint32_t len = size;
 
@@ -133,15 +133,15 @@ size_t FinishedRay::Serialize(char *data, const bool compress) {
     return len;
 }
 
-void FinishedRay::Deserialize(const char *data, const size_t len,
+void Sample::Deserialize(const char *data, const size_t len,
                               const bool decompress) {
     if (decompress) {
         if (LZ4_decompress_safe(data, reinterpret_cast<char *>(this), len,
-                                sizeof(FinishedRay)) < 0) {
+                                sizeof(Sample)) < 0) {
             throw runtime_error("ray decompression failed");
         }
     } else {
         memcpy(reinterpret_cast<char *>(this), data,
-               min(sizeof(FinishedRay), len));
+               min(sizeof(Sample), len));
     }
 }

@@ -74,7 +74,7 @@ int main(int argc, char const *argv[]) {
         global::manager.init(scenePath);
 
         queue<RayStatePtr> rayList;
-        vector<FinishedRay> finishedRays;
+        vector<Sample> samples;
 
         /* loading all the rays */
         {
@@ -136,7 +136,7 @@ int main(int argc, char const *argv[]) {
                 if (newRay.IsShadowRay()) {
                     if (hit || emptyVisit) {
                         newRay.Ld = hit ? 0.f : newRay.Ld;
-                        finishedRays.emplace_back(*newRayPtr);
+                        samples.emplace_back(*newRayPtr);
                     } else {
                         rayList.push(move(newRayPtr));
                     }
@@ -144,7 +144,7 @@ int main(int argc, char const *argv[]) {
                     rayList.push(move(newRayPtr));
                 } else if (emptyVisit) {
                     newRay.Ld = 0.f;
-                    finishedRays.emplace_back(*newRayPtr);
+                    samples.emplace_back(*newRayPtr);
                 }
             } else if (theRay.HasHit()) {
                 RayStatePtr bounceRay, shadowRay;
@@ -162,7 +162,7 @@ int main(int argc, char const *argv[]) {
             }
         }
 
-        graphics::AccumulateImage(camera, finishedRays);
+        graphics::AccumulateImage(camera, samples);
         camera->film->WriteImage();
     } catch (const exception &e) {
         print_exception(argv[0], e);
