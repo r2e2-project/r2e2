@@ -14,16 +14,6 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
-void LambdaWorker::pushTraceQueue(RayStatePtr&& state) {
-    traceQueue.push_back(move(state));
-}
-
-RayStatePtr LambdaWorker::popTraceQueue() {
-    RayStatePtr state = move(traceQueue.front());
-    traceQueue.pop_front();
-    return state;
-}
-
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
     const Bounds2i sampleBounds = scene.camera->film->GetSampleBounds();
     const uint8_t maxDepth = 5;
@@ -44,9 +34,9 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             const auto nextTreelet = statePtr->CurrentTreelet();
 
             if (treeletIds.count(nextTreelet)) {
-                pushTraceQueue(move(statePtr));
+                traceQueue.push(move(statePtr));
             } else {
-                outQueue[nextTreelet].push_back(move(statePtr));
+                outQueue[nextTreelet].push(move(statePtr));
                 outQueueSize++;
             }
         }
@@ -56,15 +46,17 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 ResultType LambdaWorker::handleTraceQueue() {
     RECORD_INTERVAL("handleTraceQueue");
 
-    deque<RayStatePtr> processedRays;
+    queue<RayStatePtr> processedRays;
 
     constexpr size_t MAX_RAYS = 5'000;
+    size_t tracedCount = 0;
     MemoryArena arena;
 
-    for (size_t i = 0; i < MAX_RAYS && !traceQueue.empty(); i++) {
-        RayStatePtr rayPtr = popTraceQueue();
-        RayState& ray = *rayPtr;
+    while(!traceQueue.empty() && tracedCount++ < MAX_RAYS) {
+        RayStatePtr rayPtr = move(traceQueue.front());
+        traceQueue.pop();
 
+        RayState& ray = *rayPtr;
         const uint64_t pathId = ray.PathID();
 
         if (!ray.toVisitEmpty()) {
@@ -80,14 +72,14 @@ ResultType LambdaWorker::handleTraceQueue() {
                     newRay.Ld = hit ? 0.f : newRay.Ld;
                     finishedRays.emplace(*newRayPtr);
                 } else {
-                    processedRays.push_back(move(newRayPtr));
+                    processedRays.push(move(newRayPtr));
                 }
             } else if (!emptyVisit || hit) {
-                processedRays.push_back(move(newRayPtr));
+                processedRays.push(move(newRayPtr));
             } else if (emptyVisit) {
                 newRay.Ld = 0.f;
                 finishedRays.emplace(*newRayPtr);
-                finishedPathIds.push_back(pathId);
+                finishedPathIds.push(pathId);
             }
         } else if (ray.hit) {
             RayStatePtr bounceRay, shadowRay;
@@ -101,13 +93,13 @@ ResultType LambdaWorker::handleTraceQueue() {
             }
 
             if (bounceRay != nullptr) {
-                processedRays.push_back(move(bounceRay));
+                processedRays.push(move(bounceRay));
             } else { /* this was the last bounce in this path */
-                finishedPathIds.push_back(pathId);
+                finishedPathIds.push(pathId);
             }
 
             if (shadowRay != nullptr) {
-                processedRays.push_back(move(shadowRay));
+                processedRays.push(move(shadowRay));
             }
         } else {
             throw runtime_error("invalid ray in ray queue");
@@ -116,14 +108,14 @@ ResultType LambdaWorker::handleTraceQueue() {
 
     while (!processedRays.empty()) {
         RayStatePtr ray = move(processedRays.front());
-        processedRays.pop_front();
+        processedRays.pop();
 
         const TreeletId nextTreelet = ray->CurrentTreelet();
 
         if (treeletIds.count(nextTreelet)) {
-            pushTraceQueue(move(ray));
+            traceQueue.push(move(ray));
         } else {
-            outQueue[nextTreelet].push_back(move(ray));
+            outQueue[nextTreelet].push(move(ray));
             outQueueSize++;
         }
     }

@@ -32,7 +32,7 @@ ResultType LambdaWorker::handleOutQueue() {
             bag.info.rayCount++;
             bag.info.bagSize += len;
 
-            rayList.pop_front();
+            rayList.pop();
         }
     }
 
@@ -125,7 +125,7 @@ ResultType LambdaWorker::handleReceiveQueue() {
             ray->hop++;
             offset += len;
 
-            pushTraceQueue(move(ray));
+            traceQueue.push(move(ray));
         }
     }
 

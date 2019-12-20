@@ -2,7 +2,7 @@
 #define PBRT_CLOUD_LAMBDA_WORKER_H
 
 #include <cstring>
-#include <deque>
+#include <queue>
 #include <fstream>
 #include <future>
 #include <iostream>
@@ -134,11 +134,9 @@ class LambdaWorker {
     Poller::Action::Result::Type handleTraceQueue();
 
     void generateRays(const Bounds2i& cropWindow);
-    void pushTraceQueue(RayStatePtr&& state);
-    RayStatePtr popTraceQueue();
 
-    std::deque<RayStatePtr> traceQueue{};
-    std::map<TreeletId, std::deque<RayStatePtr>> outQueue{};
+    std::queue<RayStatePtr> traceQueue{};
+    std::map<TreeletId, std::queue<RayStatePtr>> outQueue{};
     std::queue<FinishedRay> finishedRays{};
     size_t outQueueSize{0};
 
@@ -191,7 +189,7 @@ class LambdaWorker {
     std::queue<RayBag> receiveQueue{};
 
     /* id of the paths that are finished (for bookkeeping) */
-    std::deque<uint64_t> finishedPathIds{};
+    std::queue<uint64_t> finishedPathIds{};
 
     /*** Ray Bags *************************************************************/
 
