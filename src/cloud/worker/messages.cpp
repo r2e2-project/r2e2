@@ -64,11 +64,11 @@ void LambdaWorker::processMessage(const Message& message) {
         protobuf::RayBags proto;
 
         for (const protobuf::RayBagInfo& item : proto.items()) {
-            RayBagInfo key{from_protobuf(item)};
+            RayBagInfo info{from_protobuf(item)};
             const auto id =
-                transferAgent.requestDownload(key.str(rayBagsKeyPrefix));
+                transferAgent.requestDownload(info.str(rayBagsKeyPrefix));
 
-            pendingRayBags[id] = make_pair(Task::Download, key);
+            pendingRayBags[id] = make_pair(Task::Download, info);
         }
 
         break;
