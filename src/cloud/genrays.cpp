@@ -62,7 +62,7 @@ int main(int argc, char const *argv[]) {
         /* Generate all the samples */
         size_t sampleCount = 0;
 
-        char rayBuffer[RayState::MaxCompressedSize()];
+        char rayBuffer[sizeof(RayState)];
 
         for (size_t sample = 0; sample < sampler->samplesPerPixel; sample++) {
             for (Point2i pixel : sampleBounds) {

@@ -84,9 +84,7 @@ class RayState {
     void Deserialize(const char *data, const size_t len,
                      const bool decompress = true);
 
-    static constexpr size_t MaxCompressedSize() {
-        return 4 + LZ4_COMPRESSBOUND(sizeof(RayState));
-    }
+    size_t MaxCompressedSize() const { return 4 + LZ4_COMPRESSBOUND(Size()); }
 
     static RayStatePtr Create();
 };
@@ -112,9 +110,7 @@ class Sample {
     void Deserialize(const char *data, const size_t len,
                      const bool decompress = true);
 
-    static constexpr size_t MaxCompressedSize() {
-        return 4 + LZ4_COMPRESSBOUND(sizeof(Sample));
-    }
+    size_t MaxCompressedSize() const { return 4 + LZ4_COMPRESSBOUND(Size()); }
 };
 
 }  // namespace pbrt

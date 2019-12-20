@@ -17,8 +17,10 @@ ResultType LambdaWorker::handleOutQueue() {
         auto& queue = sendQueue[treeletId];
 
         while (!rayList.empty()) {
+            auto& ray = rayList.front();
+
             if (queue.empty() ||
-                queue.back().info.bagSize + RayState::MaxCompressedSize() >
+                queue.back().info.bagSize + ray->MaxCompressedSize() >
                     MAX_BAG_SIZE) {
                 /* let's create an empty bag */
                 queue.emplace(*workerId, treeletId, currentBagId[treeletId]++,
@@ -26,7 +28,6 @@ ResultType LambdaWorker::handleOutQueue() {
             }
 
             auto& bag = queue.back();
-            auto& ray = rayList.front();
 
             const auto len = ray->Serialize(&bag.data[0] + bag.info.bagSize);
             bag.info.rayCount++;
@@ -47,15 +48,15 @@ ResultType LambdaWorker::handleSamples() {
     }
 
     while (!samples.empty()) {
-        auto& ray = samples.front();
+        auto& sample = samples.front();
 
-        if (out.back().info.bagSize + Sample::MaxCompressedSize() >
+        if (out.back().info.bagSize + sample.MaxCompressedSize() >
             MAX_BAG_SIZE) {
             out.emplace(*workerId, 0, currentSampleBagId++, true, MAX_BAG_SIZE);
         }
 
         auto& bag = out.back();
-        const auto len = ray.Serialize(&bag.data[0] + bag.info.bagSize);
+        const auto len = sample.Serialize(&bag.data[0] + bag.info.bagSize);
         bag.info.rayCount++;
         bag.info.bagSize += len;
 
