@@ -22,6 +22,8 @@ args = parser.parse_args()
 COLOR_MAP = pylab.cm.get_cmap('RdYlGn', 12)
 
 def plot_heatmap(mat, title, xlabel, ylabel, out):
+    plt.clf()
+
     plt.imshow(mat.transpose(), cmap=COLOR_MAP, interpolation='nearest',
                aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0),
                vmin=-1.5, vmax=mat.max(),
@@ -74,7 +76,7 @@ def gen_ray_queue(df, out, aggregate):
     plt.ylabel("Total Number of Waiting Rays")
     plt.savefig(out, dpi=300)
 
-def sent_bytes(df, out, aggregate):
+def sent_bytes(df, out):
     per_second_per_treelet = df.groupby(['timestampS', 'workerID']).sum()
 
     bytessent_ps_pt = per_second_per_treelet.bytesSent
@@ -83,7 +85,7 @@ def sent_bytes(df, out, aggregate):
 
     plot_heatmap(mat, args.title, "Time (s)", "Worker ID", out)
 
-def received_bytes(df, out, aggregate):
+def received_bytes(df, out):
     per_second_per_treelet = df.groupby(['timestampS', 'workerID']).sum()
 
     bytessent_ps_pt = per_second_per_treelet.bytesReceived
@@ -93,15 +95,10 @@ def received_bytes(df, out, aggregate):
     plot_heatmap(mat, args.title, "Time (s)", "Worker ID", out)
 
 data = pd.read_csv(os.path.join(args.input, 'data.csv'))
+
 gen_per_second_per_treelet(data, os.path.join(args.out, "per-treelet.png"))
-plt.clf()
 gen_per_second_per_worker(data, os.path.join(args.out, "per-worker.png"))
-plt.clf()
-gen_ray_queue(data, os.path.join(args.out, "aggregate-ray-queue.png"), aggregate=True)
-plt.clf()
-gen_ray_queue(data, os.path.join(args.out, "individual-ray-queue.png"), aggregate=False)
-plt.clf()
-sent_bytes(data, os.path.join(args.out, "per-worker-outrate.png"), aggregate=False)
-plt.clf()
-received_bytes(data, os.path.join(args.out, "per-worker-inrate.png"), aggregate=False)
-plt.clf()
+gen_ray_queue(data, os.path.join(args.out, "aggregate-ray-queue.png"), True)
+gen_ray_queue(data, os.path.join(args.out, "individual-ray-queue.png"), False)
+sent_bytes(data, os.path.join(args.out, "per-worker-outrate.png"))
+received_bytes(data, os.path.join(args.out, "per-worker-inrate.png"))
