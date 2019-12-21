@@ -147,7 +147,7 @@ for cmd, dir, scene, nlambdas, spp in cmds:
         with open(os.path.join(dir, 'COMMAND'), 'w') as fout:
             print(cmd, file=fout)
 
-        print(">>> try #{}, running: {}".format(i + 1, cmd), file=os.stderr)
+        print(">>> try #{}, running: {}".format(i + 1, cmd), file=sys.stderr)
         launch(cmd)
         i += 1
 
