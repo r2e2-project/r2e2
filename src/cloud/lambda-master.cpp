@@ -139,6 +139,10 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
         tlStream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
                     "bytesEnqueued,bytesDequeued\n";
+
+        // Log the 0 entries
+        for (auto &item : lastStats.workers) item.second = true;
+        for (auto &item : lastStats.treelets) item.second = true;
     }
 
     cout << "Tile size is " << tiles.tileSize << "\u00d7" << tiles.tileSize
