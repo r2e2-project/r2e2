@@ -125,7 +125,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     /* are we logging anything? */
     if (config.collectDebugLogs || config.collectDiagnostics ||
-        config.rayActionsLogRate > 0 || config.packetsLogRate > 0) {
+        config.workerStatsWriteInterval > 0 || config.rayActionsLogRate > 0 ||
+        config.packetsLogRate > 0) {
         roost::create_directories(config.logsDirectory);
     }
 
