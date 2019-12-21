@@ -19,6 +19,8 @@ void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
     if (info.sampleBag) {
         worker.samples.count += info.rayCount;
         worker.samples.bytes += info.bagSize;
+
+        lastFinishedRay = steady_clock::now();
     } else {
         worker.enqueued.count += info.rayCount;
         worker.enqueued.bytes += info.bagSize;
