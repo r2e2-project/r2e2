@@ -2,6 +2,7 @@
 
 if [[ $# != 1 ]]; then
     echo "USAGE: $0 <data.csv>"
+    exit 1
 fi
 
 if [[ ! $(command -v q) ]]; then
@@ -11,7 +12,7 @@ fi
 
 DATA_PATH=$1
 
-TREELETS=$(q -H -d, "SELECT treeletID, CAST(SUM(raysProcessed) AS INT64) FROM ${DATA_PATH} GROUP BY treeletID ORDER BY treeletID")
+TREELETS=$(q -H -d, "SELECT treeletId, CAST(SUM(raysDequeued) AS INT64) FROM ${DATA_PATH} GROUP BY treeletId ORDER BY treeletId")
 
 TREELET_COUNT=$(echo "$TREELETS" | wc -l)
 
