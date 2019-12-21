@@ -19,6 +19,8 @@ void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
     if (info.sampleBag) {
         worker.samples.count += info.rayCount;
         worker.samples.bytes += info.bagSize;
+        aggregatedStats.samples.count += info.rayCount;
+        aggregatedStats.samples.bytes += info.bagSize;
 
         lastFinishedRay = steady_clock::now();
     } else {
@@ -26,6 +28,8 @@ void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
         worker.enqueued.bytes += info.bagSize;
         treelet.enqueued.count += info.rayCount;
         treelet.enqueued.bytes += info.bagSize;
+        aggregatedStats.enqueued.count += info.rayCount;
+        aggregatedStats.enqueued.bytes += info.bagSize;
     }
 }
 
@@ -40,6 +44,8 @@ void LambdaMaster::logDequeue(const WorkerId workerId, const RayBagInfo &info) {
     worker.dequeued.bytes += info.bagSize;
     treelet.dequeued.count += info.rayCount;
     treelet.dequeued.bytes += info.bagSize;
+    aggregatedStats.dequeued.count += info.rayCount;
+    aggregatedStats.dequeued.bytes += info.bagSize;
 }
 
 ResultType LambdaMaster::handleWorkerStats() {
