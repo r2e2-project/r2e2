@@ -36,7 +36,7 @@
 
 namespace pbrt {
 
-constexpr std::chrono::milliseconds SEND_QUEUE_INTERVAL{500};
+constexpr std::chrono::milliseconds SEND_QUEUE_INTERVAL{200};
 constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL{2'000};
 
 constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
