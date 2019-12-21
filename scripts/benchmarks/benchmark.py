@@ -9,6 +9,7 @@ import shutil
 import signal
 import asyncio
 import json
+
 from math import floor, log10
 from datetime import datetime
 
@@ -30,7 +31,7 @@ parser.add_argument('-F', '--install-function', action='store_true')
 args = parser.parse_args()
 
 resource.setrlimit(resource.RLIMIT_NOFILE,
-        (100000, 100000))
+        (65536, 65536))
 
 pbrt_path = os.path.abspath(os.path.join(os.path.dirname(
     os.path.realpath(__file__)),
