@@ -23,7 +23,6 @@ COLOR_MAP = pylab.cm.get_cmap('RdYlGn', 12)
 
 def plot_heatmap(mat, title, xlabel, ylabel, out):
     plt.clf()
-
     plt.imshow(mat.transpose(), cmap=COLOR_MAP, interpolation='nearest',
                aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0),
                vmin=-1.5, vmax=mat.max(),
@@ -36,11 +35,10 @@ def plot_heatmap(mat, title, xlabel, ylabel, out):
     plt.colorbar()
     plt.savefig(out, dpi=300)
 
-
 def gen_per_second_per_treelet(df, out):
-    per_second_per_treelet = df.groupby(['timestampS', 'treeletID']).sum()
+    per_second_per_treelet = df.groupby(['timestampS', 'treeletId']).sum()
 
-    raysProcessed_ps_pt = per_second_per_treelet.raysProcessed
+    raysProcessed_ps_pt = per_second_per_treelet.raysDequeued
     timestamp_sums = raysProcessed_ps_pt.sum(level=0).to_numpy()
     mat = raysProcessed_ps_pt.unstack().to_numpy()
     mat = mat / timestamp_sums.reshape(-1, 1)
@@ -49,9 +47,9 @@ def gen_per_second_per_treelet(df, out):
     plot_heatmap(mat, args.title, "Time (s)", "Treelet ID", out)
 
 def gen_per_second_per_worker(df, out):
-    per_second_per_worker = df.groupby(['timestampS', 'workerID']).sum()
+    per_second_per_worker = df.groupby(['timestampS', 'workerId']).sum()
 
-    raysProcessed_ps_pw = per_second_per_worker.raysProcessed
+    raysProcessed_ps_pw = per_second_per_worker.raysDequeued
     timestamp_sums = raysProcessed_ps_pw.sum(level=0).to_numpy()
     mat = raysProcessed_ps_pw.unstack().to_numpy()
     mat = mat / timestamp_sums.reshape(-1, 1)
@@ -60,13 +58,15 @@ def gen_per_second_per_worker(df, out):
     plot_heatmap(mat, args.title, "Time (s)", "Worker ID", out)
 
 def gen_ray_queue(df, out, aggregate):
+    plt.clf()
+
     if aggregate:
         per_time = df.groupby(['timestampS']).sum()
-        plt.plot((per_time.raysWaiting - per_time.raysProcessed).cumsum())
+        plt.plot((per_time.raysEnqueued - per_time.raysDequeued).cumsum())
     else:
-        for id, group in df.groupby('workerID'):
+        for id, group in df.groupby('workerId'):
             per_time = group.groupby(['timestampS']).sum()
-            cumulative = (per_time.raysWaiting - per_time.raysProcessed).cumsum()
+            cumulative = (per_time.raysEnqueued - per_time.raysDequeued).cumsum()
             plt.plot(cumulative, label=str(id))
 
         plt.legend()
@@ -77,28 +77,32 @@ def gen_ray_queue(df, out, aggregate):
     plt.savefig(out, dpi=300)
 
 def sent_bytes(df, out):
-    per_second_per_treelet = df.groupby(['timestampS', 'workerID']).sum()
+    per_second_per_treelet = df.groupby(['timestampS', 'workerId']).sum()
 
-    bytessent_ps_pt = per_second_per_treelet.bytesSent
+    bytessent_ps_pt = per_second_per_treelet.bytesEnqueued
     mat = bytessent_ps_pt.unstack().to_numpy()
     mat = np.nan_to_num(mat)
 
     plot_heatmap(mat, args.title, "Time (s)", "Worker ID", out)
 
 def received_bytes(df, out):
-    per_second_per_treelet = df.groupby(['timestampS', 'workerID']).sum()
+    per_second_per_treelet = df.groupby(['timestampS', 'workerId']).sum()
 
-    bytessent_ps_pt = per_second_per_treelet.bytesReceived
+    bytessent_ps_pt = per_second_per_treelet.bytesDequeued
     mat = bytessent_ps_pt.unstack().to_numpy()
     mat = np.nan_to_num(mat)
 
     plot_heatmap(mat, args.title, "Time (s)", "Worker ID", out)
 
-data = pd.read_csv(os.path.join(args.input, 'data.csv'))
+treelet_data = pd.read_csv(os.path.join(args.input, 'treelets.csv'))
+worker_data = pd.read_csv(os.path.join(args.input, 'workers.csv'))
 
-gen_per_second_per_treelet(data, os.path.join(args.out, "per-treelet.png"))
-gen_per_second_per_worker(data, os.path.join(args.out, "per-worker.png"))
-gen_ray_queue(data, os.path.join(args.out, "aggregate-ray-queue.png"), True)
-gen_ray_queue(data, os.path.join(args.out, "individual-ray-queue.png"), False)
-sent_bytes(data, os.path.join(args.out, "per-worker-outrate.png"))
-received_bytes(data, os.path.join(args.out, "per-worker-inrate.png"))
+treelet_data['timestampS'] = (treelet_data.timestamp / 1000).astype('int32')
+worker_data['timestampS'] = (worker_data.timestamp / 1000).astype('int32')
+
+gen_per_second_per_treelet(treelet_data, os.path.join(args.out, "per-treelet.png"))
+gen_per_second_per_worker(worker_data, os.path.join(args.out, "per-worker.png"))
+sent_bytes(worker_data, os.path.join(args.out, "per-worker-outrate.png"))
+received_bytes(worker_data, os.path.join(args.out, "per-worker-inrate.png"))
+gen_ray_queue(treelet_data, os.path.join(args.out, "aggregate-ray-queue.png"), True)
+gen_ray_queue(treelet_data, os.path.join(args.out, "individual-ray-queue.png"), False)
