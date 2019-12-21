@@ -59,6 +59,7 @@ else:
 scenes = subprocess.check_output("""
     aws s3 ls s3://{s3_path}|awk -F' ' '{{print $2}}'|cut -d/ -f1
     """.format(s3_path=args.s3_path), shell=True).decode('utf-8').split()
+
 if len(args.include) > 0:
     scenes = list(set(scenes).intersection(set(args.include)))
     if len(scenes) < len(args.include):
@@ -74,7 +75,7 @@ signal.signal(signal.SIGINT, ignore_ctrlc)
 samples = args.samples if args.samples else [1]
 
 out_dir = os.path.join(args.out_dir, args.run_name + datetime.now().strftime('-%H-%M-%S-%m-%d-%Y'))
-os.mkdir(out_dir)
+os.makedirs(out_dir)
 
 cmds = []
 cur_port = args.start_port
