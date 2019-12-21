@@ -63,8 +63,9 @@ ResultType LambdaMaster::handleWorkerStats() {
 
         /* timestamp,workerId,raysEnqueued,raysDequeued,bytesEnqueued,
            bytesDequeued,numSamples,bytesSamples */
-        wsStream << t << ',' << workerId << ',' << (stats.enqueued.count / T)
-                 << ',' << (stats.dequeued.count / T) << ','
+        wsStream << t << ',' << workerId << ',' << fixed
+                 << (stats.enqueued.count / T) << ','
+                 << (stats.dequeued.count / T) << ','
                  << (stats.enqueued.bytes / T) << ','
                  << (stats.dequeued.bytes / T) << ','
                  << (stats.samples.count / T) << ','
@@ -84,8 +85,9 @@ ResultType LambdaMaster::handleWorkerStats() {
 
         /* timestamp,treeletId,raysEnqueued,raysDequeued,bytesEnqueued,
            bytesDequeued */
-        tlStream << t << ',' << treeletId << ',' << (stats.enqueued.count / T)
-                 << ',' << (stats.dequeued.count / T) << ','
+        tlStream << t << ',' << treeletId << ',' << fixed
+                 << (stats.enqueued.count / T) << ','
+                 << (stats.dequeued.count / T) << ','
                  << (stats.enqueued.bytes / T) << ','
                  << (stats.dequeued.bytes / T) << '\n';
     }
