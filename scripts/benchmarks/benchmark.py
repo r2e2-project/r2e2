@@ -161,7 +161,7 @@ for cmd, dir, scene, nlambdas, spp in cmds:
 
     if args.generate_static:
         subprocess.run(os.path.join(pbrt_scripts_path,
-            "generate_static_assignment.sh") + " data.csv > STATIC0",
+            "generate_static_assignment.sh") + " treelets.csv > STATIC0",
             shell=True, check=True)
         subprocess.run("aws s3 cp STATIC0 s3://{s3_path}/{scene}/".format(
             s3_path=args.s3_path, scene=scene), shell=True, check=True)
