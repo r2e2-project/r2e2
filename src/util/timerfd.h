@@ -14,15 +14,18 @@ struct TimerFD {
     FileDescriptor fd;
     itimerspec timerspec;
 
-    template <class Duration>
-    TimerFD(const Duration& duration)
+    template <class DurationA, class DurationB>
+    TimerFD(const DurationA& duration, const DurationB& initial)
         : fd(CheckSystemCall("timerfd",
                              timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK))) {
         timerspec.it_interval = to_timespec(duration);
-        timerspec.it_value = to_timespec(duration);
+        timerspec.it_value = to_timespec(initial);
         CheckSystemCall("timerfd_settime",
                         timerfd_settime(fd.fd_num(), 0, &timerspec, nullptr));
     }
+
+    template <class Duration>
+    TimerFD(const Duration& duration) : TimerFD(duration, duration) {}
 
     void reset() {
         char buffer[8];
