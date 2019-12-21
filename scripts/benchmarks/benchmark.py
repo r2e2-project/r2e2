@@ -25,6 +25,7 @@ parser.add_argument('-p', '--start-port', default=9900, type=int)
 parser.add_argument('-o', '--out-dir', required=True)
 parser.add_argument('-n', '--run-name', required=True, type=str)
 parser.add_argument('-D', '--directional', action='store_true')
+parser.add_argument('-F', '--install-function', action='store_true')
 
 args = parser.parse_args()
 
@@ -42,10 +43,11 @@ build_path = os.path.abspath(args.build_path)
 master_path = os.path.join(build_path, 'pbrt-lambda-master')
 worker_path = os.path.join(build_path, 'pbrt-lambda-worker')
 
-subprocess.run("""
-    ./create-function.py --pbrt-lambda-worker {worker_path} --delete
-    """.format(worker_path=worker_path),
-    cwd=os.path.join(pbrt_path, 'src/remote'), check=True, shell=True)
+if args.install_function:
+    subprocess.run("""
+        ./create-function.py --pbrt-lambda-worker {worker_path} --delete
+        """.format(worker_path=worker_path),
+        cwd=os.path.join(pbrt_path, 'src/remote'), check=True, shell=True)
 
 if args.ip is None:
     ip = subprocess.check_output("curl -s http://checkip.amazonaws.com",
@@ -172,7 +174,7 @@ for cmd, dir, scene, nlambdas, spp in cmds:
             shell=True, check=True)
 
     os.chdir(cwd)
-    
+
     with open(os.path.join(dir, 'master.json')) as f:
         info = json.load(f)
 
