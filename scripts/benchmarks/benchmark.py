@@ -152,9 +152,6 @@ for cmd, dir, scene, nlambdas, spp in cmds:
         continue
 
     os.chdir(dir)
-    subprocess.run(os.path.join(pbrt_scripts_path,
-        "generate_trace.py") + " --diagnostics-directory .",
-        shell=True, check=True)
 
     if args.generate_static:
         subprocess.run(os.path.join(pbrt_scripts_path,
@@ -163,10 +160,6 @@ for cmd, dir, scene, nlambdas, spp in cmds:
         subprocess.run("aws s3 cp STATIC0 s3://{s3_path}/{scene}/".format(
             s3_path=args.s3_path, scene=scene), shell=True, check=True)
     else:
-        subprocess.run(os.path.join(pbrt_scripts_path,
-            "parse_worker_info.py") + " -i . -o rays.csv",
-            shell=True, check=True)
-
         graph_title = "{scene}: {nworkers} - {spp}spp".format(scene=scene, nworkers=nlambdas, spp=spp)
         os.mkdir('graphs')
         subprocess.run(os.path.join(os.path.join(pbrt_scripts_path, 'benchmarks'),
