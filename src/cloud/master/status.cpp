@@ -39,17 +39,16 @@ ResultType LambdaMaster::handleStatusMessage() {
     const auto elapsedTime = steady_clock::now() - startTime;
     const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
 
-    auto percent = [](const int n, const int total) -> double {
-        return total ? (((int)(100 * (100.0 * n / total))) / 100.0) : 0.0;
+    auto percent = [](const uint64_t n, const uint64_t total) -> double {
+        return total ? (((uint64_t)(100 * (100.0 * n / total))) / 100.0) : 0.0;
     };
 
     constexpr char const *BG_A = "\033[48;5;022m";
     constexpr char const *BG_B = "\033[48;5;028m";
 
+    auto &s = aggregatedStats;
+
     // clang-format off
-
-    auto&s = aggregatedStats;
-
     ostringstream oss;
     oss << "\033[0m" << fixed << setprecision(2)
 
@@ -74,7 +73,6 @@ ResultType LambdaMaster::handleStatusMessage() {
                 << (elapsedSeconds % 60) << " "
 
         << BG_B;
-
     // clang-format on
 
     StatusBar::set_text(oss.str());
