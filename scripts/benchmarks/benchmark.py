@@ -82,10 +82,9 @@ cur_port = args.start_port
 for i, scene in enumerate(scenes):
     cmdprefix = ("{master_path} --ip {ip} --timeout 60"
               " --storage-backend s3://{s3_path}/{scene}?region=us-west-2"
-              " --aws-region us-west-2 -T auto -R -f discard -w 5 -d".format(
+              " --aws-region us-west-2 -T auto -w 2 -d".format(
                   master_path=master_path,
                   ip=ip,
-                  port=args.start_port + i,
                   s3_path=args.s3_path,
                   scene=scene))
 
@@ -101,12 +100,12 @@ for i, scene in enumerate(scenes):
         for spp in samples:
             onespp_rate = 1 / spp / 10
             dir = os.path.join(out_dir,
-                    "{scene}-{nlambdas}-{spp}".format(scene=scene, nlambdas=nlambdas,
+                    "{scene}-{nlambdas}-{spp}".format(scene=scene,
+                                                      nlambdas=nlambdas,
                                                       spp=spp))
-            cmd = cmdprefix + (" -S {spp} -L {rate} -D {dir} --job-summary {json}"
+            cmd = cmdprefix + (" -S {spp} -D {dir} --job-summary {json}"
                                " --lambdas {nlambdas} --port {port}").format(
-                    spp=spp, rate=str(round(onespp_rate,
-                                        -int(floor(log10(abs(onespp_rate)))))),
+                    spp=spp,
                     dir=dir,
                     nlambdas=nlambdas,
                     port=cur_port,
