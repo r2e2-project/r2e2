@@ -21,6 +21,20 @@ args = parser.parse_args()
 
 COLOR_MAP = pylab.cm.get_cmap('RdYlGn', 12)
 
+def plot_heatmap(mat, title, xlabel, ylabel, out):
+    plt.imshow(mat.transpose(), cmap=COLOR_MAP, interpolation='nearest',
+               aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0),
+               vmin=-1.5, vmax=mat.max(),
+               norm=matplotlib.colors.PowerNorm(gamma=0.2))
+
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.clim(0, mat.max())
+    plt.colorbar()
+    plt.savefig(out, dpi=300)
+
+
 def gen_per_second_per_treelet(df, out):
     per_second_per_treelet = df.groupby(['timestampS', 'treeletID']).sum()
 
@@ -30,14 +44,7 @@ def gen_per_second_per_treelet(df, out):
     mat = mat / timestamp_sums.reshape(-1, 1)
     mat = np.nan_to_num(mat)
 
-    plt.imshow(mat.transpose(), cmap=COLOR_MAP, interpolation='nearest', aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0), vmin=-1.5, vmax=mat.max(), norm=matplotlib.colors.PowerNorm(gamma=0.2))
-    plt.xlabel("Time (seconds)")
-    plt.ylabel("Treelet ID")
-    plt.title(args.title)
-    plt.clim(0, mat.max())
-    plt.colorbar()
-    plt.savefig(out, dpi=300)
-
+    plot_heatmap(mat, args.title, "Time (s)", "Treelet ID", out)
 
 def gen_per_second_per_worker(df, out):
     per_second_per_worker = df.groupby(['timestampS', 'workerID']).sum()
@@ -48,13 +55,7 @@ def gen_per_second_per_worker(df, out):
     mat = mat / timestamp_sums.reshape(-1, 1)
     mat = np.nan_to_num(mat)
 
-    plt.imshow(mat.transpose(), cmap=COLOR_MAP, interpolation='nearest', aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0), vmin=-1.5, vmax=mat.max(), norm=matplotlib.colors.PowerNorm(gamma=0.2))
-    plt.xlabel("Time (seconds)")
-    plt.ylabel("Worker ID")
-    plt.title(args.title)
-    plt.clim(0, mat.max())
-    plt.colorbar()
-    plt.savefig(out, dpi=300)
+    plot_heatmap(mat, args.title, "Time (s)", "Worker ID", out)
 
 def gen_ray_queue(df, out, aggregate):
     if aggregate:
@@ -80,16 +81,7 @@ def sent_bytes(df, out, aggregate):
     mat = bytessent_ps_pt.unstack().to_numpy()
     mat = np.nan_to_num(mat)
 
-    #max_out = (240 * U.mbps).to(U.bps).magnitude
-    #mat = mat / max_out
-
-    plt.imshow(mat.transpose(), cmap=COLOR_MAP, interpolation='nearest', aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0), vmin=-1.5, vmax=mat.max())
-    plt.xlabel("Time (seconds)")
-    plt.ylabel("Worker ID")
-    plt.title(args.title)
-    plt.clim(0, mat.max())
-    plt.colorbar()
-    plt.savefig(out, dpi=300)
+    plot_heatmap(mat, args.title, "Time (s)", "Worker ID", out)
 
 def received_bytes(df, out, aggregate):
     per_second_per_treelet = df.groupby(['timestampS', 'workerID']).sum()
@@ -98,16 +90,7 @@ def received_bytes(df, out, aggregate):
     mat = bytessent_ps_pt.unstack().to_numpy()
     mat = np.nan_to_num(mat)
 
-    #max_out = (240 * U.mbps).to(U.bps).magnitude
-    #mat = mat / max_out
-
-    plt.imshow(mat.transpose(), cmap=COLOR_MAP, interpolation='nearest', aspect='auto', extent=(0, mat.shape[0], mat.shape[1], 0), vmin=-1.5, vmax=mat.max())
-    plt.xlabel("Time (seconds)")
-    plt.ylabel("Worker ID")
-    plt.title(args.title)
-    plt.clim(0, mat.max())
-    plt.colorbar()
-    plt.savefig(out, dpi=300)
+    plot_heatmap(mat, args.title, "Time (s)", "Worker ID", out)
 
 data = pd.read_csv(os.path.join(args.input, 'data.csv'))
 gen_per_second_per_treelet(data, os.path.join(args.out, "per-treelet.png"))
