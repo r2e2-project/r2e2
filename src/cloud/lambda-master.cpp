@@ -133,6 +133,12 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     if (config.workerStatsWriteInterval > 0) {
         wsStream.open(config.logsDirectory + "/" + "workers.csv", ios::trunc);
         tlStream.open(config.logsDirectory + "/" + "treelets.csv", ios::trunc);
+
+        wsStream << "timestamp,workerId,raysEnqueued,raysDequeued,"
+                    "bytesEnqueued,bytesDequeued,numSamples,bytesSamples\n";
+
+        tlStream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
+                    "bytesEnqueued,bytesDequeued\n";
     }
 
     cout << "Tile size is " << tiles.tileSize << "\u00d7" << tiles.tileSize
