@@ -1,6 +1,7 @@
 #include "cloud/lambda-master.h"
 
 #include <chrono>
+#include <typeinfo>
 
 #include "cloud/r2t2.h"
 #include "execution/meow/message.h"
@@ -62,6 +63,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
 
         for (const auto &item : proto.items()) {
             const RayBagInfo info = from_protobuf(item);
+            logEnqueue(workerId, info);
 
             if (info.sampleBag) {
                 continue;
@@ -72,8 +74,6 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             } else {
                 pendingRayBags[info.treeletId].push(info);
             }
-
-            queueSize[info.treeletId] += info.bagSize;
         }
 
         break;
@@ -85,7 +85,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
 
         for (const auto &item : proto.items()) {
             const RayBagInfo info = from_protobuf(item);
-            queueSize[info.treeletId] -= info.bagSize;
+            logDequeue(workerId, info);
         }
 
         break;
@@ -95,8 +95,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         protobuf::WorkerStats proto;
         protoutil::from_string(message.payload(), proto);
 
-        WorkerStats stats = from_protobuf(proto);
-        workerStats.merge(stats);
+        aggregatedStats.finishedPaths += proto.finished_paths();
 
         break;
     }

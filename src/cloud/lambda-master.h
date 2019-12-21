@@ -166,7 +166,26 @@ class LambdaMaster {
     // Stats                                                                  //
     ////////////////////////////////////////////////////////////////////////////
 
-    WorkerStats workerStats;
+    WorkerStats aggregatedStats{};
+    std::vector<WorkerStats> workerStats{};
+    std::vector<TreeletStats> treeletStats{};
+
+    /*** Outputting stats *****************************************************/
+
+    void logEnqueue(const WorkerId workerId, const RayBagInfo &info);
+    void logDequeue(const WorkerId workerId, const RayBagInfo &info);
+
+    /* object for writing worker & treelet stats */
+    std::ofstream wsStream{};
+    std::ofstream tlStream{};
+
+    struct {
+        std::vector<std::pair<WorkerStats, bool>> workers{};
+        std::vector<std::pair<TreeletStats, bool>> treelets{};
+    } lastStats{};
+
+    /* write worker stats periodically */
+    Poller::Action::Result::Type handleWorkerStats();
 
     /* prints the status message every second */
     Poller::Action::Result::Type handleStatusMessage();
@@ -275,6 +294,8 @@ class LambdaMaster {
     TimerFD queuedRayBagsTimer{QUEUED_RAY_BAGS_INTERVAL};
     TimerFD statusPrintTimer{STATUS_PRINT_INTERVAL};
     TimerFD writeOutputTimer{WRITE_OUTPUT_INTERVAL};
+    TimerFD workerStatsWriteTimer;
+
     std::unique_ptr<TimerFD> exitTimer;
 };
 

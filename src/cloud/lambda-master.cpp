@@ -66,7 +66,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       storageBackendUri(storageBackendUri),
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
       awsRegion(awsRegion),
-      awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https") {
+      awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
+      workerStatsWriteTimer(seconds{config.workerStatsWriteInterval}) {
     LOG(INFO) << "job-id=" << jobId;
 
     const string scenePath = sceneDir.name();
@@ -107,6 +108,13 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     /* now we can initialize the SceneManager */
     global::manager.init(scenePath);
 
+    const size_t treeletCount = global::manager.treeletCount();
+
+    workerStats.resize(numberOfLambdas + 1);
+    treeletStats.resize(treeletCount);
+    lastStats.workers.resize(numberOfLambdas + 1);
+    lastStats.treelets.resize(treeletCount);
+
     /* and initialize the necessary scene objects */
     scene.initialize(config.samplesPerPixel, config.cropWindow);
     objectManager.initialize(numberOfLambdas,
@@ -119,6 +127,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     if (config.collectDebugLogs || config.collectDiagnostics ||
         config.rayActionsLogRate > 0 || config.packetsLogRate > 0) {
         roost::create_directories(config.logsDirectory);
+    }
+
+    if (config.workerStatsWriteInterval > 0) {
+        wsStream.open(config.logsDirectory + "/" + "workers.csv", ios::trunc);
+        tlStream.open(config.logsDirectory + "/" + "treelets.csv", ios::trunc);
     }
 
     cout << "Tile size is " << tiles.tileSize << "\u00d7" << tiles.tileSize
@@ -140,12 +153,12 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         [this]() { return queuedRayBags.size() > 0; },
         []() { throw runtime_error("queued ray bags failed"); }));
 
-    if (config.finishedRayAction == FinishedRayAction::SendBack) {
+    if (config.workerStatsWriteInterval > 0) {
         loop.poller().add_action(Poller::Action(
-            writeOutputTimer.fd, Direction::In,
-            bind(&LambdaMaster::handleWriteOutput, this),
+            workerStatsWriteTimer.fd, Direction::In,
+            bind(&LambdaMaster::handleWorkerStats, this),
             [this]() { return true; },
-            []() { throw runtime_error("worker requests failed"); }));
+            []() { throw runtime_error("worker stats failed"); }));
     }
 
     loop.poller().add_action(
@@ -285,6 +298,9 @@ void LambdaMaster::run() {
 
     vector<storage::GetRequest> getRequests;
     const string logPrefix = "logs/" + jobId + "/";
+
+    wsStream.close();
+    tlStream.close();
 
     for (const auto &workerkv : workers) {
         const auto &worker = workerkv.second;

@@ -7,6 +7,84 @@
 using namespace std;
 using namespace std::chrono;
 using namespace pbrt;
+using namespace PollerShortNames;
+
+void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
+    auto &worker = workerStats[workerId];
+    auto &treelet = treeletStats[info.treeletId];
+
+    lastStats.workers[workerId].second = true;
+    lastStats.treelets[info.treeletId].second = true;
+
+    if (info.sampleBag) {
+        worker.samples.count += info.rayCount;
+        worker.samples.bytes += info.bagSize;
+    } else {
+        worker.enqueued.count += info.rayCount;
+        worker.enqueued.bytes += info.bagSize;
+        treelet.enqueued.count += info.rayCount;
+        treelet.enqueued.bytes += info.bagSize;
+    }
+}
+
+void LambdaMaster::logDequeue(const WorkerId workerId, const RayBagInfo &info) {
+    auto &worker = workerStats[workerId];
+    auto &treelet = treeletStats[info.treeletId];
+
+    lastStats.workers[workerId].second = true;
+    lastStats.treelets[info.treeletId].second = true;
+
+    worker.dequeued.count += info.rayCount;
+    worker.dequeued.bytes += info.bagSize;
+    treelet.dequeued.count += info.rayCount;
+    treelet.dequeued.bytes += info.bagSize;
+}
+
+ResultType LambdaMaster::handleWorkerStats() {
+    workerStatsWriteTimer.reset();
+
+    const auto t =
+        duration_cast<milliseconds>(steady_clock::now() - startTime).count();
+
+    for (size_t workerId = 1; workerId <= numberOfLambdas; workerId++) {
+        if (!lastStats.workers[workerId].second) {
+            continue; /* nothing new to log */
+        }
+
+        const WorkerStats stats =
+            workerStats[workerId] - lastStats.workers[workerId].first;
+
+        lastStats.workers[workerId].first = workerStats[workerId];
+        lastStats.workers[workerId].second = false;
+
+        /* timestamp,workerId,raysEnqueued,raysDequeued,bytesEnqueued,
+           bytesDequeued,numSamples,bytesSamples */
+        wsStream << t << ',' << workerId << ',' << stats.enqueued.count << ','
+                 << stats.dequeued.count << ',' << stats.enqueued.bytes << ','
+                 << stats.dequeued.bytes << ',' << stats.samples.count << ','
+                 << stats.samples.bytes << '\n';
+    }
+
+    for (size_t treeletId = 0; treeletId < treeletStats.size(); treeletId++) {
+        if (!lastStats.treelets[treeletId].second) {
+            continue; /* nothing new to log */
+        }
+
+        const TreeletStats stats =
+            treeletStats[treeletId] - lastStats.treelets[treeletId].first;
+
+        lastStats.treelets[treeletId].first = treeletStats[treeletId];
+        lastStats.treelets[treeletId].second = false;
+
+        /* timestamp,treeletId,raysEnqueued,raysDequeued,bytesEnqueued,
+           bytesDequeued */
+        tlStream << t << ',' << treeletId << ',' << stats.enqueued.count << ','
+                 << stats.dequeued.count << ',' << stats.enqueued.bytes << ','
+                 << stats.dequeued.bytes << '\n';
+    }
+
+    return ResultType::Continue;
+}
 
 void LambdaMaster::dumpJobSummary() const {
     protobuf::JobSummary proto;
