@@ -89,7 +89,7 @@ def gen_ray_queue(df, out, aggregate):
         plt.legend()
 
     plt.title(args.title)
-    plt.xlabel("Time (seconds)")
+    plt.xlabel("Time (s)")
     plt.ylabel("Total Number of Waiting Rays")
     plt.gcf().subplots_adjust(left=0.2)
     plt.savefig(out, dpi=300)
@@ -125,6 +125,16 @@ def received_bytes(df, out):
                  "Time (s)",
                  "Worker ID", out)
 
+def ray_throughput_over_time(df, out):
+    mat = df.groupby(['timestampS']).sum().numSamples
+
+    plt.plot(mat)
+    plt.title(args.title + '\nRay throughput over time')
+    plt.xlabel("Time (s)")
+    plt.ylabel("Throughput (rays / worker / s)")
+    plt.gcf().subplots_adjust(left=0.2)
+    plt.savefig(out, dpi=300)
+
 treelet_data = pd.read_csv(os.path.join(args.input, 'treelets.csv'))
 worker_data = pd.read_csv(os.path.join(args.input, 'workers.csv'))
 
@@ -139,3 +149,4 @@ sent_bytes(worker_data, os.path.join(args.out, "per-worker-outrate.png"))
 received_bytes(worker_data, os.path.join(args.out, "per-worker-inrate.png"))
 gen_ray_queue(worker_data, os.path.join(args.out, "aggregate-ray-queue.png"), True)
 gen_ray_queue(worker_data, os.path.join(args.out, "individual-ray-queue.png"), False)
+ray_throughput_over_time(worker_data, os.path.join(args.out, "ray-throughput.png"))
