@@ -39,21 +39,42 @@ ResultType LambdaMaster::handleStatusMessage() {
     const auto elapsedTime = steady_clock::now() - startTime;
     const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
 
-    auto percentage = [](const int n, const int total) -> double {
+    auto percent = [](const int n, const int total) -> double {
         return total ? (((int)(100 * (100.0 * n / total))) / 100.0) : 0.0;
     };
 
-    constexpr char const *BG_DARK_GREEN = "\033[48;5;022m";
-    constexpr char const *BG_LIGHT_GREEN = "\033[48;5;028m";
+    constexpr char const *BG_A = "\033[48;5;022m";
+    constexpr char const *BG_B = "\033[48;5;028m";
+
+    // clang-format off
+
+    auto&s = aggregatedStats;
 
     ostringstream oss;
-    oss << "\033[0m" << BG_DARK_GREEN << " \u21af "
-        << aggregatedStats.finishedPaths << " (" << fixed << setprecision(2)
-        << percentage(aggregatedStats.finishedPaths, scene.totalPaths) << "%) "
-        << BG_LIGHT_GREEN << " \u03bb " << workers.size() << "/"
-        << numberOfLambdas << " " << BG_DARK_GREEN << " " << setfill('0')
-        << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
-        << (elapsedSeconds % 60) << " " << BG_LIGHT_GREEN;
+    oss << "\033[0m" << fixed << setprecision(2)
+
+        // finished paths
+        << BG_A << " \u21af " << s.finishedPaths
+                << " (" << percent(s.finishedPaths, scene.totalPaths) << "%) "
+
+        // worker count
+        << BG_B << " \u03bb " << workers.size() << "/" << numberOfLambdas << " "
+
+        // enqueued bytes
+        << BG_A << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
+
+        // dequeued bytes
+        << BG_B << " \u2193 " << format_bytes(s.dequeued.bytes)
+                << " (" << percent(s.dequeued.bytes, s.enqueued.bytes) << "%) "
+
+        // elapsed time
+        << BG_A << " " << setfill('0')
+                << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
+                << (elapsedSeconds % 60) << " "
+
+        << BG_B;
+
+    // clang-format on
 
     StatusBar::set_text(oss.str());
 
