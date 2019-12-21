@@ -138,11 +138,16 @@ def launch(cmd):
 for cmd, dir, scene, nlambdas, spp in cmds:
     master = os.path.join(dir, 'master.json')
     i = 0
+
     while not os.path.isfile(master) or not job_finished(master):
         shutil.rmtree(dir, ignore_errors=True)
         if i > 2:
             break
         os.mkdir(dir)
+
+        with open(os.path.join(dir, 'COMMAND'), 'w') as fout:
+            print(cmd, file=fout)
+
         launch(cmd)
         i += 1
 
