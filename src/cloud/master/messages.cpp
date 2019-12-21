@@ -37,6 +37,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
     /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
          << "] from worker " << workerId << endl; */
 
+    lastActionTime = steady_clock::now();
     auto &worker = workers.at(workerId);
 
     switch (message.opcode()) {
