@@ -67,7 +67,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
       awsRegion(awsRegion),
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
-      workerStatsWriteTimer(seconds{config.workerStatsWriteInterval}) {
+      workerStatsWriteTimer(seconds{config.workerStatsWriteInterval},
+                            milliseconds{1}) {
     LOG(INFO) << "job-id=" << jobId;
 
     const string scenePath = sceneDir.name();
