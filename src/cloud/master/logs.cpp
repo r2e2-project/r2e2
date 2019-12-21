@@ -48,6 +48,8 @@ ResultType LambdaMaster::handleWorkerStats() {
     const auto t =
         duration_cast<milliseconds>(steady_clock::now() - startTime).count();
 
+    const float T = static_cast<float>(config.workerStatsWriteInterval);
+
     for (size_t workerId = 1; workerId <= numberOfLambdas; workerId++) {
         if (!lastStats.workers[workerId].second) {
             continue; /* nothing new to log */
@@ -61,10 +63,12 @@ ResultType LambdaMaster::handleWorkerStats() {
 
         /* timestamp,workerId,raysEnqueued,raysDequeued,bytesEnqueued,
            bytesDequeued,numSamples,bytesSamples */
-        wsStream << t << ',' << workerId << ',' << stats.enqueued.count << ','
-                 << stats.dequeued.count << ',' << stats.enqueued.bytes << ','
-                 << stats.dequeued.bytes << ',' << stats.samples.count << ','
-                 << stats.samples.bytes << '\n';
+        wsStream << t << ',' << workerId << ',' << (stats.enqueued.count / T)
+                 << ',' << (stats.dequeued.count / T) << ','
+                 << (stats.enqueued.bytes / T) << ','
+                 << (stats.dequeued.bytes / T) << ','
+                 << (stats.samples.count / T) << ','
+                 << (stats.samples.bytes / T) << '\n';
     }
 
     for (size_t treeletId = 0; treeletId < treeletStats.size(); treeletId++) {
@@ -80,9 +84,10 @@ ResultType LambdaMaster::handleWorkerStats() {
 
         /* timestamp,treeletId,raysEnqueued,raysDequeued,bytesEnqueued,
            bytesDequeued */
-        tlStream << t << ',' << treeletId << ',' << stats.enqueued.count << ','
-                 << stats.dequeued.count << ',' << stats.enqueued.bytes << ','
-                 << stats.dequeued.bytes << '\n';
+        tlStream << t << ',' << treeletId << ',' << (stats.enqueued.count / T)
+                 << ',' << (stats.dequeued.count / T) << ','
+                 << (stats.enqueued.bytes / T) << ','
+                 << (stats.dequeued.bytes / T) << '\n';
     }
 
     return ResultType::Continue;
