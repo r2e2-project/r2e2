@@ -32,45 +32,69 @@ void TransferAgent::doAction(Action&& action) {
             const auto& config = this->clientConfig;
 
             SSLContext ssl_context;
-            HTTPResponseParser responses;
-            SecureSocket s3 =
-                ssl_context.new_secure_socket(tcp_connection(config.address));
+            bool succeeded = false;
 
-            s3.connect();
+            while (!succeeded) {
+                HTTPResponseParser responses;
+                SecureSocket s3 = ssl_context.new_secure_socket(
+                    tcp_connection(config.address));
 
-            HTTPRequest outgoingRequest;
+                try {
+                    s3.connect();
+                } catch (exception& ex) {
+                    continue;
+                }
 
-            switch (action.type) {
-            case Action::Upload:
-                outgoingRequest =
-                    S3PutRequest(config.credentials, config.endpoint,
-                                 config.region, action.key, action.data,
-                                 UNSIGNED_PAYLOAD)
-                        .to_http_request();
-                break;
+                HTTPRequest outgoingRequest;
 
-            case Action::Download:
-                outgoingRequest =
-                    S3GetRequest(config.credentials, config.endpoint,
-                                 config.region, action.key)
-                        .to_http_request();
-                break;
-            }
+                switch (action.type) {
+                case Action::Upload:
+                    outgoingRequest =
+                        S3PutRequest(config.credentials, config.endpoint,
+                                     config.region, action.key, action.data,
+                                     UNSIGNED_PAYLOAD)
+                            .to_http_request();
+                    break;
 
-            responses.new_request_arrived(outgoingRequest);
-            s3.write(outgoingRequest.str());
+                case Action::Download:
+                    outgoingRequest =
+                        S3GetRequest(config.credentials, config.endpoint,
+                                     config.region, action.key)
+                            .to_http_request();
+                    break;
+                }
 
-            size_t responseCount = 0;
+                responses.new_request_arrived(outgoingRequest);
 
-            while (responseCount < 1) {
-                responses.parse(s3.read());
+                try {
+                    s3.write(outgoingRequest.str());
+                } catch (exception& ex) {
+                    continue;
+                }
 
-                if (!responses.empty()) {
-                    if (responses.front().first_line() != "HTTP/1.1 200 OK") {
-                        throw runtime_error("TransferAgent::doAction failed ");
-                    } else {
-                        responseCount++;
-                        action.data = move(responses.front().body());
+                size_t responseCount = 0;
+
+                while (responseCount < 1) {
+                    string data;
+
+                    try {
+                        data = s3.read();
+                    } catch (exception& ex) {
+                        break;
+                    }
+
+                    responses.parse(data);
+
+                    if (!responses.empty()) {
+                        if (responses.front().first_line() !=
+                            "HTTP/1.1 200 OK") {
+                            cerr << "TransferAgent::doAction failed " << endl;
+                        } else {
+                            responseCount++;
+                            action.data = move(responses.front().body());
+                            succeeded = true;
+                        }
+
                         break;
                     }
                 }
