@@ -127,7 +127,7 @@ class LambdaMaster {
     };
 
     WorkerId currentWorkerId{1};
-    std::map<WorkerId, Worker> workers{};
+    std::vector<Worker> workers;
 
     ////////////////////////////////////////////////////////////////////////////
     // Communication                                                          //

@@ -58,7 +58,8 @@ ResultType LambdaMaster::handleStatusMessage() {
                 << " (" << percent(s.finishedPaths, scene.totalPaths) << "%) "
 
         // worker count
-        << BG_B << " \u03bb " << workers.size() << "/" << numberOfLambdas << " "
+        << BG_B << " \u03bb " << (workers.size() - 1) << "/" << numberOfLambdas
+                << " "
 
         // enqueued bytes
         << BG_A << " \u2191 " << format_bytes(s.enqueued.bytes) << " "

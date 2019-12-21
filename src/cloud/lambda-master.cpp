@@ -69,6 +69,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
       workerStatsWriteTimer(seconds{config.workerStatsWriteInterval},
                             milliseconds{1}) {
+    workers.emplace_back(0, nullptr); /* worker 0 is the master */
     LOG(INFO) << "job-id=" << jobId;
 
     const string scenePath = sceneDir.name();
@@ -179,55 +180,50 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                        [this]() { return true; },
                        []() { throw runtime_error("status print failed"); }));
 
-    loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfLambdas](
-                                                    ExecutionLoop &loop,
-                                                    TCPSocket &&socket) {
-        if (currentWorkerId > numberOfLambdas) {
-            socket.close();
-            return false;
-        }
-
-        auto failure_handler = [this, ID = currentWorkerId]() {
-            ostringstream message;
-            const auto &worker = workers.at(ID);
-            message << "worker died: " << ID;
-
-            if (!worker.awsLogStream.empty()) {
-                message << " (" << worker.awsLogStream << ")";
+    loop.make_listener(
+        {"0.0.0.0", listenPort},
+        [this, numberOfLambdas](ExecutionLoop &loop, TCPSocket &&socket) {
+            if (currentWorkerId > numberOfLambdas) {
+                socket.close();
+                return false;
             }
 
-            throw runtime_error(message.str());
-        };
+            auto failure_handler = [this, ID = currentWorkerId]() {
+                ostringstream message;
+                const auto &worker = workers.at(ID);
+                message << "worker died: " << ID;
 
-        auto messageParser = make_shared<MessageParser>();
-        auto connection = loop.add_connection<TCPSocket>(
-            move(socket),
-            [this, ID = currentWorkerId, messageParser](
-                shared_ptr<TCPConnection> connection, string &&data) {
-                messageParser->parse(data);
-
-                while (!messageParser->empty()) {
-                    incomingMessages.emplace_back(ID,
-                                                  move(messageParser->front()));
-                    messageParser->pop();
+                if (!worker.awsLogStream.empty()) {
+                    message << " (" << worker.awsLogStream << ")";
                 }
 
-                return true;
-            },
-            failure_handler, failure_handler);
+                throw runtime_error(message.str());
+            };
 
-        auto &worker =
-            (*workers
-                  .emplace(piecewise_construct,
-                           forward_as_tuple(currentWorkerId),
-                           forward_as_tuple(currentWorkerId, move(connection)))
-                  .first)
-                .second;
+            auto messageParser = make_shared<MessageParser>();
+            auto connection = loop.add_connection<TCPSocket>(
+                move(socket),
+                [this, ID = currentWorkerId, messageParser](
+                    shared_ptr<TCPConnection> connection, string &&data) {
+                    messageParser->parse(data);
 
-        this->objectManager.assignBaseObjects(worker, this->config.assignment);
-        currentWorkerId++;
-        return true;
-    });
+                    while (!messageParser->empty()) {
+                        incomingMessages.emplace_back(
+                            ID, move(messageParser->front()));
+                        messageParser->pop();
+                    }
+
+                    return true;
+                },
+                failure_handler, failure_handler);
+
+            workers.emplace_back(currentWorkerId, move(connection));
+
+            objectManager.assignBaseObjects(workers[currentWorkerId],
+                                            this->config.assignment);
+            currentWorkerId++;
+            return true;
+        });
 }
 
 ResultType LambdaMaster::handleJobStart() {
@@ -235,8 +231,9 @@ ResultType LambdaMaster::handleJobStart() {
 
     generationStart = lastActionTime = steady_clock::now();
 
-    for (auto &workerkv : workers) {
-        auto &worker = workerkv.second;
+    for (size_t i = 1; i < workers.size(); i++) {
+        auto &worker = workers[i];
+
         protobuf::GetObjects proto;
         for (const ObjectKey &id : worker.objects) {
             *proto.add_object_ids() = to_protobuf(id);
@@ -314,8 +311,8 @@ void LambdaMaster::run() {
     wsStream.close();
     tlStream.close();
 
-    for (const auto &workerkv : workers) {
-        const auto &worker = workerkv.second;
+    for (size_t i = 1; i < workers.size(); i++) {
+        const auto &worker = workers[i];
         worker.connection->socket().close();
 
         if (config.collectDebugLogs || config.collectDiagnostics ||
