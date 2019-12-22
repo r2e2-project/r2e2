@@ -45,13 +45,21 @@ class TransferAgent {
         Address address{};
     } clientConfig;
 
-    std::queue<Action> results{};
+    static constexpr size_t MAX_SIMULTANEOUS_JOBS{16};
+    static constexpr size_t MAX_REQUESTS_ON_CONNECTION{16};
 
-    std::mutex mtx;
+    std::mutex resultsMutex;
+    std::mutex outstandingMutex;
+    std::atomic<uint32_t> runningTasks{0};
     std::atomic<bool> isEmpty{true};
-    std::map<uint64_t, std::future<void>> runningTasks;
 
+    std::queue<Action> results{};
+    std::queue<Action> outstanding{};
+
+    HTTPRequest getRequest(const Action& action);
     void doAction(Action&& action);
+
+    void workerThread(Action && action);
 
   public:
     TransferAgent(const S3StorageBackend& backend);

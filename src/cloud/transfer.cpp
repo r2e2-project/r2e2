@@ -3,6 +3,7 @@
 #include "net/http_response_parser.h"
 
 using namespace std;
+using namespace chrono;
 using namespace pbrt;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
@@ -25,87 +26,130 @@ TransferAgent::TransferAgent(const S3StorageBackend& backend) {
     clientConfig.address = Address{clientConfig.endpoint, "https"};
 }
 
-void TransferAgent::doAction(Action&& action) {
-    runningTasks.emplace(make_pair(
-        action.id, async(launch::async, [this, a{move(action)}] {
-            Action action = move(a);
-            const auto& config = this->clientConfig;
+HTTPRequest TransferAgent::getRequest(const Action& action) {
+    switch (action.type) {
+    case Action::Upload:
+        return S3PutRequest(clientConfig.credentials, clientConfig.endpoint,
+                            clientConfig.region, action.key, action.data,
+                            UNSIGNED_PAYLOAD)
+            .to_http_request();
 
-            SSLContext ssl_context;
-            bool succeeded = false;
+    case Action::Download:
+        return S3GetRequest(clientConfig.credentials, clientConfig.endpoint,
+                            clientConfig.region, action.key)
+            .to_http_request();
+    default:
+        throw runtime_error("Unknown action type");
+    }
+}
 
-            while (!succeeded) {
-                HTTPResponseParser responses;
-                SecureSocket s3 = ssl_context.new_secure_socket(
-                    tcp_connection(config.address));
+void TransferAgent::workerThread(Action&& a) {
+    runningTasks++;
+
+    Action action = move(a);
+    SSLContext ssl_context;
+
+    bool connectionOkay = true;
+    bool workToDo = true;
+
+    while (workToDo) {
+        /* Did the connection fail? Pause for a moment */
+        if (!connectionOkay) this_thread::sleep_for(milliseconds{50});
+
+        /* Creating a connection to S3 */
+        SecureSocket s3 =
+            ssl_context.new_secure_socket(tcp_connection(clientConfig.address));
+
+        try {
+            s3.connect();
+        } catch (exception& ex) {
+            connectionOkay = false;
+            continue;
+        }
+
+        HTTPResponseParser parser;
+
+        connectionOkay = true;
+        size_t requestCount = 0;
+        size_t responseCount = 0;
+
+        while (connectionOkay && workToDo) {
+            HTTPRequest outgoingRequest = getRequest(action);
+            parser.new_request_arrived(outgoingRequest);
+            requestCount++;
+
+            try {
+                s3.write(outgoingRequest.str());
+            } catch (exception& ex) {
+                connectionOkay = false;
+                break;
+            }
+
+            while (responseCount < requestCount) {
+                string data;
 
                 try {
-                    s3.connect();
+                    data = s3.read();
                 } catch (exception& ex) {
-                    continue;
-                }
-
-                HTTPRequest outgoingRequest;
-
-                switch (action.type) {
-                case Action::Upload:
-                    outgoingRequest =
-                        S3PutRequest(config.credentials, config.endpoint,
-                                     config.region, action.key, action.data,
-                                     UNSIGNED_PAYLOAD)
-                            .to_http_request();
-                    break;
-
-                case Action::Download:
-                    outgoingRequest =
-                        S3GetRequest(config.credentials, config.endpoint,
-                                     config.region, action.key)
-                            .to_http_request();
+                    connectionOkay = false;
                     break;
                 }
 
-                responses.new_request_arrived(outgoingRequest);
+                parser.parse(data);
 
-                try {
-                    s3.write(outgoingRequest.str());
-                } catch (exception& ex) {
-                    continue;
-                }
+                if (!parser.empty()) {
+                    const string status = move(parser.front().first_line());
+                    const string data = move(parser.front().body());
+                    parser.pop();
 
-                size_t responseCount = 0;
+                    responseCount++;
 
-                while (responseCount < 1) {
-                    string data;
-
-                    try {
-                        data = s3.read();
-                    } catch (exception& ex) {
+                    if (status != "HTTP/1.1 200 OK") {
+                        cerr << "transfer failed: " << status << endl;
+                        connectionOkay = false;
                         break;
                     }
 
-                    responses.parse(data);
+                    action.data = move(data);
 
-                    if (!responses.empty()) {
-                        if (responses.front().first_line() !=
-                            "HTTP/1.1 200 OK") {
-                            cerr << "TransferAgent::doAction failed " << endl;
+                    /* putting the result on the queue */
+                    {
+                        unique_lock<mutex> lock{resultsMutex};
+                        isEmpty = false;
+                        results.emplace(move(action));
+                    }
+
+                    /* is there another request that we pick up? */
+                    {
+                        unique_lock<mutex> lock{outstandingMutex};
+
+                        if (!outstanding.empty()) {
+                            action = move(outstanding.front());
+                            outstanding.pop();
                         } else {
-                            responseCount++;
-                            action.data = move(responses.front().body());
-                            succeeded = true;
+                            workToDo = false;
                         }
+                    }
 
-                        break;
+                    if (requestCount >= MAX_REQUESTS_ON_CONNECTION) {
+                        connectionOkay = false;
                     }
                 }
             }
+        }
+    }
 
-            {
-                unique_lock<mutex> lock{this->mtx};
-                this->isEmpty = false;
-                results.emplace(move(action));
-            }
-        })));
+    runningTasks--;
+}
+
+void TransferAgent::doAction(Action&& action) {
+    if (runningTasks.load() >= MAX_SIMULTANEOUS_JOBS) {
+        unique_lock<mutex> lock{outstandingMutex};
+        outstanding.push(move(action));
+        return;
+    }
+
+    thread(&TransferAgent::workerThread, this, move(action)).detach();
 }
 
 uint64_t TransferAgent::requestDownload(const string& key) {
@@ -121,11 +165,9 @@ uint64_t TransferAgent::requestUpload(const string& key, string&& data) {
 bool TransferAgent::empty() { return isEmpty.load(); }
 
 TransferAgent::Action TransferAgent::pop() {
-    unique_lock<mutex> lock{mtx};
+    unique_lock<mutex> lock{resultsMutex};
     Action action = move(results.front());
     results.pop();
-
-    runningTasks.erase(action.id);
     isEmpty.store(results.empty());
 
     return action;
