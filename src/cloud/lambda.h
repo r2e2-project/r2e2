@@ -21,10 +21,10 @@ struct RayBagInfo {
         std::ostringstream oss;
 
         if (!sampleBag) {
-            oss << prefix << 'T' << treeletId << '-' << workerId << '_'
+            oss << prefix << "T" << treeletId << "/W" << workerId << "/B"
                 << bagId;
         } else {
-            oss << prefix << "samples-" << workerId << "_" << bagId;
+            oss << prefix << "samples/W" << workerId << "/B" << bagId;
         }
 
         return oss.str();
