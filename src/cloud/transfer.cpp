@@ -115,8 +115,8 @@ void TransferAgent::workerThread(Action&& a) {
                     /* putting the result on the queue */
                     {
                         unique_lock<mutex> lock{resultsMutex};
-                        isEmpty = false;
                         results.emplace(move(action));
+                        isEmpty = false;
                     }
 
                     /* is there another request that we pick up? */
