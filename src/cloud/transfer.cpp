@@ -52,9 +52,21 @@ void TransferAgent::workerThread(Action&& a) {
     bool connectionOkay = true;
     bool workToDo = true;
 
+    const milliseconds backoff{20};
+    size_t tryCount = 0;
+
     while (workToDo) {
         /* Did the connection fail? Pause for a moment */
-        if (!connectionOkay) this_thread::sleep_for(milliseconds{50});
+        if (!connectionOkay) {
+            this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
+        }
+
+        tryCount++;
+
+        if (tryCount > 10) {
+            cerr << "too many retries... dying." << endl;
+            throw runtime_error("stopped trying!");
+        }
 
         /* Creating a connection to S3 */
         SecureSocket s3 =
@@ -98,19 +110,28 @@ void TransferAgent::workerThread(Action&& a) {
                 parser.parse(data);
 
                 if (!parser.empty()) {
-                    const string status = move(parser.front().first_line());
+                    const string status = move(parser.front().status_code());
                     const string data = move(parser.front().body());
                     parser.pop();
 
                     responseCount++;
 
-                    if (status != "HTTP/1.1 200 OK") {
-                        cerr << "transfer failed: " << status << endl;
-                        connectionOkay = false;
-                        break;
+                    if (status != "200") {
+                        if (status[0] == '5') {
+                            /* 500 or 503; we need to back-off */
+                            connectionOkay = false;
+                            break;
+                        }
+
+                        /* it seems that it's our fault */
+                        cerr << "transfer error: code " << status << endl;
+                        throw runtime_error("transfer failed");
                     }
 
                     action.data = move(data);
+
+                    /* let's reset the try count */
+                    tryCount = 0;
 
                     /* putting the result on the queue */
                     {
@@ -133,6 +154,7 @@ void TransferAgent::workerThread(Action&& a) {
 
                     if (requestCount >= MAX_REQUESTS_ON_CONNECTION) {
                         connectionOkay = false;
+                        tryCount = 1;
                     }
                 }
             }

@@ -45,7 +45,7 @@ class TransferAgent {
         Address address{};
     } clientConfig;
 
-    static constexpr size_t MAX_SIMULTANEOUS_JOBS{16};
+    static constexpr size_t MAX_SIMULTANEOUS_JOBS{8};
     static constexpr size_t MAX_REQUESTS_ON_CONNECTION{16};
 
     std::mutex resultsMutex;
