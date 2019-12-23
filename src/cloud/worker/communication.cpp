@@ -34,6 +34,7 @@ ResultType LambdaWorker::handleOutQueue() {
             bag.info.bagSize += len;
 
             rayList.pop();
+            outQueueSize--;
         }
     }
 
