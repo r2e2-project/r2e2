@@ -16,11 +16,8 @@ def handler(event, context):
     coordinator_address = event['coordinator']
     coordinator_host, coordinator_port = event['coordinator'].split(':')
 
-    # remove old worker directories
-    os.system("rm -rf /tmp/pbrt-worker.*")
-
-    # remove old log files
-    os.system("rm -rf /tmp/pbrt-lambda-*")
+    # remove everything in the temp dir
+    print('rm -rf /tmp/*: {}'.format(os.system("rm -rf /tmp/*")))
 
     command = ["pbrt-lambda-worker",
                "--ip", coordinator_host,
