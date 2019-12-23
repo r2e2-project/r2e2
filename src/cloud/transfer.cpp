@@ -160,6 +160,7 @@ void TransferAgent::workerThread(Action&& a) {
 void TransferAgent::doAction(Action&& action) {
     if (steady_clock::now() - lastAddrInfo > seconds{ADDRINFO_INTERVAL}) {
         clientConfig.address = {clientConfig.endpoint, "https"};
+        lastAddrInfo = steady_clock::now();
     }
 
     action.address = clientConfig.address;
