@@ -19,9 +19,6 @@ private:
   unsigned int read_count_, write_count_;
 
 protected:
-  void register_read( void ) { read_count_++; }
-  void register_write( void ) { write_count_++; }
-  void register_service( const bool write ) { write ? write_count_++ : read_count_++; }
   void set_eof( void ) { eof_ = true; }
 
 public:
@@ -62,6 +59,10 @@ public:
   /* forbid copying FileDescriptor objects or assigning them */
   FileDescriptor( const FileDescriptor & other ) = delete;
   const FileDescriptor & operator=( const FileDescriptor & other ) = delete;
+
+  void register_read( void ) { read_count_++; }
+  void register_write( void ) { write_count_++; }
+  void register_service( const bool write ) { write ? write_count_++ : read_count_++; }
 };
 
 #endif /* PBRT_UTIL_FILE_DESCRIPTOR_H */

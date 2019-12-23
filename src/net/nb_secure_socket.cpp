@@ -44,9 +44,8 @@ Poller::Action::Action(NBSecureSocket& s_socket,
                        NBSecureSocket::State::needs_ssl_write_to_read) {
                 s_socket.continue_SSL_read();
             } else {
-                throw runtime_error(
-                    "unexpected state: " +
-                    to_string(static_cast<int>(s_socket.state())));
+                s_socket.register_write();
+                return Result{};
             }
 
             return retval;
@@ -84,7 +83,8 @@ Poller::Action::Action(NBSecureSocket& s_socket,
                        s_socket.state() == NBSecureSocket::State::ready) {
                 s_socket.continue_SSL_read();
             } else {
-                throw runtime_error("unexpected state");
+                s_socket.register_read();
+                return Result{};
             }
 
             if (s_socket.something_to_read()) {
