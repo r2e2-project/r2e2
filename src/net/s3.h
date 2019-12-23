@@ -39,6 +39,15 @@ public:
                 const std::string & object );
 };
 
+class S3DeleteRequest : public AWSRequest
+{
+public:
+  S3DeleteRequest( const AWSCredentials & credentials,
+                   const std::string & endpoint, const std::string & region,
+                   const std::string & object );
+
+};
+
 struct S3ClientConfig
 {
   std::string region { "us-west-1" };

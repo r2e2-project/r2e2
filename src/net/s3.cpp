@@ -68,6 +68,23 @@ S3GetRequest::S3GetRequest( const AWSCredentials & credentials,
                           {} );
 }
 
+S3DeleteRequest::S3DeleteRequest( const AWSCredentials & credentials,
+                                  const string & endpoint, const string & region,
+                                  const string & object )
+  : AWSRequest( credentials, region, "DELETE /" + object + " HTTP/1.1", {} )
+{
+  headers_[ "host" ] = endpoint;
+
+  if ( credentials.session_token().initialized() ) {
+    headers_[ "x-amz-security-token" ] = *credentials.session_token();
+  }
+
+  AWSv4Sig::sign_request( "DELETE\n/" + object,
+                          credentials_.secret_key(), credentials_.access_key(),
+                          region_, "s3", request_date_, {}, headers_,
+                          {} );
+}
+
 TCPSocket tcp_connection( const Address & address )
 {
   TCPSocket sock;
