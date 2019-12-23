@@ -118,7 +118,9 @@ void TransferAgent::workerThread(Action&& a) {
                         throw runtime_error("transfer failed: " + status);
                     }
 
-                    action.data = move(data);
+                    if (action.type == Action::Download) {
+                        action.data = move(data);
+                    }
 
                     /* let's reset the try count */
                     tryCount = 0;
