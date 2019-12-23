@@ -27,6 +27,8 @@ class TransferAgent {
         std::string key;
         std::string data;
 
+        Address address{};
+
         Action(const uint64_t id, const Type type, const std::string& key,
                std::string&& data)
             : id(id), type(type), key(key), data(move(data)) {}
@@ -48,6 +50,11 @@ class TransferAgent {
     static constexpr size_t MAX_SIMULTANEOUS_JOBS{4};
     static constexpr size_t MAX_REQUESTS_ON_CONNECTION{8};
 
+    static constexpr size_t ADDRINFO_INTERVAL{5};
+
+    std::chrono::steady_clock::time_point lastAddrInfo{
+        std::chrono::steady_clock::now()};
+
     std::mutex resultsMutex;
     std::mutex outstandingMutex;
     std::atomic<uint32_t> runningTasks{0};
@@ -59,7 +66,7 @@ class TransferAgent {
     HTTPRequest getRequest(const Action& action);
     void doAction(Action&& action);
 
-    void workerThread(Action && action);
+    void workerThread(Action&& action);
 
   public:
     TransferAgent(const S3StorageBackend& backend);

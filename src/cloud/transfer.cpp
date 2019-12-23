@@ -65,7 +65,7 @@ void TransferAgent::workerThread(Action&& a) {
 
         /* Creating a connection to S3 */
         SecureSocket s3 =
-            ssl_context.new_secure_socket(tcp_connection(clientConfig.address));
+            ssl_context.new_secure_socket(tcp_connection(action.address));
 
         try {
             s3.connect();
@@ -156,6 +156,12 @@ void TransferAgent::workerThread(Action&& a) {
 }
 
 void TransferAgent::doAction(Action&& action) {
+    if (steady_clock::now() - lastAddrInfo > seconds{ADDRINFO_INTERVAL}) {
+        clientConfig.address = {clientConfig.endpoint, "https"};
+    }
+
+    action.address = clientConfig.address;
+
     if (runningTasks.load() >= MAX_SIMULTANEOUS_JOBS) {
         unique_lock<mutex> lock{outstandingMutex};
         outstanding.push(move(action));
