@@ -251,6 +251,9 @@ void S3Client::download_files( const std::string & bucket,
               if ( not responses.empty() ) {
                 if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
                   const size_t response_index = first_file_idx + response_count * thread_count;
+                  cerr << "HTTP failure in downloading '" +
+                                       download_requests.at( response_index ).object_key +
+                                       "': " + responses.front().first_line() << endl;
                   throw runtime_error( "HTTP failure in downloading '" +
                                        download_requests.at( response_index ).object_key +
                                        "': " + responses.front().first_line() );
