@@ -52,25 +52,23 @@ void TransferAgent::workerThread(Action&& a) {
     bool connectionOkay = true;
     bool workToDo = true;
 
-    const milliseconds backoff{20};
+    const milliseconds backoff{50};
     size_t tryCount = 0;
+
+    Address address{clientConfig.endpoint, "https"};
 
     while (workToDo) {
         /* Did the connection fail? Pause for a moment */
         if (!connectionOkay) {
             this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
+            address = {clientConfig.endpoint, "https"};
         }
 
-        tryCount++;
-
-        if (tryCount > 10) {
-            cerr << "too many retries... dying." << endl;
-            throw runtime_error("stopped trying!");
-        }
+        tryCount = min(8ul, tryCount + 1);  // maximum is 6.4s
 
         /* Creating a connection to S3 */
         SecureSocket s3 =
-            ssl_context.new_secure_socket(tcp_connection(clientConfig.address));
+            ssl_context.new_secure_socket(tcp_connection(address));
 
         try {
             s3.connect();
@@ -98,16 +96,12 @@ void TransferAgent::workerThread(Action&& a) {
             }
 
             while (responseCount < requestCount) {
-                string data;
-
                 try {
-                    data = s3.read();
+                    parser.parse(s3.read());
                 } catch (exception& ex) {
                     connectionOkay = false;
                     break;
                 }
-
-                parser.parse(data);
 
                 if (!parser.empty()) {
                     const string status = move(parser.front().status_code());
@@ -124,8 +118,7 @@ void TransferAgent::workerThread(Action&& a) {
                         }
 
                         /* it seems that it's our fault */
-                        cerr << "transfer error: code " << status << endl;
-                        throw runtime_error("transfer failed");
+                        throw runtime_error("transfer failed: " + status);
                     }
 
                     action.data = move(data);
@@ -147,6 +140,7 @@ void TransferAgent::workerThread(Action&& a) {
                         if (!outstanding.empty()) {
                             action = move(outstanding.front());
                             outstanding.pop();
+                            workToDo = true;
                         } else {
                             workToDo = false;
                         }
