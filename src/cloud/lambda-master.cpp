@@ -528,6 +528,8 @@ int main(int argc, char *argv[]) {
                 assignment = Assignment::All;
             } else if (name == "debug") {
                 assignment = Assignment::Debug;
+            } else if (name == "none") {
+                assignment = Assignment::None;
             } else {
                 usage(argv[0], EXIT_FAILURE);
             }

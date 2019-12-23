@@ -116,6 +116,8 @@ void LambdaMaster::ObjectManager::assignBaseObjects(Worker &worker,
         doAllAssign(worker);
     } else if (assignment & Assignment::Debug) {
         doDebugAssign(worker);
+    } else if (assignment == Assignment::None) {
+        /* nothing */
     } else {
         throw runtime_error("unrecognized assignment type");
     }
