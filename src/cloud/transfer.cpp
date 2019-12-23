@@ -55,20 +55,17 @@ void TransferAgent::workerThread(Action&& a) {
     const milliseconds backoff{50};
     size_t tryCount = 0;
 
-    Address address{clientConfig.endpoint, "https"};
-
     while (workToDo) {
         /* Did the connection fail? Pause for a moment */
         if (!connectionOkay) {
             this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
-            address = {clientConfig.endpoint, "https"};
         }
 
         tryCount = min(8ul, tryCount + 1);  // maximum is 6.4s
 
         /* Creating a connection to S3 */
         SecureSocket s3 =
-            ssl_context.new_secure_socket(tcp_connection(address));
+            ssl_context.new_secure_socket(tcp_connection(clientConfig.address));
 
         try {
             s3.connect();
