@@ -3,6 +3,7 @@
 #include "net/http_response_parser.h"
 #include "net/socket.h"
 #include "util/poller.h"
+#include "util/random.h"
 
 using namespace std;
 using namespace chrono;
@@ -23,14 +24,18 @@ TransferAgent::TransferAgent(const S3StorageBackend& backend) {
     clientConfig.address = Address{clientConfig.endpoint, "http"};
 
     for (size_t i = 0; i < WORKER_THREAD_COUNT; i++) {
-        workerThreads.emplace_back(&TransferAgent::workerThread, this);
+        eventFds.emplace_back();
+    }
+
+    for (size_t i = 0; i < WORKER_THREAD_COUNT; i++) {
+        workerThreads.emplace_back(&TransferAgent::workerThread, this, i);
     }
 }
 
 TransferAgent::~TransferAgent() {
     terminated = true;
-    workEvent.write_event();
 
+    for (auto& e : eventFds) e.write_event();
     for (auto& t : workerThreads) t.join();
 }
 
@@ -51,21 +56,26 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
     }
 }
 
-void TransferAgent::workerThread() {
+void TransferAgent::workerThread(const size_t threadIndex) {
+    auto& eventFd = eventFds[threadIndex];
+
     Poller poller;
     TCPSocket socket;
-
     bool connectionOkay = false;
+    unique_ptr<HTTPResponseParser> parser;
+    string writeBuffer;
 
-    unique_ptr<HTTPResponseParser> parser = make_unique<HTTPResponseParser>();
     queue<Action> waiting;
     queue<Action> submitted;
     queue<Action> done;
 
-    string writeBuffer;
-
     auto socketReadCallback = [&]() {
-        parser->parse(socket.read());
+        try {
+            parser->parse(socket.read());
+        } catch (exception& ex) {
+            connectionOkay = false;
+            return ResultType::CancelAll;
+        }
 
         while (!parser->empty()) {
             const string status = move(parser->front().status_code());
@@ -95,18 +105,26 @@ void TransferAgent::workerThread() {
     };
 
     auto socketWriteCallback = [&]() {
-        auto next = socket.write(writeBuffer.cbegin(), writeBuffer.cend());
+        string::const_iterator next;
+
+        try {
+            next = socket.write(writeBuffer.cbegin(), writeBuffer.cend());
+        } catch (exception& ex) {
+            connectionOkay = false;
+            return ResultType::CancelAll;
+        }
+
         writeBuffer.erase(writeBuffer.cbegin(), next);
         return ResultType::Continue;
     };
 
     /* work is read from `outstanding` */
     poller.add_action(Poller::Action(
-        workEvent, Direction::In,
+        eventFd, Direction::In,
         [&]() {
             if (terminated) return ResultType::Exit;
 
-            if (workEvent.read_event()) {
+            if (eventFd.read_event()) {
                 unique_lock<mutex> lock{outstandingMutex};
                 if (!this->outstanding.empty()) {
                     waiting.push(move(this->outstanding.front()));
@@ -153,6 +171,11 @@ void TransferAgent::workerThread() {
             socket = {};
             socket.set_blocking(false);
             socket.connect_nonblock(clientConfig.address);
+            parser = make_unique<HTTPResponseParser>();
+
+            waiting = move(submitted);
+            submitted = {};
+            writeBuffer = {};
 
             /* doing the transfer -- write */
             poller.add_action(Poller::Action(
@@ -165,10 +188,6 @@ void TransferAgent::workerThread() {
                 socket, Direction::In, socketReadCallback,
                 []() { return true; }, [&]() { connectionOkay = false; }));
 
-            waiting = move(submitted);
-            submitted = {};
-            writeBuffer = {};
-            parser = make_unique<HTTPResponseParser>();
             connectionOkay = true;
         }
 
@@ -182,7 +201,7 @@ void TransferAgent::doAction(Action&& action) {
         outstanding.push(move(action));
     }
 
-    workEvent.write_event();
+    random::sample(eventFds.begin(), eventFds.end())->write_event();
 }
 
 uint64_t TransferAgent::requestDownload(const string& key) {

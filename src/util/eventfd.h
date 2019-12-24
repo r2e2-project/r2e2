@@ -11,9 +11,10 @@
 
 class EventFD : public FileDescriptor {
   public:
-    EventFD()
+    EventFD(const bool semaphore = false)
         : FileDescriptor(CheckSystemCall(
-              "eventfd", eventfd(0u, EFD_SEMAPHORE | EFD_NONBLOCK))) {}
+              "eventfd",
+              eventfd(0u, (semaphore ? EFD_SEMAPHORE : 0) | EFD_NONBLOCK))) {}
 
     bool read_event() {
         uint64_t value;

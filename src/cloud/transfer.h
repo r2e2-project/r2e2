@@ -49,17 +49,18 @@ class TransferAgent {
 
     static constexpr size_t WORKER_THREAD_COUNT{4};
 
-    void workerThread();
-    std::mutex resultsMutex;
-    std::mutex outstandingMutex;
+    void workerThread(const size_t threadIndex);
+
+    std::mutex resultsMutex{};
+    std::mutex outstandingMutex{};
     std::atomic<bool> isEmpty{true};
     std::atomic<bool> terminated{false};
-    std::vector<std::thread> workerThreads;
+    std::vector<std::thread> workerThreads{};
+    std::vector<EventFD> eventFds{};
 
     std::queue<Action> results{};
     std::queue<Action> outstanding{};
 
-    EventFD workEvent{};
     FileDescriptor alwaysOnFd{STDERR_FILENO};
 
     HTTPRequest getRequest(const Action& action);
