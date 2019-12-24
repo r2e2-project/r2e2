@@ -8,12 +8,6 @@ using namespace pbrt;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
-TCPSocket tcp_connection(const Address& address) {
-    TCPSocket sock;
-    sock.connect(address);
-    return sock;
-}
-
 TransferAgent::TransferAgent(const S3StorageBackend& backend) {
     clientConfig.credentials = backend.client().credentials();
     clientConfig.region = backend.client().config().region;
@@ -23,7 +17,7 @@ TransferAgent::TransferAgent(const S3StorageBackend& backend) {
     clientConfig.endpoint =
         S3::endpoint(clientConfig.region, clientConfig.bucket);
 
-    clientConfig.address = Address{clientConfig.endpoint, "https"};
+    clientConfig.address = Address{clientConfig.endpoint, "http"};
 }
 
 HTTPRequest TransferAgent::getRequest(const Action& action) {
@@ -47,8 +41,6 @@ void TransferAgent::workerThread(Action&& a) {
     runningTasks++;
 
     Action action = move(a);
-    SSLContext ssl_context;
-
     bool connectionOkay = true;
     bool workToDo = true;
 
@@ -64,11 +56,10 @@ void TransferAgent::workerThread(Action&& a) {
         tryCount = min(8ul, tryCount + 1);  // maximum is 6.4s
 
         /* Creating a connection to S3 */
-        SecureSocket s3 =
-            ssl_context.new_secure_socket(tcp_connection(action.address));
+        TCPSocket s3;
 
         try {
-            s3.connect();
+            s3.connect(action.address);
         } catch (exception& ex) {
             connectionOkay = false;
             continue;
@@ -159,7 +150,7 @@ void TransferAgent::workerThread(Action&& a) {
 
 void TransferAgent::doAction(Action&& action) {
     if (steady_clock::now() - lastAddrInfo > seconds{ADDRINFO_INTERVAL}) {
-        clientConfig.address = {clientConfig.endpoint, "https"};
+        clientConfig.address = {clientConfig.endpoint, "http"};
         lastAddrInfo = steady_clock::now();
     }
 
