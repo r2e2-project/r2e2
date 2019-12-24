@@ -8,12 +8,14 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <thread>
 
 #include "net/address.h"
 #include "net/s3.h"
 #include "net/secure_socket.h"
 #include "net/socket.h"
 #include "storage/backend_s3.h"
+#include "util/eventfd.h"
 
 namespace pbrt {
 
@@ -26,8 +28,6 @@ class TransferAgent {
         Type type;
         std::string key;
         std::string data;
-
-        Address address{};
 
         Action(const uint64_t id, const Type type, const std::string& key,
                std::string&& data)
@@ -47,31 +47,30 @@ class TransferAgent {
         Address address{};
     } clientConfig;
 
-    static constexpr size_t MAX_SIMULTANEOUS_JOBS{4};
-    static constexpr size_t MAX_REQUESTS_ON_CONNECTION{8};
+    static constexpr size_t WORKER_THREAD_COUNT{4};
 
-    static constexpr size_t ADDRINFO_INTERVAL{5};
-
-    std::chrono::steady_clock::time_point lastAddrInfo{
-        std::chrono::steady_clock::now()};
-
+    void workerThread();
     std::mutex resultsMutex;
     std::mutex outstandingMutex;
-    std::atomic<uint32_t> runningTasks{0};
     std::atomic<bool> isEmpty{true};
+    std::atomic<bool> terminated{false};
+    std::vector<std::thread> workerThreads;
 
     std::queue<Action> results{};
     std::queue<Action> outstanding{};
 
+    EventFD workEvent{};
+    FileDescriptor alwaysOnFd{STDERR_FILENO};
+
     HTTPRequest getRequest(const Action& action);
     void doAction(Action&& action);
-
-    void workerThread(Action&& action);
 
   public:
     TransferAgent(const S3StorageBackend& backend);
     uint64_t requestDownload(const std::string& key);
     uint64_t requestUpload(const std::string& key, std::string&& data);
+
+    ~TransferAgent();
 
     bool empty();
     Action pop();

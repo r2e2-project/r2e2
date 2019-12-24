@@ -11,7 +11,9 @@
 
 class EventFD : public FileDescriptor {
   public:
-    EventFD() : FileDescriptor(eventfd(0u, EFD_SEMAPHORE | EFD_NONBLOCK)) {}
+    EventFD()
+        : FileDescriptor(CheckSystemCall(
+              "eventfd", eventfd(0u, EFD_SEMAPHORE | EFD_NONBLOCK))) {}
 
     bool read_event() {
         uint64_t value;

@@ -1,18 +1,15 @@
 #include "cloud/transfer.h"
 
 #include "net/http_response_parser.h"
+#include "net/socket.h"
+#include "util/poller.h"
 
 using namespace std;
 using namespace chrono;
 using namespace pbrt;
+using namespace PollerShortNames;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
-
-TCPSocket tcp_connection(const Address& address) {
-    TCPSocket sock;
-    sock.connect(address);
-    return sock;
-}
 
 TransferAgent::TransferAgent(const S3StorageBackend& backend) {
     clientConfig.credentials = backend.client().credentials();
@@ -23,7 +20,18 @@ TransferAgent::TransferAgent(const S3StorageBackend& backend) {
     clientConfig.endpoint =
         S3::endpoint(clientConfig.region, clientConfig.bucket);
 
-    clientConfig.address = Address{clientConfig.endpoint, "https"};
+    clientConfig.address = Address{clientConfig.endpoint, "http"};
+
+    for (size_t i = 0; i < WORKER_THREAD_COUNT; i++) {
+        workerThreads.emplace_back(&TransferAgent::workerThread, this);
+    }
+}
+
+TransferAgent::~TransferAgent() {
+    terminated = true;
+    workEvent.write_event();
+
+    for (auto& t : workerThreads) t.join();
 }
 
 HTTPRequest TransferAgent::getRequest(const Action& action) {
@@ -43,135 +51,118 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
     }
 }
 
-void TransferAgent::workerThread(Action&& a) {
-    runningTasks++;
+void TransferAgent::workerThread() {
+    Poller poller;
 
-    Action action = move(a);
-    SSLContext ssl_context;
+    SSLContext sslContext;
+    TCPSocket socket;
+    socket.set_blocking(false);
+    socket.connect_nonblock(clientConfig.address);
 
-    bool connectionOkay = true;
-    bool workToDo = true;
+    HTTPResponseParser parser;
 
-    const milliseconds backoff{50};
-    size_t tryCount = 0;
+    queue<Action> submitted;
+    queue<Action> done;
 
-    while (workToDo) {
-        /* Did the connection fail? Pause for a moment */
-        if (!connectionOkay) {
-            this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
-        }
+    string writeBuffer;
 
-        tryCount = min(8ul, tryCount + 1);  // maximum is 6.4s
+    /* (1) work is read from `outstanding` */
+    poller.add_action(Poller::Action(
+        workEvent, Direction::In,
+        [&]() {
+            if (terminated) return ResultType::Exit;
 
-        /* Creating a connection to S3 */
-        SecureSocket s3 =
-            ssl_context.new_secure_socket(tcp_connection(action.address));
-
-        try {
-            s3.connect();
-        } catch (exception& ex) {
-            connectionOkay = false;
-            continue;
-        }
-
-        HTTPResponseParser parser;
-
-        connectionOkay = true;
-        size_t requestCount = 0;
-        size_t responseCount = 0;
-
-        while (connectionOkay && workToDo) {
-            HTTPRequest outgoingRequest = getRequest(action);
-            parser.new_request_arrived(outgoingRequest);
-            requestCount++;
-
-            try {
-                s3.write(outgoingRequest.str());
-            } catch (exception& ex) {
-                connectionOkay = false;
-                break;
-            }
-
-            while (responseCount < requestCount) {
-                try {
-                    parser.parse(s3.read());
-                } catch (exception& ex) {
-                    connectionOkay = false;
-                    break;
-                }
-
-                if (!parser.empty()) {
-                    const string status = move(parser.front().status_code());
-                    const string data = move(parser.front().body());
-                    parser.pop();
-
-                    responseCount++;
-
-                    if (status != "200") {
-                        if (status[0] == '5') {
-                            /* 500 or 503; we need to back-off */
-                            connectionOkay = false;
-                            break;
-                        }
-
-                        /* it seems that it's our fault */
-                        throw runtime_error("transfer failed: " + status);
-                    }
-
-                    if (action.type == Action::Download) {
-                        action.data = move(data);
-                    }
-
-                    /* let's reset the try count */
-                    tryCount = 0;
-
-                    /* putting the result on the queue */
-                    {
-                        unique_lock<mutex> lock{resultsMutex};
-                        results.emplace(move(action));
-                        isEmpty = false;
-                    }
-
-                    /* is there another request that we pick up? */
-                    {
-                        unique_lock<mutex> lock{outstandingMutex};
-
-                        if (!outstanding.empty()) {
-                            action = move(outstanding.front());
-                            outstanding.pop();
-                            workToDo = true;
-                        } else {
-                            workToDo = false;
-                        }
-                    }
-
-                    if (requestCount >= MAX_REQUESTS_ON_CONNECTION) {
-                        connectionOkay = false;
-                        tryCount = 1;
+            if (workEvent.read_event()) {
+                {
+                    unique_lock<mutex> lock{outstandingMutex};
+                    if (!this->outstanding.empty()) {
+                        submitted.push(move(this->outstanding.front()));
+                        this->outstanding.pop();
                     }
                 }
+
+                HTTPRequest request = getRequest(submitted.front());
+                parser.new_request_arrived(request);
+                writeBuffer += request.str();
             }
-        }
+
+            return ResultType::Continue;
+        },
+        []() { return true; },
+        []() { throw runtime_error("event fd failed"); }));
+
+    /* (2) doing the transfer */
+    poller.add_action(Poller::Action(
+        socket, Direction::Out,
+        [&]() {
+            auto next = socket.write(writeBuffer.cbegin(), writeBuffer.cend());
+            writeBuffer.erase(writeBuffer.cbegin(), next);
+            return ResultType::Continue;
+        },
+        [&writeBuffer]() { return !writeBuffer.empty(); },
+        []() { throw runtime_error("connection failed"); }));
+
+    /* (2) doing the transfer */
+    poller.add_action(Poller::Action(
+        socket, Direction::In,
+        [&]() {
+            parser.parse(socket.read());
+
+            while (!parser.empty()) {
+                const string status = move(parser.front().status_code());
+                const string data = move(parser.front().body());
+                parser.pop();
+
+                if (status[0] != '2') {
+                    if (status[0] == '5') {
+                        /* XXX we need to back off */
+                        submitted.push(move(submitted.front()));
+                        submitted.pop();
+                        return ResultType::Continue;
+                    }
+
+                    return ResultType::Exit; /* we fucked up */
+                }
+
+                if (submitted.front().type == Action::Download) {
+                    submitted.front().data = move(data);
+                }
+
+                done.emplace(move(submitted.front()));
+                submitted.pop();
+            }
+
+            return ResultType::Continue;
+        },
+        []() { return true; },
+        []() { throw runtime_error("connection failed"); }));
+
+    /* (2) writing back the output */
+    poller.add_action(Poller::Action(
+        alwaysOnFd, Direction::Out,
+        [&]() {
+            this->results.push(move(done.front()));
+            done.pop();
+            resultsMutex.unlock();
+            isEmpty = false;
+
+            return ResultType::Continue;
+        },
+        [this, &done]() { return !done.empty() && resultsMutex.try_lock(); },
+        []() { throw runtime_error("always on fd failed"); }));
+
+    while (!terminated) {
+        if (poller.poll(-1).result == Poller::Result::Type::Exit) break;
     }
-
-    runningTasks--;
 }
 
 void TransferAgent::doAction(Action&& action) {
-    if (steady_clock::now() - lastAddrInfo > seconds{ADDRINFO_INTERVAL}) {
-        clientConfig.address = {clientConfig.endpoint, "https"};
-        lastAddrInfo = steady_clock::now();
-    }
-
-    action.address = clientConfig.address;
-
-    if (runningTasks.load() >= MAX_SIMULTANEOUS_JOBS) {
+    {
         unique_lock<mutex> lock{outstandingMutex};
         outstanding.push(move(action));
-        return;
     }
 
-    thread(&TransferAgent::workerThread, this, move(action)).detach();
+    workEvent.write_event();
 }
 
 uint64_t TransferAgent::requestDownload(const string& key) {
@@ -188,6 +179,7 @@ bool TransferAgent::empty() { return isEmpty.load(); }
 
 TransferAgent::Action TransferAgent::pop() {
     unique_lock<mutex> lock{resultsMutex};
+
     Action action = move(results.front());
     results.pop();
     isEmpty.store(results.empty());
