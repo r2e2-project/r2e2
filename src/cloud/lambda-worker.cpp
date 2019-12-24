@@ -69,20 +69,19 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return outQueueSize > 0; },
         []() { throw runtime_error("out queue failed"); }));
 
-    loop.poller().add_action(
-        Poller::Action(alwaysOnFd, Direction::Out,
-                       bind(&LambdaWorker::handleSamples, this),
-                       [this]() { return !samples.empty(); },
-                       []() { throw runtime_error("send queue failed"); }));
+    loop.poller().add_action(Poller::Action(
+        alwaysOnFd, Direction::Out, bind(&LambdaWorker::handleSamples, this),
+        [this]() { return !samples.empty(); },
+        []() { throw runtime_error("send queue failed"); }));
 
     loop.poller().add_action(
-        Poller::Action(sendQueueTimer.fd, Direction::In,
+        Poller::Action(sendQueueTimer, Direction::In,
                        bind(&LambdaWorker::handleSendQueue, this),
                        [this]() { return !sendQueue.empty(); },
                        []() { throw runtime_error("send queue failed"); }));
 
     loop.poller().add_action(
-        Poller::Action(sampleBagsTimer.fd, Direction::In,
+        Poller::Action(sampleBagsTimer, Direction::In,
                        bind(&LambdaWorker::handleSampleBags, this),
                        [this]() { return !sampleBags.empty(); },
                        []() { throw runtime_error("sample bags failed"); }));
@@ -106,14 +105,14 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("messages failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        workerStatsTimer.fd, Direction::In,
+        workerStatsTimer, Direction::In,
         bind(&LambdaWorker::handleWorkerStats, this), [this]() { return true; },
         []() { throw runtime_error("handle worker stats failed"); }));
 
     /* record diagnostics */
     if (config.collectDiagnostics) {
         loop.poller().add_action(Poller::Action(
-            workerDiagnosticsTimer.fd, Direction::In,
+            workerDiagnosticsTimer, Direction::In,
             bind(&LambdaWorker::handleDiagnostics, this),
             [this]() { return true; },
             []() { throw runtime_error("handle diagnostics failed"); }));

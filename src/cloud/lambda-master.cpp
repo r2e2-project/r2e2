@@ -161,21 +161,21 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         []() { throw runtime_error("generate rays failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        queuedRayBagsTimer.fd, Direction::In,
+        queuedRayBagsTimer, Direction::In,
         bind(&LambdaMaster::handleQueuedRayBags, this),
         [this]() { return queuedRayBags.size() > 0; },
         []() { throw runtime_error("queued ray bags failed"); }));
 
     if (config.workerStatsWriteInterval > 0) {
         loop.poller().add_action(Poller::Action(
-            workerStatsWriteTimer.fd, Direction::In,
+            workerStatsWriteTimer, Direction::In,
             bind(&LambdaMaster::handleWorkerStats, this),
             [this]() { return true; },
             []() { throw runtime_error("worker stats failed"); }));
     }
 
     loop.poller().add_action(
-        Poller::Action(statusPrintTimer.fd, Direction::In,
+        Poller::Action(statusPrintTimer, Direction::In,
                        bind(&LambdaMaster::handleStatusMessage, this),
                        [this]() { return true; },
                        []() { throw runtime_error("status print failed"); }));

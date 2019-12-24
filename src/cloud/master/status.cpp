@@ -27,7 +27,7 @@ ResultType LambdaMaster::handleStatusMessage() {
         exitTimer = make_unique<TimerFD>(EXIT_GRACE_PERIOD);
 
         loop.poller().add_action(
-            Poller::Action(exitTimer->fd, Direction::In,
+            Poller::Action(*exitTimer, Direction::In,
                            [this]() {
                                exitTimer = nullptr;
                                return ResultType::Exit;
