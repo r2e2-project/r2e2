@@ -15,6 +15,8 @@ using PollerResult = Poller::Result::Type;
 ResultType LambdaWorker::handleWorkerStats() {
     workerStatsTimer.reset();
 
+    if (!workerId.initialized()) return ResultType::Continue;
+
     WorkerStats stats;
     stats.finishedPaths = finishedPathIds.size();
 
