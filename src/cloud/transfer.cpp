@@ -53,37 +53,65 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
 
 void TransferAgent::workerThread() {
     Poller poller;
-
-    SSLContext sslContext;
     TCPSocket socket;
-    socket.set_blocking(false);
-    socket.connect_nonblock(clientConfig.address);
 
-    HTTPResponseParser parser;
+    bool connectionOkay = false;
 
+    unique_ptr<HTTPResponseParser> parser = make_unique<HTTPResponseParser>();
+    queue<Action> waiting;
     queue<Action> submitted;
     queue<Action> done;
 
     string writeBuffer;
 
-    /* (1) work is read from `outstanding` */
+    auto socketReadCallback = [&]() {
+        parser->parse(socket.read());
+
+        while (!parser->empty()) {
+            const string status = move(parser->front().status_code());
+            const string data = move(parser->front().body());
+            parser->pop();
+
+            if (status[0] != '2') {
+                if (status[0] == '5') {
+                    /* XXX we need to back off */
+                    submitted.push(move(submitted.front()));
+                    submitted.pop();
+                    return ResultType::Continue;
+                }
+
+                return ResultType::Exit; /* we fucked up */
+            }
+
+            if (submitted.front().type == Action::Download) {
+                submitted.front().data = move(data);
+            }
+
+            done.emplace(move(submitted.front()));
+            submitted.pop();
+        }
+
+        return ResultType::Continue;
+    };
+
+    auto socketWriteCallback = [&]() {
+        auto next = socket.write(writeBuffer.cbegin(), writeBuffer.cend());
+        writeBuffer.erase(writeBuffer.cbegin(), next);
+        return ResultType::Continue;
+    };
+
+    /* work is read from `outstanding` */
     poller.add_action(Poller::Action(
         workEvent, Direction::In,
         [&]() {
             if (terminated) return ResultType::Exit;
 
             if (workEvent.read_event()) {
-                {
-                    unique_lock<mutex> lock{outstandingMutex};
-                    if (!this->outstanding.empty()) {
-                        submitted.push(move(this->outstanding.front()));
-                        this->outstanding.pop();
-                    }
+                unique_lock<mutex> lock{outstandingMutex};
+                if (!this->outstanding.empty()) {
+                    waiting.push(move(this->outstanding.front()));
+                    this->outstanding.pop();
                 }
-
-                HTTPRequest request = getRequest(submitted.front());
-                parser.new_request_arrived(request);
-                writeBuffer += request.str();
             }
 
             return ResultType::Continue;
@@ -91,53 +119,21 @@ void TransferAgent::workerThread() {
         []() { return true; },
         []() { throw runtime_error("event fd failed"); }));
 
-    /* (2) doing the transfer */
     poller.add_action(Poller::Action(
-        socket, Direction::Out,
-        [&]() {
-            auto next = socket.write(writeBuffer.cbegin(), writeBuffer.cend());
-            writeBuffer.erase(writeBuffer.cbegin(), next);
-            return ResultType::Continue;
-        },
-        [&writeBuffer]() { return !writeBuffer.empty(); },
-        []() { throw runtime_error("connection failed"); }));
-
-    /* (2) doing the transfer */
-    poller.add_action(Poller::Action(
-        socket, Direction::In,
-        [&]() {
-            parser.parse(socket.read());
-
-            while (!parser.empty()) {
-                const string status = move(parser.front().status_code());
-                const string data = move(parser.front().body());
-                parser.pop();
-
-                if (status[0] != '2') {
-                    if (status[0] == '5') {
-                        /* XXX we need to back off */
-                        submitted.push(move(submitted.front()));
-                        submitted.pop();
-                        return ResultType::Continue;
-                    }
-
-                    return ResultType::Exit; /* we fucked up */
-                }
-
-                if (submitted.front().type == Action::Download) {
-                    submitted.front().data = move(data);
-                }
-
-                done.emplace(move(submitted.front()));
-                submitted.pop();
-            }
+        alwaysOnFd, Direction::Out,
+        [&] {
+            HTTPRequest outgoingRequest = getRequest(waiting.front());
+            parser->new_request_arrived(outgoingRequest);
+            writeBuffer += outgoingRequest.str();
+            submitted.push(move(waiting.front()));
+            waiting.pop();
 
             return ResultType::Continue;
         },
-        []() { return true; },
-        []() { throw runtime_error("connection failed"); }));
+        [&]() { return !waiting.empty(); },
+        []() { throw runtime_error("waiting queue failed"); }));
 
-    /* (2) writing back the output */
+    /* writing back the output */
     poller.add_action(Poller::Action(
         alwaysOnFd, Direction::Out,
         [&]() {
@@ -152,6 +148,30 @@ void TransferAgent::workerThread() {
         []() { throw runtime_error("always on fd failed"); }));
 
     while (!terminated) {
+        if (!connectionOkay) {
+            /* we need to set up the connection */
+            socket = {};
+            socket.set_blocking(false);
+            socket.connect_nonblock(clientConfig.address);
+
+            /* doing the transfer -- write */
+            poller.add_action(Poller::Action(
+                socket, Direction::Out, socketWriteCallback,
+                [&writeBuffer]() { return !writeBuffer.empty(); },
+                [&]() { connectionOkay = false; }));
+
+            /* doing the transfer -- read */
+            poller.add_action(Poller::Action(
+                socket, Direction::In, socketReadCallback,
+                []() { return true; }, [&]() { connectionOkay = false; }));
+
+            waiting = move(submitted);
+            submitted = {};
+            writeBuffer = {};
+            parser = make_unique<HTTPResponseParser>();
+            connectionOkay = true;
+        }
+
         if (poller.poll(-1).result == Poller::Result::Type::Exit) break;
     }
 }
