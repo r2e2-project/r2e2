@@ -76,7 +76,7 @@ void TransferAgent::workerThread() {
                 unique_lock<mutex> lock{outstandingMutex};
 
                 cv.wait(lock, [this]() {
-                    return !terminated && !outstanding.empty();
+                    return terminated || !outstanding.empty();
                 });
 
                 if (terminated) break;
