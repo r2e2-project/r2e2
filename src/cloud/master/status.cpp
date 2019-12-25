@@ -14,8 +14,9 @@ constexpr milliseconds EXIT_GRACE_PERIOD{10'000};
 ResultType LambdaMaster::handleStatusMessage() {
     statusPrintTimer.reset();
 
-    if (config.timeout.count() &&
-        steady_clock::now() - lastActionTime >= config.timeout) {
+    const auto now = steady_clock::now();
+
+    if (config.timeout.count() && now - lastActionTime >= config.timeout) {
         cerr << "Job terminated due to inactivity." << endl;
         return ResultType::Exit;
     } else if (exitTimer == nullptr &&
@@ -36,7 +37,12 @@ ResultType LambdaMaster::handleStatusMessage() {
                            []() { throw runtime_error("job finish"); }));
     }
 
-    const auto elapsedTime = steady_clock::now() - startTime;
+    const auto laggingWorkers = count_if(
+        workers.begin() + 1, workers.end(), [&now](const Worker &worker) {
+            return now - worker.lastSeen >= seconds{4};
+        });
+
+    const auto elapsedTime = now - startTime;
     const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
 
     auto percent = [](const uint64_t n, const uint64_t total) -> double {
@@ -60,19 +66,22 @@ ResultType LambdaMaster::handleStatusMessage() {
         << BG_B << " \u03bb " << (workers.size() - 1) << "/" << numberOfLambdas
                 << " "
 
+        // lagging workers
+        << BG_A << " ! " << laggingWorkers << " "
+
         // enqueued bytes
-        << BG_A << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
+        << BG_B << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
 
         // dequeued bytes
-        << BG_B << " \u2193 " << format_bytes(s.dequeued.bytes)
+        << BG_A << " \u2193 " << format_bytes(s.dequeued.bytes)
                 << " (" << percent(s.dequeued.bytes, s.enqueued.bytes) << "%) "
 
         // elapsed time
-        << BG_A << " " << setfill('0')
+        << BG_B << " " << setfill('0')
                 << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
                 << (elapsedSeconds % 60) << " "
 
-        << BG_B;
+        << BG_A;
     // clang-format on
 
     StatusBar::set_text(oss.str());

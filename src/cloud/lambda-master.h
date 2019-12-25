@@ -120,7 +120,7 @@ class LambdaMaster {
         bool initialized{false};
         std::shared_ptr<TCPConnection> connection;
         std::set<ObjectKey> objects{};
-        uint64_t nextStatusLogTimestamp{0};
+        steady_clock::time_point lastSeen{steady_clock::now()};
         std::string awsLogStream{};
 
         Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)

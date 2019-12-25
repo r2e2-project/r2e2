@@ -38,7 +38,9 @@ void LambdaMaster::processMessage(const uint64_t workerId,
          << "] from worker " << workerId << endl; */
 
     lastActionTime = steady_clock::now();
+
     auto &worker = workers.at(workerId);
+    worker.lastSeen = lastActionTime;
 
     switch (message.opcode()) {
     case OpCode::Hey: {
