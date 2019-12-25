@@ -90,6 +90,11 @@ void TransferAgent::workerThread() {
 
             if (tryCount > 0) {
                 this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
+
+                if (tryCount > 8) {
+                    connectionOkay = false;
+                    continue;
+                }
             }
 
             TRY_OPERATION(s3.write(request.str()));
