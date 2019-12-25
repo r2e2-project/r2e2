@@ -2,6 +2,7 @@
 #define PBRT_CLOUD_TRANSFER_H
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <future>
 #include <map>
@@ -27,8 +28,6 @@ class TransferAgent {
         std::string key;
         std::string data;
 
-        Address address{};
-
         Action(const uint64_t id, const Type type, const std::string& key,
                std::string&& data)
             : id(id), type(type), key(key), data(move(data)) {}
@@ -47,33 +46,32 @@ class TransferAgent {
         Address address{};
     } clientConfig;
 
-    static constexpr size_t MAX_SIMULTANEOUS_JOBS{4};
+    static constexpr size_t MAX_THREADS{4};
     static constexpr size_t MAX_REQUESTS_ON_CONNECTION{8};
 
-    static constexpr size_t ADDRINFO_INTERVAL{5};
-
-    std::chrono::steady_clock::time_point lastAddrInfo{
-        std::chrono::steady_clock::now()};
-
+    std::vector<std::thread> threads{};
+    std::atomic<bool> terminated{false};
     std::mutex resultsMutex;
     std::mutex outstandingMutex;
-    std::atomic<uint32_t> runningTasks{0};
+
+    std::queue<Action> outstanding{};
+    std::queue<Action> results{};
     std::atomic<bool> isEmpty{true};
 
-    std::queue<Action> results{};
-    std::queue<Action> outstanding{};
+    std::condition_variable cv;
 
     HTTPRequest getRequest(const Action& action);
     void doAction(Action&& action);
 
-    void workerThread(Action&& action);
+    void workerThread();
 
   public:
     TransferAgent(const S3StorageBackend& backend);
     uint64_t requestDownload(const std::string& key);
     uint64_t requestUpload(const std::string& key, std::string&& data);
+    ~TransferAgent();
 
-    bool empty();
+    bool empty() const { return isEmpty.load(); }
     Action pop();
 };
 

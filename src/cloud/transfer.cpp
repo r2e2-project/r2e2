@@ -1,6 +1,7 @@
 #include "cloud/transfer.h"
 
 #include "net/http_response_parser.h"
+#include "util/optional.h"
 
 using namespace std;
 using namespace chrono;
@@ -18,6 +19,16 @@ TransferAgent::TransferAgent(const S3StorageBackend& backend) {
         S3::endpoint(clientConfig.region, clientConfig.bucket);
 
     clientConfig.address = Address{clientConfig.endpoint, "http"};
+
+    for (size_t i = 0; i < MAX_THREADS; i++) {
+        threads.emplace_back(&TransferAgent::workerThread, this);
+    }
+}
+
+TransferAgent::~TransferAgent() {
+    terminated = true;
+    cv.notify_all();
+    for (auto& t : threads) t.join();
 }
 
 HTTPRequest TransferAgent::getRequest(const Action& action) {
@@ -37,132 +48,94 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
     }
 }
 
-void TransferAgent::workerThread(Action&& a) {
-    runningTasks++;
+#define TRY_OPERATION(x)        \
+    try {                       \
+        x;                      \
+    } catch (unix_error&) {     \
+        connectionOkay = false; \
+        continue;               \
+    }
 
-    Action action = move(a);
-    bool connectionOkay = true;
-    bool workToDo = true;
+void TransferAgent::workerThread() {
+    Optional<Action> action;
+    constexpr milliseconds backoff{50};
 
-    const milliseconds backoff{50};
-    size_t tryCount = 0;
-
-    while (workToDo) {
-        /* Did the connection fail? Pause for a moment */
-        if (!connectionOkay) {
-            this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
-        }
-
-        tryCount = min(8ul, tryCount + 1);  // maximum is 6.4s
-
-        /* Creating a connection to S3 */
+    while (!terminated) {
         TCPSocket s3;
+        auto parser = make_unique<HTTPResponseParser>();
+        bool connectionOkay = true;
+        size_t tryCount = 0;
 
-        try {
-            s3.connect(action.address);
-        } catch (exception& ex) {
-            connectionOkay = false;
-            continue;
-        }
+        TRY_OPERATION(s3.connect(clientConfig.address));
 
-        HTTPResponseParser parser;
+        while (!terminated && connectionOkay) {
+            if (!action.initialized()) {
+                unique_lock<mutex> lock{outstandingMutex};
 
-        connectionOkay = true;
-        size_t requestCount = 0;
-        size_t responseCount = 0;
+                cv.wait(lock, [this]() {
+                    return !terminated && !outstanding.empty();
+                });
 
-        while (connectionOkay && workToDo) {
-            HTTPRequest outgoingRequest = getRequest(action);
-            parser.new_request_arrived(outgoingRequest);
-            requestCount++;
+                if (terminated) break;
 
-            try {
-                s3.write(outgoingRequest.str());
-            } catch (exception& ex) {
-                connectionOkay = false;
-                break;
+                action.reset(move(outstanding.front()));
+                outstanding.pop();
             }
 
-            while (responseCount < requestCount) {
-                try {
-                    parser.parse(s3.read());
-                } catch (exception& ex) {
-                    connectionOkay = false;
-                    break;
-                }
+            HTTPRequest request = getRequest(*action);
+            parser->new_request_arrived(request);
 
-                if (!parser.empty()) {
-                    const string status = move(parser.front().status_code());
-                    const string data = move(parser.front().body());
-                    parser.pop();
+            if (tryCount > 0) {
+                this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
+            }
 
-                    responseCount++;
+            TRY_OPERATION(s3.write(request.str()));
 
-                    if (status != "200") {
-                        if (status[0] == '5') {
-                            /* 500 or 503; we need to back-off */
-                            connectionOkay = false;
-                            break;
+            while (!terminated && connectionOkay && action.initialized()) {
+                TRY_OPERATION(parser->parse(s3.read()));
+
+                while (!parser->empty()) {
+                    const string status = move(parser->front().status_code());
+                    const string data = move(parser->front().body());
+                    parser->pop();
+
+                    switch (status[0]) {
+                    case '2':  // successful
+                        if (action->type == Action::Download) {
+                            action->data = move(data);
                         }
 
-                        /* it seems that it's our fault */
-                        throw runtime_error("transfer failed: " + status);
-                    }
+                        {
+                            unique_lock<mutex> lock{resultsMutex};
+                            results.emplace(move(*action));
+                        }
 
-                    if (action.type == Action::Download) {
-                        action.data = move(data);
-                    }
-
-                    /* let's reset the try count */
-                    tryCount = 0;
-
-                    /* putting the result on the queue */
-                    {
-                        unique_lock<mutex> lock{resultsMutex};
-                        results.emplace(move(action));
+                        tryCount = 0;
                         isEmpty = false;
-                    }
+                        action.clear();
+                        break;
 
-                    /* is there another request that we pick up? */
-                    {
-                        unique_lock<mutex> lock{outstandingMutex};
+                    case '5':  // we need to slow down
+                        tryCount++;
+                        break;
 
-                        if (!outstanding.empty()) {
-                            action = move(outstanding.front());
-                            outstanding.pop();
-                            workToDo = true;
-                        } else {
-                            workToDo = false;
-                        }
-                    }
-
-                    if (requestCount >= MAX_REQUESTS_ON_CONNECTION) {
-                        connectionOkay = false;
-                        tryCount = 1;
+                    default:  // unexpected response, like 404 or something
+                        throw runtime_error("transfer failed: " + status);
                     }
                 }
             }
         }
     }
-
-    runningTasks--;
 }
 
 void TransferAgent::doAction(Action&& action) {
-    if (steady_clock::now() - lastAddrInfo > seconds{ADDRINFO_INTERVAL}) {
-        clientConfig.address = {clientConfig.endpoint, "http"};
-        lastAddrInfo = steady_clock::now();
-    }
-
-    action.address = clientConfig.address;
-
-    if (runningTasks.load() >= MAX_SIMULTANEOUS_JOBS) {
+    {
         unique_lock<mutex> lock{outstandingMutex};
         outstanding.push(move(action));
-        return;
     }
 
-    thread(&TransferAgent::workerThread, this, move(action)).detach();
+    cv.notify_one();
+    return;
 }
 
 uint64_t TransferAgent::requestDownload(const string& key) {
@@ -174,8 +147,6 @@ uint64_t TransferAgent::requestUpload(const string& key, string&& data) {
     doAction({nextId, Action::Upload, key, move(data)});
     return nextId++;
 }
-
-bool TransferAgent::empty() { return isEmpty.load(); }
 
 TransferAgent::Action TransferAgent::pop() {
     unique_lock<mutex> lock{resultsMutex};
