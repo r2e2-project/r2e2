@@ -67,6 +67,7 @@ void TransferAgent::workerThread() {
         auto parser = make_unique<HTTPResponseParser>();
         bool connectionOkay = true;
         size_t tryCount = 0;
+        size_t requestCount = 0;
 
         TRY_OPERATION(s3.connect(clientConfig.address));
 
@@ -92,6 +93,7 @@ void TransferAgent::workerThread() {
             }
 
             TRY_OPERATION(s3.write(request.str()));
+            requestCount++;
 
             while (!terminated && connectionOkay && action.initialized()) {
                 TRY_OPERATION(parser->parse(s3.read()));
@@ -125,6 +127,10 @@ void TransferAgent::workerThread() {
                         throw runtime_error("transfer failed: " + status);
                     }
                 }
+            }
+
+            if (requestCount >= MAX_REQUESTS_ON_CONNECTION) {
+                connectionOkay = false;
             }
         }
     }
