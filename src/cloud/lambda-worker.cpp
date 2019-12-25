@@ -1,6 +1,7 @@
 #include "lambda-worker.h"
 
 #include <getopt.h>
+#include <signal.h>
 
 #include "core/camera.h"
 #include "core/light.h"
@@ -28,6 +29,9 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       workingDirectory("/tmp/pbrt-worker"),
       storageBackend(StorageBackend::create_backend(storageUri)),
       transferAgent(*dynamic_cast<S3StorageBackend*>(storageBackend.get())) {
+    // let the program handle SIGPIPE
+    signal(SIGPIPE, SIG_IGN);
+
     cerr << "* starting worker in " << workingDirectory.name() << endl;
     roost::chdir(workingDirectory.name());
 
