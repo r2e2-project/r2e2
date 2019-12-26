@@ -48,14 +48,14 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
     }
 }
 
-#define TRY_OPERATION(x)                 \
-    try {                                \
-        x;                               \
-    } catch (exception & ex) {           \
-        this_thread::sleep_for(backoff); \
-        print_exception(#x, ex);         \
-        connectionOkay = false;          \
-        continue;                        \
+#define TRY_OPERATION(x)                     \
+    try {                                    \
+        x;                                   \
+    } catch (exception & ex) {               \
+        this_thread::sleep_for(2 * backoff); \
+        print_exception(#x, ex);             \
+        connectionOkay = false;              \
+        continue;                            \
     }
 
 void TransferAgent::workerThread(const size_t threadId) {
