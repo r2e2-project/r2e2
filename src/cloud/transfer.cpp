@@ -53,21 +53,27 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
         x;                                   \
     } catch (exception & ex) {               \
         this_thread::sleep_for(2 * backoff); \
-        print_exception(#x, ex);             \
+        tryCount++;                          \
         connectionOkay = false;              \
         continue;                            \
     }
 
 void TransferAgent::workerThread(const size_t threadId) {
-    Optional<Action> action;
     constexpr milliseconds backoff{50};
+    size_t tryCount = 0;
+
+    Optional<Action> action;
 
     while (!terminated) {
         TCPSocket s3;
         auto parser = make_unique<HTTPResponseParser>();
         bool connectionOkay = true;
-        size_t tryCount = 0;
         size_t requestCount = 0;
+
+        if (tryCount > 0) {
+            tryCount = min<size_t>(tryCount, 7u);
+            this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
+        }
 
         TRY_OPERATION(s3.connect(clientConfig.address));
 
@@ -82,18 +88,8 @@ void TransferAgent::workerThread(const size_t threadId) {
 
                 if (terminated) return;
 
-                action.reset(move(outstanding.front()));
+                action.initialize(move(outstanding.front()));
                 outstanding.pop();
-            }
-
-            /* do we need to backoff for a bit? */
-            if (tryCount > 0) {
-                this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
-
-                if (tryCount > 6) {
-                    connectionOkay = false;
-                    continue;
-                }
             }
 
             HTTPRequest request = getRequest(*action);
@@ -106,8 +102,6 @@ void TransferAgent::workerThread(const size_t threadId) {
                 TRY_OPERATION(parser->parse(s3.read()));
 
                 if (!parser->empty()) {
-                    bool failed = false;
-
                     const string status = move(parser->front().status_code());
                     const string data = move(parser->front().body());
                     parser->pop();
@@ -127,15 +121,13 @@ void TransferAgent::workerThread(const size_t threadId) {
                         break;
 
                     case '5':  // we need to slow down
-                        failed = true;
+                        connectionOkay = false;
                         tryCount++;
                         break;
 
                     default:  // unexpected response, like 404 or something
                         throw runtime_error("transfer failed: " + status);
                     }
-
-                    if (failed) break;
                 }
             }
 

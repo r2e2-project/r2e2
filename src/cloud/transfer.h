@@ -48,8 +48,8 @@ class TransferAgent {
         Address address{};
     } clientConfig;
 
-    static constexpr size_t MAX_THREADS{4};
-    static constexpr size_t MAX_REQUESTS_ON_CONNECTION{8};
+    static constexpr size_t MAX_THREADS{8};
+    static constexpr size_t MAX_REQUESTS_ON_CONNECTION{4};
 
     std::vector<std::thread> threads{};
     std::atomic<bool> terminated{false};
