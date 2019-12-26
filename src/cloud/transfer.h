@@ -15,6 +15,8 @@
 #include "net/secure_socket.h"
 #include "net/socket.h"
 #include "storage/backend_s3.h"
+#include "util/eventfd.h"
+#include "util/optional.h"
 
 namespace pbrt {
 
@@ -57,12 +59,13 @@ class TransferAgent {
 
     std::queue<Action> outstanding{};
     std::queue<Action> results{};
-    std::atomic<bool> isEmpty{true};
 
     HTTPRequest getRequest(const Action& action);
     void doAction(Action&& action);
 
     void workerThread(const size_t threadId);
+
+    EventFD eventFD{false};
 
   public:
     TransferAgent(const S3StorageBackend& backend);
@@ -70,8 +73,10 @@ class TransferAgent {
     uint64_t requestUpload(const std::string& key, std::string&& data);
     ~TransferAgent();
 
-    bool empty() const { return isEmpty.load(); }
-    Action pop();
+    EventFD& eventfd() { return eventFD; }
+
+    bool empty() const;
+    Optional<Action> try_pop();
 };
 
 }  // namespace pbrt

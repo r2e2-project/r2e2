@@ -122,8 +122,8 @@ void TransferAgent::workerThread(const size_t threadId) {
                         }
 
                         tryCount = 0;
-                        isEmpty = false;
                         action.clear();
+                        eventFD.write_event();
                         break;
 
                     case '5':  // we need to slow down
@@ -166,11 +166,13 @@ uint64_t TransferAgent::requestUpload(const string& key, string&& data) {
     return nextId++;
 }
 
-TransferAgent::Action TransferAgent::pop() {
+Optional<TransferAgent::Action> TransferAgent::try_pop() {
     unique_lock<mutex> lock{resultsMutex};
+
+    if (results.empty()) return {};
+
     Action action = move(results.front());
     results.pop();
-    isEmpty.store(results.empty());
 
-    return action;
+    return {true, move(action)};
 }

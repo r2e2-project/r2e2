@@ -97,9 +97,9 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                        []() { throw runtime_error("receive queue failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        alwaysOnFd, Direction::Out,
+        transferAgent.eventfd(), Direction::In,
         bind(&LambdaWorker::handleTransferResults, this),
-        [this]() { return !transferAgent.empty(); },
+        [this]() { return !pendingRayBags.empty(); },
         []() { throw runtime_error("handle transfer results failed"); }));
 
     /* handle received messages */

@@ -11,7 +11,9 @@
 
 class EventFD : public FileDescriptor {
   public:
-    EventFD() : FileDescriptor(eventfd(0u, EFD_SEMAPHORE | EFD_NONBLOCK)) {}
+    EventFD(const bool semaphore = false)
+        : FileDescriptor(
+              eventfd(0u, (semaphore ? EFD_SEMAPHORE : 0) | EFD_NONBLOCK)) {}
 
     bool read_event() {
         uint64_t value;
