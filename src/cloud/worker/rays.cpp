@@ -48,7 +48,7 @@ ResultType LambdaWorker::handleTraceQueue() {
 
     queue<RayStatePtr> processedRays;
 
-    constexpr size_t MAX_RAYS = 5'000;
+    constexpr size_t MAX_RAYS = 10'000;
     size_t tracedCount = 0;
     MemoryArena arena;
 
