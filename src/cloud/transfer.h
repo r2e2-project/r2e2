@@ -53,17 +53,16 @@ class TransferAgent {
     std::atomic<bool> terminated{false};
     std::mutex resultsMutex;
     std::mutex outstandingMutex;
+    std::condition_variable cv;
 
     std::queue<Action> outstanding{};
     std::queue<Action> results{};
     std::atomic<bool> isEmpty{true};
 
-    std::condition_variable cv;
-
     HTTPRequest getRequest(const Action& action);
     void doAction(Action&& action);
 
-    void workerThread();
+    void workerThread(const size_t threadId);
 
   public:
     TransferAgent(const S3StorageBackend& backend);

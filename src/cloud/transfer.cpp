@@ -21,7 +21,7 @@ TransferAgent::TransferAgent(const S3StorageBackend& backend) {
     clientConfig.address = Address{clientConfig.endpoint, "http"};
 
     for (size_t i = 0; i < MAX_THREADS; i++) {
-        threads.emplace_back(&TransferAgent::workerThread, this);
+        threads.emplace_back(&TransferAgent::workerThread, this, i);
     }
 }
 
@@ -58,7 +58,7 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
         continue;                        \
     }
 
-void TransferAgent::workerThread() {
+void TransferAgent::workerThread(const size_t threadId) {
     Optional<Action> action;
     constexpr milliseconds backoff{50};
 
@@ -72,6 +72,7 @@ void TransferAgent::workerThread() {
         TRY_OPERATION(s3.connect(clientConfig.address));
 
         while (!terminated && connectionOkay) {
+            /* make sure we have an action to perfom */
             if (!action.initialized()) {
                 unique_lock<mutex> lock{outstandingMutex};
 
@@ -79,23 +80,24 @@ void TransferAgent::workerThread() {
                     return terminated || !outstanding.empty();
                 });
 
-                if (terminated) break;
+                if (terminated) return;
 
                 action.reset(move(outstanding.front()));
                 outstanding.pop();
             }
 
-            HTTPRequest request = getRequest(*action);
-            parser->new_request_arrived(request);
-
+            /* do we need to backoff for a bit? */
             if (tryCount > 0) {
                 this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
 
-                if (tryCount > 8) {
+                if (tryCount > 6) {
                     connectionOkay = false;
                     continue;
                 }
             }
+
+            HTTPRequest request = getRequest(*action);
+            parser->new_request_arrived(request);
 
             TRY_OPERATION(s3.write(request.str()));
             requestCount++;
@@ -103,16 +105,16 @@ void TransferAgent::workerThread() {
             while (!terminated && connectionOkay && action.initialized()) {
                 TRY_OPERATION(parser->parse(s3.read()));
 
-                while (!parser->empty()) {
+                if (!parser->empty()) {
+                    bool failed = false;
+
                     const string status = move(parser->front().status_code());
                     const string data = move(parser->front().body());
                     parser->pop();
 
                     switch (status[0]) {
                     case '2':  // successful
-                        if (action->type == Action::Download) {
-                            action->data = move(data);
-                        }
+                        action->data = move(data);
 
                         {
                             unique_lock<mutex> lock{resultsMutex};
@@ -125,12 +127,15 @@ void TransferAgent::workerThread() {
                         break;
 
                     case '5':  // we need to slow down
+                        failed = true;
                         tryCount++;
                         break;
 
                     default:  // unexpected response, like 404 or something
                         throw runtime_error("transfer failed: " + status);
                     }
+
+                    if (failed) break;
                 }
             }
 
