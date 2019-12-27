@@ -29,8 +29,6 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
     RayStatePtr &&rayStatePtr, const CloudBVH &treelet,
     const vector<shared_ptr<Light>> &lights, const Vector2i &sampleExtent,
     shared_ptr<GlobalSampler> &sampler, MemoryArena &arena) {
-    pair<RayStatePtr, RayStatePtr> result;
-
     RayStatePtr bouncePtr = nullptr;
     RayStatePtr shadowRayPtr = nullptr;
 
@@ -100,6 +98,9 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
                 /* now we have to shoot the ray to the light source */
                 shadowRayPtr = move(rayStatePtr);
                 auto &shadowRay = *shadowRayPtr;
+
+                /* if bounce isn't produced, this is the last ray in the path */
+                if (bouncePtr == nullptr) shadowRay.remainingBounces = 0;
 
                 shadowRay.ray = visibility.P0().SpawnRayTo(visibility.P1());
                 shadowRay.Ld = (f * Li / lightPdf) / lightSelectPdf;

@@ -51,7 +51,7 @@ ResultType LambdaWorker::handleTraceQueue() {
     size_t tracedCount = 0;
     MemoryArena arena;
 
-    while(!traceQueue.empty() && tracedCount++ < MAX_RAYS) {
+    while (!traceQueue.empty() && tracedCount++ < MAX_RAYS) {
         RayStatePtr rayPtr = move(traceQueue.front());
         traceQueue.pop();
 
@@ -70,6 +70,11 @@ ResultType LambdaWorker::handleTraceQueue() {
                 if (hit || emptyVisit) {
                     newRay.Ld = hit ? 0.f : newRay.Ld;
                     samples.emplace(*newRayPtr);
+
+                    /* was this the last shadow ray? */
+                    if (newRay.remainingBounces == 0) {
+                        finishedPathIds.push(pathId);
+                    }
                 } else {
                     processedRays.push(move(newRayPtr));
                 }
@@ -87,19 +92,12 @@ ResultType LambdaWorker::handleTraceQueue() {
                                    scene.sampleExtent, scene.sampler, arena);
 
             if (bounceRay == nullptr && shadowRay == nullptr) {
-                /* rayPtr is not touched if if Shade() returned nothing */
-                // XXX logging
-            }
-
-            if (bounceRay != nullptr) {
-                processedRays.push(move(bounceRay));
-            } else { /* this was the last bounce in this path */
+                /* this was the last ray in the path */
                 finishedPathIds.push(pathId);
             }
 
-            if (shadowRay != nullptr) {
-                processedRays.push(move(shadowRay));
-            }
+            if (bounceRay != nullptr) processedRays.push(move(bounceRay));
+            if (shadowRay != nullptr) processedRays.push(move(shadowRay));
         } else {
             throw runtime_error("invalid ray in ray queue");
         }
