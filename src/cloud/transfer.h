@@ -20,7 +20,7 @@
 
 namespace pbrt {
 
-constexpr std::chrono::seconds ADDR_UPDATE_INTERVAL{20};
+constexpr std::chrono::seconds ADDR_UPDATE_INTERVAL{25};
 
 class TransferAgent {
   private:

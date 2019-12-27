@@ -18,6 +18,8 @@ TransferAgent::TransferAgent(const S3StorageBackend& backend) {
     clientConfig.endpoint =
         S3::endpoint(clientConfig.region, clientConfig.bucket);
 
+    clientConfig.address.store(Address{clientConfig.endpoint, "http"});
+
     for (size_t i = 0; i < MAX_THREADS; i++) {
         threads.emplace_back(&TransferAgent::workerThread, this, i);
     }
@@ -115,10 +117,10 @@ void TransferAgent::workerThread(const size_t threadId) {
 
                     switch (status[0]) {
                     case '2':  // successful
-                        {
-                            unique_lock<mutex> lock{resultsMutex};
-                            results.emplace(action->id, move(data));
-                        }
+                    {
+                        unique_lock<mutex> lock{resultsMutex};
+                        results.emplace(action->id, move(data));
+                    }
 
                         tryCount = 0;
                         action.clear();
