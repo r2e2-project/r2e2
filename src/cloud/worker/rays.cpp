@@ -16,7 +16,6 @@ using PollerResult = Poller::Result::Type;
 
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
     const Bounds2i sampleBounds = scene.camera->film->GetSampleBounds();
-    const uint8_t maxDepth = 5;
 
     /* for ray tracking */
     bernoulli_distribution bd{config.rayActionsLogRate};
@@ -31,7 +30,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
             statePtr->trackRay = trackRays ? bd(randEngine) : false;
 
-            const auto nextTreelet = statePtr->CurrentTreelet();
+            const TreeletId nextTreelet = statePtr->CurrentTreelet();
 
             if (treeletIds.count(nextTreelet)) {
                 traceQueue.push(move(statePtr));
