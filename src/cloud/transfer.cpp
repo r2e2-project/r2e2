@@ -20,8 +20,8 @@ TransferAgent::TransferAgent(const S3StorageBackend& backend) {
 
     clientConfig.address.store(Address{clientConfig.endpoint, "http"});
 
-    for (size_t i = 0; i < threads.size(); i++) {
-        threads[i] = move(::thread{&TransferAgent::workerThread, this, i});
+    for (size_t i = 0; i < MAX_THREADS; i++) {
+        threads.emplace_back(&TransferAgent::workerThread, this, i);
     }
 }
 
