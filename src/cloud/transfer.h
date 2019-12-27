@@ -1,6 +1,7 @@
 #ifndef PBRT_CLOUD_TRANSFER_H
 #define PBRT_CLOUD_TRANSFER_H
 
+#include <array>
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
@@ -54,7 +55,7 @@ class TransferAgent {
 
     std::chrono::steady_clock::time_point lastAddrUpdate{};
 
-    std::vector<std::thread> threads{};
+    std::array<std::thread, MAX_THREADS> threads{};
     std::atomic<bool> terminated{false};
     std::mutex resultsMutex;
     std::mutex outstandingMutex;
