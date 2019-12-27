@@ -27,7 +27,6 @@ class TransferAgent {
     struct Action {
         enum Type { Download, Upload };
 
-        Address address;
         uint64_t id;
         Type type;
         std::string key;
@@ -47,7 +46,7 @@ class TransferAgent {
         std::string prefix{};
 
         std::string endpoint{};
-        Address address{};
+        std::atomic<Address> address{Address{}};
     } clientConfig;
 
     static constexpr size_t MAX_THREADS{8};

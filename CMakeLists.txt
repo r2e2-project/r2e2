@@ -539,6 +539,7 @@ FIND_PACKAGE(LZ4 REQUIRED)
 SET(ALL_PBRT_LIBS
   pbrt
   pbrt_messages
+  atomic
   ${CMAKE_THREAD_LIBS_INIT}
   ${OPENEXR_LIBS}
   glog

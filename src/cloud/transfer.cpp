@@ -63,33 +63,42 @@ void TransferAgent::workerThread(const size_t threadId) {
 
     Optional<Action> action;
 
+    auto lastAddrUpdate = steady_clock::now() + seconds{threadId};
+    Address s3Address = clientConfig.address.load();
+
     while (!terminated) {
-        /* make sure we have an action to perfom */
-        if (!action.initialized()) {
-            unique_lock<mutex> lock{outstandingMutex};
-
-            cv.wait(lock,
-                    [this]() { return terminated || !outstanding.empty(); });
-
-            if (terminated) return;
-
-            action.initialize(move(outstanding.front()));
-            outstanding.pop();
-        }
-
         TCPSocket s3;
         auto parser = make_unique<HTTPResponseParser>();
         bool connectionOkay = true;
         size_t requestCount = 0;
 
         if (tryCount > 0) {
-            tryCount = min<size_t>(tryCount, 7u);
+            tryCount = min<size_t>(tryCount, 7u);  // caps at 3.2s
             this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
         }
 
-        TRY_OPERATION(s3.connect(action->address));
+        if (steady_clock::now() - lastAddrUpdate >= ADDR_UPDATE_INTERVAL) {
+            s3Address = clientConfig.address.load();
+            lastAddrUpdate = steady_clock::now();
+        }
+
+        TRY_OPERATION(s3.connect(s3Address));
 
         while (!terminated && connectionOkay) {
+            /* make sure we have an action to perfom */
+            if (!action.initialized()) {
+                unique_lock<mutex> lock{outstandingMutex};
+
+                cv.wait(lock, [this]() {
+                    return terminated || !outstanding.empty();
+                });
+
+                if (terminated) return;
+
+                action.initialize(move(outstanding.front()));
+                outstanding.pop();
+            }
+
             HTTPRequest request = getRequest(*action);
             parser->new_request_arrived(request);
 
@@ -138,11 +147,9 @@ void TransferAgent::workerThread(const size_t threadId) {
 
 void TransferAgent::doAction(Action&& action) {
     if (steady_clock::now() - lastAddrUpdate >= ADDR_UPDATE_INTERVAL) {
-        clientConfig.address = Address{clientConfig.endpoint, "http"};
+        clientConfig.address.store(Address{clientConfig.endpoint, "http"});
         lastAddrUpdate = steady_clock::now();
     }
-
-    action.address = clientConfig.address;
 
     {
         unique_lock<mutex> lock{outstandingMutex};
