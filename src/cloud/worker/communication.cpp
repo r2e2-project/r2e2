@@ -139,11 +139,11 @@ ResultType LambdaWorker::handleTransferResults() {
 
     transferAgent.eventfd().read_event();
 
-    Optional<TransferAgent::Action> actionOpt;
+    Optional<pair<uint64_t, string>> actionOpt;
     while ((actionOpt = transferAgent.try_pop()).initialized()) {
-        TransferAgent::Action &action = *actionOpt;
+        auto &action = *actionOpt;
 
-        auto infoIt = pendingRayBags.find(action.id);
+        auto infoIt = pendingRayBags.find(action.first);
         if (infoIt != pendingRayBags.end()) {
             const auto& info = infoIt->second.second;
 
@@ -157,7 +157,7 @@ ResultType LambdaWorker::handleTransferResults() {
             case Task::Download:
                 /* we have to put the received bag on the receive queue,
                    and tell the master */
-                receiveQueue.emplace(info, move(action.data));
+                receiveQueue.emplace(info, move(action.second));
                 *dequeuedProto.add_items() = to_protobuf(info);
                 break;
             }

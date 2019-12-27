@@ -21,7 +21,7 @@
 namespace pbrt {
 
 class TransferAgent {
-  public:
+  private:
     struct Action {
         enum Type { Download, Upload };
 
@@ -35,7 +35,6 @@ class TransferAgent {
             : id(id), type(type), key(key), data(move(data)) {}
     };
 
-  private:
     uint64_t nextId{1};
 
     struct S3Config {
@@ -58,7 +57,7 @@ class TransferAgent {
     std::condition_variable cv;
 
     std::queue<Action> outstanding{};
-    std::queue<Action> results{};
+    std::queue<std::pair<uint64_t, std::string>> results{};
 
     HTTPRequest getRequest(const Action& action);
     void doAction(Action&& action);
@@ -76,7 +75,7 @@ class TransferAgent {
     EventFD& eventfd() { return eventFD; }
 
     bool empty() const;
-    Optional<Action> try_pop();
+    Optional<std::pair<uint64_t, std::string>> try_pop();
 };
 
 }  // namespace pbrt

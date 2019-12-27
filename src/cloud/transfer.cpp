@@ -113,7 +113,7 @@ void TransferAgent::workerThread(const size_t threadId) {
 
                         {
                             unique_lock<mutex> lock{resultsMutex};
-                            results.emplace(move(*action));
+                            results.emplace(action->id, move(action->data));
                         }
 
                         tryCount = 0;
@@ -159,13 +159,13 @@ uint64_t TransferAgent::requestUpload(const string& key, string&& data) {
     return nextId++;
 }
 
-Optional<TransferAgent::Action> TransferAgent::try_pop() {
+Optional<pair<uint64_t, string>> TransferAgent::try_pop() {
     unique_lock<mutex> lock{resultsMutex};
 
     if (results.empty()) return {};
 
-    Action action = move(results.front());
+    auto result = move(results.front());
     results.pop();
 
-    return {true, move(action)};
+    return {true, move(result)};
 }
