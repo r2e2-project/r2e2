@@ -137,11 +137,14 @@ ResultType LambdaWorker::handleTransferResults() {
     protobuf::RayBags enqueuedProto;
     protobuf::RayBags dequeuedProto;
 
-    transferAgent.eventfd().read_event();
+    if (!transferAgent.eventfd().read_event()) {
+        return ResultType::Continue;
+    }
 
     pair<uint64_t, string> action;
     while (transferAgent.try_pop(action)) {
         auto infoIt = pendingRayBags.find(action.first);
+
         if (infoIt != pendingRayBags.end()) {
             const auto& info = infoIt->second.second;
 
