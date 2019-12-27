@@ -18,8 +18,6 @@ TransferAgent::TransferAgent(const S3StorageBackend& backend) {
     clientConfig.endpoint =
         S3::endpoint(clientConfig.region, clientConfig.bucket);
 
-    clientConfig.address = Address{clientConfig.endpoint, "http"};
-
     for (size_t i = 0; i < MAX_THREADS; i++) {
         threads.emplace_back(&TransferAgent::workerThread, this, i);
     }
@@ -66,6 +64,19 @@ void TransferAgent::workerThread(const size_t threadId) {
     Optional<Action> action;
 
     while (!terminated) {
+        /* make sure we have an action to perfom */
+        if (!action.initialized()) {
+            unique_lock<mutex> lock{outstandingMutex};
+
+            cv.wait(lock,
+                    [this]() { return terminated || !outstanding.empty(); });
+
+            if (terminated) return;
+
+            action.initialize(move(outstanding.front()));
+            outstanding.pop();
+        }
+
         TCPSocket s3;
         auto parser = make_unique<HTTPResponseParser>();
         bool connectionOkay = true;
@@ -76,23 +87,9 @@ void TransferAgent::workerThread(const size_t threadId) {
             this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
         }
 
-        TRY_OPERATION(s3.connect(clientConfig.address));
+        TRY_OPERATION(s3.connect(action->address));
 
         while (!terminated && connectionOkay) {
-            /* make sure we have an action to perfom */
-            if (!action.initialized()) {
-                unique_lock<mutex> lock{outstandingMutex};
-
-                cv.wait(lock, [this]() {
-                    return terminated || !outstanding.empty();
-                });
-
-                if (terminated) return;
-
-                action.initialize(move(outstanding.front()));
-                outstanding.pop();
-            }
-
             HTTPRequest request = getRequest(*action);
             parser->new_request_arrived(request);
 
@@ -140,6 +137,13 @@ void TransferAgent::workerThread(const size_t threadId) {
 }
 
 void TransferAgent::doAction(Action&& action) {
+    if (steady_clock::now() - lastAddrUpdate >= ADDR_UPDATE_INTERVAL) {
+        clientConfig.address = Address{clientConfig.endpoint, "http"};
+        lastAddrUpdate = steady_clock::now();
+    }
+
+    action.address = clientConfig.address;
+
     {
         unique_lock<mutex> lock{outstandingMutex};
         outstanding.push(move(action));

@@ -20,11 +20,14 @@
 
 namespace pbrt {
 
+constexpr std::chrono::seconds ADDR_UPDATE_INTERVAL{20};
+
 class TransferAgent {
   private:
     struct Action {
         enum Type { Download, Upload };
 
+        Address address;
         uint64_t id;
         Type type;
         std::string key;
@@ -49,6 +52,8 @@ class TransferAgent {
 
     static constexpr size_t MAX_THREADS{8};
     static constexpr size_t MAX_REQUESTS_ON_CONNECTION{4};
+
+    std::chrono::steady_clock::time_point lastAddrUpdate{};
 
     std::vector<std::thread> threads{};
     std::atomic<bool> terminated{false};
