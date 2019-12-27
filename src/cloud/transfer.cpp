@@ -115,11 +115,9 @@ void TransferAgent::workerThread(const size_t threadId) {
 
                     switch (status[0]) {
                     case '2':  // successful
-                        action->data = move(data);
-
                         {
                             unique_lock<mutex> lock{resultsMutex};
-                            results.emplace(action->id, move(action->data));
+                            results.emplace(action->id, move(data));
                         }
 
                         tryCount = 0;

@@ -24,9 +24,9 @@ using OpCode = Message::OpCode;
 
 ResultType LambdaMaster::handleMessages() {
     while (!incomingMessages.empty()) {
-        auto front = move(incomingMessages.front());
-        incomingMessages.pop_front();
+        auto &front = incomingMessages.front();
         processMessage(front.first, front.second);
+        incomingMessages.pop_front();
     }
 
     return ResultType::Continue;
