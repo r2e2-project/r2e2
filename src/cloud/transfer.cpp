@@ -43,6 +43,7 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
         return S3GetRequest(clientConfig.credentials, clientConfig.endpoint,
                             clientConfig.region, action.key)
             .to_http_request();
+
     default:
         throw runtime_error("Unknown action type");
     }
