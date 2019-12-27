@@ -80,7 +80,7 @@ class TransferAgent {
     EventFD& eventfd() { return eventFD; }
 
     bool empty() const;
-    Optional<std::pair<uint64_t, std::string>> try_pop();
+    bool try_pop(std::pair<uint64_t, std::string>& output);
 };
 
 }  // namespace pbrt

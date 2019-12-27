@@ -163,13 +163,13 @@ uint64_t TransferAgent::requestUpload(const string& key, string&& data) {
     return nextId++;
 }
 
-Optional<pair<uint64_t, string>> TransferAgent::try_pop() {
+bool TransferAgent::try_pop(pair<uint64_t, string>& output) {
     unique_lock<mutex> lock{resultsMutex};
 
-    if (results.empty()) return {};
+    if (results.empty()) return false;
 
-    auto result = move(results.front());
+    output = move(results.front());
     results.pop();
 
-    return {true, move(result)};
+    return true;
 }

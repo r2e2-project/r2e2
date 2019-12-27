@@ -139,10 +139,8 @@ ResultType LambdaWorker::handleTransferResults() {
 
     transferAgent.eventfd().read_event();
 
-    Optional<pair<uint64_t, string>> actionOpt;
-    while ((actionOpt = transferAgent.try_pop()).initialized()) {
-        auto &action = *actionOpt;
-
+    pair<uint64_t, string> action;
+    while (transferAgent.try_pop(action)) {
         auto infoIt = pendingRayBags.find(action.first);
         if (infoIt != pendingRayBags.end()) {
             const auto& info = infoIt->second.second;
@@ -161,8 +159,6 @@ ResultType LambdaWorker::handleTransferResults() {
                 *dequeuedProto.add_items() = to_protobuf(info);
                 break;
             }
-
-            /* tell the master we've finished uploading this */
 
             pendingRayBags.erase(infoIt);
         }
