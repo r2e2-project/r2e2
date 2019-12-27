@@ -116,7 +116,7 @@ class LambdaWorker {
         std::vector<std::unique_ptr<Transform>> transformCache{};
         std::unique_ptr<Scene> fakeScene{};
         std::vector<std::shared_ptr<Light>> lights{};
-        std::shared_ptr<CloudBVH> bvh{nullptr};
+        std::unique_ptr<CloudBVH> bvh{nullptr};
 
         void initialize();
 

@@ -47,7 +47,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     }
 
     PbrtOptions.nThreads = 1;
-    scene.bvh = make_shared<CloudBVH>();
+    scene.bvh = make_unique<CloudBVH>();
     scene.samplesPerPixel = config.samplesPerPixel;
     manager.init(".");
 
