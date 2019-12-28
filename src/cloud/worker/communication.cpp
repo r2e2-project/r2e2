@@ -78,6 +78,7 @@ ResultType LambdaWorker::handleSendQueue() {
         while (!queue.empty()) {
             auto& bag = queue.front();
             bag.data.erase(bag.info.bagSize);
+            bag.data.shrink_to_fit();
 
             const auto id = transferAgent.requestUpload(
                 bag.info.str(rayBagsKeyPrefix), move(bag.data));
