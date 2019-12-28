@@ -63,7 +63,7 @@ void TransferAgent::workerThread(const size_t threadId) {
     constexpr milliseconds backoff{50};
     size_t tryCount = 0;
 
-    Optional<Action> action;
+    deque<Action> actions;
 
     auto lastAddrUpdate = steady_clock::now() + seconds{threadId};
     Address s3Address = clientConfig.address.load();
@@ -88,7 +88,7 @@ void TransferAgent::workerThread(const size_t threadId) {
 
         while (!terminated && connectionOkay) {
             /* make sure we have an action to perfom */
-            if (!action.initialized()) {
+            if (actions.empty()) {
                 unique_lock<mutex> lock{outstandingMutex};
 
                 cv.wait(lock, [this]() {
@@ -97,20 +97,25 @@ void TransferAgent::workerThread(const size_t threadId) {
 
                 if (terminated) return;
 
-                action.initialize(move(outstanding.front()));
-                outstanding.pop();
+                while (!outstanding.empty() &&
+                       actions.size() <
+                           MAX_REQUESTS_ON_CONNECTION - requestCount) {
+                    actions.push_back(move(outstanding.front()));
+                    outstanding.pop();
+                }
             }
 
-            HTTPRequest request = getRequest(*action);
-            parser->new_request_arrived(request);
+            for (const auto& action : actions) {
+                HTTPRequest request = getRequest(action);
+                parser->new_request_arrived(request);
+                TRY_OPERATION(s3.write(request.str()));
+                requestCount++;
+            }
 
-            TRY_OPERATION(s3.write(request.str()));
-            requestCount++;
-
-            while (!terminated && connectionOkay && action.initialized()) {
+            while (!terminated && connectionOkay && !actions.empty()) {
                 TRY_OPERATION(parser->parse(s3.read()));
 
-                if (!parser->empty()) {
+                while (!parser->empty()) {
                     const string status = move(parser->front().status_code());
                     const string data = move(parser->front().body());
                     parser->pop();
@@ -119,11 +124,11 @@ void TransferAgent::workerThread(const size_t threadId) {
                     case '2':  // successful
                     {
                         unique_lock<mutex> lock{resultsMutex};
-                        results.emplace(action->id, move(data));
+                        results.emplace(actions.front().id, move(data));
                     }
 
                         tryCount = 0;
-                        action.clear();
+                        actions.pop_front();
                         eventFD.write_event();
                         break;
 
