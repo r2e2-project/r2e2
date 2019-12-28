@@ -32,20 +32,20 @@ TransferAgent::~TransferAgent() {
 }
 
 HTTPRequest TransferAgent::getRequest(const Action& action) {
-    switch (action.type) {
-    case Action::Upload:
+    switch (action.task) {
+    case Task::Upload:
         return S3PutRequest(clientConfig.credentials, clientConfig.endpoint,
                             clientConfig.region, action.key, action.data,
                             UNSIGNED_PAYLOAD)
             .to_http_request();
 
-    case Action::Download:
+    case Task::Download:
         return S3GetRequest(clientConfig.credentials, clientConfig.endpoint,
                             clientConfig.region, action.key)
             .to_http_request();
 
     default:
-        throw runtime_error("Unknown action type");
+        throw runtime_error("Unknown action task");
     }
 }
 
@@ -161,12 +161,12 @@ void TransferAgent::doAction(Action&& action) {
 }
 
 uint64_t TransferAgent::requestDownload(const string& key) {
-    doAction({nextId, Action::Download, key, string()});
+    doAction({nextId, Task::Download, key, string()});
     return nextId++;
 }
 
 uint64_t TransferAgent::requestUpload(const string& key, string&& data) {
-    doAction({nextId, Action::Upload, key, move(data)});
+    doAction({nextId, Task::Upload, key, move(data)});
     return nextId++;
 }
 

@@ -25,18 +25,19 @@ namespace pbrt {
 constexpr std::chrono::seconds ADDR_UPDATE_INTERVAL{25};
 
 class TransferAgent {
+  public:
+    enum class Task { Download, Upload };
+
   private:
     struct Action {
-        enum Type { Download, Upload };
-
         uint64_t id;
-        Type type;
+        Task task;
         std::string key;
         std::string data;
 
-        Action(const uint64_t id, const Type type, const std::string& key,
+        Action(const uint64_t id, const Task task, const std::string& key,
                std::string&& data)
-            : id(id), type(type), key(key), data(move(data)) {}
+            : id(id), task(task), key(key), data(move(data)) {}
     };
 
     uint64_t nextId{1};
