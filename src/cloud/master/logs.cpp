@@ -9,7 +9,8 @@ using namespace std::chrono;
 using namespace pbrt;
 using namespace PollerShortNames;
 
-void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
+void LambdaMaster::recordEnqueue(const WorkerId workerId,
+                                 const RayBagInfo &info) {
     auto &worker = workers[workerId];
     auto &treelet = treelets[info.treeletId];
 
@@ -33,7 +34,8 @@ void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
     }
 }
 
-void LambdaMaster::logAssign(const WorkerId workerId, const RayBagInfo &info) {
+void LambdaMaster::recordAssign(const WorkerId workerId,
+                                const RayBagInfo &info) {
     auto &worker = workers[workerId];
 
     worker.assignedRayBags.insert(info);
@@ -46,7 +48,8 @@ void LambdaMaster::logAssign(const WorkerId workerId, const RayBagInfo &info) {
     aggregatedStats.assigned.bytes += info.bagSize;
 }
 
-void LambdaMaster::logDequeue(const WorkerId workerId, const RayBagInfo &info) {
+void LambdaMaster::recordDequeue(const WorkerId workerId,
+                                 const RayBagInfo &info) {
     auto &worker = workers[workerId];
     auto &treelet = treelets[info.treeletId];
 

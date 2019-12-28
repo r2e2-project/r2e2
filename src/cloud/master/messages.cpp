@@ -66,7 +66,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
 
         for (const auto &item : proto.items()) {
             const RayBagInfo info = from_protobuf(item);
-            logEnqueue(workerId, info);
+            recordEnqueue(workerId, info);
 
             if (info.sampleBag) {
                 continue;
@@ -88,7 +88,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
 
         for (const auto &item : proto.items()) {
             const RayBagInfo info = from_protobuf(item);
-            logDequeue(workerId, info);
+            recordDequeue(workerId, info);
         }
 
         break;
