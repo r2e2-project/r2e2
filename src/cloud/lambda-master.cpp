@@ -217,7 +217,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
             workers.emplace_back(currentWorkerId, move(connection));
 
-            objectManager.assignBaseObjects(workers[currentWorkerId],
+            objectManager.assignBaseObjects(workers[currentWorkerId], treelets,
                                             this->config.assignment);
             currentWorkerId++;
             return true;

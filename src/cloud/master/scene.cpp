@@ -68,43 +68,46 @@ void LambdaMaster::ObjectManager::assignObject(Worker &worker,
 }
 
 void LambdaMaster::ObjectManager::assignTreelet(Worker &worker,
-                                                const TreeletId treeletId) {
-    assignObject(worker, {ObjectType::Treelet, treeletId});
+                                                Treelet &treelet) {
+    assignObject(worker, {ObjectType::Treelet, treelet.id});
 
-    assignedTreelets[treeletId].push_back(worker.id);
-    unassignedTreelets.erase(treeletId);
+    unassignedTreelets.erase(treelet.id);
 
-    for (const auto &obj : treeletFlattenDependencies[treeletId]) {
+    worker.treelets.insert(treelet.id);
+    treelet.workers.insert(worker.id);
+
+    for (const auto &obj : treeletFlattenDependencies[treelet.id]) {
         assignObject(worker, obj);
     }
 }
 
 void LambdaMaster::ObjectManager::assignBaseObjects(Worker &worker,
+                                                    vector<Treelet> &treelets,
                                                     const int assignment) {
     assignObject(worker, ObjectKey{ObjectType::Scene, 0});
     assignObject(worker, ObjectKey{ObjectType::Camera, 0});
     assignObject(worker, ObjectKey{ObjectType::Sampler, 0});
     assignObject(worker, ObjectKey{ObjectType::Lights, 0});
 
-    auto doUniformAssign = [this](Worker &worker) {
-        assignTreelet(worker, (worker.id - 1) % treeletIds.size());
+    auto doUniformAssign = [&](Worker &worker) {
+        assignTreelet(worker, treelets[(worker.id - 1) % treelets.size()]);
     };
 
-    auto doStaticAssign = [this](Worker &worker) {
+    auto doStaticAssign = [&](Worker &worker) {
         for (const auto t : staticAssignments[worker.id - 1]) {
-            assignTreelet(worker, t);
+            assignTreelet(worker, treelets[t]);
         }
     };
 
-    auto doAllAssign = [this](Worker &worker) {
+    auto doAllAssign = [&](Worker &worker) {
         for (const auto &t : treeletIds) {
-            assignTreelet(worker, t.id);
+            assignTreelet(worker, treelets[t.id]);
         }
     };
 
-    auto doDebugAssign = [this](Worker &worker) {
+    auto doDebugAssign = [&](Worker &worker) {
         if (worker.id == 0) {
-            assignTreelet(worker, 0);
+            assignTreelet(worker, treelets[0]);
         }
     };
 

@@ -246,11 +246,11 @@ class LambdaMaster {
     class ObjectManager {
       public:
         void initialize(const uint32_t numWorkers, const bool staticAssignment);
-        void assignBaseObjects(Worker &worker, const int assignment);
-        void assignTreelet(Worker &worker, const TreeletId treeletId);
+        void assignBaseObjects(Worker &worker, std::vector<Treelet> &treelets,
+                               const int assignment);
+        void assignTreelet(Worker &worker, Treelet &treelet);
 
         std::set<TreeletId> unassignedTreelets{};
-        std::map<TreeletId, std::vector<WorkerId>> assignedTreelets{};
 
       private:
         struct SceneObjectInfo {

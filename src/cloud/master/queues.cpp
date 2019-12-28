@@ -24,7 +24,7 @@ ResultType LambdaMaster::handleQueuedRayBags() {
             auto& bag = bags.front();
 
             /* picking a random worker */
-            const auto& candidates = objectManager.assignedTreelets[treeletId];
+            const auto& candidates = treelets[treeletId].workers;
             const auto workerId =
                 *random::sample(candidates.begin(), candidates.end());
 
