@@ -32,7 +32,6 @@
 
 namespace pbrt {
 
-constexpr std::chrono::milliseconds QUEUED_RAY_BAGS_INTERVAL{200};
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 
@@ -316,7 +315,6 @@ class LambdaMaster {
     FileDescriptor alwaysOnFd{STDOUT_FILENO};
 
     /* Timers */
-    TimerFD queuedRayBagsTimer{QUEUED_RAY_BAGS_INTERVAL};
     TimerFD statusPrintTimer{STATUS_PRINT_INTERVAL};
     TimerFD writeOutputTimer{WRITE_OUTPUT_INTERVAL};
     TimerFD workerStatsWriteTimer;
