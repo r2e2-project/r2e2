@@ -44,7 +44,7 @@ void LambdaMaster::recordAssign(const WorkerId workerId,
     worker.stats.assigned.count += info.rayCount;
     worker.stats.assigned.bytes += info.bagSize;
 
-    aggregatedStats.assigned.bytes += info.rayCount;
+    aggregatedStats.assigned.count += info.rayCount;
     aggregatedStats.assigned.bytes += info.bagSize;
 }
 
