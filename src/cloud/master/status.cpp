@@ -49,8 +49,15 @@ ResultType LambdaMaster::handleStatusMessage() {
         return total ? (((uint64_t)(100 * (100.0 * n / total))) / 100.0) : 0.0;
     };
 
-    constexpr char const *BG_A = "\033[48;5;022m";
-    constexpr char const *BG_B = "\033[48;5;028m";
+    auto BG = []() -> char const * {
+        constexpr char const *BG_A = "\033[48;5;022m";
+        constexpr char const *BG_B = "\033[48;5;028m";
+
+        static bool alternate = true;
+        alternate = !alternate;
+
+        return alternate ? BG_B : BG_A;
+    };
 
     auto &s = aggregatedStats;
 
@@ -59,29 +66,34 @@ ResultType LambdaMaster::handleStatusMessage() {
     oss << "\033[0m" << fixed << setprecision(2)
 
         // finished paths
-        << BG_A << " \u21af " << s.finishedPaths
+        << BG() << " \u21af " << s.finishedPaths
                 << " (" << percent(s.finishedPaths, scene.totalPaths) << "%) "
 
         // worker count
-        << BG_B << " \u03bb " << (workers.size() - 1) << "/" << numberOfWorkers
+        << BG() << " \u03bb " << (workers.size() - 1) << "/" << numberOfWorkers
                 << " "
 
         // lagging workers
-        << BG_A << " ! " << laggingWorkers << " "
+        << BG() << " ! " << laggingWorkers << " "
 
         // enqueued bytes
-        << BG_B << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
+        << BG() << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
+
+        // assigned bytes
+        << BG() << " \u21ba " << format_bytes(s.assigned.bytes - s.dequeued.bytes)
+                << " (" << percent(s.assigned.bytes - s.dequeued.bytes,
+                                   s.enqueued.bytes) << "%) "
 
         // dequeued bytes
-        << BG_A << " \u2193 " << format_bytes(s.dequeued.bytes)
+        << BG() << " \u2193 " << format_bytes(s.dequeued.bytes)
                 << " (" << percent(s.dequeued.bytes, s.enqueued.bytes) << "%) "
 
         // elapsed time
-        << BG_B << " " << setfill('0')
+        << BG() << " " << setfill('0')
                 << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
                 << (elapsedSeconds % 60) << " "
 
-        << BG_A;
+        << BG();
     // clang-format on
 
     StatusBar::set_text(oss.str());

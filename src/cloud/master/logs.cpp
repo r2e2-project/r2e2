@@ -36,10 +36,11 @@ void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
 void LambdaMaster::logAssign(const WorkerId workerId, const RayBagInfo &info) {
     auto &worker = workers[workerId];
 
+    worker.assignedRayBags.insert(info);
+
     worker.lastStats.first = true;
     worker.stats.assigned.count += info.rayCount;
     worker.stats.assigned.bytes += info.bagSize;
-    worker.assignedRayBags.insert(info);
 
     aggregatedStats.assigned.bytes += info.rayCount;
     aggregatedStats.assigned.bytes += info.bagSize;
@@ -49,10 +50,10 @@ void LambdaMaster::logDequeue(const WorkerId workerId, const RayBagInfo &info) {
     auto &worker = workers[workerId];
     auto &treelet = treelets[info.treeletId];
 
+    worker.assignedRayBags.erase(info);
+
     worker.lastStats.first = true;
     treelet.lastStats.first = true;
-
-    worker.assignedRayBags.erase(info);
 
     worker.stats.dequeued.count += info.rayCount;
     worker.stats.dequeued.bytes += info.bagSize;

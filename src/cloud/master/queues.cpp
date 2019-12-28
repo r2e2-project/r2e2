@@ -41,7 +41,7 @@ ResultType LambdaMaster::handleQueuedRayBags() {
 
         while (!bags.empty()) {
             *proto.add_items() = to_protobuf(bags.front());
-            worker.assignedRayBags.insert(bags.front());
+            logAssign(item.first, bags.front());
             bags.pop();
         }
 
