@@ -10,7 +10,7 @@ using namespace pbrt;
 using namespace PollerShortNames;
 
 void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
-    auto &worker = workerStats[workerId];
+    auto &worker = workers[workerId].stats;
     auto &treelet = treeletStats[info.treeletId];
 
     lastStats.workers[workerId].second = true;
@@ -34,7 +34,7 @@ void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
 }
 
 void LambdaMaster::logDequeue(const WorkerId workerId, const RayBagInfo &info) {
-    auto &worker = workerStats[workerId];
+    auto &worker = workers[workerId].stats;
     auto &treelet = treeletStats[info.treeletId];
 
     lastStats.workers[workerId].second = true;
@@ -62,9 +62,9 @@ ResultType LambdaMaster::handleWorkerStats() {
         }
 
         const WorkerStats stats =
-            workerStats[workerId] - lastStats.workers[workerId].first;
+            workers[workerId].stats - lastStats.workers[workerId].first;
 
-        lastStats.workers[workerId].first = workerStats[workerId];
+        lastStats.workers[workerId].first = workers[workerId].stats;
         lastStats.workers[workerId].second = false;
 
         /* timestamp,workerId,raysEnqueued,raysDequeued,bytesEnqueued,

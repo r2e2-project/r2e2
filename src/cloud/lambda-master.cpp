@@ -112,7 +112,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     const size_t treeletCount = global::manager.treeletCount();
 
-    workerStats.resize(numberOfLambdas + 1);
     treeletStats.resize(treeletCount);
     lastStats.workers.resize(numberOfLambdas + 1);
     lastStats.treelets.resize(treeletCount);

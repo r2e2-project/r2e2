@@ -123,6 +123,9 @@ class LambdaMaster {
         steady_clock::time_point lastSeen{steady_clock::now()};
         std::string awsLogStream{};
 
+        // Statistics
+        WorkerStats stats{};
+
         Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}
     };
@@ -168,7 +171,6 @@ class LambdaMaster {
     ////////////////////////////////////////////////////////////////////////////
 
     WorkerStats aggregatedStats{};
-    std::vector<WorkerStats> workerStats{};
     std::vector<TreeletStats> treeletStats{};
 
     /*** Outputting stats *****************************************************/
