@@ -34,7 +34,7 @@ struct WorkerStats {
     struct {
         uint64_t count{0};
         uint64_t bytes{0};
-    } enqueued{}, dequeued{}, samples{};
+    } enqueued{}, assigned{}, dequeued{}, samples{};
 
     void merge(const WorkerStats& other);
     void reset();
