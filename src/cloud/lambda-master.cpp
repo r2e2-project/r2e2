@@ -69,6 +69,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
       workerStatsWriteTimer(seconds{config.workerStatsWriteInterval},
                             milliseconds{1}) {
+    workers.reserve(numberOfLambdas + 1);
     workers.emplace_back(0, nullptr); /* worker 0 is the master */
     LOG(INFO) << "job-id=" << jobId;
 
@@ -110,10 +111,13 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     /* now we can initialize the SceneManager */
     global::manager.init(scenePath);
 
+    /* initializing the treelets array */
     const size_t treeletCount = global::manager.treeletCount();
+    treelets.reserve(treeletCount);
 
-    treeletStats.resize(treeletCount);
-    lastStats.treelets.resize(treeletCount);
+    for (size_t i = 0; i < treeletCount; i++) {
+        treelets.emplace_back(i);
+    }
 
     /* and initialize the necessary scene objects */
     scene.initialize(config.samplesPerPixel, config.cropWindow);
@@ -139,9 +143,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
         tlStream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
                     "bytesEnqueued,bytesDequeued\n";
-
-        // Log the 0 entries
-        for (auto &item : lastStats.treelets) item.second = true;
     }
 
     cout << "Tile size is " << tiles.tileSize << "\u00d7" << tiles.tileSize

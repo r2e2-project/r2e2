@@ -119,9 +119,11 @@ class LambdaMaster {
         WorkerId id;
         bool initialized{false};
         std::shared_ptr<TCPConnection> connection;
-        std::set<ObjectKey> objects{};
         steady_clock::time_point lastSeen{steady_clock::now()};
         std::string awsLogStream{};
+
+        std::set<TreeletId> treelets{};
+        std::set<ObjectKey> objects{};
 
         // Statistics
         WorkerStats stats{};
@@ -132,7 +134,25 @@ class LambdaMaster {
     };
 
     WorkerId currentWorkerId{1};
-    std::vector<Worker> workers;
+    std::vector<Worker> workers{};
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Treelets                                                               //
+    ////////////////////////////////////////////////////////////////////////////
+
+    struct Treelet {
+        TreeletId id;
+
+        std::set<WorkerId> workers;
+
+        // Statistics
+        TreeletStats stats;
+        std::pair<bool, TreeletStats> lastStats{true, {}};
+
+        Treelet(const TreeletId id) : id(id) {}
+    };
+
+    std::vector<Treelet> treelets{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Communication                                                          //
@@ -172,7 +192,6 @@ class LambdaMaster {
     ////////////////////////////////////////////////////////////////////////////
 
     WorkerStats aggregatedStats{};
-    std::vector<TreeletStats> treeletStats{};
 
     /*** Outputting stats *****************************************************/
 
@@ -182,10 +201,6 @@ class LambdaMaster {
     /* object for writing worker & treelet stats */
     std::ofstream wsStream{};
     std::ofstream tlStream{};
-
-    struct {
-        std::vector<std::pair<TreeletStats, bool>> treelets{};
-    } lastStats{};
 
     /* write worker stats periodically */
     Poller::Action::Result::Type handleWorkerStats();

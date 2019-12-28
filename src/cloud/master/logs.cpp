@@ -11,10 +11,10 @@ using namespace PollerShortNames;
 
 void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
     auto &worker = workers[workerId].stats;
-    auto &treelet = treeletStats[info.treeletId];
+    auto &treelet = treelets[info.treeletId].stats;
 
     workers[workerId].lastStats.first = true;
-    lastStats.treelets[info.treeletId].second = true;
+    treelets[info.treeletId].lastStats.first = true;
 
     if (info.sampleBag) {
         worker.samples.count += info.rayCount;
@@ -35,10 +35,10 @@ void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
 
 void LambdaMaster::logDequeue(const WorkerId workerId, const RayBagInfo &info) {
     auto &worker = workers[workerId].stats;
-    auto &treelet = treeletStats[info.treeletId];
+    auto &treelet = treelets[info.treeletId].stats;
 
     workers[workerId].lastStats.first = true;
-    lastStats.treelets[info.treeletId].second = true;
+    treelets[info.treeletId].lastStats.first = true;
 
     worker.dequeued.count += info.rayCount;
     worker.dequeued.bytes += info.bagSize;
@@ -78,16 +78,16 @@ ResultType LambdaMaster::handleWorkerStats() {
                  << (stats.samples.bytes / T) << '\n';
     }
 
-    for (size_t treeletId = 0; treeletId < treeletStats.size(); treeletId++) {
-        if (!lastStats.treelets[treeletId].second) {
+    for (size_t treeletId = 0; treeletId < treelets.size(); treeletId++) {
+        if (!treelets[treeletId].lastStats.first) {
             continue; /* nothing new to log */
         }
 
         const TreeletStats stats =
-            treeletStats[treeletId] - lastStats.treelets[treeletId].first;
+            treelets[treeletId].stats - treelets[treeletId].lastStats.second;
 
-        lastStats.treelets[treeletId].first = treeletStats[treeletId];
-        lastStats.treelets[treeletId].second = false;
+        treelets[treeletId].lastStats.second = treelets[treeletId].stats;
+        treelets[treeletId].lastStats.first = false;
 
         /* timestamp,treeletId,raysEnqueued,raysDequeued,bytesEnqueued,
            bytesDequeued */
