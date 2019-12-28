@@ -82,16 +82,16 @@ class TransferAgent {
     EventFD& eventfd() { return eventFD; }
 
     bool empty() const;
-    bool try_pop(std::pair<uint64_t, std::string>& output);
+    bool tryPop(std::pair<uint64_t, std::string>& output);
 
     template <class Container>
-    size_t try_pop_bulk(
+    size_t tryPopBulk(
         std::back_insert_iterator<Container> insertIt,
         const size_t maxCount = std::numeric_limits<size_t>::max());
 };
 
 template <class Container>
-size_t TransferAgent::try_pop_bulk(
+size_t TransferAgent::tryPopBulk(
     std::back_insert_iterator<Container> insertIt, const size_t maxCount) {
     std::unique_lock<std::mutex> lock{resultsMutex};
 
