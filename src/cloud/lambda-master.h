@@ -224,8 +224,6 @@ class LambdaMaster {
         void loadSampler(const int samplesPerPixel);
     } scene{};
 
-    SeqNoSet finishedPathIds{};
-
     /*** Object Assignment ****************************************************/
 
     class ObjectManager {
