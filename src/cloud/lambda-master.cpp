@@ -71,11 +71,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                             milliseconds{1}) {
     workers.reserve(numberOfWorkers + 1);
     workers.emplace_back(0, nullptr); /* worker 0 is the master */
-    LOG(INFO) << "job-id=" << jobId;
 
     const string scenePath = sceneDir.name();
-    cerr << "Creating temp folder at " << scenePath << "... done." << endl;
-
     roost::create_directories(scenePath);
 
     /* download required scene objects from the bucket */
@@ -146,11 +143,24 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                     "bytesEnqueued,bytesDequeued\n";
     }
 
-    cerr << "This scene has " << treeletCount
-         << pluralize("treelets", treeletCount) << '.' << endl;
+    auto printInfo = [](char const *key, auto value) {
+        cerr << "  " << key << "    \e[1m" << value << "\e[0m" << endl;
+    };
 
-    cerr << "Tile size is " << tiles.tileSize << "\u00d7" << tiles.tileSize
-         << '.' << endl;
+    cerr << endl << "Job info:" << endl;
+    printInfo("Job ID           ", jobId);
+    printInfo("Working directory", scenePath);
+    printInfo("Public address   ", publicAddress);
+    printInfo("Worker count     ", numberOfWorkers);
+    printInfo("Treelet count    ", treeletCount);
+    printInfo("Tile size        ",
+              to_string(tiles.tileSize) + "\u00d7" + to_string(tiles.tileSize));
+    printInfo("Output dimensions", to_string(scene.sampleExtent.x) + "\u00d7" +
+                                       to_string(scene.sampleExtent.y));
+    printInfo("Samples per pixel", config.samplesPerPixel);
+    printInfo("Total paths      ", scene.sampleExtent.x * scene.sampleExtent.y *
+                                       config.samplesPerPixel);
+    cerr << endl;
 
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleMessages, this),
@@ -289,7 +299,6 @@ void LambdaMaster::run() {
     /* Ask for 10% more lambdas */
     const size_t EXTRA_LAMBDAS = numberOfWorkers * 0.1;
 
-    cerr << "Job ID: " << jobId << endl;
     cerr << "Launching " << numberOfWorkers << " (+" << EXTRA_LAMBDAS
          << ") lambda(s)... ";
 
