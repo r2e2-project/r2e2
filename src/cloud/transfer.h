@@ -5,6 +5,8 @@
 #include <condition_variable>
 #include <cstdint>
 #include <future>
+#include <iterator>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <queue>
@@ -80,7 +82,28 @@ class TransferAgent {
 
     bool empty() const;
     bool try_pop(std::pair<uint64_t, std::string>& output);
+
+    template <class Container>
+    size_t try_pop_bulk(
+        std::back_insert_iterator<Container> insertIt,
+        const size_t maxCount = std::numeric_limits<size_t>::max());
 };
+
+template <class Container>
+size_t TransferAgent::try_pop_bulk(
+    std::back_insert_iterator<Container> insertIt, const size_t maxCount) {
+    std::unique_lock<std::mutex> lock{resultsMutex};
+
+    if (results.empty()) return 0;
+
+    size_t count;
+    for (count = 0; !results.empty() && count < maxCount; count++) {
+        insertIt = std::move(results.front());
+        results.pop();
+    }
+
+    return count;
+}
 
 }  // namespace pbrt
 

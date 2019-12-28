@@ -142,8 +142,10 @@ ResultType LambdaWorker::handleTransferResults() {
         return ResultType::Continue;
     }
 
-    pair<uint64_t, string> action;
-    while (transferAgent.try_pop(action)) {
+    vector<pair<uint64_t, string>> actions;
+    transferAgent.try_pop_bulk(back_inserter(actions));
+
+    for (auto& action : actions) {
         auto infoIt = pendingRayBags.find(action.first);
 
         if (infoIt != pendingRayBags.end()) {
