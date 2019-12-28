@@ -43,6 +43,13 @@ struct RayBagInfo {
     RayBagInfo() = default;
     RayBagInfo(const RayBagInfo&) = default;
     RayBagInfo& operator=(const RayBagInfo&) = default;
+
+    bool operator<(const RayBagInfo& other) const {
+        return (workerId < other.workerId) ||
+               (workerId == other.workerId &&
+                (treeletId < other.treeletId ||
+                 (treeletId == other.treeletId && bagId < other.bagId)));
+    }
 };
 
 struct RayBag {
