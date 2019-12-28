@@ -55,7 +55,7 @@ WorkerStats WorkerStats::operator-(const WorkerStats& other) const {
     res.dequeued.count = dequeued.count - other.dequeued.count;
     res.samples.count = samples.count - other.samples.count;
     res.enqueued.bytes = enqueued.bytes - other.enqueued.bytes;
-    res.assigned.bytes = enqueued.bytes - other.assigned.bytes;
+    res.assigned.bytes = assigned.bytes - other.assigned.bytes;
     res.dequeued.bytes = dequeued.bytes - other.dequeued.bytes;
     res.samples.bytes = samples.bytes - other.samples.bytes;
 
