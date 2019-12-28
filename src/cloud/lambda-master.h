@@ -125,6 +125,8 @@ class LambdaMaster {
         std::set<TreeletId> treelets{};
         std::set<ObjectKey> objects{};
 
+        std::set<RayBagInfo> assignedRayBags{};
+
         // Statistics
         WorkerStats stats{};
         std::pair<bool, WorkerStats> lastStats{true, {}};
@@ -202,6 +204,7 @@ class LambdaMaster {
     /*** Outputting stats *****************************************************/
 
     void logEnqueue(const WorkerId workerId, const RayBagInfo &info);
+    void logAssign(const WorkerId workerId, const RayBagInfo &info);
     void logDequeue(const WorkerId workerId, const RayBagInfo &info);
 
     /* object for writing worker & treelet stats */

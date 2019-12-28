@@ -34,17 +34,19 @@ ResultType LambdaMaster::handleQueuedRayBags() {
     }
 
     for (auto& item : assignedBags) {
+        auto& worker = workers[item.first];
+
         queue<RayBagInfo>& bags = item.second;
         protobuf::RayBags proto;
 
         while (!bags.empty()) {
             *proto.add_items() = to_protobuf(bags.front());
+            worker.assignedRayBags.insert(bags.front());
             bags.pop();
         }
 
-        workers.at(item.first)
-            .connection->enqueue_write(Message::str(
-                0, OpCode::ProcessRayBag, protoutil::to_string(proto)));
+        worker.connection->enqueue_write(Message::str(
+            0, OpCode::ProcessRayBag, protoutil::to_string(proto)));
     }
 
     queuedRayBags.clear();

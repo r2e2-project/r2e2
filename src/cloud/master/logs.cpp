@@ -10,40 +10,54 @@ using namespace pbrt;
 using namespace PollerShortNames;
 
 void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
-    auto &worker = workers[workerId].stats;
-    auto &treelet = treelets[info.treeletId].stats;
+    auto &worker = workers[workerId];
+    auto &treelet = treelets[info.treeletId];
 
-    workers[workerId].lastStats.first = true;
-    treelets[info.treeletId].lastStats.first = true;
+    worker.lastStats.first = true;
+    treelet.lastStats.first = true;
 
     if (info.sampleBag) {
-        worker.samples.count += info.rayCount;
-        worker.samples.bytes += info.bagSize;
+        worker.stats.samples.count += info.rayCount;
+        worker.stats.samples.bytes += info.bagSize;
         aggregatedStats.samples.count += info.rayCount;
         aggregatedStats.samples.bytes += info.bagSize;
 
         lastFinishedRay = steady_clock::now();
     } else {
-        worker.enqueued.count += info.rayCount;
-        worker.enqueued.bytes += info.bagSize;
-        treelet.enqueued.count += info.rayCount;
-        treelet.enqueued.bytes += info.bagSize;
+        worker.stats.enqueued.count += info.rayCount;
+        worker.stats.enqueued.bytes += info.bagSize;
+        treelet.stats.enqueued.count += info.rayCount;
+        treelet.stats.enqueued.bytes += info.bagSize;
         aggregatedStats.enqueued.count += info.rayCount;
         aggregatedStats.enqueued.bytes += info.bagSize;
     }
 }
 
+void LambdaMaster::logAssign(const WorkerId workerId, const RayBagInfo &info) {
+    auto &worker = workers[workerId];
+
+    worker.lastStats.first = true;
+    worker.stats.assigned.count += info.rayCount;
+    worker.stats.assigned.bytes += info.bagSize;
+    worker.assignedRayBags.insert(info);
+
+    aggregatedStats.assigned.bytes += info.rayCount;
+    aggregatedStats.assigned.bytes += info.bagSize;
+}
+
 void LambdaMaster::logDequeue(const WorkerId workerId, const RayBagInfo &info) {
-    auto &worker = workers[workerId].stats;
-    auto &treelet = treelets[info.treeletId].stats;
+    auto &worker = workers[workerId];
+    auto &treelet = treelets[info.treeletId];
 
-    workers[workerId].lastStats.first = true;
-    treelets[info.treeletId].lastStats.first = true;
+    worker.lastStats.first = true;
+    treelet.lastStats.first = true;
 
-    worker.dequeued.count += info.rayCount;
-    worker.dequeued.bytes += info.bagSize;
-    treelet.dequeued.count += info.rayCount;
-    treelet.dequeued.bytes += info.bagSize;
+    worker.assignedRayBags.erase(info);
+
+    worker.stats.dequeued.count += info.rayCount;
+    worker.stats.dequeued.bytes += info.bagSize;
+    treelet.stats.dequeued.count += info.rayCount;
+    treelet.stats.dequeued.bytes += info.bagSize;
     aggregatedStats.dequeued.count += info.rayCount;
     aggregatedStats.dequeued.bytes += info.bagSize;
 }
@@ -67,12 +81,14 @@ ResultType LambdaMaster::handleWorkerStats() {
         workers[workerId].lastStats.second = workers[workerId].stats;
         workers[workerId].lastStats.first = false;
 
-        /* timestamp,workerId,raysEnqueued,raysDequeued,bytesEnqueued,
-           bytesDequeued,numSamples,bytesSamples */
+        /* timestamp,workerId,raysEnqueued,raysAssigned,raysDequeued,
+        bytesEnqueued,bytesAssigned,bytesDequeued,numSamples,bytesSamples */
         wsStream << t << ',' << workerId << ',' << fixed
                  << (stats.enqueued.count / T) << ','
+                 << (stats.assigned.count / T) << ','
                  << (stats.dequeued.count / T) << ','
                  << (stats.enqueued.bytes / T) << ','
+                 << (stats.assigned.bytes / T) << ','
                  << (stats.dequeued.bytes / T) << ','
                  << (stats.samples.count / T) << ','
                  << (stats.samples.bytes / T) << '\n';
