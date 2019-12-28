@@ -56,7 +56,7 @@ ResultType LambdaMaster::handleWorkerStats() {
 
     const float T = static_cast<float>(config.workerStatsWriteInterval);
 
-    for (size_t workerId = 1; workerId <= numberOfLambdas; workerId++) {
+    for (size_t workerId = 1; workerId <= numberOfWorkers; workerId++) {
         if (!workers[workerId].lastStats.first) {
             continue; /* nothing new to log */
         }
@@ -116,7 +116,7 @@ void LambdaMaster::dumpJobSummary() const {
         duration_cast<milliseconds>(lastFinishedRay - generationStart).count() /
         1000.0);
 
-    proto.set_num_lambdas(numberOfLambdas);
+    proto.set_num_lambdas(numberOfWorkers);
     proto.set_total_paths(scene.totalPaths);
     proto.set_finished_paths(aggregatedStats.finishedPaths);
     proto.set_finished_rays(aggregatedStats.samples.count);
@@ -131,7 +131,7 @@ void LambdaMaster::printJobSummary() const {
 
     cerr << "* Job summary: " << endl;
     cerr << "  >> Average ray throughput: "
-         << (1.0 * 0 / numberOfLambdas /
+         << (1.0 * 0 / numberOfWorkers /
              duration_cast<seconds>(lastFinishedRay - generationStart).count())
          << " rays/core/s" << endl;
 
@@ -161,7 +161,7 @@ void LambdaMaster::printJobSummary() const {
 
     if (lastFinishedRay >= startTime) {
         cerr << "  >> Estimated cost: $" << fixed << setprecision(2)
-             << (LAMBDA_UNIT_COST * numberOfLambdas *
+             << (LAMBDA_UNIT_COST * numberOfWorkers *
                  ceil(duration_cast<milliseconds>(lastFinishedRay - startTime)
                           .count() /
                       1000.0))

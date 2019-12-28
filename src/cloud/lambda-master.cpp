@@ -55,13 +55,13 @@ LambdaMaster::~LambdaMaster() {
 }
 
 LambdaMaster::LambdaMaster(const uint16_t listenPort,
-                           const uint32_t numberOfLambdas,
+                           const uint32_t numberOfWorkers,
                            const string &publicAddress,
                            const string &storageBackendUri,
                            const string &awsRegion,
                            const MasterConfiguration &config)
     : config(config),
-      numberOfLambdas(numberOfLambdas),
+      numberOfWorkers(numberOfWorkers),
       publicAddress(publicAddress),
       storageBackendUri(storageBackendUri),
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
@@ -69,7 +69,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
       workerStatsWriteTimer(seconds{config.workerStatsWriteInterval},
                             milliseconds{1}) {
-    workers.reserve(numberOfLambdas + 1);
+    workers.reserve(numberOfWorkers + 1);
     workers.emplace_back(0, nullptr); /* worker 0 is the master */
     LOG(INFO) << "job-id=" << jobId;
 
@@ -121,11 +121,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     /* and initialize the necessary scene objects */
     scene.initialize(config.samplesPerPixel, config.cropWindow);
-    objectManager.initialize(numberOfLambdas,
+    objectManager.initialize(numberOfWorkers,
                              config.assignment & Assignment::Static);
 
     tiles = Tiles{config.tileSize, scene.sampleBounds,
-                  scene.sampler->samplesPerPixel, numberOfLambdas};
+                  scene.sampler->samplesPerPixel, numberOfWorkers};
 
     /* are we logging anything? */
     if (config.collectDebugLogs || config.collectDiagnostics ||
@@ -155,7 +155,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleJobStart, this),
-        [this]() { return this->numberOfLambdas == this->initializedWorkers; },
+        [this]() { return this->numberOfWorkers == this->initializedWorkers; },
         []() { throw runtime_error("generate rays failed"); }));
 
     loop.poller().add_action(Poller::Action(
@@ -180,8 +180,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     loop.make_listener(
         {"0.0.0.0", listenPort},
-        [this, numberOfLambdas](ExecutionLoop &loop, TCPSocket &&socket) {
-            if (currentWorkerId > numberOfLambdas) {
+        [this, numberOfWorkers](ExecutionLoop &loop, TCPSocket &&socket) {
+            if (currentWorkerId > numberOfWorkers) {
                 socket.close();
                 return false;
             }
@@ -283,13 +283,13 @@ void LambdaMaster::run() {
     };
 
     /* Ask for 10% more lambdas */
-    const size_t EXTRA_LAMBDAS = numberOfLambdas * 0.1;
+    const size_t EXTRA_LAMBDAS = numberOfWorkers * 0.1;
 
     cerr << "Job ID: " << jobId << endl;
-    cerr << "Launching " << numberOfLambdas << " (+" << EXTRA_LAMBDAS
+    cerr << "Launching " << numberOfWorkers << " (+" << EXTRA_LAMBDAS
          << ") lambda(s)... ";
 
-    for (size_t i = 0; i < numberOfLambdas + EXTRA_LAMBDAS; i++) {
+    for (size_t i = 0; i < numberOfWorkers + EXTRA_LAMBDAS; i++) {
         loop.make_http_request<SSLConnection>(
             "start-worker", awsAddress, generateRequest(),
             [](const uint64_t, const string &, const HTTPResponse &) {},

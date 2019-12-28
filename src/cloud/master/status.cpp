@@ -63,7 +63,7 @@ ResultType LambdaMaster::handleStatusMessage() {
                 << " (" << percent(s.finishedPaths, scene.totalPaths) << "%) "
 
         // worker count
-        << BG_B << " \u03bb " << (workers.size() - 1) << "/" << numberOfLambdas
+        << BG_B << " \u03bb " << (workers.size() - 1) << "/" << numberOfWorkers
                 << " "
 
         // lagging workers
