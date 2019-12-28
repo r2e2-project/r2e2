@@ -113,7 +113,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     const size_t treeletCount = global::manager.treeletCount();
 
     treeletStats.resize(treeletCount);
-    lastStats.workers.resize(numberOfLambdas + 1);
     lastStats.treelets.resize(treeletCount);
 
     /* and initialize the necessary scene objects */
@@ -142,7 +141,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                     "bytesEnqueued,bytesDequeued\n";
 
         // Log the 0 entries
-        for (auto &item : lastStats.workers) item.second = true;
         for (auto &item : lastStats.treelets) item.second = true;
     }
 

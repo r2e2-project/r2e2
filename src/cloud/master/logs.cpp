@@ -13,7 +13,7 @@ void LambdaMaster::logEnqueue(const WorkerId workerId, const RayBagInfo &info) {
     auto &worker = workers[workerId].stats;
     auto &treelet = treeletStats[info.treeletId];
 
-    lastStats.workers[workerId].second = true;
+    workers[workerId].lastStats.first = true;
     lastStats.treelets[info.treeletId].second = true;
 
     if (info.sampleBag) {
@@ -37,7 +37,7 @@ void LambdaMaster::logDequeue(const WorkerId workerId, const RayBagInfo &info) {
     auto &worker = workers[workerId].stats;
     auto &treelet = treeletStats[info.treeletId];
 
-    lastStats.workers[workerId].second = true;
+    workers[workerId].lastStats.first = true;
     lastStats.treelets[info.treeletId].second = true;
 
     worker.dequeued.count += info.rayCount;
@@ -57,15 +57,15 @@ ResultType LambdaMaster::handleWorkerStats() {
     const float T = static_cast<float>(config.workerStatsWriteInterval);
 
     for (size_t workerId = 1; workerId <= numberOfLambdas; workerId++) {
-        if (!lastStats.workers[workerId].second) {
+        if (!workers[workerId].lastStats.first) {
             continue; /* nothing new to log */
         }
 
         const WorkerStats stats =
-            workers[workerId].stats - lastStats.workers[workerId].first;
+            workers[workerId].stats - workers[workerId].lastStats.second;
 
-        lastStats.workers[workerId].first = workers[workerId].stats;
-        lastStats.workers[workerId].second = false;
+        workers[workerId].lastStats.second = workers[workerId].stats;
+        workers[workerId].lastStats.first = false;
 
         /* timestamp,workerId,raysEnqueued,raysDequeued,bytesEnqueued,
            bytesDequeued,numSamples,bytesSamples */

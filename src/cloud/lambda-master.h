@@ -125,6 +125,7 @@ class LambdaMaster {
 
         // Statistics
         WorkerStats stats{};
+        std::pair<bool, WorkerStats> lastStats{true, {}};
 
         Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
             : id(id), connection(std::move(connection)) {}
@@ -183,7 +184,6 @@ class LambdaMaster {
     std::ofstream tlStream{};
 
     struct {
-        std::vector<std::pair<WorkerStats, bool>> workers{};
         std::vector<std::pair<TreeletStats, bool>> treelets{};
     } lastStats{};
 
