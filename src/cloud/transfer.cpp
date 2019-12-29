@@ -53,7 +53,6 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
     try {                                    \
         x;                                   \
     } catch (exception & ex) {               \
-        this_thread::sleep_for(2 * backoff); \
         tryCount++;                          \
         connectionOkay = false;              \
         continue;                            \
@@ -118,6 +117,7 @@ void TransferAgent::workerThread(const size_t threadId) {
 
                 if (result.length() == 0) {
                     // connection was closed by the other side
+                    tryCount++;
                     connectionOkay = false;
                     continue;
                 }
