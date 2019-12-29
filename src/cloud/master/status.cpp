@@ -21,7 +21,7 @@ ResultType LambdaMaster::handleStatusMessage() {
         return ResultType::Exit;
     } else if (exitTimer == nullptr &&
                scene.totalPaths == aggregatedStats.finishedPaths) {
-        cerr << "Terminating the job in "
+        cerr << "Done! Terminating the job in "
              << duration_cast<seconds>(EXIT_GRACE_PERIOD).count() << "s..."
              << endl;
 
@@ -42,8 +42,7 @@ ResultType LambdaMaster::handleStatusMessage() {
             return now - worker.lastSeen >= seconds{4};
         });
 
-    const auto elapsedTime = now - startTime;
-    const auto elapsedSeconds = duration_cast<seconds>(elapsedTime).count();
+    const auto elapsedSeconds = duration_cast<seconds>(now - startTime).count();
 
     auto percent = [](const uint64_t n, const uint64_t total) -> double {
         return total ? (((uint64_t)(100 * (100.0 * n / total))) / 100.0) : 0.0;
