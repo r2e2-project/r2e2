@@ -80,13 +80,12 @@ ResultType LambdaMaster::handleStatusMessage() {
         << BG() << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
 
         // assigned bytes
-        << BG() << " \u21ba " << format_bytes(s.assigned.bytes - s.dequeued.bytes)
-                << " (" << percent(s.assigned.bytes - s.dequeued.bytes,
-                                   s.enqueued.bytes) << "%) "
+        << BG() << " \u21ba " << percent(s.assigned.bytes - s.dequeued.bytes,
+                                         s.enqueued.bytes) << "% "
 
         // dequeued bytes
-        << BG() << " \u2193 " << format_bytes(s.dequeued.bytes)
-                << " (" << percent(s.dequeued.bytes, s.enqueued.bytes) << "%) "
+        << BG() << " \u2193 " << percent(s.dequeued.bytes, s.enqueued.bytes)
+                << "% "
 
         // elapsed time
         << BG() << " " << setfill('0')
