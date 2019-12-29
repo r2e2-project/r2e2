@@ -146,47 +146,97 @@ void LambdaMaster::dumpJobSummary() const {
     fout << protoutil::to_json(proto) << endl;
 }
 
+template <class T>
+class Value {
+  private:
+    T value;
+
+  public:
+    Value(T value) : value(value) {}
+    T get() const { return value; }
+};
+
+template <class T>
+ostream &operator<<(ostream &o, const Value<T> &v) {
+    o << "\e[1m" << v.get() << "\e[0m";
+    return o;
+}
+
 void LambdaMaster::printJobSummary() const {
     const static double LAMBDA_UNIT_COST = 0.00004897; /* $/lambda/sec */
 
-    cerr << "* Job summary: " << endl;
-    cerr << "  >> Average ray throughput: "
-         << (1.0 * 0 / numberOfWorkers /
-             duration_cast<seconds>(lastFinishedRay - generationStart).count())
-         << " rays/core/s" << endl;
+    auto percent = [](const uint64_t n, const uint64_t total) -> double {
+        return total ? (((uint64_t)(100 * (100.0 * n / total))) / 100.0) : 0.0;
+    };
 
-    if (lastFinishedRay >= startTime) {
-        cerr << "  >> Total run time: " << fixed << setprecision(2)
-             << (duration_cast<milliseconds>(lastFinishedRay - startTime)
-                     .count() /
-                 1000.0)
-             << " seconds" << endl;
-    }
+    auto printFloat = [](char const *key, auto value,
+                         const string &extra = {}) {
+        cerr << "  " << key << "    \e[1m" << fixed << setprecision(2) << value;
+        if (!extra.empty()) cerr << " " << extra;
+        cerr << "\e[0m" << endl;
+    };
 
-    if (generationStart >= startTime) {
-        cerr << "      - Launching lambdas: " << fixed << setprecision(2)
-             << (duration_cast<milliseconds>(generationStart - startTime)
-                     .count() /
-                 1000.0)
-             << " seconds" << endl;
-    }
+    double launchingTime =
+        duration_cast<milliseconds>(generationStart - startTime).count() /
+        1000.0;
 
-    if (lastFinishedRay >= generationStart) {
-        cerr << "      - Tracing rays: " << fixed << setprecision(2)
-             << (duration_cast<milliseconds>(lastFinishedRay - generationStart)
-                     .count() /
-                 1000.0)
-             << " seconds" << endl;
-    }
+    launchingTime = (launchingTime < 0) ? 0 : launchingTime;
 
-    if (lastFinishedRay >= startTime) {
-        cerr << "  >> Estimated cost: $" << fixed << setprecision(2)
-             << (LAMBDA_UNIT_COST * numberOfWorkers *
-                 ceil(duration_cast<milliseconds>(lastFinishedRay - startTime)
-                          .count() /
-                      1000.0))
-             << endl;
-    }
+    double tracingTime =
+        duration_cast<milliseconds>(lastFinishedRay - generationStart).count() /
+        1000.0;
 
-    cerr << endl;
+    tracingTime = (tracingTime < 0) ? 0 : tracingTime;
+
+    const double totalTime = launchingTime + tracingTime;
+
+    const double avgRayThroughput =
+        (totalTime > 0)
+            ? (10 * aggregatedStats.samples.count / numberOfWorkers / totalTime)
+            : 0;
+
+    cerr << endl << "Job summary:" << endl;
+    cerr << "  Ray throughput       " << fixed << setprecision(2)
+         << Value<double>(avgRayThroughput) << " rays/worker/s" << endl;
+
+    cerr << "  Total paths          " << Value<uint64_t>(scene.totalPaths)
+         << endl;
+
+    cerr << "  Finished paths       "
+         << Value<uint64_t>(aggregatedStats.finishedPaths) << " (" << fixed
+         << setprecision(2)
+         << percent(aggregatedStats.finishedPaths, scene.totalPaths) << "%)"
+         << endl;
+
+    cerr << "  Finished rays        "
+         << Value<uint64_t>(aggregatedStats.samples.count) << endl;
+
+    cerr << "  Total transfers      "
+         << Value<uint64_t>(aggregatedStats.enqueued.count) << endl;
+
+    cerr << "  Total upload         "
+         << Value<string>(format_bytes(aggregatedStats.enqueued.bytes)) << endl;
+
+    cerr << "  Total download       "
+         << Value<string>(format_bytes(aggregatedStats.dequeued.bytes)) << endl;
+
+    cerr << "  Total sample size    "
+         << Value<string>(format_bytes(aggregatedStats.samples.bytes)) << endl;
+
+    cerr << "  Total time           " << fixed << setprecision(2)
+         << Value<double>(totalTime) << " seconds\n"
+         << "    Starting workers   " << Value<double>(launchingTime)
+         << " seconds\n"
+         << "    Tracing rays       " << Value<double>(tracingTime)
+         << " seconds" << endl;
+
+    cerr << "  Estimated cost       "
+         << "$" << fixed << setprecision(2)
+         << Value<double>(
+                LAMBDA_UNIT_COST * numberOfWorkers *
+                ceil(duration_cast<milliseconds>(lastFinishedRay - startTime)
+                         .count() /
+                     1000.0))
+         << endl
+         << endl;
 }
