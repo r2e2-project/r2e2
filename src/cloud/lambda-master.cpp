@@ -135,7 +135,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
         wsStream.open(config.logsDirectory + "/" + "workers.csv", ios::trunc);
         tlStream.open(config.logsDirectory + "/" + "treelets.csv", ios::trunc);
 
-        wsStream << "timestamp,workerId,raysEnqueued,raysAssigned,raysDequeued,"
+        wsStream << "timestamp,workerId,pathsFinished,raysEnqueued,"
+                    "raysAssigned,raysDequeued,"
                     "bytesEnqueued,bytesAssigned,bytesDequeued,numSamples,"
                     "bytesSamples\n";
 

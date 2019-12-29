@@ -85,9 +85,11 @@ ResultType LambdaMaster::handleWorkerStats() {
         workers[workerId].lastStats.second = workers[workerId].stats;
         workers[workerId].lastStats.first = false;
 
-        /* timestamp,workerId,raysEnqueued,raysAssigned,raysDequeued,
-        bytesEnqueued,bytesAssigned,bytesDequeued,numSamples,bytesSamples */
+        /* timestamp,workerId,pathsFinished,raysEnqueued,raysAssigned,
+        raysDequeued,bytesEnqueued,bytesAssigned,bytesDequeued,numSamples,
+        bytesSamples */
         wsStream << t << ',' << workerId << ',' << fixed
+                 << (stats.finishedPaths / T) << ','
                  << (stats.enqueued.count / T) << ','
                  << (stats.assigned.count / T) << ','
                  << (stats.dequeued.count / T) << ','
