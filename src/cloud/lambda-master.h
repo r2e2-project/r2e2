@@ -118,7 +118,7 @@ class LambdaMaster {
         WorkerId id;
         bool initialized{false};
         std::shared_ptr<TCPConnection> connection;
-        steady_clock::time_point lastSeen{steady_clock::now()};
+        steady_clock::time_point lastSeen{};
         std::string awsLogStream{};
 
         std::set<TreeletId> treelets{};
