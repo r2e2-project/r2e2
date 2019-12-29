@@ -212,7 +212,16 @@ void LambdaMaster::printJobSummary() const {
          << Value<uint64_t>(aggregatedStats.samples.count) << endl;
 
     cerr << "  Total transfers      "
-         << Value<uint64_t>(aggregatedStats.enqueued.count) << endl;
+         << Value<uint64_t>(aggregatedStats.enqueued.count);
+
+    if (aggregatedStats.samples.count > 0) {
+        cerr << " (" << fixed << setprecision(2)
+             << (1.0 * aggregatedStats.enqueued.count /
+                 aggregatedStats.samples.count)
+             << " transfers/ray)";
+    }
+
+    cerr << endl;
 
     cerr << "  Total upload         "
          << Value<string>(format_bytes(aggregatedStats.enqueued.bytes)) << endl;
