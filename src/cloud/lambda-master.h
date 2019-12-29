@@ -80,6 +80,7 @@ class LambdaMaster {
 
     void run();
 
+    protobuf::JobSummary getJobSummary() const;
     void printJobSummary() const;
     void dumpJobSummary() const;
 

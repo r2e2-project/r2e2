@@ -397,6 +397,11 @@ message JobSummary {
     uint64 finished_paths = 6;
     uint64 finished_rays = 7;
     uint64 num_enqueues = 8;
+    double ray_throughput = 9;
+    uint64 total_upload = 10;
+    uint64 total_download = 11;
+    uint64 total_samples = 12;
+    double estimated_cost = 13;
 }
 
 // Ray Bags

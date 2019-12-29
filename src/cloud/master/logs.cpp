@@ -121,27 +121,52 @@ ResultType LambdaMaster::handleWorkerStats() {
     return ResultType::Continue;
 }
 
-void LambdaMaster::dumpJobSummary() const {
+protobuf::JobSummary LambdaMaster::getJobSummary() const {
     protobuf::JobSummary proto;
 
-    proto.set_total_time(
-        duration_cast<milliseconds>(lastFinishedRay - startTime).count() /
-        1000.0);
+    constexpr static double LAMBDA_UNIT_COST = 0.00004897; /* $/lambda/sec */
 
-    proto.set_launch_time(
+    double launchTime =
         duration_cast<milliseconds>(generationStart - startTime).count() /
-        1000.0);
+        1000.0;
 
-    proto.set_ray_time(
+    launchTime = (launchTime < 0) ? 0 : launchTime;
+
+    double rayTime =
         duration_cast<milliseconds>(lastFinishedRay - generationStart).count() /
-        1000.0);
+        1000.0;
 
+    rayTime = (rayTime < 0) ? 0 : rayTime;
+
+    const double totalTime = launchTime + rayTime;
+
+    const double avgRayThroughput =
+        (totalTime > 0)
+            ? (10 * aggregatedStats.samples.count / numberOfWorkers / totalTime)
+            : 0;
+
+    const double estimatedCost =
+        LAMBDA_UNIT_COST * numberOfWorkers * ceil(totalTime);
+
+    proto.set_total_time(totalTime);
+    proto.set_launch_time(launchTime);
+    proto.set_ray_time(rayTime);
     proto.set_num_lambdas(numberOfWorkers);
     proto.set_total_paths(scene.totalPaths);
     proto.set_finished_paths(aggregatedStats.finishedPaths);
     proto.set_finished_rays(aggregatedStats.samples.count);
     proto.set_num_enqueues(aggregatedStats.enqueued.count);
+    proto.set_ray_throughput(avgRayThroughput);
+    proto.set_total_upload(aggregatedStats.enqueued.bytes);
+    proto.set_total_download(aggregatedStats.dequeued.bytes);
+    proto.set_total_samples(aggregatedStats.samples.bytes);
+    proto.set_estimated_cost(estimatedCost);
 
+    return proto;
+}
+
+void LambdaMaster::dumpJobSummary() const {
+    protobuf::JobSummary proto = getJobSummary();
     ofstream fout{config.jobSummaryPath};
     fout << protoutil::to_json(proto) << endl;
 }
@@ -163,89 +188,55 @@ ostream &operator<<(ostream &o, const Value<T> &v) {
 }
 
 void LambdaMaster::printJobSummary() const {
-    const static double LAMBDA_UNIT_COST = 0.00004897; /* $/lambda/sec */
-
     auto percent = [](const uint64_t n, const uint64_t total) -> double {
         return total ? (((uint64_t)(100 * (100.0 * n / total))) / 100.0) : 0.0;
     };
 
-    auto printFloat = [](char const *key, auto value,
-                         const string &extra = {}) {
-        cerr << "  " << key << "    \e[1m" << fixed << setprecision(2) << value;
-        if (!extra.empty()) cerr << " " << extra;
-        cerr << "\e[0m" << endl;
-    };
-
-    double launchingTime =
-        duration_cast<milliseconds>(generationStart - startTime).count() /
-        1000.0;
-
-    launchingTime = (launchingTime < 0) ? 0 : launchingTime;
-
-    double tracingTime =
-        duration_cast<milliseconds>(lastFinishedRay - generationStart).count() /
-        1000.0;
-
-    tracingTime = (tracingTime < 0) ? 0 : tracingTime;
-
-    const double totalTime = launchingTime + tracingTime;
-
-    const double avgRayThroughput =
-        (totalTime > 0)
-            ? (10 * aggregatedStats.samples.count / numberOfWorkers / totalTime)
-            : 0;
+    const protobuf::JobSummary proto = getJobSummary();
 
     cerr << endl << "Job summary:" << endl;
     cerr << "  Ray throughput       " << fixed << setprecision(2)
-         << Value<double>(avgRayThroughput) << " rays/worker/s" << endl;
+         << Value<double>(proto.ray_throughput()) << " rays/worker/s" << endl;
 
-    cerr << "  Total paths          " << Value<uint64_t>(scene.totalPaths)
+    cerr << "  Total paths          " << Value<uint64_t>(proto.total_paths())
          << endl;
 
-    cerr << "  Finished paths       "
-         << Value<uint64_t>(aggregatedStats.finishedPaths) << " (" << fixed
-         << setprecision(2)
-         << percent(aggregatedStats.finishedPaths, scene.totalPaths) << "%)"
+    cerr << "  Finished paths       " << Value<uint64_t>(proto.finished_paths())
+         << " (" << fixed << setprecision(2)
+         << percent(proto.finished_paths(), proto.total_paths()) << "%)"
          << endl;
 
-    cerr << "  Finished rays        "
-         << Value<uint64_t>(aggregatedStats.samples.count) << endl;
+    cerr << "  Finished rays        " << Value<uint64_t>(proto.finished_rays())
+         << endl;
 
-    cerr << "  Total transfers      "
-         << Value<uint64_t>(aggregatedStats.enqueued.count);
+    cerr << "  Total transfers      " << Value<uint64_t>(proto.num_enqueues());
 
     if (aggregatedStats.samples.count > 0) {
         cerr << " (" << fixed << setprecision(2)
-             << (1.0 * aggregatedStats.enqueued.count /
-                 aggregatedStats.samples.count)
+             << (1.0 * proto.num_enqueues() / proto.finished_rays())
              << " transfers/ray)";
     }
 
     cerr << endl;
 
     cerr << "  Total upload         "
-         << Value<string>(format_bytes(aggregatedStats.enqueued.bytes)) << endl;
+         << Value<string>(format_bytes(proto.total_upload())) << endl;
 
     cerr << "  Total download       "
-         << Value<string>(format_bytes(aggregatedStats.dequeued.bytes)) << endl;
+         << Value<string>(format_bytes(proto.total_download())) << endl;
 
     cerr << "  Total sample size    "
-         << Value<string>(format_bytes(aggregatedStats.samples.bytes)) << endl;
+         << Value<string>(format_bytes(proto.total_samples())) << endl;
 
     cerr << "  Total time           " << fixed << setprecision(2)
-         << Value<double>(totalTime) << " seconds\n"
-         << "    Starting workers   " << Value<double>(launchingTime)
+         << Value<double>(proto.total_time()) << " seconds\n"
+         << "    Starting workers   " << Value<double>(proto.launch_time())
          << " seconds\n"
-         << "    Tracing rays       " << Value<double>(tracingTime)
+         << "    Tracing rays       " << Value<double>(proto.ray_time())
          << " seconds" << endl;
 
     cerr << "  Estimated cost       "
          << "$" << fixed << setprecision(2)
-         << Value<double>(
-                LAMBDA_UNIT_COST * numberOfWorkers *
-                ceil(duration_cast<milliseconds>(lastFinishedRay - startTime)
-                         .count() /
-                     1000.0))
-         << endl
+         << Value<double>(proto.estimated_cost()) << endl
          << endl;
 }
