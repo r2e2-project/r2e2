@@ -49,13 +49,13 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
     }
 }
 
-#define TRY_OPERATION(x)                     \
-    try {                                    \
-        x;                                   \
-    } catch (exception & ex) {               \
-        tryCount++;                          \
-        connectionOkay = false;              \
-        continue;                            \
+#define TRY_OPERATION(x)        \
+    try {                       \
+        x;                      \
+    } catch (exception & ex) {  \
+        tryCount++;             \
+        connectionOkay = false; \
+        continue;               \
     }
 
 void TransferAgent::workerThread(const size_t threadId) {
@@ -96,12 +96,14 @@ void TransferAgent::workerThread(const size_t threadId) {
 
                 if (terminated) return;
 
-                while (!outstanding.empty() &&
-                       actions.size() <
-                           MAX_REQUESTS_ON_CONNECTION - requestCount) {
+                const auto capacity = MAX_REQUESTS_ON_CONNECTION - requestCount;
+
+                do {
                     actions.push_back(move(outstanding.front()));
                     outstanding.pop();
-                }
+                } while (!outstanding.empty() &&
+                         outstanding.size() / MAX_THREADS >= 1 &&
+                         actions.size() < capacity);
             }
 
             for (const auto& action : actions) {
