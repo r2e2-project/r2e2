@@ -113,7 +113,16 @@ void TransferAgent::workerThread(const size_t threadId) {
             }
 
             while (!terminated && connectionOkay && !actions.empty()) {
-                TRY_OPERATION(parser->parse(s3.read()));
+                string result;
+                TRY_OPERATION(result = s3.read());
+
+                if (result.length() == 0) {
+                    // connection was closed by the other side
+                    connectionOkay = false;
+                    continue;
+                }
+
+                parser->parse(result);
 
                 while (!parser->empty()) {
                     const string status = move(parser->front().status_code());
