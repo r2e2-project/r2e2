@@ -49,13 +49,14 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
     }
 }
 
-#define TRY_OPERATION(x)        \
+#define TRY_OPERATION(x, y)     \
     try {                       \
         x;                      \
     } catch (exception & ex) {  \
         tryCount++;             \
         connectionOkay = false; \
-        continue;               \
+        s3.close();             \
+        y;                      \
     }
 
 void TransferAgent::workerThread(const size_t threadId) {
@@ -83,7 +84,7 @@ void TransferAgent::workerThread(const size_t threadId) {
             lastAddrUpdate = steady_clock::now();
         }
 
-        TRY_OPERATION(s3.connect(s3Address));
+        TRY_OPERATION(s3.connect(s3Address), continue);
 
         while (!terminated && connectionOkay) {
             /* make sure we have an action to perfom */
@@ -109,19 +110,20 @@ void TransferAgent::workerThread(const size_t threadId) {
             for (const auto& action : actions) {
                 HTTPRequest request = getRequest(action);
                 parser->new_request_arrived(request);
-                TRY_OPERATION(s3.write(request.str()));
+                TRY_OPERATION(s3.write(request.str()), break);
                 requestCount++;
             }
 
             while (!terminated && connectionOkay && !actions.empty()) {
                 string result;
-                TRY_OPERATION(result = s3.read());
+                TRY_OPERATION(result = s3.read(), break);
 
                 if (result.length() == 0) {
                     // connection was closed by the other side
                     tryCount++;
                     connectionOkay = false;
-                    continue;
+                    s3.close();
+                    break;
                 }
 
                 parser->parse(result);
