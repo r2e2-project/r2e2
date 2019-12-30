@@ -44,6 +44,15 @@ std::string to_json(const ProtobufType& protobuf,
     return ret;
 }
 
+template <class ProtobufType>
+void from_json(const std::string& data, ProtobufType& dest) {
+    using namespace google::protobuf::util;
+
+    if (not JsonStringToMessage(data, &dest).ok()) {
+        throw std::runtime_error("cannot convert json to protobuf");
+    }
+}
+
 }  // namespace protoutil
 
 namespace pbrt {
