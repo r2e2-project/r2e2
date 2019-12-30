@@ -46,6 +46,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                           .count();
     }
 
+    if (trackRays) {
+        TLOG(RAY) << "timestamp,pathId,hop,shadowRay,workerId,treeletId,"
+                  << "action,bag";
+        TLOG(BAG) << "timestamp,bag,workerId,count,size,action";
+    }
+
     PbrtOptions.nThreads = 1;
     scene.bvh = make_unique<CloudBVH>();
     scene.samplesPerPixel = config.samplesPerPixel;

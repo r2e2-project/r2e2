@@ -71,6 +71,7 @@ void LambdaWorker::logRay(const RayAction action, const RayState& state,
     switch(action) {
     case RayAction::Generated: oss << "Generated,";                break;
     case RayAction::Traced:    oss << "Traced,";                   break;
+    case RayAction::Queued:    oss << "Queued,";                   break;
     case RayAction::Bagged:    oss << "Bagged," << info.str("");   break;
     case RayAction::Unbagged:  oss << "Unbagged," << info.str(""); break;
     case RayAction::Finished:  oss << "Finished,";                 break;

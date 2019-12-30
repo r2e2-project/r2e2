@@ -218,11 +218,19 @@ class LambdaWorker {
     // Logging                                                                //
     ////////////////////////////////////////////////////////////////////////////
 
-    enum class RayAction { Generated, Traced, Bagged, Unbagged, Finished };
+    enum class RayAction {
+        Generated,
+        Traced,
+        Queued,
+        Bagged,
+        Unbagged,
+        Finished
+    };
+
     enum class BagAction { Enqueued, Dequeued };
 
     void logRay(const RayAction action, const RayState& state,
-                const RayBagInfo& info = {});
+                const RayBagInfo& info = RayBagInfo::EmptyBag());
 
     void logBag(const BagAction action, const RayBagInfo& info);
 

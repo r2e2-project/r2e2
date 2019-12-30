@@ -33,6 +33,8 @@ ResultType LambdaWorker::handleOutQueue() {
             bag.info.rayCount++;
             bag.info.bagSize += len;
 
+            logRay(RayAction::Bagged, *ray, bag.info);
+
             rayList.pop();
             outQueueSize--;
         }
@@ -127,6 +129,8 @@ ResultType LambdaWorker::handleReceiveQueue() {
             ray->hop++;
             offset += len;
 
+            logRay(RayAction::Unbagged, *ray, bag.info);
+
             traceQueue.push(move(ray));
         }
     }
@@ -155,6 +159,8 @@ ResultType LambdaWorker::handleTransferResults() {
             case Task::Upload: {
                 /* we have to tell the master that we uploaded this */
                 *enqueuedProto.add_items() = to_protobuf(info);
+
+                logBag(BagAction::Enqueued, info);
                 break;
             }
 
@@ -163,6 +169,8 @@ ResultType LambdaWorker::handleTransferResults() {
                    and tell the master */
                 receiveQueue.emplace(info, move(action.second));
                 *dequeuedProto.add_items() = to_protobuf(info);
+
+                logBag(BagAction::Dequeued, info);
                 break;
             }
 

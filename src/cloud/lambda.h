@@ -50,6 +50,11 @@ struct RayBagInfo {
                 (treeletId < other.treeletId ||
                  (treeletId == other.treeletId && bagId < other.bagId)));
     }
+
+    static RayBagInfo& EmptyBag() {
+        static RayBagInfo bag;
+        return bag;
+    }
 };
 
 struct RayBag {

@@ -29,6 +29,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
                 scene.sampler);
 
             statePtr->trackRay = trackRays ? bd(randEngine) : false;
+            logRay(RayAction::Generated, *statePtr);
 
             const TreeletId nextTreelet = statePtr->CurrentTreelet();
 
@@ -58,6 +59,8 @@ ResultType LambdaWorker::handleTraceQueue() {
         RayState& ray = *rayPtr;
         const uint64_t pathId = ray.PathID();
 
+        logRay(RayAction::Traced, ray);
+
         if (!ray.toVisitEmpty()) {
             const uint32_t rayTreelet = ray.toVisitTop().treelet;
             auto newRayPtr = graphics::TraceRay(move(rayPtr), *scene.bvh);
@@ -70,6 +73,8 @@ ResultType LambdaWorker::handleTraceQueue() {
                 if (hit || emptyVisit) {
                     newRay.Ld = hit ? 0.f : newRay.Ld;
                     samples.emplace(*newRayPtr);
+
+                    logRay(RayAction::Finished, newRay);
 
                     /* was this the last shadow ray? */
                     if (newRay.remainingBounces == 0) {
@@ -84,6 +89,8 @@ ResultType LambdaWorker::handleTraceQueue() {
                 newRay.Ld = 0.f;
                 samples.emplace(*newRayPtr);
                 finishedPathIds.push(pathId);
+
+                logRay(RayAction::Finished, newRay);
             }
         } else if (ray.hit) {
             RayStatePtr bounceRay, shadowRay;
@@ -94,10 +101,19 @@ ResultType LambdaWorker::handleTraceQueue() {
             if (bounceRay == nullptr && shadowRay == nullptr) {
                 /* this was the last ray in the path */
                 finishedPathIds.push(pathId);
+
+                logRay(RayAction::Finished, ray);
             }
 
-            if (bounceRay != nullptr) processedRays.push(move(bounceRay));
-            if (shadowRay != nullptr) processedRays.push(move(shadowRay));
+            if (bounceRay != nullptr) {
+                logRay(RayAction::Generated, *bounceRay);
+                processedRays.push(move(bounceRay));
+            }
+
+            if (shadowRay != nullptr) {
+                logRay(RayAction::Generated, *shadowRay);
+                processedRays.push(move(shadowRay));
+            }
         } else {
             throw runtime_error("invalid ray in ray queue");
         }
@@ -112,6 +128,7 @@ ResultType LambdaWorker::handleTraceQueue() {
         if (treeletIds.count(nextTreelet)) {
             traceQueue.push(move(ray));
         } else {
+            logRay(RayAction::Queued, *ray);
             outQueue[nextTreelet].push(move(ray));
             outQueueSize++;
         }
