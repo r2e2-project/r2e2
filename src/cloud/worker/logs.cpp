@@ -61,7 +61,6 @@ void LambdaWorker::logRay(const RayAction action, const RayState& state,
     ostringstream oss;
 
     /* timestamp,pathId,hop,shadowRay,workerId,treeletId,action,bag */
-
     oss << duration_cast<milliseconds>(system_clock::now().time_since_epoch())
                .count()
         << ',' << state.sample.id << ',' << state.hop << ','
@@ -79,4 +78,25 @@ void LambdaWorker::logRay(const RayAction action, const RayState& state,
     // clang-format on
 
     TLOG(RAY) << oss.str();
+}
+
+void LambdaWorker::logBag(const BagAction action, const RayBagInfo& info) {
+    if (!trackRays) return;
+
+    ostringstream oss;
+
+    /* timestamp,bag,workerId,count,size,action */
+    oss << duration_cast<milliseconds>(system_clock::now().time_since_epoch())
+               .count()
+        << ',' << info.str("") << ',' << *workerId << ',' << info.rayCount
+        << ',' << info.bagSize << ',';
+
+    // clang-format off
+    switch(action) {
+    case BagAction::Enqueued: oss << "Enqueued"; break;
+    case BagAction::Dequeued: oss << "Dequeued"; break;
+    }
+    // clang-format on
+
+    TLOG(BAG) << oss.str();
 }
