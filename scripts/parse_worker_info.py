@@ -29,7 +29,7 @@ subprocess.run("cat {firstfile} | grep \"\\[{tag}\\]\" | head -n1 |"
                    tag=args.tag, clen=clen, ofile=args.output_csv),
                shell=True, check=True)
 
-subprocess.run("cat {fileglob} | grep \"\\[{tag}\\]\" | grep -v pathID |"
+subprocess.run("cat {fileglob} | grep \"\\[{tag}\\]\" | grep -v timestamp |"
                "cut -c {clen}- >> {ofile}".format(
                    fileglob=os.path.join(args.info_directory, "*.INFO"),
                    tag=args.tag, clen=clen, ofile=args.output_csv),
