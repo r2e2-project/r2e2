@@ -66,6 +66,8 @@ struct MasterConfiguration {
     std::chrono::seconds timeout;
     std::string jobSummaryPath;
     uint64_t newTileThreshold;
+
+    std::vector<std::pair<std::string, uint32_t>> engines;
 };
 
 class LambdaMaster {

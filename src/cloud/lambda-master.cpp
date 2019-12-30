@@ -445,6 +445,9 @@ int main(int argc, char *argv[]) {
     int tileSize = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
 
+    uint32_t maxJobsOnEngine = 1;
+    vector<pair<string, uint32_t>> engines;
+
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
         {"ip", required_argument, nullptr, 'i'},
@@ -464,13 +467,15 @@ int main(int argc, char *argv[]) {
         {"pix-per-tile", required_argument, nullptr, 'T'},
         {"new-tile-send", required_argument, nullptr, 'n'},
         {"directional", no_argument, nullptr, 'I'},
+        {"jobs", required_argument, nullptr, 'J'},
+        {"engine", required_argument, nullptr, 'E'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:l:w:hdD:a:S:L:c:t:j:T:n:g",
+            getopt_long(argc, argv, "p:i:r:b:l:w:D:a:S:L:c:t:j:T:n:J:E:ghd",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -494,6 +499,8 @@ int main(int argc, char *argv[]) {
         case 'j': jobSummaryPath = optarg; break;
         case 'n': newTileThreshold = stoull(optarg); break;
         case 'I': PbrtOptions.directionalTreelets = true; break;
+        case 'J': maxJobsOnEngine = stoul(optarg); break;
+        case 'E': engines.emplace_back(optarg, maxJobsOnEngine); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
 
             // clang-format on
@@ -578,7 +585,8 @@ int main(int argc, char *argv[]) {
                                   rayActionsLogRate, packetsLogRate,
                                   logsDirectory,     cropWindow,
                                   tileSize,          seconds{timeout},
-                                  jobSummaryPath,    newTileThreshold};
+                                  jobSummaryPath,    newTileThreshold,
+                                  move(engines)};
 
     try {
         master = make_unique<LambdaMaster>(listenPort, numLambdas,
