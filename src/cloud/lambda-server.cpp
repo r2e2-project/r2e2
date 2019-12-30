@@ -53,7 +53,7 @@ int main(int argc, char const *argv[]) {
                         cerr << request.first_line() << endl;
 
                         protobuf::InvocationPayload payload;
-                        protoutil::from_string(request.body(), payload);
+                        protoutil::from_json(request.body(), payload);
 
                         loop.add_child_process(
                             "lambda-worker",
