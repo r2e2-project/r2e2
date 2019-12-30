@@ -340,7 +340,9 @@ void LambdaMaster::run() {
                 loop.make_http_request<TCPConnection>(
                     "start-worker", engineAddr, request,
                     [](const uint64_t, const string &, const HTTPResponse &) {},
-                    [](const uint64_t, const string &) {});
+                    [](const uint64_t, const string &) {
+                        throw runtime_error("request failed");
+                    });
             }
 
             if (launchedWorkers >= numberOfWorkers) {
