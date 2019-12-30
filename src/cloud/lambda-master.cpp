@@ -274,43 +274,82 @@ ResultType LambdaMaster::handleWriteOutput() {
 void LambdaMaster::run() {
     StatusBar::get();
 
-    /* request launching the lambdas */
-    auto generateRequest = [this]() -> HTTPRequest {
-        protobuf::InvocationPayload proto;
-        proto.set_storage_backend(storageBackendUri);
-        proto.set_coordinator(publicAddress);
-        proto.set_send_reliably(config.sendReliably);
-        proto.set_max_udp_rate(config.maxUdpRate);
-        proto.set_samples_per_pixel(config.samplesPerPixel);
-        proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
-        proto.set_ray_actions_log_rate(config.rayActionsLogRate);
-        proto.set_packets_log_rate(config.packetsLogRate);
-        proto.set_collect_diagnostics(config.collectDiagnostics);
-        proto.set_log_leases(config.logLeases);
-        proto.set_directional_treelets(PbrtOptions.directionalTreelets);
+    /* invocation payload (same for Lambda & custom engines) */
+    protobuf::InvocationPayload proto;
+    proto.set_storage_backend(storageBackendUri);
+    proto.set_coordinator(publicAddress);
+    proto.set_send_reliably(config.sendReliably);
+    proto.set_max_udp_rate(config.maxUdpRate);
+    proto.set_samples_per_pixel(config.samplesPerPixel);
+    proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
+    proto.set_ray_actions_log_rate(config.rayActionsLogRate);
+    proto.set_packets_log_rate(config.packetsLogRate);
+    proto.set_collect_diagnostics(config.collectDiagnostics);
+    proto.set_log_leases(config.logLeases);
+    proto.set_directional_treelets(PbrtOptions.directionalTreelets);
 
-        return LambdaInvocationRequest(
-                   awsCredentials, awsRegion, lambdaFunctionName,
-                   protoutil::to_json(proto),
-                   LambdaInvocationRequest::InvocationType::EVENT,
-                   LambdaInvocationRequest::LogType::NONE)
-            .to_http_request();
-    };
+    const string invocationJson = protoutil::to_json(proto);
 
-    /* Ask for 10% more lambdas */
-    const size_t EXTRA_LAMBDAS = numberOfWorkers * 0.1;
+    if (config.engines.empty()) {  // running on AWS Lambda
+        /* request launching the lambdas */
+        auto generateRequest = [this, &invocationJson]() -> HTTPRequest {
+            return LambdaInvocationRequest(
+                       awsCredentials, awsRegion, lambdaFunctionName,
+                       invocationJson,
+                       LambdaInvocationRequest::InvocationType::EVENT,
+                       LambdaInvocationRequest::LogType::NONE)
+                .to_http_request();
+        };
 
-    cerr << "Launching " << numberOfWorkers << " (+" << EXTRA_LAMBDAS
-         << ") lambda(s)... ";
+        /* Ask for 10% more lambdas */
+        const size_t EXTRA_LAMBDAS = numberOfWorkers * 0.1;
 
-    for (size_t i = 0; i < numberOfWorkers + EXTRA_LAMBDAS; i++) {
-        loop.make_http_request<SSLConnection>(
-            "start-worker", awsAddress, generateRequest(),
-            [](const uint64_t, const string &, const HTTPResponse &) {},
-            [](const uint64_t, const string &) {});
+        cerr << "Launching " << numberOfWorkers << " (+" << EXTRA_LAMBDAS
+             << ") lambda(s)... ";
+
+        for (size_t i = 0; i < numberOfWorkers + EXTRA_LAMBDAS; i++) {
+            loop.make_http_request<SSLConnection>(
+                "start-worker", awsAddress, generateRequest(),
+                [](const uint64_t, const string &, const HTTPResponse &) {},
+                [](const uint64_t, const string &) {});
+        }
+
+        cerr << "done." << endl;
+    } else {  // running on custom engine
+        // create the worker request
+        HTTPRequest request;
+        request.set_first_line("POST /new_worker HTTP/1.1");
+        request.add_header(
+            HTTPHeader{"Content-Length", to_string(invocationJson.length())});
+        request.done_with_headers();
+        request.read_in_body(invocationJson);
+
+        cerr << "Launching " << numberOfWorkers << " workers on "
+             << config.engines.size()
+             << pluralize(" engine", config.engines.size()) << "... ";
+
+        size_t launchedWorkers = 0;
+
+        for (auto &engine : config.engines) {
+            auto engineIpPort = Address::decompose(engine.first);
+            Address engineAddr{engineIpPort.first, engineIpPort.second};
+
+            for (size_t i = 0;
+                 i < engine.second && launchedWorkers < numberOfWorkers;
+                 i++, launchedWorkers++) {
+                loop.make_http_request<TCPConnection>(
+                    "start-worker", engineAddr, request,
+                    [](const uint64_t, const string &, const HTTPResponse &) {},
+                    [](const uint64_t, const string &) {});
+            }
+
+            if (launchedWorkers >= numberOfWorkers) {
+                break;
+            }
+        }
+
+        cerr << "done." << endl;
     }
-
-    cerr << "done." << endl;
 
     while (true) {
         auto res = loop.loop_once().result;
