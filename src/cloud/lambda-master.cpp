@@ -452,15 +452,10 @@ int main(int argc, char *argv[]) {
         {"storage-backend", required_argument, nullptr, 'b'},
         {"lambdas", required_argument, nullptr, 'l'},
         {"assignment", required_argument, nullptr, 'a'},
-        {"finished-ray", required_argument, nullptr, 'f'},
-        {"reliable-udp", no_argument, nullptr, 'R'},
-        {"max-udp-rate", required_argument, nullptr, 'M'},
         {"debug-logs", no_argument, nullptr, 'g'},
         {"diagnostics", no_argument, nullptr, 'd'},
-        {"log-leases", no_argument, nullptr, 'e'},
         {"worker-stats", required_argument, nullptr, 'w'},
         {"log-rays", required_argument, nullptr, 'L'},
-        {"log-packets", required_argument, nullptr, 'P'},
         {"logs-dir", required_argument, nullptr, 'D'},
         {"samples", required_argument, nullptr, 'S'},
         {"crop-window", required_argument, nullptr, 'c'},
@@ -475,7 +470,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:l:w:hdD:a:S:f:L:c:P:M:t:j:T:n:Rge",
+            getopt_long(argc, argv, "p:i:r:b:l:w:hdD:a:S:L:c:t:j:T:n:g",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -484,21 +479,17 @@ int main(int argc, char *argv[]) {
 
         switch (opt) {
         // clang-format off
-        case 'R': sendReliably = true; break;
-        case 'M': maxUdpRate = stoull(optarg); break;
         case 'p': listenPort = stoi(optarg); break;
         case 'i': publicIp = optarg; break;
         case 'r': region = optarg; break;
         case 'b': storageBackendUri = optarg; break;
         case 'l': numLambdas = stoul(optarg); break;
         case 'g': collectDebugLogs = true; break;
-        case 'e': logLeases = true; break;
         case 'w': workerStatsWriteInterval = stoul(optarg); break;
         case 'd': collectDiagnostics = true; break;
         case 'D': logsDirectory = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'L': rayActionsLogRate = stof(optarg); break;
-        case 'P': packetsLogRate = stof(optarg); break;
         case 't': timeout = stoul(optarg); break;
         case 'j': jobSummaryPath = optarg; break;
         case 'n': newTileThreshold = stoull(optarg); break;
@@ -532,8 +523,6 @@ int main(int argc, char *argv[]) {
 
             if (name == "static") {
                 assignment = Assignment::Static;
-            } else if (name == "static+uniform") {
-                assignment = Assignment::Static | Assignment::Uniform;
             } else if (name == "uniform") {
                 assignment = Assignment::Uniform;
             } else if (name == "all") {
@@ -548,19 +537,6 @@ int main(int argc, char *argv[]) {
 
             break;
         }
-
-        case 'f':
-            if (strcmp(optarg, "discard") == 0) {
-                finishedRayAction = FinishedRayAction::Discard;
-            } else if (strcmp(optarg, "send") == 0) {
-                finishedRayAction = FinishedRayAction::SendBack;
-            } else if (strcmp(optarg, "upload") == 0) {
-                finishedRayAction = FinishedRayAction::Upload;
-            } else {
-                usage(argv[0], EXIT_FAILURE);
-            }
-
-            break;
 
         case 'c':
             cropWindow = parseCropWindowOptarg(optarg);
@@ -593,6 +569,7 @@ int main(int argc, char *argv[]) {
 
     unique_ptr<LambdaMaster> master;
 
+    // TODO clean this up
     MasterConfiguration config = {assignment,        assignmentFile,
                                   finishedRayAction, sendReliably,
                                   maxUdpRate,        samplesPerPixel,
