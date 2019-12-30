@@ -19,7 +19,7 @@ constexpr auto to_underlying( E e ) noexcept
 }
 
 inline std::string pluralize( const std::string & word, const size_t count ) {
-    return word + (count == 1 ? "s" : "");
+    return word + (count != 1 ? "s" : "");
 }
 
 template <typename Duration>
