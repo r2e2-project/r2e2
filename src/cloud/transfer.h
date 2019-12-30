@@ -53,7 +53,7 @@ class TransferAgent {
     } clientConfig;
 
     static constexpr size_t MAX_THREADS{8};
-    static constexpr size_t MAX_REQUESTS_ON_CONNECTION{4};
+    static constexpr size_t MAX_REQUESTS_ON_CONNECTION{1};
 
     std::chrono::steady_clock::time_point lastAddrUpdate{};
 
