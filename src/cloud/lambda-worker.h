@@ -2,10 +2,10 @@
 #define PBRT_CLOUD_LAMBDA_WORKER_H
 
 #include <cstring>
-#include <queue>
 #include <fstream>
 #include <future>
 #include <iostream>
+#include <queue>
 #include <random>
 #include <string>
 #include <thread>
@@ -217,6 +217,14 @@ class LambdaWorker {
     ////////////////////////////////////////////////////////////////////////////
     // Logging                                                                //
     ////////////////////////////////////////////////////////////////////////////
+
+    enum class RayAction { Generated, Traced, Bagged, Unbagged, Finished };
+    enum class BagAction { Enqueued, Dequeued };
+
+    void logRay(const RayAction action, const RayState& state,
+                const RayBagInfo& info = {});
+
+    void logBag(const BagAction action, const RayBagInfo& info);
 
     const std::string logBase{"pbrt-worker"};
     const std::string infoLogName{logBase + ".INFO"};

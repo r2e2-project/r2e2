@@ -53,3 +53,30 @@ void LambdaWorker::uploadLogs() {
 
     storageBackend->put(putLogsRequest);
 }
+
+void LambdaWorker::logRay(const RayAction action, const RayState& state,
+                          const RayBagInfo& info) {
+    if (!trackRays || !state.trackRay) return;
+
+    ostringstream oss;
+
+    /* timestamp,pathId,hop,shadowRay,workerId,treeletId,action,bag */
+
+    oss << duration_cast<milliseconds>(system_clock::now().time_since_epoch())
+               .count()
+        << ',' << state.sample.id << ',' << state.hop << ','
+        << state.isShadowRay << ',' << *workerId << ','
+        << state.CurrentTreelet() << ',';
+
+    // clang-format off
+    switch(action) {
+    case RayAction::Generated: oss << "Generated,";                break;
+    case RayAction::Traced:    oss << "Traced,";                   break;
+    case RayAction::Bagged:    oss << "Bagged," << info.str("");   break;
+    case RayAction::Unbagged:  oss << "Unbagged," << info.str(""); break;
+    case RayAction::Finished:  oss << "Finished,";                 break;
+    }
+    // clang-format on
+
+    TLOG(RAY) << oss.str();
+}
