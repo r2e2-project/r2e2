@@ -97,7 +97,10 @@ int main(int argc, char const *argv[]) {
         });
 
         while (true) {
-            loop.loop_once(-1);
+            auto res = loop.loop_once().result;
+            if (res != Poller::Result::Type::Success &&
+                res != Poller::Result::Type::Timeout)
+                break;
         }
 
     } catch (exception &ex) {
