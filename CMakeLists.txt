@@ -473,6 +473,7 @@ FILE ( GLOB PBRT_SOURCE
   src/cloud/*
   src/cloud/master/*
   src/cloud/worker/*
+  src/cloud/schedulers/*
   src/messages/*
   src/util/*
   src/net/*
