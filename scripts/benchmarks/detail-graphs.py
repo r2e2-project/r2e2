@@ -52,6 +52,42 @@ def plot_heatmap(mat, title, xlabel, ylabel, out):
     plt.savefig(out, dpi=300)
     plt.clf()
 
+def plot_completion_marks(data):
+    targets = [0.25, 0.50, 0.75, 0.9, 0.95, 0.99, 1.0]
+
+    fot = (data.groupby('timestampS')
+               .agg({'timestampS': 'max', 'pathsFinished': 'sum'}))
+    timestamps = fot.timestampS.to_numpy()
+    fractions = np.cumsum(fot.pathsFinished.to_numpy() * TIMESTEP)
+    fractions /= np.max(fractions)
+
+    T = []
+    i = 0
+
+    for target in targets:
+        while fractions[i] < target:
+            i += 1
+
+        A = (fractions[i - 1], timestamps[i - 1])
+        B = (fractions[i], timestamps[i])
+
+        t = A[1] + ((A[1] - B[1]) / (A[0] - B[0])) * (target - A[0])
+        T += [t]
+
+    #plt.scatter(T, [1] * len(T), marker='|', c='red')
+
+    #ax2 = plt.gca().twiny()
+    #ax2.set_xticks(T)
+    #ax2.set_xticklabels(["{:d}%".format(int(f * 100)) for f in targets])
+
+    for i in range(len(T)):
+        plt.axvline(T[i], linestyle=':', linewidth=0.5, color='#999999')
+        plt.annotate("{}%".format(int(targets[i] * 100)), (T[i], 0.98),
+                     xycoords=("data", "axes fraction"), textcoords="offset pixels",
+                     xytext=(10, 0),
+                     fontsize='x-small', color='#999999', ha='left', va='center_baseline',
+                     rotation='vertical')
+
 def gen_per_second_per_treelet(df, out):
     per_second_per_treelet = df.groupby(['timestampS', 'treeletId']).sum()
 
