@@ -12,10 +12,9 @@ using namespace PollerShortNames;
 void LambdaMaster::recordEnqueue(const WorkerId workerId,
                                  const RayBagInfo &info) {
     auto &worker = workers[workerId];
-    auto &treelet = treelets[info.treeletId];
 
     worker.lastStats.first = true;
-    treelet.lastStats.first = true;
+    treelets[info.treeletId].lastStats.first = true;
 
     if (info.sampleBag) {
         worker.stats.samples.count += info.rayCount;
@@ -27,8 +26,8 @@ void LambdaMaster::recordEnqueue(const WorkerId workerId,
     } else {
         worker.stats.enqueued.count += info.rayCount;
         worker.stats.enqueued.bytes += info.bagSize;
-        treelet.stats.enqueued.count += info.rayCount;
-        treelet.stats.enqueued.bytes += info.bagSize;
+        treeletStats[info.treeletId].enqueued.count += info.rayCount;
+        treeletStats[info.treeletId].enqueued.bytes += info.bagSize;
         aggregatedStats.enqueued.count += info.rayCount;
         aggregatedStats.enqueued.bytes += info.bagSize;
     }
@@ -51,17 +50,16 @@ void LambdaMaster::recordAssign(const WorkerId workerId,
 void LambdaMaster::recordDequeue(const WorkerId workerId,
                                  const RayBagInfo &info) {
     auto &worker = workers[workerId];
-    auto &treelet = treelets[info.treeletId];
 
     worker.assignedRayBags.erase(info);
-
     worker.lastStats.first = true;
-    treelet.lastStats.first = true;
+
+    treelets[info.treeletId].lastStats.first = true;
 
     worker.stats.dequeued.count += info.rayCount;
     worker.stats.dequeued.bytes += info.bagSize;
-    treelet.stats.dequeued.count += info.rayCount;
-    treelet.stats.dequeued.bytes += info.bagSize;
+    treeletStats[info.treeletId].dequeued.count += info.rayCount;
+    treeletStats[info.treeletId].dequeued.bytes += info.bagSize;
     aggregatedStats.dequeued.count += info.rayCount;
     aggregatedStats.dequeued.bytes += info.bagSize;
 }
@@ -106,9 +104,9 @@ ResultType LambdaMaster::handleWorkerStats() {
         }
 
         const TreeletStats stats =
-            treelets[treeletId].stats - treelets[treeletId].lastStats.second;
+            treeletStats[treeletId] - treelets[treeletId].lastStats.second;
 
-        treelets[treeletId].lastStats.second = treelets[treeletId].stats;
+        treelets[treeletId].lastStats.second = treeletStats[treeletId];
         treelets[treeletId].lastStats.first = false;
 
         /* timestamp,treeletId,raysEnqueued,raysDequeued,bytesEnqueued,

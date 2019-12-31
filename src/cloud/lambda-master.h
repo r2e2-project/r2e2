@@ -146,17 +146,14 @@ class LambdaMaster {
 
     struct Treelet {
         TreeletId id;
-
-        std::set<WorkerId> workers;
-
-        // Statistics
-        TreeletStats stats;
+        std::set<WorkerId> workers{};
         std::pair<bool, TreeletStats> lastStats{true, {}};
 
         Treelet(const TreeletId id) : id(id) {}
     };
 
     std::vector<Treelet> treelets{};
+    std::vector<TreeletStats> treeletStats{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Treelet <-> Worker Assignments                                         //
