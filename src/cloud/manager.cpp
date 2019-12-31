@@ -136,41 +136,23 @@ protobuf::Manifest SceneManager::makeManifest() const {
     return manifest;
 }
 
-map<ObjectType, vector<SceneManager::Object>> SceneManager::listObjects() {
-    if (!sceneFD.initialized()) {
-        throw runtime_error("SceneManager is not initialized");
+set<ObjectKey> SceneManager::getRecursiveDependencies(const ObjectKey& object) {
+    set<ObjectKey> allDeps;
+
+    for (const ObjectKey& id : dependencies[object]) {
+        allDeps.insert(id);
+        auto deps = getRecursiveDependencies(id);
+        allDeps.insert(deps.begin(), deps.end());
     }
 
-    if (dependencies.empty()) {
-        loadManifest();
-    }
-
-    map<ObjectType, vector<Object>> result;
-    /* read the list of objects from the manifest file */
-    for (auto& kv : dependencies) {
-        const ObjectKey& id = kv.first;
-        result[id.type].push_back(Object(id.id, objectSizes[id]));
-    }
-
-    return result;
-}
-
-map<ObjectKey, set<ObjectKey>> SceneManager::listObjectDependencies() {
-    if (!sceneFD.initialized()) {
-        throw runtime_error("SceneManager is not initialized");
-    }
-
-    if (dependencies.empty()) {
-        loadManifest();
-    }
-
-    return dependencies;
+    return allDeps;
 }
 
 void SceneManager::loadManifest() {
     auto reader = GetReader(ObjectType::Manifest);
     protobuf::Manifest manifest;
     reader->read(&manifest);
+
     for (const protobuf::Manifest::Object& obj : manifest.objects()) {
         ObjectKey id = from_protobuf(obj.id());
         objectSizes[id] = obj.size();
@@ -179,20 +161,53 @@ void SceneManager::loadManifest() {
             dependencies[id].insert(from_protobuf(dep));
         }
     }
+
     dependencies[ObjectKey{ObjectType::Scene, 0}];
     dependencies[ObjectKey{ObjectType::Camera, 0}];
     dependencies[ObjectKey{ObjectType::Lights, 0}];
     dependencies[ObjectKey{ObjectType::Sampler, 0}];
 }
 
+void SceneManager::loadTreeletDependencies() {
+    if (dependencies.empty()) {
+        loadManifest();
+    }
+
+    for (const auto& kv : dependencies) {
+        if (kv.first.type == ObjectType::Treelet) {
+            treeletDependencies[kv.first.id] =
+                getRecursiveDependencies(kv.first);
+        }
+    }
+}
+
+const set<ObjectKey>& SceneManager::getTreeletDependencies(
+    const ObjectID treeletId) {
+    if (!sceneFD.initialized()) {
+        throw runtime_error("SceneManager is not initialized");
+    }
+
+    if (treeletDependencies.empty()) {
+        loadTreeletDependencies();
+    }
+
+    return treeletDependencies.at(treeletId);
+}
+
 size_t SceneManager::treeletCount() {
+    if (!sceneFD.initialized()) {
+        throw runtime_error("SceneManager is not initialized");
+    }
+
+    if (dependencies.empty()) {
+        loadManifest();
+    }
+
     size_t idx = 0;
 
-    auto objects = listObjects()[ObjectType::Treelet];
-
-    for (auto & object : objects) {
-        if (object.id > idx) {
-            idx = object.id;
+    for (auto& kv : dependencies) {
+        if (kv.first.type == ObjectType::Treelet) {
+            idx = kv.first.id;
         }
     }
 

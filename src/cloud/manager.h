@@ -73,26 +73,31 @@ class SceneManager {
     void recordDependency(const ObjectKey& from, const ObjectKey& to);
     protobuf::Manifest makeManifest() const;
 
-    std::map<ObjectType, std::vector<Object>> listObjects();
-    std::map<ObjectKey, std::set<ObjectKey>> listObjectDependencies();
-
     static std::string getFileName(const ObjectType type, const uint32_t id);
     const std::string& getScenePath() const { return scenePath; }
 
     std::vector<double> getTreeletProbs() const;
 
+    const std::set<ObjectKey>& getTreeletDependencies(
+        const ObjectID treeletId);
+
     size_t treeletCount();
 
   private:
     void loadManifest();
+    void loadTreeletDependencies();
+
+    std::set<ObjectKey> getRecursiveDependencies(const ObjectKey& object);
 
     size_t autoIds[to_underlying(ObjectType::COUNT)] = {0};
     std::string scenePath{};
     Optional<FileDescriptor> sceneFD{};
     std::unordered_map<const void*, uint32_t> ptrIds{};
-    std::map<ObjectKey, std::set<ObjectKey>> dependencies;
-    std::map<ObjectKey, uint64_t> objectSizes{};
     std::map<std::string, uint32_t> textureNameToId;
+    std::map<ObjectKey, uint64_t> objectSizes{};
+    std::map<ObjectKey, std::set<ObjectKey>> dependencies;
+
+    std::map<ObjectID, std::set<ObjectKey>> treeletDependencies;
 };
 
 namespace global {

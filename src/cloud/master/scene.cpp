@@ -16,55 +16,26 @@ void LambdaMaster::ObjectManager::initialize(const uint32_t numWorkers,
                                              const bool staticAssignment) {
     if (initialized) return;
 
-    if (staticAssignment) {
-        loadStaticAssignment(0, numWorkers);
-    }
-
     /* get the list of all objects and create entries for tracking their
      * assignment to workers for each */
-    for (auto &kv : global::manager.listObjects()) {
-        const ObjectType &type = kv.first;
-        const vector<SceneManager::Object> &objects = kv.second;
-        for (const SceneManager::Object &obj : objects) {
-            ObjectKey key{type, obj.id};
-            SceneObjectInfo info{};
-            info.id = obj.id;
-            info.size = obj.size;
-            sceneObjects.insert({key, info});
-            if (type == ObjectType::Treelet) {
-                unassignedTreelets.insert(obj.id);
-                treeletIds.insert(key);
-            }
-        }
+
+    const size_t treeletCount = global::manager.treeletCount();
+
+    for (size_t i = 0; i < treeletCount; i++) {
+        unassignedTreelets.insert(i);
+        treeletIds.insert({ObjectType::Treelet, i});
     }
 
-    requiredDependentObjects = global::manager.listObjectDependencies();
-
-    for (const auto &treeletId : treeletIds) {
-        treeletFlattenDependencies[treeletId.id] =
-            getRecursiveDependencies(treeletId);
+    if (staticAssignment) {
+        loadStaticAssignment(0, numWorkers);
     }
 
     initialized = true;
 }
 
-set<ObjectKey> LambdaMaster::ObjectManager::getRecursiveDependencies(
-    const ObjectKey &object) {
-    set<ObjectKey> allDeps;
-    for (const ObjectKey &id : requiredDependentObjects[object]) {
-        allDeps.insert(id);
-        auto deps = getRecursiveDependencies(id);
-        allDeps.insert(deps.begin(), deps.end());
-    }
-    return allDeps;
-}
-
 void LambdaMaster::ObjectManager::assignObject(Worker &worker,
                                                const ObjectKey &object) {
-    if (worker.objects.count(object) == 0) {
-        SceneObjectInfo &info = sceneObjects.at(object);
-        worker.objects.insert(object);
-    }
+    worker.objects.insert(object);
 }
 
 void LambdaMaster::ObjectManager::assignTreelet(Worker &worker,
@@ -76,7 +47,9 @@ void LambdaMaster::ObjectManager::assignTreelet(Worker &worker,
     worker.treelets.insert(treelet.id);
     treelet.workers.insert(worker.id);
 
-    for (const auto &obj : treeletFlattenDependencies[treelet.id]) {
+    auto &dependencies = global::manager.getTreeletDependencies(treelet.id);
+
+    for (const auto &obj : dependencies) {
         assignObject(worker, obj);
     }
 }

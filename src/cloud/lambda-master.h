@@ -264,23 +264,13 @@ class LambdaMaster {
         std::set<TreeletId> unassignedTreelets{};
 
       private:
-        struct SceneObjectInfo {
-            SceneManager::ObjectID id;
-            size_t size;
-        };
-
         bool initialized{false};
 
-        std::set<ObjectKey> getRecursiveDependencies(const ObjectKey &object);
         void assignObject(Worker &worker, const ObjectKey &object);
-
         void loadStaticAssignment(const uint32_t assignmentId,
                                   const uint32_t numWorkers);
 
         std::set<ObjectKey> treeletIds{};
-        std::map<ObjectKey, SceneObjectInfo> sceneObjects{};
-        std::map<ObjectKey, std::set<ObjectKey>> requiredDependentObjects{};
-        std::map<TreeletId, std::set<ObjectKey>> treeletFlattenDependencies{};
         std::map<WorkerId, std::vector<TreeletId>> staticAssignments{};
     } objectManager{};
 
