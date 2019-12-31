@@ -66,13 +66,12 @@ class SceneManager {
     WriterPtr GetWriter(const ObjectType type, const uint32_t id = 0) const;
 
     /* used during dumping */
-    uint32_t getNextId(const ObjectType type, const void* ptr = nullptr);
     uint32_t getId(const void* ptr) const { return ptrIds.at(ptr); }
+    uint32_t getNextId(const ObjectType type, const void* ptr = nullptr);
+    uint32_t getTextureId(const std::string& path);
     bool hasId(const void* ptr) const { return ptrIds.count(ptr) > 0; }
     void recordDependency(const ObjectKey& from, const ObjectKey& to);
     protobuf::Manifest makeManifest() const;
-
-    uint32_t getTextureId(const std::string& path);
 
     std::map<ObjectType, std::vector<Object>> listObjects();
     std::map<ObjectKey, std::set<ObjectKey>> listObjectDependencies();
