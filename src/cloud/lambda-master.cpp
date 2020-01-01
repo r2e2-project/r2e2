@@ -111,9 +111,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     /* initializing the treelets array */
     const size_t treeletCount = global::manager.treeletCount();
     treelets.reserve(treeletCount);
+    treeletStats.reserve(treeletCount);
 
     for (size_t i = 0; i < treeletCount; i++) {
         treelets.emplace_back(i);
+        treeletStats.emplace_back();
     }
 
     /* and initialize the necessary scene objects */
