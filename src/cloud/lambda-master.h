@@ -12,6 +12,7 @@
 #include "cloud/estimators.h"
 #include "cloud/lambda.h"
 #include "cloud/manager.h"
+#include "cloud/scheduler.h"
 #include "cloud/stats.h"
 #include "core/camera.h"
 #include "core/geometry.h"
@@ -156,10 +157,15 @@ class LambdaMaster {
     std::vector<TreeletStats> treeletStats{};
 
     ////////////////////////////////////////////////////////////////////////////
-    // Treelet <-> Worker Assignments                                         //
+    // Scheduler                                                              //
     ////////////////////////////////////////////////////////////////////////////
 
-    // TODO
+    void executeSchedule(const Schedule &schedule);
+
+    /* requests invoking n workers */
+    void invokeWorkers(const size_t n);
+
+    std::unique_ptr<Scheduler> scheduler;
 
     ////////////////////////////////////////////////////////////////////////////
     // Communication                                                          //

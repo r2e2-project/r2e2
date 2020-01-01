@@ -2,6 +2,9 @@
 
 #include "cloud/scheduler.h"
 #include "execution/meow/message.h"
+#include "messages/utils.h"
+#include "net/lambda.h"
+#include "util/exception.h"
 #include "util/random.h"
 
 using namespace std;
@@ -9,6 +12,72 @@ using namespace pbrt;
 using namespace meow;
 
 using OpCode = Message::OpCode;
+
+void LambdaMaster::invokeWorkers(const size_t nWorkers) {
+    /* invocation payload (same for Lambda & custom engines) */
+    // XXX this can be factored out of this function
+    protobuf::InvocationPayload proto;
+    proto.set_storage_backend(storageBackendUri);
+    proto.set_coordinator(publicAddress);
+    proto.set_send_reliably(config.sendReliably);
+    proto.set_max_udp_rate(config.maxUdpRate);
+    proto.set_samples_per_pixel(config.samplesPerPixel);
+    proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
+    proto.set_ray_actions_log_rate(config.rayActionsLogRate);
+    proto.set_packets_log_rate(config.packetsLogRate);
+    proto.set_collect_diagnostics(config.collectDiagnostics);
+    proto.set_log_leases(config.logLeases);
+    proto.set_directional_treelets(PbrtOptions.directionalTreelets);
+
+    const string invocationJson = protoutil::to_json(proto);
+
+    if (config.engines.empty()) {
+        auto generateRequest = [this, &invocationJson]() -> HTTPRequest {
+            return LambdaInvocationRequest(
+                       awsCredentials, awsRegion, lambdaFunctionName,
+                       invocationJson,
+                       LambdaInvocationRequest::InvocationType::EVENT,
+                       LambdaInvocationRequest::LogType::NONE)
+                .to_http_request();
+        };
+
+        for (size_t i = 0; i < nWorkers; i++) {
+            loop.make_http_request<SSLConnection>(
+                "start-worker", awsAddress, generateRequest(),
+                [](const uint64_t, const string &, const HTTPResponse &) {},
+                [](const uint64_t, const string &) {});
+        }
+    } else {
+        HTTPRequest request;
+        request.set_first_line("POST /new_worker HTTP/1.1");
+        request.add_header(
+            HTTPHeader{"Content-Length", to_string(invocationJson.length())});
+        request.done_with_headers();
+        request.read_in_body(invocationJson);
+
+        size_t launchedWorkers = 0;
+
+        for (auto &engine : config.engines) {
+            auto engineIpPort = Address::decompose(engine.first);
+            Address engineAddr{engineIpPort.first, engineIpPort.second};
+
+            for (size_t i = 0;
+                 i < engine.second && launchedWorkers < numberOfWorkers;
+                 i++, launchedWorkers++) {
+                loop.make_http_request<TCPConnection>(
+                    "start-worker", engineAddr, request,
+                    [](const uint64_t, const string &, const HTTPResponse &) {},
+                    [](const uint64_t, const string &) {
+                        throw runtime_error("request failed");
+                    });
+            }
+
+            if (launchedWorkers >= numberOfWorkers) {
+                break;
+            }
+        }
+    }
+}
 
 void LambdaMaster::executeSchedule(const Schedule &schedule) {
     /* XXX is the schedule viable? */
