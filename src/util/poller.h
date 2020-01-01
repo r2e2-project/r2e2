@@ -63,6 +63,9 @@ private:
   std::list<Action> actions_ {};
   std::vector<pollfd> pollfds_ {};
 
+  /* remove all actions for file descriptors in `fd_nums` */
+  void remove_actions( const std::set<int> & fd_nums );
+
 public:
   struct Result
   {
@@ -77,8 +80,6 @@ public:
   uint64_t add_action( Action action );
   Result poll( const int timeout_ms );
 
-  /* remove all actions for file descriptors in `fd_nums` */
-  void remove_actions( const std::set<int> & fd_nums );
   void deactivate_actions( const std::set<uint64_t> & action_ids );
 };
 
