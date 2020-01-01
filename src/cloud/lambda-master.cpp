@@ -125,8 +125,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     /* are we logging anything? */
     if (config.collectDebugLogs || config.collectDiagnostics ||
-        config.workerStatsWriteInterval > 0 || config.rayActionsLogRate > 0 ||
-        config.packetsLogRate > 0) {
+        config.workerStatsWriteInterval > 0 || config.rayActionsLogRate > 0) {
         roost::create_directories(config.logsDirectory);
     }
 
@@ -308,7 +307,7 @@ void LambdaMaster::run() {
         worker.connection->socket().close();
 
         if (config.collectDebugLogs || config.collectDiagnostics ||
-            config.rayActionsLogRate || config.packetsLogRate) {
+            config.rayActionsLogRate) {
             getRequests.emplace_back(
                 logPrefix + to_string(worker.id) + ".INFO",
                 config.logsDirectory + "/" + to_string(worker.id) + ".INFO");
@@ -340,16 +339,11 @@ void usage(const char *argv0, int exitCode) {
          << "  -r --aws-region REGION     region to run lambdas in" << endl
          << "  -b --storage-backend NAME  storage backend URI" << endl
          << "  -l --lambdas N             how many lambdas to run" << endl
-         << "  -R --reliable-udp          send ray packets reliably" << endl
-         << "  -M --max-udp-rate RATE     maximum UDP send rate for workers"
-         << endl
          << "  -g --debug-logs            collect worker debug logs" << endl
          << "  -d --diagnostics           collect worker diagnostics" << endl
-         << "  -e --log-leases            log leases" << endl
          << "  -w --worker-stats N        log worker stats every N seconds"
          << endl
          << "  -L --log-rays RATE         log ray actions" << endl
-         << "  -P --log-packets RATE      log packets" << endl
          << "  -D --logs-dir DIR          set logs directory (default: logs/)"
          << endl
          << "  -S --samples N             number of samples per pixel" << endl
@@ -359,16 +353,10 @@ void usage(const char *argv0, int exitCode) {
          << "                               - static+uniform" << endl
          << "                               - all" << endl
          << "                               - debug" << endl
-         << "  -f --finished-ray ACTION   what to do with finished rays" << endl
-         << "                               - discard (default)" << endl
-         << "                               - send" << endl
-         << "                               - upload" << endl
          << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
          << endl
          << "  -T --pix-per-tile N        pixels per tile (default=44)" << endl
          << "  -n --new-tile-send N       threshold for sending new tiles"
-         << endl
-
          << endl
          << "  -t --timeout T             exit after T seconds of inactivity"
          << endl
@@ -405,14 +393,10 @@ int main(int argc, char *argv[]) {
     string storageBackendUri;
     string assignmentFile;
     string region{"us-west-2"};
-    bool sendReliably = false;
-    uint64_t maxUdpRate = 200;
     uint64_t workerStatsWriteInterval = 0;
     bool collectDiagnostics = false;
     bool collectDebugLogs = false;
-    bool logLeases = false;
     float rayActionsLogRate = 0.0;
-    float packetsLogRate = 0.0;
     string logsDirectory = "logs/";
     Optional<Bounds2i> cropWindow;
     uint32_t timeout = 0;
@@ -542,8 +526,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (listenPort == 0 || numLambdas < 0 || samplesPerPixel < 0 ||
-        rayActionsLogRate < 0 || rayActionsLogRate > 1.0 ||
-        packetsLogRate < 0 || packetsLogRate > 1.0 || publicIp.empty() ||
+        rayActionsLogRate < 0 || rayActionsLogRate > 1.0 || publicIp.empty() ||
         storageBackendUri.empty() || region.empty() || newTileThreshold == 0 ||
         (cropWindow.initialized() && pixelsPerTile != 0 &&
          pixelsPerTile != numeric_limits<typeof(pixelsPerTile)>::max() &&
@@ -557,15 +540,20 @@ int main(int argc, char *argv[]) {
     unique_ptr<LambdaMaster> master;
 
     // TODO clean this up
-    MasterConfiguration config = {assignment,        assignmentFile,
-                                  finishedRayAction, sendReliably,
-                                  maxUdpRate,        samplesPerPixel,
-                                  collectDebugLogs,  collectDiagnostics,
-                                  logLeases,         workerStatsWriteInterval,
-                                  rayActionsLogRate, packetsLogRate,
-                                  logsDirectory,     cropWindow,
-                                  tileSize,          seconds{timeout},
-                                  jobSummaryPath,    newTileThreshold,
+    MasterConfiguration config = {assignment,
+                                  assignmentFile,
+                                  finishedRayAction,
+                                  samplesPerPixel,
+                                  collectDebugLogs,
+                                  collectDiagnostics,
+                                  workerStatsWriteInterval,
+                                  rayActionsLogRate,
+                                  logsDirectory,
+                                  cropWindow,
+                                  tileSize,
+                                  seconds{timeout},
+                                  jobSummaryPath,
+                                  newTileThreshold,
                                   move(engines)};
 
     try {

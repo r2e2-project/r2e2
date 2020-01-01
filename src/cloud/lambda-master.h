@@ -52,15 +52,11 @@ struct MasterConfiguration {
     int assignment; /* look at `struct Assignment` */
     std::string assignmentFile;
     FinishedRayAction finishedRayAction;
-    bool sendReliably;
-    uint64_t maxUdpRate;
     int samplesPerPixel;
     bool collectDebugLogs;
     bool collectDiagnostics;
-    bool logLeases;
     uint64_t workerStatsWriteInterval;
     float rayActionsLogRate;
-    float packetsLogRate;
     std::string logsDirectory;
     Optional<Bounds2i> cropWindow;
     int tileSize;
