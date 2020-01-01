@@ -45,18 +45,6 @@ void LambdaMaster::processMessage(const uint64_t workerId,
     switch (message.opcode()) {
     case OpCode::Hey: {
         worker.awsLogStream = message.payload();
-
-        protobuf::Hey proto;
-        proto.set_worker_id(workerId);
-        proto.set_job_id(jobId);
-        worker.connection->enqueue_write(
-            Message::str(0, OpCode::Hey, protoutil::to_string(proto)));
-
-        if (!worker.initialized) {
-            worker.initialized = true;
-            initializedWorkers++;
-        }
-
         break;
     }
 
@@ -101,6 +89,16 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         worker.stats.finishedPaths += proto.finished_paths();
         aggregatedStats.finishedPaths += proto.finished_paths();
 
+        break;
+    }
+
+    case OpCode::Bye: {
+        if (worker.state == Worker::State::FinishingUp) {
+            /* it's fine for this worker to say bye */
+            worker.state = Worker::State::Terminating;
+        }
+
+        worker.connection->enqueue_write(Message::str(0, OpCode::Bye, ""));
         break;
     }
 

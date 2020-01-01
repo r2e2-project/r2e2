@@ -47,6 +47,8 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
+map<LambdaMaster::Worker::Role, size_t> LambdaMaster::Worker::activeCount;
+
 LambdaMaster::~LambdaMaster() {
     try {
         roost::empty_directory(sceneDir.name());
@@ -122,7 +124,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                              config.assignment & Assignment::Static);
 
     tiles = Tiles{config.tileSize, scene.sampleBounds,
-                  scene.sampler->samplesPerPixel, maxWorkers};
+                  scene.sampler->samplesPerPixel, rayGenerators};
 
     /* are we logging anything? */
     if (config.collectDebugLogs || config.collectDiagnostics ||
@@ -196,46 +198,85 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     loop.make_listener({"0.0.0.0", listenPort}, [this, maxWorkers](
                                                     ExecutionLoop &loop,
                                                     TCPSocket &&socket) {
-        if (currentWorkerId > maxWorkers) {
-            socket.close();
-            return false;
-        }
+        const WorkerId workerId = currentWorkerId++;
 
-        auto failure_handler = [this, ID = currentWorkerId]() {
-            ostringstream message;
-            const auto &worker = workers.at(ID);
-            message << "worker died: " << ID;
+        auto connectionCloseHandler = [this, workerId]() {
+            auto &worker = workers.at(workerId);
+            Worker::activeCount[worker.role]--;
 
-            if (!worker.awsLogStream.empty()) {
-                message << " (" << worker.awsLogStream << ")";
+            if (worker.state == Worker::State::Terminating) {
+                /* it's okay for this worker to go away,
+                   let's not panic! */
+                worker.state = Worker::State::Terminated;
+                return;
             }
 
-            throw runtime_error(message.str());
+            throw runtime_error("worker went away unexpectedly: " +
+                                to_string(workerId));
         };
 
-        auto messageParser = make_shared<MessageParser>();
+        auto parser = make_shared<MessageParser>();
         auto connection = loop.add_connection<TCPSocket>(
             move(socket),
-            [this, ID = currentWorkerId, messageParser](
-                shared_ptr<TCPConnection>, string &&data) {
-                messageParser->parse(data);
+            [this, workerId, parser](auto, string &&data) {
+                parser->parse(data);
 
-                while (!messageParser->empty()) {
-                    incomingMessages.emplace_back(ID,
-                                                  move(messageParser->front()));
-                    messageParser->pop();
+                while (!parser->empty()) {
+                    incomingMessages.emplace_back(workerId,
+                                                  move(parser->front()));
+                    parser->pop();
                 }
 
                 return true;
             },
-            failure_handler, failure_handler);
+            connectionCloseHandler, connectionCloseHandler);
 
-        workers.emplace(piecewise_construct, forward_as_tuple(currentWorkerId),
-                        forward_as_tuple(currentWorkerId, move(connection)));
+        if (workerId <= this->rayGenerators) {
+            /* This worker is a ray generator
+               Let's (1) say hi, (2) tell the worker to fetch the scene,
+               (3) generate rays for its tile, and (4) finish up. */
 
-        objectManager.assignBaseObjects(workers.at(currentWorkerId), treelets,
-                                        this->config.assignment);
-        currentWorkerId++;
+            /* (0) create the entry for the worker */
+            auto &worker =
+                workers
+                    .emplace(piecewise_construct, forward_as_tuple(workerId),
+                             forward_as_tuple(workerId, Worker::Role::Generator,
+                                              move(connection)))
+                    .first->second;
+
+            objectManager.assignBaseObjects(worker, treelets,
+                                            this->config.assignment);
+
+            /* (1) saying hi, assigning id to the worker */
+            protobuf::Hey heyProto;
+            heyProto.set_worker_id(workerId);
+            heyProto.set_job_id(jobId);
+            worker.connection->enqueue_write(
+                Message::str(0, OpCode::Hey, protoutil::to_string(heyProto)));
+
+            /* (2) tell the worker to get the scene objects necessary */
+            protobuf::GetObjects objsProto;
+            for (const ObjectKey &id : worker.objects) {
+                *objsProto.add_object_ids() = to_protobuf(id);
+            }
+
+            worker.connection->enqueue_write(Message::str(
+                0, OpCode::GetObjects, protoutil::to_string(objsProto)));
+
+            /* (3) tell the worker to generate rays */
+            if (tiles.cameraRaysRemaining()) {
+                tiles.sendWorkerTile(worker);
+            }
+
+            /* and finally, (4) finish up */
+            worker.connection->enqueue_write(
+                Message::str(0, OpCode::FinishUp, ""));
+
+            worker.state = Worker::State::FinishingUp;
+        } else {
+            /* this is a normal worker */
+        }
+
         return true;
     });
 }
@@ -247,18 +288,6 @@ ResultType LambdaMaster::handleJobStart() {
 
     for (auto &workerkv : workers) {
         auto &worker = workerkv.second;
-
-        protobuf::GetObjects proto;
-        for (const ObjectKey &id : worker.objects) {
-            *proto.add_object_ids() = to_protobuf(id);
-        }
-
-        worker.connection->enqueue_write(
-            Message::str(0, OpCode::GetObjects, protoutil::to_string(proto)));
-
-        if (tiles.cameraRaysRemaining()) {
-            tiles.sendWorkerTile(worker);
-        }
     }
 
     tiles.canSendTiles = true;
@@ -275,23 +304,13 @@ ResultType LambdaMaster::handleWriteOutput() {
 void LambdaMaster::run() {
     StatusBar::get();
 
-    if (config.engines.empty()) {  // running on AWS Lambda
-        const size_t EXTRA_LAMBDAS = maxWorkers * 0.1;
-        cerr << "Launching " << maxWorkers << " (+" << EXTRA_LAMBDAS
-             << ") lambda(s)... ";
+    /* let's invoke the ray generators */
+    cerr << "Launching " << rayGenerators << " ray "
+         << pluralize("generator", rayGenerators) << "... ";
 
-        invokeWorkers(maxWorkers + EXTRA_LAMBDAS);
+    invokeWorkers(rayGenerators);
 
-        cerr << "done." << endl;
-    } else {  // running on custom engine
-        cerr << "Launching " << maxWorkers << " workers on "
-             << config.engines.size()
-             << pluralize(" engine", config.engines.size()) << "... ";
-
-        invokeWorkers(maxWorkers);
-
-        cerr << "done." << endl;
-    }
+    cerr << "done." << endl;
 
     while (true) {
         auto res = loop.loop_once().result;
@@ -444,7 +463,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:m:G::w:D:a:S:L:c:t:j:T:n:J:E:ghd",
+            getopt_long(argc, argv, "p:i:r:b:m:G:w:D:a:S:L:c:t:j:T:n:J:E:ghd",
                         long_options, nullptr);
 
         if (opt == -1) {

@@ -116,8 +116,12 @@ class LambdaMaster {
     ////////////////////////////////////////////////////////////////////////////
 
     struct Worker {
+        enum class State { Active, FinishingUp, Terminating, Terminated };
+        enum class Role { Generator, Tracer, Aggregator };
+
         WorkerId id;
-        bool initialized{false};
+        State state{State::Active};
+        Role role;
         std::shared_ptr<TCPConnection> connection;
         steady_clock::time_point lastSeen{};
         std::string awsLogStream{};
@@ -131,8 +135,13 @@ class LambdaMaster {
         WorkerStats stats{};
         std::pair<bool, WorkerStats> lastStats{true, {}};
 
-        Worker(const WorkerId id, std::shared_ptr<TCPConnection> &&connection)
-            : id(id), connection(std::move(connection)) {}
+        Worker(const WorkerId id, const Role role,
+               std::shared_ptr<TCPConnection> &&connection)
+            : id(id), role(role), connection(std::move(connection)) {
+            Worker::activeCount[role]++;
+        }
+
+        static std::map<Role, size_t> activeCount;
     };
 
     WorkerId currentWorkerId{1};

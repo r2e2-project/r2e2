@@ -68,12 +68,17 @@ ResultType LambdaMaster::handleStatusMessage() {
         << BG() << " \u21af " << s.finishedPaths
                 << " (" << percent(s.finishedPaths, scene.totalPaths) << "%) "
 
-        // worker count
-        << BG() << " \u03bb " << (workers.size() - 1) << "/" << maxWorkers
+        << BG() << " \u21a6 " << Worker::activeCount[Worker::Role::Generator]
+                << " "
+
+        << BG() << " \u03bb " << Worker::activeCount[Worker::Role::Tracer]
+                << " "
+
+        << BG() << " \u03a3 " << Worker::activeCount[Worker::Role::Aggregator]
                 << " "
 
         // lagging workers
-        << BG() << " ! " << laggingWorkers << " "
+        << BG() << " \u203c " << laggingWorkers << " "
 
         // enqueued bytes
         << BG() << " \u2191 " << format_bytes(s.enqueued.bytes) << " "

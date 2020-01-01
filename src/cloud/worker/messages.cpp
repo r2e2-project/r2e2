@@ -11,6 +11,8 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
+constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
+
 ResultType LambdaWorker::handleMessages() {
     RECORD_INTERVAL("handleMessages");
 
@@ -37,6 +39,10 @@ void LambdaWorker::processMessage(const Message& message) {
         rayBagsKeyPrefix = "jobs/" + (*jobId) + "/";
 
         cerr << protoutil::to_json(proto) << endl;
+
+        coordinatorConnection->enqueue_write(
+            Message::str(0, OpCode::Hey, safe_getenv_or(LOG_STREAM_ENVAR, "")));
+
         break;
     }
 
@@ -85,7 +91,8 @@ void LambdaWorker::processMessage(const Message& message) {
                 return ResultType::Cancel;
             },
             [this]() {
-                return traceQueue.empty() && sendQueue.empty() &&
+                return traceQueue.empty() && outQueue.empty() &&
+                       samples.empty() && sendQueue.empty() &&
                        receiveQueue.empty() && pendingRayBags.empty() &&
                        sampleBags.empty();
             },

@@ -18,8 +18,6 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
-constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
-
 LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const uint16_t coordinatorPort,
                            const string& storageUri,
@@ -127,9 +125,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
             [this]() { return true; },
             []() { throw runtime_error("handle diagnostics failed"); }));
     }
-
-    coordinatorConnection->enqueue_write(
-        Message::str(0, OpCode::Hey, safe_getenv_or(LOG_STREAM_ENVAR, "")));
 }
 
 void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
