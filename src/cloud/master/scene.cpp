@@ -20,6 +20,7 @@ void LambdaMaster::assignTreelet(Worker &worker, Treelet &treelet) {
     assignObject(worker, {ObjectType::Treelet, treelet.id});
 
     unassignedTreelets.erase(treelet.id);
+    moveFromPendingToQueued(treelet.id);
 
     worker.treelets.insert(treelet.id);
     treelet.workers.insert(worker.id);

@@ -88,19 +88,20 @@ ResultType LambdaMaster::handleReschedule() {
     rescheduleTimer.reset();
 
     /* (1) call the schedule function */
-    cerr << "Rescheduling... ";
 
     auto start = steady_clock::now();
     auto schedule = scheduler->schedule(maxWorkers, treeletStats);
 
     if (schedule.initialized()) {
+        cerr << "Rescheduling... ";
+
         executeSchedule(*schedule);
+        auto end = steady_clock::now();
+
+        cerr << "done (" << fixed << setprecision(2)
+             << duration_cast<milliseconds>(end - start).count() << " ms)."
+             << endl;
     }
-
-    auto end = steady_clock::now();
-
-    cerr << "done (" << fixed << setprecision(2)
-         << duration_cast<milliseconds>(end - start).count() << " ms)." << endl;
 
     return ResultType::Continue;
 }

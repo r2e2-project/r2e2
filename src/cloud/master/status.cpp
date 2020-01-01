@@ -9,7 +9,7 @@ using namespace std::chrono;
 using namespace pbrt;
 using namespace PollerShortNames;
 
-constexpr milliseconds EXIT_GRACE_PERIOD{10'000};
+constexpr milliseconds EXIT_GRACE_PERIOD{5'000};
 
 ResultType LambdaMaster::handleStatusMessage() {
     statusPrintTimer.reset();
@@ -39,7 +39,8 @@ ResultType LambdaMaster::handleStatusMessage() {
 
     const auto laggingWorkers =
         count_if(workers.begin(), workers.end(), [&now](const auto &worker) {
-            return now - worker.second.lastSeen >= seconds{4};
+            return (worker.second.state != Worker::State::Terminated) &&
+                   (now - worker.second.lastSeen >= seconds{4});
         });
 
     const auto elapsedSeconds = duration_cast<seconds>(now - startTime).count();

@@ -166,11 +166,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
         []() { throw runtime_error("messages failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleJobStart, this),
-        [this]() { return this->maxWorkers == this->initializedWorkers; },
-        []() { throw runtime_error("generate rays failed"); }));
-
-    loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out,
         bind(&LambdaMaster::handleQueuedRayBags, this),
         [this]() { return queuedRayBags.size() > 0; },
@@ -193,6 +188,12 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     loop.make_listener({"0.0.0.0", listenPort}, [this, maxWorkers](
                                                     ExecutionLoop &loop,
                                                     TCPSocket &&socket) {
+        /* do we want this worker? */
+        if (Worker::nextId >= this->rayGenerators && treeletsToSpawn.empty()) {
+            socket.close();
+            return true;
+        }
+
         const WorkerId workerId = Worker::nextId++;
 
         auto connectionCloseHandler = [this, workerId]() {
@@ -269,30 +270,42 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
             worker.state = Worker::State::FinishingUp;
         } else {
             /* this is a normal worker */
+            if (!treeletsToSpawn.empty()) {
+                const TreeletId treeletId = treeletsToSpawn.front();
+                treeletsToSpawn.pop_front();
+
+                /* (0) create the entry for the worker */
+                auto &worker =
+                    workers
+                        .emplace(
+                            piecewise_construct, forward_as_tuple(workerId),
+                            forward_as_tuple(workerId, Worker::Role::Tracer,
+                                             move(connection)))
+                        .first->second;
+
+                assignBaseObjects(worker);
+                assignTreelet(worker, treelets[treeletId]);
+
+                /* (1) saying hi, assigning id to the worker */
+                protobuf::Hey heyProto;
+                heyProto.set_worker_id(workerId);
+                heyProto.set_job_id(jobId);
+                worker.connection->enqueue_write(Message::str(
+                    0, OpCode::Hey, protoutil::to_string(heyProto)));
+
+                /* (2) tell the worker to get the scene objects necessary */
+                protobuf::GetObjects objsProto;
+                for (const ObjectKey &id : worker.objects) {
+                    *objsProto.add_object_ids() = to_protobuf(id);
+                }
+
+                worker.connection->enqueue_write(Message::str(
+                    0, OpCode::GetObjects, protoutil::to_string(objsProto)));
+            }
         }
 
         return true;
     });
-}
-
-ResultType LambdaMaster::handleJobStart() {
-    set<uint32_t> paired{0};
-
-    generationStart = lastActionTime = steady_clock::now();
-
-    for (auto &workerkv : workers) {
-        auto &worker = workerkv.second;
-    }
-
-    tiles.canSendTiles = true;
-
-    return ResultType::Cancel;
-}
-
-ResultType LambdaMaster::handleWriteOutput() {
-    writeOutputTimer.reset();
-    scene.camera->film->WriteImage();
-    return ResultType::Continue;
 }
 
 void LambdaMaster::run() {
@@ -423,7 +436,6 @@ int main(int argc, char *argv[]) {
 
     int samplesPerPixel = 0;
     int tileSize = 0;
-    FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
 
     uint32_t maxJobsOnEngine = 1;
     vector<pair<string, uint32_t>> engines;
@@ -544,19 +556,12 @@ int main(int argc, char *argv[]) {
     unique_ptr<LambdaMaster> master;
 
     // TODO clean this up
-    MasterConfiguration config = {finishedRayAction,
-                                  samplesPerPixel,
-                                  collectDebugLogs,
-                                  collectDiagnostics,
-                                  workerStatsWriteInterval,
-                                  rayActionsLogRate,
-                                  logsDirectory,
-                                  cropWindow,
-                                  tileSize,
-                                  seconds{timeout},
-                                  jobSummaryPath,
-                                  newTileThreshold,
-                                  move(engines)};
+    MasterConfiguration config = {samplesPerPixel,    collectDebugLogs,
+                                  collectDiagnostics, workerStatsWriteInterval,
+                                  rayActionsLogRate,  logsDirectory,
+                                  cropWindow,         tileSize,
+                                  seconds{timeout},   jobSummaryPath,
+                                  newTileThreshold,   move(engines)};
 
     try {
         master = make_unique<LambdaMaster>(

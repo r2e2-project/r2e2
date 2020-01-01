@@ -34,13 +34,9 @@
 namespace pbrt {
 
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
-constexpr std::chrono::milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL{5'000};
 
-enum class FinishedRayAction { Discard, SendBack, Upload };
-
 struct MasterConfiguration {
-    FinishedRayAction finishedRayAction;
     int samplesPerPixel;
     bool collectDebugLogs;
     bool collectDiagnostics;
@@ -166,7 +162,7 @@ class LambdaMaster {
     void invokeWorkers(const size_t n);
 
     std::unique_ptr<Scheduler> scheduler;
-    std::vector<TreeletId> treeletsToSpawn;
+    std::deque<TreeletId> treeletsToSpawn;
 
     ////////////////////////////////////////////////////////////////////////////
     // Worker <-> Object Assignments                                          //
@@ -189,9 +185,6 @@ class LambdaMaster {
 
     /* process incoming messages */
     Poller::Action::Result::Type handleMessages();
-
-    /* tell the workers to fetch base objects and generate rays */
-    Poller::Action::Result::Type handleJobStart();
 
     /* a queue for incoming messages */
     std::deque<std::pair<WorkerId, meow::Message>> incomingMessages{};
@@ -287,10 +280,6 @@ class LambdaMaster {
         size_t curTile{0};
     } tiles{};
 
-    /*** Accumulation *********************************************************/
-
-    Poller::Action::Result::Type handleWriteOutput();
-
     ////////////////////////////////////////////////////////////////////////////
     // Other Stuff                                                            //
     ////////////////////////////////////////////////////////////////////////////
@@ -301,7 +290,6 @@ class LambdaMaster {
 
     /* Timers */
     TimerFD statusPrintTimer{STATUS_PRINT_INTERVAL};
-    TimerFD writeOutputTimer{WRITE_OUTPUT_INTERVAL};
     TimerFD rescheduleTimer{RESCHEDULE_INTERVAL,
                             std::chrono::milliseconds{500}};
     TimerFD workerStatsWriteTimer;

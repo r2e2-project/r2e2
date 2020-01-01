@@ -22,5 +22,6 @@ Optional<Schedule> UniformScheduler::schedule(
         results[i]++;
     }
 
+    scheduledOnce = true;
     return {true, move(results)};
 }
