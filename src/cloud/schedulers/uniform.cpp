@@ -5,7 +5,7 @@
 using namespace std;
 using namespace pbrt;
 
-Optional<vector<size_t>> UniformScheduler::schedule(
+Optional<Schedule> UniformScheduler::schedule(
     const size_t maxWorkers, const vector<TreeletStats> &treelets) {
     if (scheduledOnce) return {false};
 

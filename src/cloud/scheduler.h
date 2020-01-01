@@ -10,9 +10,11 @@
 
 namespace pbrt {
 
+using Schedule = std::vector<size_t>;
+
 class Scheduler {
   public:
-      virtual Optional<std::vector<size_t>> schedule(
+    virtual Optional<Schedule> schedule(
         const size_t maxWorkers, const std::vector<TreeletStats> &treelets) = 0;
 
     virtual ~Scheduler() {}

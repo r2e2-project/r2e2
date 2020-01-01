@@ -10,7 +10,7 @@ class UniformScheduler : public Scheduler {
     bool scheduledOnce{false};
 
   public:
-    Optional<std::vector<size_t>> schedule(
+    Optional<Schedule> schedule(
         const size_t maxWorkers,
         const std::vector<TreeletStats> &treelets) override;
 };
