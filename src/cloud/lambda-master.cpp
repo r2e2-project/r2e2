@@ -54,14 +54,15 @@ LambdaMaster::~LambdaMaster() {
     }
 }
 
-LambdaMaster::LambdaMaster(const uint16_t listenPort,
-                           const uint32_t numberOfWorkers,
+LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
+                           const uint32_t rayGenerators,
                            const string &publicAddress,
                            const string &storageBackendUri,
                            const string &awsRegion,
                            const MasterConfiguration &config)
     : config(config),
-      numberOfWorkers(numberOfWorkers),
+      maxWorkers(maxWorkers),
+      rayGenerators(rayGenerators),
       publicAddress(publicAddress),
       storageBackendUri(storageBackendUri),
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
@@ -117,11 +118,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     /* and initialize the necessary scene objects */
     scene.initialize(config.samplesPerPixel, config.cropWindow);
-    objectManager.initialize(numberOfWorkers,
+    objectManager.initialize(maxWorkers,
                              config.assignment & Assignment::Static);
 
     tiles = Tiles{config.tileSize, scene.sampleBounds,
-                  scene.sampler->samplesPerPixel, numberOfWorkers};
+                  scene.sampler->samplesPerPixel, maxWorkers};
 
     /* are we logging anything? */
     if (config.collectDebugLogs || config.collectDiagnostics ||
@@ -150,7 +151,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
     printInfo("Job ID           ", jobId);
     printInfo("Working directory", scenePath);
     printInfo("Public address   ", publicAddress);
-    printInfo("Worker count     ", numberOfWorkers);
+    printInfo("Maxium workers   ", maxWorkers);
+    printInfo("Ray generators   ", rayGenerators);
     printInfo("Treelet count    ", treeletCount);
     printInfo("Tile size        ",
               to_string(tiles.tileSize) + "\u00d7" + to_string(tiles.tileSize));
@@ -168,7 +170,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
 
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleJobStart, this),
-        [this]() { return this->numberOfWorkers == this->initializedWorkers; },
+        [this]() { return this->maxWorkers == this->initializedWorkers; },
         []() { throw runtime_error("generate rays failed"); }));
 
     loop.poller().add_action(Poller::Action(
@@ -191,10 +193,10 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                        [this]() { return true; },
                        []() { throw runtime_error("status print failed"); }));
 
-    loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfWorkers](
+    loop.make_listener({"0.0.0.0", listenPort}, [this, maxWorkers](
                                                     ExecutionLoop &loop,
                                                     TCPSocket &&socket) {
-        if (currentWorkerId > numberOfWorkers) {
+        if (currentWorkerId > maxWorkers) {
             socket.close();
             return false;
         }
@@ -274,19 +276,19 @@ void LambdaMaster::run() {
     StatusBar::get();
 
     if (config.engines.empty()) {  // running on AWS Lambda
-        const size_t EXTRA_LAMBDAS = numberOfWorkers * 0.1;
-        cerr << "Launching " << numberOfWorkers << " (+" << EXTRA_LAMBDAS
+        const size_t EXTRA_LAMBDAS = maxWorkers * 0.1;
+        cerr << "Launching " << maxWorkers << " (+" << EXTRA_LAMBDAS
              << ") lambda(s)... ";
 
-        invokeWorkers(numberOfWorkers + EXTRA_LAMBDAS);
+        invokeWorkers(maxWorkers + EXTRA_LAMBDAS);
 
         cerr << "done." << endl;
     } else {  // running on custom engine
-        cerr << "Launching " << numberOfWorkers << " workers on "
+        cerr << "Launching " << maxWorkers << " workers on "
              << config.engines.size()
              << pluralize(" engine", config.engines.size()) << "... ";
 
-        invokeWorkers(numberOfWorkers);
+        invokeWorkers(maxWorkers);
 
         cerr << "done." << endl;
     }
@@ -338,7 +340,8 @@ void usage(const char *argv0, int exitCode) {
          << "  -i --ip IPSTRING           public ip of this machine" << endl
          << "  -r --aws-region REGION     region to run lambdas in" << endl
          << "  -b --storage-backend NAME  storage backend URI" << endl
-         << "  -l --lambdas N             how many lambdas to run" << endl
+         << "  -m --max-workers N         maximum number of workers" << endl
+         << "  -G --ray-generators N      number of ray generators" << endl
          << "  -g --debug-logs            collect worker debug logs" << endl
          << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -w --worker-stats N        log worker stats every N seconds"
@@ -388,7 +391,8 @@ int main(int argc, char *argv[]) {
     google::InitGoogleLogging(argv[0]);
 
     uint16_t listenPort = 50000;
-    int32_t numLambdas = -1;
+    int32_t maxWorkers = -1;
+    int32_t rayGenerators = -1;
     string publicIp;
     string storageBackendUri;
     string assignmentFile;
@@ -417,7 +421,8 @@ int main(int argc, char *argv[]) {
         {"ip", required_argument, nullptr, 'i'},
         {"aws-region", required_argument, nullptr, 'r'},
         {"storage-backend", required_argument, nullptr, 'b'},
-        {"lambdas", required_argument, nullptr, 'l'},
+        {"max-workers", required_argument, nullptr, 'm'},
+        {"ray-generators", required_argument, nullptr, 'G'},
         {"assignment", required_argument, nullptr, 'a'},
         {"debug-logs", no_argument, nullptr, 'g'},
         {"diagnostics", no_argument, nullptr, 'd'},
@@ -439,7 +444,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:l:w:D:a:S:L:c:t:j:T:n:J:E:ghd",
+            getopt_long(argc, argv, "p:i:r:b:m:G::w:D:a:S:L:c:t:j:T:n:J:E:ghd",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -452,7 +457,8 @@ int main(int argc, char *argv[]) {
         case 'i': publicIp = optarg; break;
         case 'r': region = optarg; break;
         case 'b': storageBackendUri = optarg; break;
-        case 'l': numLambdas = stoul(optarg); break;
+        case 'm': maxWorkers = stoul(optarg); break;
+        case 'G': rayGenerators = stoul(optarg); break;
         case 'g': collectDebugLogs = true; break;
         case 'w': workerStatsWriteInterval = stoul(optarg); break;
         case 'd': collectDiagnostics = true; break;
@@ -525,8 +531,13 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (listenPort == 0 || numLambdas < 0 || samplesPerPixel < 0 ||
-        rayActionsLogRate < 0 || rayActionsLogRate > 1.0 || publicIp.empty() ||
+    if (rayGenerators < -1) {
+        rayGenerators = maxWorkers / 2;
+    }
+
+    if (listenPort == 0 || maxWorkers < 0 || rayGenerators == 0 ||
+        samplesPerPixel < 0 || rayActionsLogRate < 0 ||
+        rayActionsLogRate > 1.0 || publicIp.empty() ||
         storageBackendUri.empty() || region.empty() || newTileThreshold == 0 ||
         (cropWindow.initialized() && pixelsPerTile != 0 &&
          pixelsPerTile != numeric_limits<typeof(pixelsPerTile)>::max() &&
@@ -557,8 +568,8 @@ int main(int argc, char *argv[]) {
                                   move(engines)};
 
     try {
-        master = make_unique<LambdaMaster>(listenPort, numLambdas,
-                                           publicAddress.str(),
+        master = make_unique<LambdaMaster>(listenPort, maxWorkers,
+                                           rayGenerators, publicAddress.str(),
                                            storageBackendUri, region, config);
         master->run();
     } catch (const exception &e) {

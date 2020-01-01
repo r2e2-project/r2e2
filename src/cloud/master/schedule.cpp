@@ -57,7 +57,7 @@ void LambdaMaster::invokeWorkers(const size_t nWorkers) {
             Address engineAddr{engineIpPort.first, engineIpPort.second};
 
             for (size_t i = 0;
-                 i < engine.second && launchedWorkers < numberOfWorkers;
+                 i < engine.second && launchedWorkers < maxWorkers;
                  i++, launchedWorkers++) {
                 loop.make_http_request<TCPConnection>(
                     "start-worker", engineAddr, request,
@@ -67,7 +67,7 @@ void LambdaMaster::invokeWorkers(const size_t nWorkers) {
                     });
             }
 
-            if (launchedWorkers >= numberOfWorkers) {
+            if (launchedWorkers >= maxWorkers) {
                 break;
             }
         }

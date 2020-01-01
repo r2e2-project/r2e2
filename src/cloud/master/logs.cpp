@@ -140,16 +140,16 @@ protobuf::JobSummary LambdaMaster::getJobSummary() const {
 
     const double avgRayThroughput =
         (totalTime > 0)
-            ? (10 * aggregatedStats.samples.count / numberOfWorkers / totalTime)
+            ? (10 * aggregatedStats.samples.count / maxWorkers / totalTime)
             : 0;
 
     const double estimatedCost =
-        LAMBDA_UNIT_COST * numberOfWorkers * ceil(totalTime);
+        LAMBDA_UNIT_COST * maxWorkers * ceil(totalTime);
 
     proto.set_total_time(totalTime);
     proto.set_launch_time(launchTime);
     proto.set_ray_time(rayTime);
-    proto.set_num_lambdas(numberOfWorkers);
+    proto.set_num_lambdas(maxWorkers);
     proto.set_total_paths(scene.totalPaths);
     proto.set_finished_paths(aggregatedStats.finishedPaths);
     proto.set_finished_rays(aggregatedStats.samples.count);

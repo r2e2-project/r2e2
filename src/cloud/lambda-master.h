@@ -69,8 +69,8 @@ struct MasterConfiguration {
 
 class LambdaMaster {
   public:
-    LambdaMaster(const uint16_t listenPort, const uint32_t numberOfWorkers,
-                 const std::string &publicAddress,
+    LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
+                 const uint32_t rayGenerators, const std::string &publicAddress,
                  const std::string &storageBackend,
                  const std::string &awsRegion,
                  const MasterConfiguration &config);
@@ -94,7 +94,8 @@ class LambdaMaster {
     const TempDirectory sceneDir{"/tmp/pbrt-lambda-master"};
     const std::string jobId{uuid::generate()};
 
-    const uint32_t numberOfWorkers;
+    const uint32_t maxWorkers;
+    const uint32_t rayGenerators;
     size_t initializedWorkers{0};
 
     ////////////////////////////////////////////////////////////////////////////

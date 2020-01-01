@@ -104,7 +104,7 @@ for i, scene in enumerate(scenes):
                                                       nlambdas=nlambdas,
                                                       spp=spp))
             cmd = cmdprefix + (" -S {spp} -D {dir} --job-summary {json}"
-                               " --lambdas {nlambdas} --port {port}").format(
+                               " --max-workers {nlambdas} --port {port}").format(
                     spp=spp,
                     dir=dir,
                     nlambdas=nlambdas,

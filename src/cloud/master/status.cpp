@@ -37,8 +37,8 @@ ResultType LambdaMaster::handleStatusMessage() {
                            []() { throw runtime_error("job finish"); }));
     }
 
-    const auto laggingWorkers = count_if(
-        workers.begin(), workers.end(), [&now](const auto &worker) {
+    const auto laggingWorkers =
+        count_if(workers.begin(), workers.end(), [&now](const auto &worker) {
             return now - worker.second.lastSeen >= seconds{4};
         });
 
@@ -69,7 +69,7 @@ ResultType LambdaMaster::handleStatusMessage() {
                 << " (" << percent(s.finishedPaths, scene.totalPaths) << "%) "
 
         // worker count
-        << BG() << " \u03bb " << (workers.size() - 1) << "/" << numberOfWorkers
+        << BG() << " \u03bb " << (workers.size() - 1) << "/" << maxWorkers
                 << " "
 
         // lagging workers
