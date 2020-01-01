@@ -142,9 +142,9 @@ class LambdaMaster {
         }
 
         static std::map<Role, size_t> activeCount;
+        static WorkerId nextId;
     };
 
-    WorkerId currentWorkerId{1};
     std::unordered_map<WorkerId, Worker> workers{};
 
     ////////////////////////////////////////////////////////////////////////////

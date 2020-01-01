@@ -47,7 +47,8 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
-map<LambdaMaster::Worker::Role, size_t> LambdaMaster::Worker::activeCount;
+map<LambdaMaster::Worker::Role, size_t> LambdaMaster::Worker::activeCount = {};
+WorkerId LambdaMaster::Worker::nextId = 1;
 
 LambdaMaster::~LambdaMaster() {
     try {
@@ -198,7 +199,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     loop.make_listener({"0.0.0.0", listenPort}, [this, maxWorkers](
                                                     ExecutionLoop &loop,
                                                     TCPSocket &&socket) {
-        const WorkerId workerId = currentWorkerId++;
+        const WorkerId workerId = Worker::nextId++;
 
         auto connectionCloseHandler = [this, workerId]() {
             auto &worker = workers.at(workerId);
