@@ -166,6 +166,7 @@ class LambdaMaster {
     void invokeWorkers(const size_t n);
 
     std::unique_ptr<Scheduler> scheduler;
+    std::vector<TreeletId> treeletsToSpawn;
 
     ////////////////////////////////////////////////////////////////////////////
     // Worker <-> Object Assignments                                          //

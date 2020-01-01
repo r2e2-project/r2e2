@@ -1,7 +1,10 @@
 #include "cloud/lambda-master.h"
 
+#include <algorithm>
 #include <chrono>
 #include <iomanip>
+#include <numeric>
+#include <random>
 
 #include "cloud/scheduler.h"
 #include "execution/meow/message.h"
@@ -19,6 +22,8 @@ using OpCode = Message::OpCode;
 using ResultType = Poller::Action::Result::Type;
 
 void LambdaMaster::invokeWorkers(const size_t nWorkers) {
+    if (nWorkers == 0) return;
+
     /* invocation payload (same for Lambda & custom engines) */
     // XXX this can be factored out of this function
     protobuf::InvocationPayload proto;
@@ -101,18 +106,28 @@ ResultType LambdaMaster::handleReschedule() {
 }
 
 void LambdaMaster::executeSchedule(const Schedule &schedule) {
-    /* XXX is the schedule viable? */
+    /* is the schedule viable? */
+    if (schedule.size() > treelets.size()) {
+        throw runtime_error("invalid schedule");
+    }
+
+    const auto totalRequestedWorkers =
+        accumulate(schedule.begin(), schedule.end(), 0);
+
+    if (totalRequestedWorkers > maxWorkers) {
+        throw runtime_error("not enough workers available for the schedule");
+    }
 
     /* let's plan */
-    vector<TreeletId> treeletsToSpawn;
     vector<WorkerId> workersToTakeDown;
+    treeletsToSpawn.clear();
 
     for (TreeletId tid = 0; tid < treelets.size(); tid++) {
         const size_t requested = schedule[tid];
         const size_t current = treelets[tid].workers.size();
 
         if (requested == current) {
-            /* we're good */
+            continue;
         } else if (requested > current) {
             /* we need to start new workers */
             treeletsToSpawn.insert(treeletsToSpawn.end(), requested - current,
@@ -124,18 +139,36 @@ void LambdaMaster::executeSchedule(const Schedule &schedule) {
                 workersToTakeDown.push_back(*it);
                 workers.erase(it);
             }
+
+            /* no workers are left for this treelet */
+            if (workers.empty()) {
+                unassignedTreelets.insert(tid);
+                moveFromQueuedToPending(tid);
+            }
         }
     }
 
+    /* let's start as many workers as we can right now */
+    const auto runningCount = Worker::activeCount[Worker::Role::Tracer];
+    const size_t availableCapacity =
+        (maxWorkers > runningCount)
+            ? static_cast<size_t>(maxWorkers - runningCount)
+            : 0ul;
+
+    invokeWorkers(min(availableCapacity, treeletsToSpawn.size()));
+
+    /* shuffling treeletsToSpawn */
+    random_device rd{};
+    mt19937 g{rd()};
+    shuffle(treeletsToSpawn.begin(), treeletsToSpawn.end(), g);
+
     /* let's kill the workers we can kill */
     for (const WorkerId workerId : workersToTakeDown) {
+        auto &worker = workers.at(workerId);
+        worker.state = Worker::State::FinishingUp;
         workers.at(workerId).connection->enqueue_write(
             Message::str(0, OpCode::FinishUp, ""));
     }
 
-    /* let's start as many workers as we can right now */
-
     /* the rest will have to wait until we have available capacity */
-
-    /* we need to do something about unassigned treelets */
 }
