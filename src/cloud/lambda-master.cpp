@@ -92,19 +92,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
         getSceneObjectRequest(ObjectType::Sampler),
     };
 
-    /* download the static assignment file if necessary */
-    if ((config.assignment & Assignment::Static)) {
-        if (config.assignmentFile.empty()) {
-            sceneObjReqs.emplace_back(
-                getSceneObjectRequest(ObjectType::StaticAssignment));
-        } else {
-            copy_then_rename(
-                config.assignmentFile,
-                roost::path(scenePath) /
-                    SceneManager::getFileName(ObjectType::StaticAssignment, 0));
-        }
-    }
-
     cerr << "Downloading scene data... ";
     storageBackend->get(sceneObjReqs);
     cerr << "done." << endl;
@@ -120,12 +107,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     for (size_t i = 0; i < treeletCount; i++) {
         treelets.emplace_back(i);
         treeletStats.emplace_back();
+        unassignedTreelets.insert(i);
     }
 
     /* and initialize the necessary scene objects */
     scene.initialize(config.samplesPerPixel, config.cropWindow);
-    objectManager.initialize(maxWorkers,
-                             config.assignment & Assignment::Static);
 
     tiles = Tiles{config.tileSize, scene.sampleBounds,
                   scene.sampler->samplesPerPixel, rayGenerators};
@@ -253,8 +239,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                                               move(connection)))
                     .first->second;
 
-            objectManager.assignBaseObjects(worker, treelets,
-                                            this->config.assignment);
+            assignBaseObjects(worker);
 
             /* (1) saying hi, assigning id to the worker */
             protobuf::Hey heyProto;
@@ -424,7 +409,6 @@ int main(int argc, char *argv[]) {
     int32_t rayGenerators = -1;
     string publicIp;
     string storageBackendUri;
-    string assignmentFile;
     string region{"us-west-2"};
     uint64_t workerStatsWriteInterval = 0;
     bool collectDiagnostics = false;
@@ -437,7 +421,6 @@ int main(int argc, char *argv[]) {
     uint64_t newTileThreshold = 10000;
     string jobSummaryPath;
 
-    int assignment = Assignment::None;
     int samplesPerPixel = 0;
     int tileSize = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
@@ -516,18 +499,7 @@ int main(int argc, char *argv[]) {
         }
 
         case 'a': {
-            const string arg = optarg;
-            const auto eqpos = arg.find('=');
-            string name;
-
-            if (eqpos == string::npos) {
-                name = arg;
-            } else {
-                name = arg.substr(0, eqpos);
-                assignmentFile = arg.substr(eqpos + 1);
-            }
-
-            if (name == "uniform") {
+            if (strcmp(optarg, "uniform") == 0) {
                 scheduler = make_unique<UniformScheduler>();
             } else {
                 usage(argv[0], EXIT_FAILURE);
@@ -572,9 +544,7 @@ int main(int argc, char *argv[]) {
     unique_ptr<LambdaMaster> master;
 
     // TODO clean this up
-    MasterConfiguration config = {assignment,
-                                  assignmentFile,
-                                  finishedRayAction,
+    MasterConfiguration config = {finishedRayAction,
                                   samplesPerPixel,
                                   collectDebugLogs,
                                   collectDiagnostics,

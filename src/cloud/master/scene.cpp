@@ -12,34 +12,11 @@ using namespace pbrt::global;
 
 using OpCode = Message::OpCode;
 
-void LambdaMaster::ObjectManager::initialize(const uint32_t numWorkers,
-                                             const bool staticAssignment) {
-    if (initialized) return;
-
-    /* get the list of all objects and create entries for tracking their
-     * assignment to workers for each */
-
-    const size_t treeletCount = global::manager.treeletCount();
-
-    for (size_t i = 0; i < treeletCount; i++) {
-        unassignedTreelets.insert(i);
-        treeletIds.insert({ObjectType::Treelet, i});
-    }
-
-    if (staticAssignment) {
-        loadStaticAssignment(0, numWorkers);
-    }
-
-    initialized = true;
-}
-
-void LambdaMaster::ObjectManager::assignObject(Worker &worker,
-                                               const ObjectKey &object) {
+void LambdaMaster::assignObject(Worker &worker, const ObjectKey &object) {
     worker.objects.insert(object);
 }
 
-void LambdaMaster::ObjectManager::assignTreelet(Worker &worker,
-                                                Treelet &treelet) {
+void LambdaMaster::assignTreelet(Worker &worker, Treelet &treelet) {
     assignObject(worker, {ObjectType::Treelet, treelet.id});
 
     unassignedTreelets.erase(treelet.id);
@@ -54,49 +31,11 @@ void LambdaMaster::ObjectManager::assignTreelet(Worker &worker,
     }
 }
 
-void LambdaMaster::ObjectManager::assignBaseObjects(Worker &worker,
-                                                    vector<Treelet> &treelets,
-                                                    const int assignment) {
+void LambdaMaster::assignBaseObjects(Worker &worker) {
     assignObject(worker, ObjectKey{ObjectType::Scene, 0});
     assignObject(worker, ObjectKey{ObjectType::Camera, 0});
     assignObject(worker, ObjectKey{ObjectType::Sampler, 0});
     assignObject(worker, ObjectKey{ObjectType::Lights, 0});
-
-    auto doUniformAssign = [&](Worker &worker) {
-        assignTreelet(worker, treelets[(worker.id - 1) % treelets.size()]);
-    };
-
-    auto doStaticAssign = [&](Worker &worker) {
-        for (const auto t : staticAssignments[worker.id - 1]) {
-            assignTreelet(worker, treelets[t]);
-        }
-    };
-
-    auto doAllAssign = [&](Worker &worker) {
-        for (const auto &t : treeletIds) {
-            assignTreelet(worker, treelets[t.id]);
-        }
-    };
-
-    auto doDebugAssign = [&](Worker &worker) {
-        if (worker.id == 0) {
-            assignTreelet(worker, treelets[0]);
-        }
-    };
-
-    if (assignment & Assignment::Static) {
-        doStaticAssign(worker);
-    } else if (assignment & Assignment::Uniform) {
-        doUniformAssign(worker);
-    } else if (assignment & Assignment::All) {
-        doAllAssign(worker);
-    } else if (assignment & Assignment::Debug) {
-        doDebugAssign(worker);
-    } else if (assignment == Assignment::None) {
-        /* nothing */
-    } else {
-        throw runtime_error("unrecognized assignment type");
-    }
 }
 
 void LambdaMaster::SceneData::loadCamera(const Optional<Bounds2i> &cropWindow) {

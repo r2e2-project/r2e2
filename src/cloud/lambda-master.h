@@ -37,21 +37,9 @@ constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WRITE_OUTPUT_INTERVAL{10'000};
 constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL{5'000};
 
-struct Assignment {
-    // clang-format off
-    static constexpr int None    = 0;
-    static constexpr int All     = (1 << 0);
-    static constexpr int Static  = (1 << 1);
-    static constexpr int Uniform = (1 << 2);
-    static constexpr int Debug   = (1 << 3); /* only assigns T0 to one worker */
-    // clang-format on
-};
-
 enum class FinishedRayAction { Discard, SendBack, Upload };
 
 struct MasterConfiguration {
-    int assignment; /* look at `struct Assignment` */
-    std::string assignmentFile;
     FinishedRayAction finishedRayAction;
     int samplesPerPixel;
     bool collectDebugLogs;
@@ -180,6 +168,16 @@ class LambdaMaster {
     std::unique_ptr<Scheduler> scheduler;
 
     ////////////////////////////////////////////////////////////////////////////
+    // Worker <-> Object Assignments                                          //
+    ////////////////////////////////////////////////////////////////////////////
+
+    void assignObject(Worker &worker, const ObjectKey &object);
+    void assignBaseObjects(Worker &worker);
+    void assignTreelet(Worker &worker, Treelet &treelet);
+
+    std::set<TreeletId> unassignedTreelets{};
+
+    ////////////////////////////////////////////////////////////////////////////
     // Communication                                                          //
     ////////////////////////////////////////////////////////////////////////////
 
@@ -266,28 +264,6 @@ class LambdaMaster {
         void loadCamera(const Optional<Bounds2i> &cropWindow);
         void loadSampler(const int samplesPerPixel);
     } scene{};
-
-    /*** Object Assignment ****************************************************/
-
-    class ObjectManager {
-      public:
-        void initialize(const uint32_t numWorkers, const bool staticAssignment);
-        void assignBaseObjects(Worker &worker, std::vector<Treelet> &treelets,
-                               const int assignment);
-        void assignTreelet(Worker &worker, Treelet &treelet);
-
-        std::set<TreeletId> unassignedTreelets{};
-
-      private:
-        bool initialized{false};
-
-        void assignObject(Worker &worker, const ObjectKey &object);
-        void loadStaticAssignment(const uint32_t assignmentId,
-                                  const uint32_t numWorkers);
-
-        std::set<ObjectKey> treeletIds{};
-        std::map<WorkerId, std::vector<TreeletId>> staticAssignments{};
-    } objectManager{};
 
     /*** Tiles ****************************************************************/
 
