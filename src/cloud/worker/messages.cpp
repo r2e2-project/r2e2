@@ -74,6 +74,25 @@ void LambdaWorker::processMessage(const Message& message) {
         break;
     }
 
+    case OpCode::FinishUp:
+        loop.poller().add_action(Poller::Action(
+            alwaysOnFd, Direction::Out,
+            [this]() {
+                /* TODO let's send the latest worker stats */
+                coordinatorConnection->enqueue_write(
+                    Message::str(*workerId, OpCode::Bye, ""));
+
+                return ResultType::Cancel;
+            },
+            [this]() {
+                return traceQueue.empty() && sendQueue.empty() &&
+                       receiveQueue.empty() && pendingRayBags.empty() &&
+                       sampleBags.empty();
+            },
+            []() { throw runtime_error("terminating failed"); }));
+
+        break;
+
     case OpCode::Bye:
         terminate();
         break;

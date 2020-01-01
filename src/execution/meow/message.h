@@ -23,6 +23,7 @@ class Message {
         RayBagDequeued,
         ProcessRayBag,
         WorkerStats,
+        FinishUp,
         Bye,
 
         COUNT
@@ -39,6 +40,7 @@ class Message {
         "RayBagDequeued",
         "ProcessRayBag",
         "WorkerStats",
+        "FinishUp",
         "Bye"};
 
     constexpr static size_t HEADER_LENGTH = 13;
