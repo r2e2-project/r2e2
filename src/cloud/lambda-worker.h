@@ -45,14 +45,9 @@ constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
 constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024};  // 4 MiB
 
 struct WorkerConfiguration {
-    bool sendReliably;
-    uint64_t maxUdpRate;
     int samplesPerPixel;
-    FinishedRayAction finishedRayAction;
     float rayActionsLogRate;
-    float packetsLogRate;
     bool collectDiagnostics;
-    bool logLeases;
 };
 
 /* Relationship between different queues in LambdaWorker:

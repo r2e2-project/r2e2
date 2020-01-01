@@ -25,23 +25,11 @@ def handler(event, context):
                "--storage-backend", storage_backend,
                "--finished-ray", str(event.get('finishedRayAction', 0))]
 
-    if event['sendReliably']:
-        command += ['--reliable-udp']
-
     if event['samplesPerPixel']:
         command += ['--samples', str(event['samplesPerPixel'])]
 
     if event['rayActionsLogRate']:
         command += ['--log-rays', str(event['rayActionsLogRate'])]
-
-    if event['packetsLogRate']:
-        command += ['--log-packets', str(event['packetsLogRate'])]
-
-    if event['maxUdpRate']:
-        command += ['--max-udp-rate', str(event['maxUdpRate'])]
-
-    if event['logLeases']:
-        command += ['--log-leases']
 
     if event['collectDiagnostics']:
         command += ['--diagnostics']

@@ -165,17 +165,9 @@ void usage(const char* argv0, int exitCode) {
          << "  -i --ip IPSTRING           ip of coordinator" << endl
          << "  -p --port PORT             port of coordinator" << endl
          << "  -s --storage-backend NAME  storage backend URI" << endl
-         << "  -R --reliable-udp          send ray packets reliably" << endl
-         << "  -M --max-udp-rate RATE     maximum UDP rate (Mbps)" << endl
          << "  -S --samples N             number of samples per pixel" << endl
-         << "  -e --log-leases            log leases" << endl
          << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
-         << "  -P --log-packets RATE      log packets" << endl
-         << "  -f --finished-ray ACTION   what to do with finished rays" << endl
-         << "                             * 0: discard (default)" << endl
-         << "                             * 1: send" << endl
-         << "                             * 2: upload" << endl
          << "  -h --help                  show help information" << endl;
 }
 
@@ -186,35 +178,25 @@ int main(int argc, char* argv[]) {
     string publicIp;
     string storageUri;
 
-    bool sendReliably = false;
-    uint64_t maxUdpRate = 80_Mbps;
     int samplesPerPixel = 0;
-    FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
     float rayActionsLogRate = 0.0;
-    float packetsLogRate = 0.0;
     bool collectDiagnostics = false;
-    bool logLeases = false;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
         {"ip", required_argument, nullptr, 'i'},
         {"storage-backend", required_argument, nullptr, 's'},
-        {"reliable-udp", no_argument, nullptr, 'R'},
         {"samples", required_argument, nullptr, 'S'},
         {"diagnostics", no_argument, nullptr, 'd'},
-        {"log-leases", no_argument, nullptr, 'e'},
         {"log-rays", required_argument, nullptr, 'L'},
-        {"log-packets", required_argument, nullptr, 'P'},
-        {"finished-ray", required_argument, nullptr, 'f'},
-        {"max-udp-rate", required_argument, nullptr, 'M'},
         {"directional", no_argument, nullptr, 'I'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
-        const int opt = getopt_long(argc, argv, "p:i:s:S:f:L:P:M:hRde",
-                                    long_options, nullptr);
+        const int opt =
+            getopt_long(argc, argv, "p:i:s:S:L:hdI", long_options, nullptr);
 
         if (opt == -1) break;
 
@@ -223,14 +205,9 @@ int main(int argc, char* argv[]) {
         case 'p': listenPort = stoi(optarg); break;
         case 'i': publicIp = optarg; break;
         case 's': storageUri = optarg; break;
-        case 'R': sendReliably = true; break;
-        case 'M': maxUdpRate = stoull(optarg) * 1'000'000; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'd': collectDiagnostics = true; break;
-        case 'e': logLeases = true; break;
         case 'L': rayActionsLogRate = stof(optarg); break;
-        case 'P': packetsLogRate = stof(optarg); break;
-        case 'f': finishedRayAction = (FinishedRayAction)stoi(optarg); break;
         case 'I': PbrtOptions.directionalTreelets = true; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
         default: usage(argv[0], EXIT_FAILURE);
@@ -239,16 +216,16 @@ int main(int argc, char* argv[]) {
     }
 
     if (listenPort == 0 || rayActionsLogRate < 0 || rayActionsLogRate > 1.0 ||
-        packetsLogRate < 0 || packetsLogRate > 1.0 || publicIp.empty() ||
-        storageUri.empty() || maxUdpRate == 0) {
+        publicIp.empty() || storageUri.empty()) {
         usage(argv[0], EXIT_FAILURE);
     }
 
     unique_ptr<LambdaWorker> worker;
-    WorkerConfiguration config{sendReliably,       maxUdpRate,
-                               samplesPerPixel,    finishedRayAction,
-                               rayActionsLogRate,  packetsLogRate,
-                               collectDiagnostics, logLeases};
+    WorkerConfiguration config{
+        samplesPerPixel,
+        rayActionsLogRate,
+        collectDiagnostics,
+    };
 
     try {
         worker =

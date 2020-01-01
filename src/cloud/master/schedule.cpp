@@ -19,14 +19,9 @@ void LambdaMaster::invokeWorkers(const size_t nWorkers) {
     protobuf::InvocationPayload proto;
     proto.set_storage_backend(storageBackendUri);
     proto.set_coordinator(publicAddress);
-    proto.set_send_reliably(config.sendReliably);
-    proto.set_max_udp_rate(config.maxUdpRate);
     proto.set_samples_per_pixel(config.samplesPerPixel);
-    proto.set_finished_ray_action(to_underlying(config.finishedRayAction));
     proto.set_ray_actions_log_rate(config.rayActionsLogRate);
-    proto.set_packets_log_rate(config.packetsLogRate);
     proto.set_collect_diagnostics(config.collectDiagnostics);
-    proto.set_log_leases(config.logLeases);
     proto.set_directional_treelets(PbrtOptions.directionalTreelets);
 
     const string invocationJson = protoutil::to_json(proto);
