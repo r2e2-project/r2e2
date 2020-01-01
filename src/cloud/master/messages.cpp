@@ -33,7 +33,7 @@ ResultType LambdaMaster::handleMessages() {
 }
 
 void LambdaMaster::processMessage(const uint64_t workerId,
-                                  const meow::Message &message) {
+                                  const Message &message) {
     /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
          << "] from worker " << workerId << endl; */
 

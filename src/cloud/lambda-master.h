@@ -139,7 +139,7 @@ class LambdaMaster {
     };
 
     WorkerId currentWorkerId{1};
-    std::vector<Worker> workers{};
+    std::unordered_map<WorkerId, Worker> workers{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Treelets                                                               //

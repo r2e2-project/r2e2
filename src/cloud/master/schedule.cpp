@@ -108,7 +108,7 @@ void LambdaMaster::executeSchedule(const Schedule &schedule) {
 
     /* let's kill the workers we can kill */
     for (const WorkerId workerId : workersToTakeDown) {
-        workers[workerId].connection->enqueue_write(
+        workers.at(workerId).connection->enqueue_write(
             Message::str(0, OpCode::FinishUp, ""));
     }
 

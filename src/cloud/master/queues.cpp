@@ -32,7 +32,7 @@ ResultType LambdaMaster::handleQueuedRayBags() {
     }
 
     for (auto& item : assignedBags) {
-        auto& worker = workers[item.first];
+        auto& worker = workers.at(item.first);
 
         queue<RayBagInfo>& bags = item.second;
         protobuf::RayBags proto;

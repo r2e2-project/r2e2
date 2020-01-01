@@ -11,7 +11,7 @@ using namespace PollerShortNames;
 
 void LambdaMaster::recordEnqueue(const WorkerId workerId,
                                  const RayBagInfo &info) {
-    auto &worker = workers[workerId];
+    auto &worker = workers.at(workerId);
 
     worker.lastStats.first = true;
     treelets[info.treeletId].lastStats.first = true;
@@ -35,7 +35,7 @@ void LambdaMaster::recordEnqueue(const WorkerId workerId,
 
 void LambdaMaster::recordAssign(const WorkerId workerId,
                                 const RayBagInfo &info) {
-    auto &worker = workers[workerId];
+    auto &worker = workers.at(workerId);
 
     worker.assignedRayBags.insert(info);
 
@@ -49,7 +49,7 @@ void LambdaMaster::recordAssign(const WorkerId workerId,
 
 void LambdaMaster::recordDequeue(const WorkerId workerId,
                                  const RayBagInfo &info) {
-    auto &worker = workers[workerId];
+    auto &worker = workers.at(workerId);
 
     worker.assignedRayBags.erase(info);
     worker.lastStats.first = true;
@@ -72,21 +72,19 @@ ResultType LambdaMaster::handleWorkerStats() {
 
     const float T = static_cast<float>(config.workerStatsWriteInterval);
 
-    for (size_t workerId = 1; workerId <= numberOfWorkers; workerId++) {
-        if (!workers[workerId].lastStats.first) {
-            continue; /* nothing new to log */
-        }
+    for (auto &workerkv : workers) {
+        auto &worker = workerkv.second;
 
-        const WorkerStats stats =
-            workers[workerId].stats - workers[workerId].lastStats.second;
+        if (!worker.lastStats.first) continue; /* nothing new to log */
 
-        workers[workerId].lastStats.second = workers[workerId].stats;
-        workers[workerId].lastStats.first = false;
+        const WorkerStats stats = worker.stats - worker.lastStats.second;
+        worker.lastStats.second = worker.stats;
+        worker.lastStats.first = false;
 
         /* timestamp,workerId,pathsFinished,raysEnqueued,raysAssigned,
         raysDequeued,bytesEnqueued,bytesAssigned,bytesDequeued,numSamples,
         bytesSamples */
-        wsStream << t << ',' << workerId << ',' << fixed
+        wsStream << t << ',' << worker.id << ',' << fixed
                  << (stats.finishedPaths / T) << ','
                  << (stats.enqueued.count / T) << ','
                  << (stats.assigned.count / T) << ','

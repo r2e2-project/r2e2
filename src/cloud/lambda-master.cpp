@@ -69,9 +69,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
       awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
       workerStatsWriteTimer(seconds{config.workerStatsWriteInterval},
                             milliseconds{1}) {
-    workers.reserve(numberOfWorkers + 1);
-    workers.emplace_back(0, nullptr); /* worker 0 is the master */
-
     const string scenePath = sceneDir.name();
     roost::create_directories(scenePath);
 
@@ -195,50 +192,51 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort,
                        [this]() { return true; },
                        []() { throw runtime_error("status print failed"); }));
 
-    loop.make_listener(
-        {"0.0.0.0", listenPort},
-        [this, numberOfWorkers](ExecutionLoop &loop, TCPSocket &&socket) {
-            if (currentWorkerId > numberOfWorkers) {
-                socket.close();
-                return false;
+    loop.make_listener({"0.0.0.0", listenPort}, [this, numberOfWorkers](
+                                                    ExecutionLoop &loop,
+                                                    TCPSocket &&socket) {
+        if (currentWorkerId > numberOfWorkers) {
+            socket.close();
+            return false;
+        }
+
+        auto failure_handler = [this, ID = currentWorkerId]() {
+            ostringstream message;
+            const auto &worker = workers.at(ID);
+            message << "worker died: " << ID;
+
+            if (!worker.awsLogStream.empty()) {
+                message << " (" << worker.awsLogStream << ")";
             }
 
-            auto failure_handler = [this, ID = currentWorkerId]() {
-                ostringstream message;
-                const auto &worker = workers.at(ID);
-                message << "worker died: " << ID;
+            throw runtime_error(message.str());
+        };
 
-                if (!worker.awsLogStream.empty()) {
-                    message << " (" << worker.awsLogStream << ")";
+        auto messageParser = make_shared<MessageParser>();
+        auto connection = loop.add_connection<TCPSocket>(
+            move(socket),
+            [this, ID = currentWorkerId, messageParser](
+                shared_ptr<TCPConnection>, string &&data) {
+                messageParser->parse(data);
+
+                while (!messageParser->empty()) {
+                    incomingMessages.emplace_back(ID,
+                                                  move(messageParser->front()));
+                    messageParser->pop();
                 }
 
-                throw runtime_error(message.str());
-            };
+                return true;
+            },
+            failure_handler, failure_handler);
 
-            auto messageParser = make_shared<MessageParser>();
-            auto connection = loop.add_connection<TCPSocket>(
-                move(socket),
-                [this, ID = currentWorkerId, messageParser](
-                    shared_ptr<TCPConnection> connection, string &&data) {
-                    messageParser->parse(data);
+        workers.emplace(piecewise_construct, forward_as_tuple(currentWorkerId),
+                        forward_as_tuple(currentWorkerId, move(connection)));
 
-                    while (!messageParser->empty()) {
-                        incomingMessages.emplace_back(
-                            ID, move(messageParser->front()));
-                        messageParser->pop();
-                    }
-
-                    return true;
-                },
-                failure_handler, failure_handler);
-
-            workers.emplace_back(currentWorkerId, move(connection));
-
-            objectManager.assignBaseObjects(workers[currentWorkerId], treelets,
-                                            this->config.assignment);
-            currentWorkerId++;
-            return true;
-        });
+        objectManager.assignBaseObjects(workers.at(currentWorkerId), treelets,
+                                        this->config.assignment);
+        currentWorkerId++;
+        return true;
+    });
 }
 
 ResultType LambdaMaster::handleJobStart() {
@@ -246,8 +244,8 @@ ResultType LambdaMaster::handleJobStart() {
 
     generationStart = lastActionTime = steady_clock::now();
 
-    for (size_t i = 1; i < workers.size(); i++) {
-        auto &worker = workers[i];
+    for (auto &workerkv : workers) {
+        auto &worker = workerkv.second;
 
         protobuf::GetObjects proto;
         for (const ObjectKey &id : worker.objects) {
@@ -305,8 +303,8 @@ void LambdaMaster::run() {
     wsStream.close();
     tlStream.close();
 
-    for (size_t i = 1; i < workers.size(); i++) {
-        const auto &worker = workers[i];
+    for (auto &workerkv : workers) {
+        const auto &worker = workerkv.second;
         worker.connection->socket().close();
 
         if (config.collectDebugLogs || config.collectDiagnostics ||
