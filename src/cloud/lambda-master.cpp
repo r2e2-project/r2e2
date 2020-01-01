@@ -21,6 +21,7 @@
 #include "cloud/manager.h"
 #include "cloud/r2t2.h"
 #include "cloud/raystate.h"
+#include "cloud/schedulers/uniform.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/transform.h"
@@ -62,10 +63,12 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                            const string &publicAddress,
                            const string &storageBackendUri,
                            const string &awsRegion,
+                           unique_ptr<Scheduler> &&scheduler,
                            const MasterConfiguration &config)
     : config(config),
       maxWorkers(maxWorkers),
       rayGenerators(rayGenerators),
+      scheduler(move(scheduler)),
       publicAddress(publicAddress),
       storageBackendUri(storageBackendUri),
       storageBackend(StorageBackend::create_backend(storageBackendUri)),
@@ -165,6 +168,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     printInfo("Total paths      ", scene.sampleExtent.x * scene.sampleExtent.y *
                                        config.samplesPerPixel);
     cerr << endl;
+
+    loop.poller().add_action(Poller::Action(
+        rescheduleTimer, Direction::In,
+        bind(&LambdaMaster::handleReschedule, this), []() { return true; },
+        []() { throw runtime_error("rescheduler failed"); }));
 
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleMessages, this),
@@ -370,12 +378,11 @@ void usage(const char *argv0, int exitCode) {
          << "  -D --logs-dir DIR          set logs directory (default: logs/)"
          << endl
          << "  -S --samples N             number of samples per pixel" << endl
-         << "  -a --assignment TYPE       indicate assignment type:" << endl
+         << "  -a --scheduler TYPE        indicate scheduler type:" << endl
          << "                               - uniform (default)" << endl
          << "                               - static" << endl
-         << "                               - static+uniform" << endl
          << "                               - all" << endl
-         << "                               - debug" << endl
+         << "                               - none" << endl
          << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
          << endl
          << "  -T --pix-per-tile N        pixels per tile (default=44)" << endl
@@ -410,6 +417,8 @@ int main(int argc, char *argv[]) {
 
     google::InitGoogleLogging(argv[0]);
 
+    unique_ptr<Scheduler> scheduler;
+
     uint16_t listenPort = 50000;
     int32_t maxWorkers = -1;
     int32_t rayGenerators = -1;
@@ -428,7 +437,7 @@ int main(int argc, char *argv[]) {
     uint64_t newTileThreshold = 10000;
     string jobSummaryPath;
 
-    int assignment = Assignment::Uniform;
+    int assignment = Assignment::None;
     int samplesPerPixel = 0;
     int tileSize = 0;
     FinishedRayAction finishedRayAction = FinishedRayAction::Discard;
@@ -443,7 +452,7 @@ int main(int argc, char *argv[]) {
         {"storage-backend", required_argument, nullptr, 'b'},
         {"max-workers", required_argument, nullptr, 'm'},
         {"ray-generators", required_argument, nullptr, 'G'},
-        {"assignment", required_argument, nullptr, 'a'},
+        {"scheduler", required_argument, nullptr, 'a'},
         {"debug-logs", no_argument, nullptr, 'g'},
         {"diagnostics", no_argument, nullptr, 'd'},
         {"worker-stats", required_argument, nullptr, 'w'},
@@ -518,16 +527,8 @@ int main(int argc, char *argv[]) {
                 assignmentFile = arg.substr(eqpos + 1);
             }
 
-            if (name == "static") {
-                assignment = Assignment::Static;
-            } else if (name == "uniform") {
-                assignment = Assignment::Uniform;
-            } else if (name == "all") {
-                assignment = Assignment::All;
-            } else if (name == "debug") {
-                assignment = Assignment::Debug;
-            } else if (name == "none") {
-                assignment = Assignment::None;
+            if (name == "uniform") {
+                scheduler = make_unique<UniformScheduler>();
             } else {
                 usage(argv[0], EXIT_FAILURE);
             }
@@ -555,8 +556,8 @@ int main(int argc, char *argv[]) {
         rayGenerators = maxWorkers / 2;
     }
 
-    if (listenPort == 0 || maxWorkers < 0 || rayGenerators == 0 ||
-        samplesPerPixel < 0 || rayActionsLogRate < 0 ||
+    if (scheduler == nullptr || listenPort == 0 || maxWorkers < 0 ||
+        rayGenerators == 0 || samplesPerPixel < 0 || rayActionsLogRate < 0 ||
         rayActionsLogRate > 1.0 || publicIp.empty() ||
         storageBackendUri.empty() || region.empty() || newTileThreshold == 0 ||
         (cropWindow.initialized() && pixelsPerTile != 0 &&
@@ -588,9 +589,10 @@ int main(int argc, char *argv[]) {
                                   move(engines)};
 
     try {
-        master = make_unique<LambdaMaster>(listenPort, maxWorkers,
-                                           rayGenerators, publicAddress.str(),
-                                           storageBackendUri, region, config);
+        master = make_unique<LambdaMaster>(
+            listenPort, maxWorkers, rayGenerators, publicAddress.str(),
+            storageBackendUri, region, move(scheduler), config);
+
         master->run();
     } catch (const exception &e) {
         print_exception(argv[0], e);

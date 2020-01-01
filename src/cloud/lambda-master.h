@@ -35,6 +35,7 @@ namespace pbrt {
 
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WRITE_OUTPUT_INTERVAL{10'000};
+constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL{5'000};
 
 struct Assignment {
     // clang-format off
@@ -73,6 +74,7 @@ class LambdaMaster {
                  const uint32_t rayGenerators, const std::string &publicAddress,
                  const std::string &storageBackend,
                  const std::string &awsRegion,
+                 std::unique_ptr<Scheduler> &&scheduler,
                  const MasterConfiguration &config);
 
     ~LambdaMaster();
@@ -165,6 +167,10 @@ class LambdaMaster {
     ////////////////////////////////////////////////////////////////////////////
     // Scheduler                                                              //
     ////////////////////////////////////////////////////////////////////////////
+
+    /* this function is periodically called; it calls the scheduler,
+       and if a new schedule is available, it executes it */
+    Poller::Action::Result::Type handleReschedule();
 
     void executeSchedule(const Schedule &schedule);
 
@@ -319,6 +325,8 @@ class LambdaMaster {
     /* Timers */
     TimerFD statusPrintTimer{STATUS_PRINT_INTERVAL};
     TimerFD writeOutputTimer{WRITE_OUTPUT_INTERVAL};
+    TimerFD rescheduleTimer{RESCHEDULE_INTERVAL,
+                            std::chrono::milliseconds{500}};
     TimerFD workerStatsWriteTimer;
 
     std::unique_ptr<TimerFD> exitTimer;

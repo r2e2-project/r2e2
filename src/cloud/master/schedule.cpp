@@ -1,5 +1,8 @@
 #include "cloud/lambda-master.h"
 
+#include <chrono>
+#include <iomanip>
+
 #include "cloud/scheduler.h"
 #include "execution/meow/message.h"
 #include "messages/utils.h"
@@ -8,10 +11,12 @@
 #include "util/random.h"
 
 using namespace std;
+using namespace chrono;
 using namespace pbrt;
 using namespace meow;
 
 using OpCode = Message::OpCode;
+using ResultType = Poller::Action::Result::Type;
 
 void LambdaMaster::invokeWorkers(const size_t nWorkers) {
     /* invocation payload (same for Lambda & custom engines) */
@@ -72,6 +77,27 @@ void LambdaMaster::invokeWorkers(const size_t nWorkers) {
             }
         }
     }
+}
+
+ResultType LambdaMaster::handleReschedule() {
+    rescheduleTimer.reset();
+
+    /* (1) call the schedule function */
+    cerr << "Rescheduling... ";
+
+    auto start = steady_clock::now();
+    auto schedule = scheduler->schedule(maxWorkers, treeletStats);
+
+    if (schedule.initialized()) {
+        executeSchedule(*schedule);
+    }
+
+    auto end = steady_clock::now();
+
+    cerr << "done (" << fixed << setprecision(2)
+         << duration_cast<milliseconds>(end - start).count() << " ms)." << endl;
+
+    return ResultType::Continue;
 }
 
 void LambdaMaster::executeSchedule(const Schedule &schedule) {
