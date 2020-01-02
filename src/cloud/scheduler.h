@@ -10,6 +10,7 @@
 
 namespace pbrt {
 
+/* Schedule is a {TreeletId -> Worker Count} mapping */
 using Schedule = std::vector<size_t>;
 
 class Scheduler {
