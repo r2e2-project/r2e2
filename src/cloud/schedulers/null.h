@@ -7,9 +7,8 @@ namespace pbrt {
 
 class NullScheduler : public Scheduler {
   public:
-    Optional<Schedule> schedule(
-        const size_t maxWorkers,
-        const std::vector<TreeletStats> &treelets) override {
+    Optional<Schedule> schedule(const size_t,
+                                const std::vector<TreeletStats> &) override {
         return {false};
     }
 };
