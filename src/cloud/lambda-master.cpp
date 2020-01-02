@@ -22,6 +22,7 @@
 #include "cloud/r2t2.h"
 #include "cloud/raystate.h"
 #include "cloud/schedulers/null.h"
+#include "cloud/schedulers/static.h"
 #include "cloud/schedulers/uniform.h"
 #include "core/camera.h"
 #include "core/geometry.h"
@@ -37,6 +38,7 @@
 #include "util/path.h"
 #include "util/random.h"
 #include "util/status_bar.h"
+#include "util/temp_file.h"
 #include "util/tokenize.h"
 #include "util/util.h"
 
@@ -425,8 +427,6 @@ int main(int argc, char *argv[]) {
 
     google::InitGoogleLogging(argv[0]);
 
-    unique_ptr<Scheduler> scheduler;
-
     uint16_t listenPort = 50000;
     int32_t maxWorkers = -1;
     int32_t rayGenerators = -1;
@@ -443,6 +443,9 @@ int main(int argc, char *argv[]) {
     uint32_t pixelsPerTile = 0;
     uint64_t newTileThreshold = 10000;
     string jobSummaryPath;
+
+    unique_ptr<Scheduler> scheduler = nullptr;
+    string schedulerName;
 
     int samplesPerPixel = 0;
     int tileSize = 0;
@@ -493,6 +496,7 @@ int main(int argc, char *argv[]) {
         case 'b': storageBackendUri = optarg; break;
         case 'm': maxWorkers = stoul(optarg); break;
         case 'G': rayGenerators = stoul(optarg); break;
+        case 'a': schedulerName = optarg; break;
         case 'g': collectDebugLogs = true; break;
         case 'w': workerStatsWriteInterval = stoul(optarg); break;
         case 'd': collectDiagnostics = true; break;
@@ -520,18 +524,6 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        case 'a': {
-            if (strcmp(optarg, "uniform") == 0) {
-                scheduler = make_unique<UniformScheduler>();
-            } else if (strcmp(optarg, "null") == 0) {
-                scheduler = make_unique<NullScheduler>();
-            } else {
-                usage(argv[0], EXIT_FAILURE);
-            }
-
-            break;
-        }
-
         case 'c':
             cropWindow = parseCropWindowOptarg(optarg);
 
@@ -546,6 +538,25 @@ int main(int argc, char *argv[]) {
             usage(argv[0], EXIT_FAILURE);
             break;
         }
+    }
+
+    if (schedulerName == "uniform") {
+        scheduler = make_unique<UniformScheduler>();
+    } else if (schedulerName == "static") {
+        auto storage = StorageBackend::create_backend(storageBackendUri);
+        TempFile staticFile{"/tmp/pbrt-lambda-master.STATIC0"};
+
+        cerr << "Downloading static assignment file... ";
+        storage->get(
+            {{SceneManager::getFileName(ObjectType::StaticAssignment, 0),
+              staticFile.name()}});
+        cerr << "done." << endl;
+
+        scheduler = make_unique<StaticScheduler>(staticFile.name());
+    } else if (schedulerName == "null") {
+        scheduler = make_unique<NullScheduler>();
+    } else {
+        usage(argv[0], EXIT_FAILURE);
     }
 
     if (rayGenerators < -1) {

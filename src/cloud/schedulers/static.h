@@ -1,5 +1,5 @@
-#ifndef PBRT_CLOUD_SCHEDULERS_NULL_H
-#define PBRT_CLOUD_SCHEDULERS_NULL_H
+#ifndef PBRT_CLOUD_SCHEDULERS_STATIC_H
+#define PBRT_CLOUD_SCHEDULERS_STATIC_H
 
 #include "cloud/allocator.h"
 #include "cloud/scheduler.h"
@@ -19,4 +19,4 @@ class StaticScheduler : public Scheduler {
 };
 
 }  // namespace pbrt
-#endif /* PBRT_CLOUD_SCHEDULERS_NULL_H */
+#endif /* PBRT_CLOUD_SCHEDULERS_STATIC_H */
