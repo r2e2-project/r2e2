@@ -140,6 +140,7 @@ class LambdaMaster {
 
     struct Treelet {
         TreeletId id;
+        size_t pendingWorkers{0};
         std::set<WorkerId> workers{};
         std::pair<bool, TreeletStats> lastStats{true, {}};
 

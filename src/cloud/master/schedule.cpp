@@ -147,6 +147,7 @@ void LambdaMaster::executeSchedule(const Schedule &schedule) {
             continue;
         } else if (requested > current) {
             /* we need to start new workers */
+            treelets[tid].pendingWorkers = requested - current;
             treeletsToSpawn.insert(treeletsToSpawn.end(), requested - current,
                                    tid);
         } else /* (requested < current) */ {
@@ -162,6 +163,8 @@ void LambdaMaster::executeSchedule(const Schedule &schedule) {
                 unassignedTreelets.insert(tid);
                 moveFromQueuedToPending(tid);
             }
+
+            treelets[tid].pendingWorkers = 0;
         }
     }
 

@@ -286,6 +286,9 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                 const TreeletId treeletId = treeletsToSpawn.front();
                 treeletsToSpawn.pop_front();
 
+                auto &treelet = treelets[treeletId];
+                treelet.pendingWorkers--;
+
                 /* (0) create the entry for the worker */
                 auto &worker =
                     workers
@@ -296,7 +299,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                         .first->second;
 
                 assignBaseObjects(worker);
-                assignTreelet(worker, treelets[treeletId]);
+                assignTreelet(worker, treelet);
 
                 /* (1) saying hi, assigning id to the worker */
                 protobuf::Hey heyProto;
