@@ -21,6 +21,7 @@
 #include "cloud/manager.h"
 #include "cloud/r2t2.h"
 #include "cloud/raystate.h"
+#include "cloud/schedulers/null.h"
 #include "cloud/schedulers/uniform.h"
 #include "core/camera.h"
 #include "core/geometry.h"
@@ -522,6 +523,8 @@ int main(int argc, char *argv[]) {
         case 'a': {
             if (strcmp(optarg, "uniform") == 0) {
                 scheduler = make_unique<UniformScheduler>();
+            } else if (strcmp(optarg, "null") == 0) {
+                scheduler = make_unique<NullScheduler>();
             } else {
                 usage(argv[0], EXIT_FAILURE);
             }
