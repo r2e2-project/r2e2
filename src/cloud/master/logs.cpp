@@ -124,19 +124,15 @@ protobuf::JobSummary LambdaMaster::getJobSummary() const {
 
     constexpr static double LAMBDA_UNIT_COST = 0.00004897; /* $/lambda/sec */
 
-    double launchTime =
-        duration_cast<milliseconds>(generationStart - startTime).count() /
-        1000.0;
-
-    launchTime = (launchTime < 0) ? 0 : launchTime;
+    double launchTime = 0;
 
     double rayTime =
-        duration_cast<milliseconds>(lastFinishedRay - generationStart).count() /
+        duration_cast<milliseconds>(lastFinishedRay - startTime).count() /
         1000.0;
 
     rayTime = (rayTime < 0) ? 0 : rayTime;
 
-    const double totalTime = launchTime + rayTime;
+    const double totalTime = rayTime;
 
     const double avgRayThroughput =
         (totalTime > 0)
@@ -158,7 +154,7 @@ protobuf::JobSummary LambdaMaster::getJobSummary() const {
     proto.set_total_upload(aggregatedStats.enqueued.bytes);
     proto.set_total_download(aggregatedStats.dequeued.bytes);
     proto.set_total_samples(aggregatedStats.samples.bytes);
-    proto.set_estimated_cost(estimatedCost);
+    proto.set_estimated_cost(0.0);
 
     return proto;
 }
@@ -227,14 +223,9 @@ void LambdaMaster::printJobSummary() const {
          << Value<string>(format_bytes(proto.total_samples())) << endl;
 
     cerr << "  Total time           " << fixed << setprecision(2)
-         << Value<double>(proto.total_time()) << " seconds\n"
-         << "    Starting workers   " << Value<double>(proto.launch_time())
-         << " seconds\n"
-         << "    Tracing rays       " << Value<double>(proto.ray_time())
-         << " seconds" << endl;
+         << Value<double>(proto.total_time()) << " seconds\n";
 
     cerr << "  Estimated cost       "
-         << "$" << fixed << setprecision(2)
-         << Value<double>(proto.estimated_cost()) << endl
+         << "N/A" << endl
          << endl;
 }
