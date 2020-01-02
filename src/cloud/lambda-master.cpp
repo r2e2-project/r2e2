@@ -179,6 +179,15 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
             []() { throw runtime_error("worker stats failed"); }));
     }
 
+    loop.poller().add_action(Poller::Action(
+        workerInvocationTimer, Direction::In,
+        bind(&LambdaMaster::handleWorkerInvocation, this),
+        [this]() {
+            return !treeletsToSpawn.empty() &&
+                   Worker::activeCount[Worker::Role::Tracer] < this->maxWorkers;
+        },
+        []() { throw runtime_error("worker invocation failed"); }));
+
     loop.poller().add_action(
         Poller::Action(statusPrintTimer, Direction::In,
                        bind(&LambdaMaster::handleStatusMessage, this),

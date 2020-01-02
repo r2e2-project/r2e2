@@ -35,6 +35,7 @@ namespace pbrt {
 
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL{5'000};
+constexpr std::chrono::milliseconds WORKER_INVOCATION_INTERVAL{2'000};
 
 struct MasterConfiguration {
     int samplesPerPixel;
@@ -155,6 +156,8 @@ class LambdaMaster {
     /* this function is periodically called; it calls the scheduler,
        and if a new schedule is available, it executes it */
     Poller::Action::Result::Type handleReschedule();
+
+    Poller::Action::Result::Type handleWorkerInvocation();
 
     void executeSchedule(const Schedule &schedule);
 
@@ -290,6 +293,7 @@ class LambdaMaster {
 
     /* Timers */
     TimerFD statusPrintTimer{STATUS_PRINT_INTERVAL};
+    TimerFD workerInvocationTimer{WORKER_INVOCATION_INTERVAL};
     TimerFD rescheduleTimer{RESCHEDULE_INTERVAL,
                             std::chrono::milliseconds{500}};
     TimerFD workerStatsWriteTimer;

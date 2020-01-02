@@ -106,6 +106,21 @@ ResultType LambdaMaster::handleReschedule() {
     return ResultType::Continue;
 }
 
+ResultType LambdaMaster::handleWorkerInvocation() {
+    workerInvocationTimer.reset();
+
+    /* let's start as many workers as we can right now */
+    const auto runningCount = Worker::activeCount[Worker::Role::Tracer];
+    const size_t availableCapacity =
+        (this->maxWorkers > runningCount)
+            ? static_cast<size_t>(this->maxWorkers - runningCount)
+            : 0ul;
+
+    invokeWorkers(min(availableCapacity, treeletsToSpawn.size()));
+
+    return ResultType::Continue;
+}
+
 void LambdaMaster::executeSchedule(const Schedule &schedule) {
     /* is the schedule viable? */
     if (schedule.size() > treelets.size()) {
@@ -148,15 +163,6 @@ void LambdaMaster::executeSchedule(const Schedule &schedule) {
             }
         }
     }
-
-    /* let's start as many workers as we can right now */
-    const auto runningCount = Worker::activeCount[Worker::Role::Tracer];
-    const size_t availableCapacity =
-        (maxWorkers > runningCount)
-            ? static_cast<size_t>(maxWorkers - runningCount)
-            : 0ul;
-
-    invokeWorkers(min(availableCapacity, treeletsToSpawn.size()));
 
     /* shuffling treeletsToSpawn */
     random_device rd{};
