@@ -124,6 +124,7 @@ ResultType LambdaMaster::handleWorkerInvocation() {
 void LambdaMaster::executeSchedule(const Schedule &schedule) {
     /* is the schedule viable? */
     if (schedule.size() > treelets.size()) {
+        cout << schedule.size() << " " << treelets.size() << endl;
         throw runtime_error("invalid schedule");
     }
 

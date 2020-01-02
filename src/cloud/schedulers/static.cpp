@@ -48,13 +48,13 @@ StaticScheduler::StaticScheduler(const string &path) {
     allocator.setTargetWeights(move(probsMap));
 }
 
-Optional<Schedule> StaticScheduler::schedule(const size_t maxWorkers,
-                                             const vector<TreeletStats> &) {
+Optional<Schedule> StaticScheduler::schedule(
+    const size_t maxWorkers, const vector<TreeletStats> &stats) {
     if (scheduledOnce) return {false};
     scheduledOnce = true;
 
     Schedule result;
-    result.resize(maxWorkers, 0);
+    result.resize(stats.size(), 0);
 
     for (size_t wid = 0; wid < maxWorkers; wid++) {
         const auto tid = allocator.allocate(wid);
