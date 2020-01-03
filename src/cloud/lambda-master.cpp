@@ -202,7 +202,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                                                     ExecutionLoop &loop,
                                                     TCPSocket &&socket) {
         /* do we want this worker? */
-        if (Worker::nextId >= this->rayGenerators && treeletsToSpawn.empty()) {
+        if (Worker::nextId > this->rayGenerators && treeletsToSpawn.empty()) {
             socket.close();
             return true;
         }
@@ -338,7 +338,7 @@ void LambdaMaster::run() {
     cerr << "Launching " << rayGenerators << " ray "
          << pluralize("generator", rayGenerators) << "... ";
 
-    invokeWorkers(rayGenerators);
+    invokeWorkers(rayGenerators + static_cast<size_t>(0.1 * rayGenerators));
 
     cerr << "done." << endl;
 
