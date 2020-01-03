@@ -233,10 +233,9 @@ class LambdaMaster {
     /*** Timepoints ***********************************************************/
 
     const steady_clock::time_point startTime{steady_clock::now()};
-
-    steady_clock::time_point lastActionTime{startTime};
-    steady_clock::time_point generationStart{};
+    steady_clock::time_point lastGeneratorDone{};
     steady_clock::time_point lastFinishedRay{};
+    steady_clock::time_point lastActionTime{startTime};
 
     ////////////////////////////////////////////////////////////////////////////
     // Scene Objects                                                          //

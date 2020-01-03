@@ -215,6 +215,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
 
             if (worker.state == Worker::State::Terminating) {
                 if (worker.role == Worker::Role::Generator) {
+                    lastGeneratorDone = steady_clock::now();
                     finishedRayGenerators++;
                 }
 

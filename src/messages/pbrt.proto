@@ -385,8 +385,8 @@ message Manifest {
 
 message JobSummary {
     double total_time = 1;
-    double launch_time = 2;
-    double ray_time = 3;
+    double generation_time = 2;
+    double tracing_time = 3;
     uint32 num_lambdas = 4;
     uint64 total_paths = 5;
     uint64 finished_paths = 6;
