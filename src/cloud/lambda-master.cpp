@@ -225,7 +225,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                 return;
             }
 
-            throw runtime_error("worker went away unexpectedly: " +
+            throw runtime_error("worker died unexpectedly: " +
                                 to_string(workerId));
         };
 
