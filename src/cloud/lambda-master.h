@@ -81,10 +81,6 @@ class LambdaMaster {
     const TempDirectory sceneDir{"/tmp/pbrt-lambda-master"};
     const std::string jobId{uuid::generate()};
 
-    const uint32_t maxWorkers;
-    const uint32_t rayGenerators;
-    size_t initializedWorkers{0};
-
     ////////////////////////////////////////////////////////////////////////////
     // Cloud                                                                  //
     ////////////////////////////////////////////////////////////////////////////
@@ -133,6 +129,10 @@ class LambdaMaster {
     };
 
     std::unordered_map<WorkerId, Worker> workers{};
+    const uint32_t maxWorkers;
+    const uint32_t rayGenerators;
+    uint32_t finishedRayGenerators{0};
+
 
     ////////////////////////////////////////////////////////////////////////////
     // Treelets                                                               //

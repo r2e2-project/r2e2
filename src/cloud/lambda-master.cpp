@@ -160,7 +160,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
 
     loop.poller().add_action(Poller::Action(
         rescheduleTimer, Direction::In,
-        bind(&LambdaMaster::handleReschedule, this), []() { return true; },
+        bind(&LambdaMaster::handleReschedule, this),
+        [this]() { return finishedRayGenerators == this->rayGenerators; },
         []() { throw runtime_error("rescheduler failed"); }));
 
     loop.poller().add_action(Poller::Action(
@@ -213,6 +214,10 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
             Worker::activeCount[worker.role]--;
 
             if (worker.state == Worker::State::Terminating) {
+                if (worker.role == Worker::Role::Generator) {
+                    finishedRayGenerators++;
+                }
+
                 /* it's okay for this worker to go away,
                    let's not panic! */
                 worker.state = Worker::State::Terminated;
