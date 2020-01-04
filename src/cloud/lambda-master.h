@@ -125,6 +125,8 @@ class LambdaMaster {
             Worker::activeCount[role]++;
         }
 
+        std::string toString() const;
+
         static std::map<Role, size_t> activeCount;
         static WorkerId nextId;
     };

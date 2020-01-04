@@ -46,6 +46,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
 
 ResultType LambdaMaster::handleQueuedRayBags() {
     auto it = freeWorkers.begin();
+
     while (it != freeWorkers.end()) {
         if (!assignWork(workers.at(*it))) {
             it = freeWorkers.erase(it);

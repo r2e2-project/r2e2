@@ -343,6 +343,31 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     });
 }
 
+string LambdaMaster::Worker::toString() const {
+    ostringstream oss;
+
+    size_t oustandingSize = 0;
+    for (const auto &bag : outstandingRayBags) oustandingSize += bag.bagSize;
+
+    oss << "id=" << id << ",state=" << static_cast<int>(state)
+        << ",role=" << static_cast<int>(role) << ",awslog=" << awsLogStream
+        << ",treelets=";
+
+    for (auto it = treelets.begin(); it != treelets.end(); it++) {
+        if (it != treelets.begin()) oss << ",";
+        oss << *it;
+    }
+
+    oss << ",outstanding=" << outstandingRayBags.size()
+        << ",outstanding-bytes=" << oustandingSize
+        << ",enqueued=" << stats.enqueued.bytes
+        << ",assigned=" << stats.assigned.bytes
+        << ",dequeued=" << stats.dequeued.bytes
+        << ",samples=" << stats.samples.bytes;
+
+    return oss.str();
+}
+
 void LambdaMaster::run() {
     StatusBar::get();
 
