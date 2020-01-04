@@ -70,10 +70,10 @@ ResultType LambdaMaster::handleStatusMessage() {
                 << " (" << percent(s.finishedPaths, scene.totalPaths) << "%) "
 
         << BG() << " \u21a6 " << Worker::activeCount[Worker::Role::Generator]
-                << " "
+                << "/" << rayGenerators << " "
 
         << BG() << " \u03bb " << Worker::activeCount[Worker::Role::Tracer]
-                << " "
+                << "/" << maxWorkers << " "
 
         << BG() << " \u03a3 " << Worker::activeCount[Worker::Role::Aggregator]
                 << " "
