@@ -10,6 +10,40 @@ using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 
+bool LambdaMaster::assignWork(Worker& worker) {
+    /* return, if the worker doesn't have any treelets */
+    if (worker.treelets.empty()) return false;
+
+    /* return if the worker already has enough work */
+    if (worker.outstandingRayBags.size() >= MAX_OUTSTANDING_BAGS) return false;
+
+    const TreeletId treeletId = *worker.treelets.begin();
+
+    auto bagsQueueIt = queuedRayBags.find(treeletId);
+
+    /* we don't have any work for this dude */
+    if (bagsQueueIt == queuedRayBags.end()) return true;
+
+    protobuf::RayBags proto;
+    auto& bags = bagsQueueIt->second;
+
+    while (!bags.empty() &&
+           worker.outstandingRayBags.size() < MAX_OUTSTANDING_BAGS) {
+        *proto.add_items() = to_protobuf(bags.front());
+        recordAssign(worker.id, bags.front());
+        bags.pop();
+    }
+
+    if (bags.empty()) {
+        queuedRayBags.erase(bagsQueueIt);
+    }
+
+    worker.connection->enqueue_write(
+        Message::str(0, OpCode::ProcessRayBag, protoutil::to_string(proto)));
+
+    return worker.outstandingRayBags.size() < MAX_OUTSTANDING_BAGS;
+}
+
 ResultType LambdaMaster::handleQueuedRayBags() {
     map<WorkerId, queue<RayBagInfo>> assignedBags;
 
