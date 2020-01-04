@@ -232,8 +232,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                 return;
             }
 
-            throw runtime_error("worker died unexpectedly: " +
-                                to_string(workerId));
+            throw runtime_error(
+                "worker died unexpectedly: " + to_string(workerId) +
+                (worker.awsLogStream.empty()
+                     ? ""s
+                     : (" ("s + worker.awsLogStream + ")"s)));
         };
 
         auto parser = make_shared<MessageParser>();
