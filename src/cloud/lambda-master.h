@@ -134,6 +134,8 @@ class LambdaMaster {
     const uint32_t rayGenerators;
     uint32_t finishedRayGenerators{0};
 
+    std::unordered_set<WorkerId> freeWorkers{};
+
     ////////////////////////////////////////////////////////////////////////////
     // Treelets                                                               //
     ////////////////////////////////////////////////////////////////////////////

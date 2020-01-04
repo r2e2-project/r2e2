@@ -45,43 +45,15 @@ bool LambdaMaster::assignWork(Worker& worker) {
 }
 
 ResultType LambdaMaster::handleQueuedRayBags() {
-    map<WorkerId, queue<RayBagInfo>> assignedBags;
-
-    for (auto& treeletRayBags : queuedRayBags) {
-        const TreeletId treeletId = treeletRayBags.first;
-        queue<RayBagInfo>& bags = treeletRayBags.second;
-
-        /* assigning ray bags to workers */
-        while (!bags.empty()) {
-            auto& bag = bags.front();
-
-            /* picking a random worker */
-            const auto& candidates = treelets[treeletId].workers;
-            const auto workerId =
-                *random::sample(candidates.begin(), candidates.end());
-
-            assignedBags[workerId].push(move(bag));
-            bags.pop();
+    auto it = freeWorkers.begin();
+    while (it != freeWorkers.end()) {
+        if (!assignWork(workers.at(*it))) {
+            it = freeWorkers.erase(it);
+        }
+        else {
+            it++;
         }
     }
-
-    for (auto& item : assignedBags) {
-        auto& worker = workers.at(item.first);
-
-        queue<RayBagInfo>& bags = item.second;
-        protobuf::RayBags proto;
-
-        while (!bags.empty()) {
-            *proto.add_items() = to_protobuf(bags.front());
-            recordAssign(worker.id, bags.front());
-            bags.pop();
-        }
-
-        worker.connection->enqueue_write(Message::str(
-            0, OpCode::ProcessRayBag, protoutil::to_string(proto)));
-    }
-
-    queuedRayBags.clear();
 
     return ResultType::Continue;
 }

@@ -51,8 +51,10 @@ void LambdaMaster::recordDequeue(const WorkerId workerId,
                                  const RayBagInfo &info) {
     auto &worker = workers.at(workerId);
 
-    worker.outstandingRayBags.erase(info);
     worker.lastStats.first = true;
+
+    worker.outstandingRayBags.erase(info);
+    freeWorkers.insert(workerId);
 
     treelets[info.treeletId].lastStats.first = true;
 

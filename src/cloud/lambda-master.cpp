@@ -172,7 +172,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out,
         bind(&LambdaMaster::handleQueuedRayBags, this),
-        [this]() { return queuedRayBags.size() > 0; },
+        [this]() { return !freeWorkers.empty() && !queuedRayBags.empty(); },
         []() { throw runtime_error("queued ray bags failed"); }));
 
     if (config.workerStatsWriteInterval > 0) {
@@ -329,6 +329,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
 
                 worker.connection->enqueue_write(Message::str(
                     0, OpCode::GetObjects, protoutil::to_string(objsProto)));
+
+                freeWorkers.insert(worker.id);
             } else {
                 throw runtime_error("we accepted a useless worker");
             }
