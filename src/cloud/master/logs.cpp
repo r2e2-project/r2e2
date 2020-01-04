@@ -37,7 +37,7 @@ void LambdaMaster::recordAssign(const WorkerId workerId,
                                 const RayBagInfo &info) {
     auto &worker = workers.at(workerId);
 
-    worker.assignedRayBags.insert(info);
+    worker.outstandingRayBags.insert(info);
 
     worker.lastStats.first = true;
     worker.stats.assigned.count += info.rayCount;
@@ -51,7 +51,7 @@ void LambdaMaster::recordDequeue(const WorkerId workerId,
                                  const RayBagInfo &info) {
     auto &worker = workers.at(workerId);
 
-    worker.assignedRayBags.erase(info);
+    worker.outstandingRayBags.erase(info);
     worker.lastStats.first = true;
 
     treelets[info.treeletId].lastStats.first = true;

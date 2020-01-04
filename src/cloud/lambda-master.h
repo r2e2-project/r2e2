@@ -112,7 +112,7 @@ class LambdaMaster {
         std::set<TreeletId> treelets{};
         std::set<ObjectKey> objects{};
 
-        std::set<RayBagInfo> assignedRayBags{};
+        std::set<RayBagInfo> outstandingRayBags{};
 
         // Statistics
         WorkerStats stats{};

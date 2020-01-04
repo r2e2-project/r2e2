@@ -210,8 +210,13 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
         const WorkerId workerId = Worker::nextId++;
 
         auto connectionCloseHandler = [this, workerId]() {
-            auto &worker = workers.at(workerId);
-            Worker::activeCount[worker.role]--;
+            auto workerIt = workers.find(workerId);
+
+            if (workerIt == workers.end()) {
+                throw runtime_error("unexpected worker id");
+            }
+
+            auto &worker = workerIt->second;
 
             if (worker.state == Worker::State::Terminating) {
                 if (worker.role == Worker::Role::Generator) {
@@ -222,6 +227,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                 /* it's okay for this worker to go away,
                    let's not panic! */
                 worker.state = Worker::State::Terminated;
+                Worker::activeCount[worker.role]--;
+                workers.erase(workerIt);
                 return;
             }
 
