@@ -49,8 +49,7 @@ ResultType LambdaMaster::handleQueuedRayBags() {
     while (it != freeWorkers.end()) {
         if (!assignWork(workers.at(*it))) {
             it = freeWorkers.erase(it);
-        }
-        else {
+        } else {
             it++;
         }
     }
