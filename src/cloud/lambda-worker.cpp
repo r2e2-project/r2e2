@@ -164,6 +164,8 @@ void usage(const char* argv0, int exitCode) {
          << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
          << "  -h --help                  show help information" << endl;
+
+    exit(exitCode);
 }
 
 int main(int argc, char* argv[]) {

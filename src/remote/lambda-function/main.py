@@ -22,8 +22,7 @@ def handler(event, context):
     command = ["pbrt-lambda-worker",
                "--ip", coordinator_host,
                "--port", coordinator_port,
-               "--storage-backend", storage_backend,
-               "--finished-ray", str(event.get('finishedRayAction', 0))]
+               "--storage-backend", storage_backend]
 
     if event['samplesPerPixel']:
         command += ['--samples', str(event['samplesPerPixel'])]
