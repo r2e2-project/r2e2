@@ -232,6 +232,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                 return;
             }
 
+            cerr << "Worker info: " << worker.toString() << endl;
+
             throw runtime_error(
                 "worker died unexpectedly: " + to_string(workerId) +
                 (worker.awsLogStream.empty()
