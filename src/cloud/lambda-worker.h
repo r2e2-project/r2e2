@@ -259,8 +259,9 @@ class LambdaWorker {
     ////////////////////////////////////////////////////////////////////////////
 
     struct LocalStats {
-        Histogram<uint16_t> rayHops{10, 0, UINT16_MAX};
         Histogram<uint16_t> pathHops{10, 0, UINT16_MAX};
+        Histogram<uint16_t> rayHops{10, 0, UINT16_MAX};
+        Histogram<uint16_t> shadowRayHops{10, 0, UINT16_MAX};
     } localStats{};
 };
 

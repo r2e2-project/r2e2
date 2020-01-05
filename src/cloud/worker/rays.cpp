@@ -72,6 +72,7 @@ ResultType LambdaWorker::handleTraceQueue() {
             if (newRay.isShadowRay) {
                 if (hit || emptyVisit) {
                     newRay.Ld = hit ? 0.f : newRay.Ld;
+                    localStats.shadowRayHops.add(newRay.hop);
                     samples.emplace(*newRayPtr);
 
                     logRay(RayAction::Finished, newRay);
@@ -79,6 +80,7 @@ ResultType LambdaWorker::handleTraceQueue() {
                     /* was this the last shadow ray? */
                     if (newRay.remainingBounces == 0) {
                         finishedPathIds.push(pathId);
+                        localStats.pathHops.add(newRay.pathHop);
                     }
                 } else {
                     processedRays.push(move(newRayPtr));
@@ -88,11 +90,17 @@ ResultType LambdaWorker::handleTraceQueue() {
             } else if (emptyVisit) {
                 newRay.Ld = 0.f;
                 samples.emplace(*newRayPtr);
+                localStats.rayHops.add(newRay.hop);
+
                 finishedPathIds.push(pathId);
+                localStats.pathHops.add(newRay.pathHop);
 
                 logRay(RayAction::Finished, newRay);
             }
         } else if (ray.hit) {
+            localStats.rayHops.add(ray.hop);
+            logRay(RayAction::Finished, ray);
+
             RayStatePtr bounceRay, shadowRay;
             tie(bounceRay, shadowRay) =
                 graphics::ShadeRay(move(rayPtr), *scene.bvh, scene.lights,
@@ -101,8 +109,7 @@ ResultType LambdaWorker::handleTraceQueue() {
             if (bounceRay == nullptr && shadowRay == nullptr) {
                 /* this was the last ray in the path */
                 finishedPathIds.push(pathId);
-
-                logRay(RayAction::Finished, ray);
+                localStats.pathHops.add(ray.pathHop);
             }
 
             if (bounceRay != nullptr) {
