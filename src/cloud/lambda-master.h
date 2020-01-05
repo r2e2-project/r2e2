@@ -36,7 +36,7 @@ namespace pbrt {
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL{5'000};
 constexpr std::chrono::milliseconds WORKER_INVOCATION_INTERVAL{2'000};
-constexpr size_t MAX_OUTSTANDING_BAGS{8};
+constexpr size_t MAX_OUTSTANDING_BAGS{12};
 
 struct MasterConfiguration {
     int samplesPerPixel;
@@ -136,7 +136,7 @@ class LambdaMaster {
     const uint32_t rayGenerators;
     uint32_t finishedRayGenerators{0};
 
-    std::unordered_set<WorkerId> freeWorkers{};
+    std::deque<WorkerId> freeWorkers{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Treelets                                                               //

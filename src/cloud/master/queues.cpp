@@ -45,6 +45,10 @@ bool LambdaMaster::assignWork(Worker& worker) {
 }
 
 ResultType LambdaMaster::handleQueuedRayBags() {
+    random_device rd{};
+    mt19937 g{rd()};
+    shuffle(freeWorkers.begin(), freeWorkers.end(), g);
+
     auto it = freeWorkers.begin();
 
     while (it != freeWorkers.end()) {
