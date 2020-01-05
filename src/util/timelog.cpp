@@ -1,33 +1,45 @@
-/* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-
 #include "util/timelog.h"
 
+#include "util/exception.h"
+
+#include <cstring>
+#include <iomanip>
+#include <iostream>
 #include <sstream>
 
 using namespace std;
-using namespace std::chrono;
 
-TimeLog::TimeLog()
-  : start_( duration_cast<milliseconds>( system_clock::now().time_since_epoch() ) ),
-    prev_( start_ )
-{}
+constexpr double THOUSAND = 1000.0;
+constexpr double MILLION = 1000000.0;
 
-void TimeLog::add_point( const std::string & title )
+string TimeLog::summary() const
 {
-  auto now = duration_cast<milliseconds>( system_clock::now().time_since_epoch() );
+  const uint64_t now = timestamp_ns();
 
-  points_.emplace_back( title, now - prev_ );
-  prev_ = now;
-}
+  const uint64_t elapsed = now - _beginning_timestamp;
 
-string TimeLog::str() const
-{
-  ostringstream oss;
-  oss << start_.count() << endl;
+  ostringstream out;
 
-  for ( const auto & point : points_ ) {
-    oss << point.first << " " << point.second.count() << endl;
+  out << "Timing summary\n--------------\n\n";
+
+  out << "Total time: " << setprecision( 2 ) << ( now - _beginning_timestamp ) / MILLION << " ms\n";
+
+  uint64_t accounted = 0;
+
+  for ( unsigned int i = 0; i < num_categories; i++ ) {
+    out << "   " << _category_names.at( i ) << ": ";
+    out << string( 32 - strlen( _category_names.at( i ) ), ' ' );
+    out << fixed << setw( 5 ) << setprecision( 1 ) << 100 * _logs.at( i ).total_ns / double( elapsed ) << "%";
+    accounted += _logs.at( i ).total_ns;
+
+    out << "     [max=" << _logs.at( i ).max_ns / THOUSAND << " us]";
+    out << " [count=" << _logs.at( i ).count << "]";
+    out << "\n";
   }
 
-  return oss.str();
+  const uint64_t unaccounted = elapsed - accounted;
+  out << "\n   Unaccounted: " << string( 23, ' ' );
+  out << 100 * unaccounted / double( elapsed ) << "%\n";
+
+  return out.str();
 }
