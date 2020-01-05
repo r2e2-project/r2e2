@@ -133,7 +133,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                     "raysEnqueued,raysAssigned,raysDequeued,"
                     "bytesEnqueued,bytesAssigned,bytesDequeued,"
                     "bagsEnqueued,bagsAssigned,bagsDequeued,"
-                    "numSamples,bytesSamples\n";
+                    "numSamples,bytesSamples,bagsSamples\n";
 
         tlStream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
                     "bytesEnqueued,bytesDequeued,bagsEnqueued,bagsDequeued\n";
