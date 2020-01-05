@@ -259,9 +259,11 @@ class LambdaWorker {
     ////////////////////////////////////////////////////////////////////////////
 
     struct LocalStats {
-        Histogram<uint16_t> pathHops{10, 0, UINT16_MAX};
-        Histogram<uint16_t> rayHops{10, 0, UINT16_MAX};
-        Histogram<uint16_t> shadowRayHops{10, 0, UINT16_MAX};
+        constexpr static uint16_t BIN_WIDTH = 5;
+
+        Histogram<uint16_t> pathHops{BIN_WIDTH, 0, UINT16_MAX};
+        Histogram<uint16_t> rayHops{BIN_WIDTH, 0, UINT16_MAX};
+        Histogram<uint16_t> shadowRayHops{BIN_WIDTH, 0, UINT16_MAX};
     } localStats{};
 };
 
