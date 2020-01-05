@@ -27,6 +27,7 @@
 #include "util/optional.h"
 #include "util/seq_no_set.h"
 #include "util/temp_dir.h"
+#include "util/timelog.h"
 #include "util/timerfd.h"
 #include "util/util.h"
 #include "util/uuid.h"

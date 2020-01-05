@@ -9,8 +9,28 @@
 
 using namespace std;
 
-constexpr double THOUSAND = 1000.0;
-constexpr double MILLION = 1000000.0;
+constexpr double THOUSAND = 1e3;
+constexpr double MILLION = 1e6;
+constexpr double BILLION = 1e9;
+
+constexpr size_t TimeLog::num_categories;
+constexpr std::array<const char*, TimeLog::num_categories> TimeLog::_category_names;
+
+template <class T>
+class Value {
+  private:
+    T value;
+
+  public:
+    Value(T value) : value(value) {}
+    T get() const { return value; }
+};
+
+template <class T>
+ostream &operator<<(ostream &o, const Value<T> &v) {
+    o << "\e[1m" << v.get() << "\e[0m";
+    return o;
+}
 
 string TimeLog::summary() const
 {
@@ -20,26 +40,28 @@ string TimeLog::summary() const
 
   ostringstream out;
 
-  out << "Timing summary\n--------------\n\n";
+  constexpr size_t WIDTH = 23;
 
-  out << "Total time: " << setprecision( 2 ) << ( now - _beginning_timestamp ) / MILLION << " ms\n";
+  out << "Timing summary:\n";
+
+  out << "  " << left << setw( WIDTH - 2 ) << "Total time" << fixed << setprecision( 3 )
+      << Value<double>( ( now - _beginning_timestamp ) / BILLION ) << " seconds\n";
 
   uint64_t accounted = 0;
 
   for ( unsigned int i = 0; i < num_categories; i++ ) {
-    out << "   " << _category_names.at( i ) << ": ";
-    out << string( 32 - strlen( _category_names.at( i ) ), ' ' );
-    out << fixed << setw( 5 ) << setprecision( 1 ) << 100 * _logs.at( i ).total_ns / double( elapsed ) << "%";
+    out << "    " << setw( WIDTH - 4 ) << left << _category_names.at( i );
+    out << fixed << setprecision( 1 ) << Value<double>(100 * _logs.at( i ).total_ns / double( elapsed )) << "%";
     accounted += _logs.at( i ).total_ns;
 
-    out << "     [max=" << _logs.at( i ).max_ns / THOUSAND << " us]";
-    out << " [count=" << _logs.at( i ).count << "]";
+    out << "\e[2m [max=" << _logs.at( i ).max_ns / THOUSAND << " us";
+    out << ", count=" << _logs.at( i ).count << "]\e[0m";
     out << "\n";
   }
 
   const uint64_t unaccounted = elapsed - accounted;
-  out << "\n   Unaccounted: " << string( 23, ' ' );
-  out << 100 * unaccounted / double( elapsed ) << "%\n";
+  out << "\n    " << setw( WIDTH - 4 ) << "Unaccounted";
+  out << fixed << setprecision( 1 ) << Value<double>(100 * unaccounted / double( elapsed )) << "%\n";
 
   return out.str();
 }

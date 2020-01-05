@@ -8,6 +8,7 @@ using namespace pbrt;
 using namespace meow;
 using namespace PollerShortNames;
 
+using T = TimeLog::Category;
 using OpCode = Message::OpCode;
 
 bool LambdaMaster::assignWork(Worker& worker) {
@@ -45,6 +46,8 @@ bool LambdaMaster::assignWork(Worker& worker) {
 }
 
 ResultType LambdaMaster::handleQueuedRayBags() {
+    ScopeTimer<T::handleQueuedRayBags> _timer;
+
     random_device rd{};
     mt19937 g{rd()};
     shuffle(freeWorkers.begin(), freeWorkers.end(), g);

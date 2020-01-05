@@ -477,6 +477,8 @@ int main(int argc, char *argv[]) {
         abort();
     }
 
+    timer();
+
     google::InitGoogleLogging(argv[0]);
 
     uint16_t listenPort = 50000;
@@ -644,6 +646,8 @@ int main(int argc, char *argv[]) {
             storageBackendUri, region, move(scheduler), config);
 
         master->run();
+
+        cerr << endl << timer().summary() << endl;
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;

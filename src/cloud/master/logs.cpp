@@ -198,7 +198,7 @@ void LambdaMaster::printJobSummary() const {
 
     const protobuf::JobSummary proto = getJobSummary();
 
-    cerr << endl << "Job summary:" << endl;
+    cerr << "Job summary:" << endl;
     cerr << "  Ray throughput       " << fixed << setprecision(2)
          << Value<double>(proto.ray_throughput()) << " rays/worker/s" << endl;
 
@@ -240,6 +240,5 @@ void LambdaMaster::printJobSummary() const {
          << " seconds" << endl;
 
     cerr << "  Estimated cost       "
-         << "N/A" << endl
-         << endl;
+         << "N/A" << endl;
 }

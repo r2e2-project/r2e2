@@ -19,16 +19,15 @@ class TimeLog
 public:
   enum class Category
   {
-    DNS,
-    Nonblock,
-    WaitingForEvent,
+    handleQueuedRayBags,
+    processMessage,
     count
   };
 
   constexpr static size_t num_categories = static_cast<size_t>( Category::count );
 
   constexpr static std::array<const char*, num_categories> _category_names {
-    { "DNS", "Nonblocking operations", "Waiting for event" }
+    { "QueuedRayBags", "ProcessMessage", }
   };
 
 private:
