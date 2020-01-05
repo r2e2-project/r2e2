@@ -31,8 +31,8 @@ string Histogram<T>::str() const {
         if (bins[lastPos] != 0) break;
     }
 
-    oss << "{'width':" << width << ",'min':" << minimum << ",'max':" << maximum;
-    oss << ",'bins':[";
+    oss << R"({"width":)" << width << R"(,"min":)" << minimum << R"(,"max":)"
+        << maximum << R"(,"bins":[)";
 
     for (size_t i = 0; i < bins.size() && i <= lastPos; i++) {
         if (i > 0) oss << ',';
