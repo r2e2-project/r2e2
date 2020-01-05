@@ -335,7 +335,9 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                 worker.connection->enqueue_write(Message::str(
                     0, OpCode::GetObjects, protoutil::to_string(objsProto)));
 
-                freeWorkers.insert(worker.id);
+                if (assignWork(worker)) {
+                    freeWorkers.insert(worker.id);
+                }
             } else {
                 throw runtime_error("we accepted a useless worker");
             }
