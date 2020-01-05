@@ -18,8 +18,9 @@ inline timepoint_t now() { return std::chrono::system_clock::now(); };
 
 struct TreeletStats {
     struct {
-        uint64_t count{0};
+        uint64_t rays{0};
         uint64_t bytes{0};
+        uint64_t count{0};
     } enqueued{}, dequeued{};
 
     void merge(const TreeletStats& other);
@@ -32,8 +33,9 @@ struct WorkerStats {
     uint64_t finishedPaths{0};
 
     struct {
-        uint64_t count{0};
+        uint64_t rays{0};
         uint64_t bytes{0};
+        uint64_t count{0};
     } enqueued{}, assigned{}, dequeued{}, samples{};
 
     void merge(const WorkerStats& other);

@@ -129,13 +129,14 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
         wsStream.open(config.logsDirectory + "/" + "workers.csv", ios::trunc);
         tlStream.open(config.logsDirectory + "/" + "treelets.csv", ios::trunc);
 
-        wsStream << "timestamp,workerId,pathsFinished,raysEnqueued,"
-                    "raysAssigned,raysDequeued,"
-                    "bytesEnqueued,bytesAssigned,bytesDequeued,numSamples,"
-                    "bytesSamples\n";
+        wsStream << "timestamp,workerId,pathsFinished,"
+                    "raysEnqueued,raysAssigned,raysDequeued,"
+                    "bytesEnqueued,bytesAssigned,bytesDequeued,"
+                    "bagsEnqueued,bagsAssigned,bagsDequeued,"
+                    "numSamples,bytesSamples\n";
 
         tlStream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
-                    "bytesEnqueued,bytesDequeued\n";
+                    "bytesEnqueued,bytesDequeued,bagsEnqueued,bagsDequeued\n";
     }
 
     auto printInfo = [](char const *key, auto value) {

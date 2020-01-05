@@ -17,19 +17,27 @@ void LambdaMaster::recordEnqueue(const WorkerId workerId,
     treelets[info.treeletId].lastStats.first = true;
 
     if (info.sampleBag) {
-        worker.stats.samples.count += info.rayCount;
+        worker.stats.samples.rays += info.rayCount;
         worker.stats.samples.bytes += info.bagSize;
-        aggregatedStats.samples.count += info.rayCount;
+        worker.stats.samples.count++;
+
+        aggregatedStats.samples.rays += info.rayCount;
         aggregatedStats.samples.bytes += info.bagSize;
+        aggregatedStats.samples.count++;
 
         lastFinishedRay = steady_clock::now();
     } else {
-        worker.stats.enqueued.count += info.rayCount;
+        worker.stats.enqueued.rays += info.rayCount;
         worker.stats.enqueued.bytes += info.bagSize;
-        treeletStats[info.treeletId].enqueued.count += info.rayCount;
+        worker.stats.enqueued.count++;
+
+        treeletStats[info.treeletId].enqueued.rays += info.rayCount;
         treeletStats[info.treeletId].enqueued.bytes += info.bagSize;
-        aggregatedStats.enqueued.count += info.rayCount;
+        treeletStats[info.treeletId].enqueued.count++;
+
+        aggregatedStats.enqueued.rays += info.rayCount;
         aggregatedStats.enqueued.bytes += info.bagSize;
+        aggregatedStats.enqueued.count++;
     }
 }
 
@@ -40,11 +48,13 @@ void LambdaMaster::recordAssign(const WorkerId workerId,
     worker.outstandingRayBags.insert(info);
 
     worker.lastStats.first = true;
-    worker.stats.assigned.count += info.rayCount;
+    worker.stats.assigned.rays += info.rayCount;
     worker.stats.assigned.bytes += info.bagSize;
+    worker.stats.assigned.count++;
 
-    aggregatedStats.assigned.count += info.rayCount;
+    aggregatedStats.assigned.rays += info.rayCount;
     aggregatedStats.assigned.bytes += info.bagSize;
+    aggregatedStats.assigned.count++;
 }
 
 void LambdaMaster::recordDequeue(const WorkerId workerId,
@@ -61,12 +71,17 @@ void LambdaMaster::recordDequeue(const WorkerId workerId,
 
     treelets[info.treeletId].lastStats.first = true;
 
-    worker.stats.dequeued.count += info.rayCount;
+    worker.stats.dequeued.rays += info.rayCount;
     worker.stats.dequeued.bytes += info.bagSize;
-    treeletStats[info.treeletId].dequeued.count += info.rayCount;
+    worker.stats.dequeued.count++;
+
+    treeletStats[info.treeletId].dequeued.rays += info.rayCount;
     treeletStats[info.treeletId].dequeued.bytes += info.bagSize;
-    aggregatedStats.dequeued.count += info.rayCount;
+    treeletStats[info.treeletId].dequeued.count++;
+
+    aggregatedStats.dequeued.rays += info.rayCount;
     aggregatedStats.dequeued.bytes += info.bagSize;
+    aggregatedStats.dequeued.count++;
 }
 
 ResultType LambdaMaster::handleWorkerStats() {
@@ -86,19 +101,25 @@ ResultType LambdaMaster::handleWorkerStats() {
         worker.lastStats.second = worker.stats;
         worker.lastStats.first = false;
 
-        /* timestamp,workerId,pathsFinished,raysEnqueued,raysAssigned,
-        raysDequeued,bytesEnqueued,bytesAssigned,bytesDequeued,numSamples,
-        bytesSamples */
+        /* timestamp,workerId,pathsFinished,
+        raysEnqueued,raysAssigned,raysDequeued,
+        bytesEnqueued,bytesAssigned,bytesDequeued,
+        bagsEnqueued,bagsAssigned,bagsDequeued,
+        numSamples,bytesSamples,bagsSamples */
+
         wsStream << t << ',' << worker.id << ',' << fixed
                  << (stats.finishedPaths / T) << ','
-                 << (stats.enqueued.count / T) << ','
-                 << (stats.assigned.count / T) << ','
-                 << (stats.dequeued.count / T) << ','
+                 << (stats.enqueued.rays / T) << ','
+                 << (stats.assigned.rays / T) << ','
+                 << (stats.dequeued.rays / T) << ','
                  << (stats.enqueued.bytes / T) << ','
                  << (stats.assigned.bytes / T) << ','
                  << (stats.dequeued.bytes / T) << ','
-                 << (stats.samples.count / T) << ','
-                 << (stats.samples.bytes / T) << '\n';
+                 << (stats.enqueued.count / T) << ','
+                 << (stats.assigned.count / T) << ','
+                 << (stats.dequeued.count / T) << ','
+                 << (stats.samples.rays / T) << ',' << (stats.samples.bytes / T)
+                 << ',' << (stats.samples.count / T) << '\n';
     }
 
     for (size_t treeletId = 0; treeletId < treelets.size(); treeletId++) {
@@ -113,12 +134,14 @@ ResultType LambdaMaster::handleWorkerStats() {
         treelets[treeletId].lastStats.first = false;
 
         /* timestamp,treeletId,raysEnqueued,raysDequeued,bytesEnqueued,
-           bytesDequeued */
+           bytesDequeued,bagsEnqueued,bagsDequeued */
         tlStream << t << ',' << treeletId << ',' << fixed
-                 << (stats.enqueued.count / T) << ','
-                 << (stats.dequeued.count / T) << ','
+                 << (stats.enqueued.rays / T) << ','
+                 << (stats.dequeued.rays / T) << ','
                  << (stats.enqueued.bytes / T) << ','
-                 << (stats.dequeued.bytes / T) << '\n';
+                 << (stats.dequeued.bytes / T) << ','
+                 << (stats.enqueued.count / T) << ','
+                 << (stats.dequeued.count / T) << '\n';
     }
 
     return ResultType::Continue;
@@ -146,7 +169,7 @@ protobuf::JobSummary LambdaMaster::getJobSummary() const {
 
     const double avgRayThroughput =
         (totalTime > 0)
-            ? (10 * aggregatedStats.samples.count / maxWorkers / totalTime)
+            ? (10 * aggregatedStats.samples.rays / maxWorkers / totalTime)
             : 0;
 
     const double estimatedCost =
@@ -158,8 +181,8 @@ protobuf::JobSummary LambdaMaster::getJobSummary() const {
     proto.set_num_lambdas(maxWorkers);
     proto.set_total_paths(scene.totalPaths);
     proto.set_finished_paths(aggregatedStats.finishedPaths);
-    proto.set_finished_rays(aggregatedStats.samples.count);
-    proto.set_num_enqueues(aggregatedStats.enqueued.count);
+    proto.set_finished_rays(aggregatedStats.samples.rays);
+    proto.set_num_enqueues(aggregatedStats.enqueued.rays);
     proto.set_ray_throughput(avgRayThroughput);
     proto.set_total_upload(aggregatedStats.enqueued.bytes);
     proto.set_total_download(aggregatedStats.dequeued.bytes);
@@ -215,7 +238,7 @@ void LambdaMaster::printJobSummary() const {
 
     cerr << "  Total transfers      " << Value<uint64_t>(proto.num_enqueues());
 
-    if (aggregatedStats.samples.count > 0) {
+    if (aggregatedStats.samples.rays > 0) {
         cerr << " (" << fixed << setprecision(2)
              << (1.0 * proto.num_enqueues() / proto.finished_rays())
              << " transfers/ray)";
