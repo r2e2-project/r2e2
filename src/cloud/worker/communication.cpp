@@ -127,6 +127,7 @@ ResultType LambdaWorker::handleReceiveQueue() {
             RayStatePtr ray = RayState::Create();
             ray->Deserialize(data + offset, len);
             ray->hop++;
+            ray->pathHop++;
             offset += len;
 
             logRay(RayAction::Unbagged, *ray, bag.info);

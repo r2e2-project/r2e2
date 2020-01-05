@@ -63,7 +63,8 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
             auto &newRay = *bouncePtr;
 
             newRay.trackRay = rayState.trackRay;
-            newRay.hop = rayState.hop;
+            newRay.hop = 0;
+            newRay.pathHop = rayState.pathHop;
             newRay.beta = rayState.beta * f * AbsDot(wi, it.shading.n) / pdf;
             newRay.ray = it.SpawnRay(wi);
             newRay.remainingBounces = rayState.remainingBounces - 1;
@@ -102,6 +103,7 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
                 /* if bounce isn't produced, this is the last ray in the path */
                 if (bouncePtr == nullptr) shadowRay.remainingBounces = 0;
 
+                shadowRay.hop = 0;
                 shadowRay.ray = visibility.P0().SpawnRayTo(visibility.P1());
                 shadowRay.Ld = (f * Li / lightPdf) / lightSelectPdf;
                 shadowRay.isShadowRay = true;

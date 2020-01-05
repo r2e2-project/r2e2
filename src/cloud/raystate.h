@@ -41,6 +41,7 @@ class RayState {
 
     bool trackRay{false};
     mutable uint16_t hop{0};
+    mutable uint16_t pathHop{0};
 
     Sample sample;
     RayDifferential ray;
