@@ -60,7 +60,7 @@ string TimeLog::summary() const
   }
 
   const uint64_t unaccounted = elapsed - accounted;
-  out << "\n    " << setw( WIDTH - 4 ) << "Unaccounted";
+  out << "    " << setw( WIDTH - 4 ) << "Unaccounted";
   out << fixed << setprecision( 1 ) << Value<double>(100 * unaccounted / double( elapsed )) << "%\n";
 
   return out.str();
