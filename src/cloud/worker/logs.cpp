@@ -46,9 +46,9 @@ ResultType LambdaWorker::handleDiagnostics() {
 void LambdaWorker::uploadLogs() {
     if (!workerId.initialized()) return;
 
-    TLOG("RAYHOPS") << localStats.rayHops.str();
-    TLOG("SHADOWHOPS") << localStats.shadowRayHops.str();
-    TLOG("PATHHOPS") << localStats.pathHops.str();
+    TLOG(RAYHOPS) << localStats.rayHops.str();
+    TLOG(SHADOWHOPS) << localStats.shadowRayHops.str();
+    TLOG(PATHHOPS) << localStats.pathHops.str();
 
     google::FlushLogFiles(google::INFO);
 
