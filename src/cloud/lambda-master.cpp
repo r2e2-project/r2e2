@@ -229,7 +229,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                    let's not panic! */
                 worker.state = Worker::State::Terminated;
                 Worker::activeCount[worker.role]--;
-                workers.erase(workerIt);
                 return;
             }
 

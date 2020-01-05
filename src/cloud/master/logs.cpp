@@ -92,34 +92,41 @@ ResultType LambdaMaster::handleWorkerStats() {
 
     const float T = static_cast<float>(config.workerStatsWriteInterval);
 
-    for (auto &workerkv : workers) {
-        auto &worker = workerkv.second;
+    for (auto it = workers.begin(); it != workers.end();) {
+        auto &worker = it->second;
 
-        if (!worker.lastStats.first) continue; /* nothing new to log */
+        if (worker.lastStats.first) {
+            const auto stats = worker.stats - worker.lastStats.second;
+            worker.lastStats.second = worker.stats;
+            worker.lastStats.first = false;
 
-        const WorkerStats stats = worker.stats - worker.lastStats.second;
-        worker.lastStats.second = worker.stats;
-        worker.lastStats.first = false;
+            /* timestamp,workerId,pathsFinished,
+            raysEnqueued,raysAssigned,raysDequeued,
+            bytesEnqueued,bytesAssigned,bytesDequeued,
+            bagsEnqueued,bagsAssigned,bagsDequeued,
+            numSamples,bytesSamples,bagsSamples */
 
-        /* timestamp,workerId,pathsFinished,
-        raysEnqueued,raysAssigned,raysDequeued,
-        bytesEnqueued,bytesAssigned,bytesDequeued,
-        bagsEnqueued,bagsAssigned,bagsDequeued,
-        numSamples,bytesSamples,bagsSamples */
+            wsStream << t << ',' << worker.id << ',' << fixed
+                     << (stats.finishedPaths / T) << ','
+                     << (stats.enqueued.rays / T) << ','
+                     << (stats.assigned.rays / T) << ','
+                     << (stats.dequeued.rays / T) << ','
+                     << (stats.enqueued.bytes / T) << ','
+                     << (stats.assigned.bytes / T) << ','
+                     << (stats.dequeued.bytes / T) << ','
+                     << (stats.enqueued.count / T) << ','
+                     << (stats.assigned.count / T) << ','
+                     << (stats.dequeued.count / T) << ','
+                     << (stats.samples.rays / T) << ','
+                     << (stats.samples.bytes / T) << ','
+                     << (stats.samples.count / T) << '\n';
+        }
 
-        wsStream << t << ',' << worker.id << ',' << fixed
-                 << (stats.finishedPaths / T) << ','
-                 << (stats.enqueued.rays / T) << ','
-                 << (stats.assigned.rays / T) << ','
-                 << (stats.dequeued.rays / T) << ','
-                 << (stats.enqueued.bytes / T) << ','
-                 << (stats.assigned.bytes / T) << ','
-                 << (stats.dequeued.bytes / T) << ','
-                 << (stats.enqueued.count / T) << ','
-                 << (stats.assigned.count / T) << ','
-                 << (stats.dequeued.count / T) << ','
-                 << (stats.samples.rays / T) << ',' << (stats.samples.bytes / T)
-                 << ',' << (stats.samples.count / T) << '\n';
+        if (worker.state == Worker::State::Terminated) {
+            it = workers.erase(it);
+        } else {
+            it++;
+        }
     }
 
     for (size_t treeletId = 0; treeletId < treelets.size(); treeletId++) {
