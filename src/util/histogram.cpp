@@ -25,10 +25,16 @@ template <class T>
 string Histogram<T>::str() const {
     ostringstream oss;
 
+    size_t lastPos;
+
+    for (lastPos = bins.size() - 1; lastPos < bins.size(); lastPos--) {
+        if (bins[lastPos] != 0) break;
+    }
+
     oss << "{'width':" << width << ",'min':" << minimum << ",'max':" << maximum;
     oss << ",'bins':[";
 
-    for (size_t i = 0; i < bins.size(); i++) {
+    for (size_t i = 0; i < bins.size() && i <= lastPos; i++) {
         if (i > 0) oss << ',';
         oss << bins[i];
     }
