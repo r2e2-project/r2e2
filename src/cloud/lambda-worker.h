@@ -27,6 +27,7 @@
 #include "net/address.h"
 #include "net/s3.h"
 #include "storage/backend.h"
+#include "util/histogram.h"
 #include "util/seq_no_set.h"
 #include "util/temp_dir.h"
 #include "util/timerfd.h"
@@ -252,6 +253,15 @@ class LambdaWorker {
     TimerFD sampleBagsTimer{SAMPLE_BAGS_INTERVAL};
     TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
     TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Local Stats                                                            //
+    ////////////////////////////////////////////////////////////////////////////
+
+    struct LocalStats {
+        Histogram<uint16_t> rayHops{10, 0, UINT16_MAX};
+        Histogram<uint16_t> pathHops{10, 0, UINT16_MAX};
+    } localStats{};
 };
 
 }  // namespace pbrt
