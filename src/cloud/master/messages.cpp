@@ -35,7 +35,7 @@ ResultType LambdaMaster::handleMessages() {
 
 void LambdaMaster::processMessage(const uint64_t workerId,
                                   const Message &message) {
-    ScopeTimer<T::processMessage> _timer;
+    ScopeTimer<T::ProcessMessage> _timer;
     /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
          << "] from worker " << workerId << endl; */
 

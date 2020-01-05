@@ -18,6 +18,7 @@ using namespace chrono;
 using namespace pbrt;
 using namespace meow;
 
+using T = TimeLog::Category;
 using OpCode = Message::OpCode;
 using ResultType = Poller::Action::Result::Type;
 
@@ -86,6 +87,8 @@ void LambdaMaster::invokeWorkers(const size_t nWorkers) {
 
 ResultType LambdaMaster::handleReschedule() {
     rescheduleTimer.reset();
+
+    ScopeTimer<T::Schedule> _timer;
 
     /* (1) call the schedule function */
 

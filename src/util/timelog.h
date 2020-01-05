@@ -19,15 +19,16 @@ class TimeLog
 public:
   enum class Category
   {
-    handleQueuedRayBags,
-    processMessage,
+    QueuedRayBags,
+    ProcessMessage,
+    Schedule,
     count
   };
 
   constexpr static size_t num_categories = static_cast<size_t>( Category::count );
 
   constexpr static std::array<const char*, num_categories> _category_names {
-    { "QueuedRayBags", "ProcessMessage", }
+    { "QueuedRayBags", "ProcessMessage", "Schedule" }
   };
 
 private:

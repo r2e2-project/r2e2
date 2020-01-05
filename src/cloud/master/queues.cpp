@@ -46,7 +46,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
 }
 
 ResultType LambdaMaster::handleQueuedRayBags() {
-    ScopeTimer<T::handleQueuedRayBags> _timer;
+    ScopeTimer<T::QueuedRayBags> _timer;
 
     random_device rd{};
     mt19937 g{rd()};
