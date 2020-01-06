@@ -27,6 +27,9 @@ parser.add_argument('-o', '--out-dir', required=True)
 parser.add_argument('-n', '--run-name', required=True, type=str)
 parser.add_argument('-D', '--directional', action='store_true')
 parser.add_argument('-F', '--install-function', action='store_true')
+parser.add_argument('-G', '--ray-generators', required=True)
+parser.add_argument('-M', '--max-depth', default=4, type=int)
+parser.add_argument('-r', '--aws-region', required=True, type=str)
 
 args = parser.parse_args()
 
@@ -80,13 +83,17 @@ os.makedirs(out_dir)
 cmds = []
 cur_port = args.start_port
 for i, scene in enumerate(scenes):
-    cmdprefix = ("{master_path} --ip {ip} --timeout 60"
-              " --storage-backend s3://{s3_path}/{scene}?region=us-west-2"
-              " --aws-region us-west-2 -T auto --worker-stats 2".format(
+    cmdprefix = (
+              "{master_path} --ip {ip} --timeout 60"
+              " --storage-backend s3://{s3_path}/{scene}?region={region}"
+              " --aws-region {region} -T auto --worker-stats 2 -G {ray_generators} -M {max_depth}".format(
                   master_path=master_path,
                   ip=ip,
                   s3_path=args.s3_path,
-                  scene=scene))
+                  scene=scene,
+                  ray_generators=args.ray_generators,
+                  max_depth=args.max_depth,
+                  region=args.aws_region))
 
     if args.generate_static:
         cmdprefix += " -a uniform"
@@ -178,7 +185,7 @@ for cmd, dir, scene, nlambdas, spp in cmds:
     with open(os.path.join(dir, 'master.json')) as f:
         info = json.load(f)
 
-    perfs[scene] = int(info['finishedRays']) / info['numLambdas'] / info['rayTime']
+    perfs[scene] = int(info['finishedRays']) / info['numLambdas'] / info['totalTime']
 
 with open(os.path.join(out_dir, 'perf.json'), 'w') as f:
     json.dump(perfs, f)
