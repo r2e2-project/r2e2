@@ -54,7 +54,7 @@ ResultType LambdaMaster::handleQueuedRayBags() {
 
     auto it = freeWorkers.begin();
 
-    while (it != freeWorkers.end()) {
+    while (it != freeWorkers.end() && !queuedRayBags.empty()) {
         auto workerIt = workers.find(*it);
 
         if (workerIt == workers.end() || !assignWork(workerIt->second)) {
