@@ -17,10 +17,7 @@ Optional<Schedule> DynamicScheduler::schedule(
     }
 
     case ROOT_ONLY: {
-        const size_t rootTreeletOutsanding =
-            stats[0].enqueued.rays - stats[0].dequeued.rays;
-
-        if (rootTreeletOutsanding == 0) {
+        if (stats[0].enqueued.rays == stats[0].dequeued.rays) {
             stage = STATIC;
             return staticScheduler.schedule(maxWorkers, stats);
         }
