@@ -21,6 +21,7 @@
 #include "cloud/manager.h"
 #include "cloud/r2t2.h"
 #include "cloud/raystate.h"
+#include "cloud/schedulers/dynamic.h"
 #include "cloud/schedulers/null.h"
 #include "cloud/schedulers/static.h"
 #include "cloud/schedulers/uniform.h"
@@ -398,8 +399,7 @@ void LambdaMaster::run() {
         const auto &worker = workerkv.second;
         worker.connection->socket().close();
 
-        if (config.collectDebugLogs ||
-            config.rayActionsLogRate) {
+        if (config.collectDebugLogs || config.rayActionsLogRate) {
             getRequests.emplace_back(
                 logPrefix + to_string(worker.id) + ".INFO",
                 config.logsDirectory + "/" + to_string(worker.id) + ".INFO");
@@ -592,7 +592,7 @@ int main(int argc, char *argv[]) {
 
     if (schedulerName == "uniform") {
         scheduler = make_unique<UniformScheduler>();
-    } else if (schedulerName == "static") {
+    } else if (schedulerName == "static" || schedulerName == "dynamic") {
         auto storage = StorageBackend::create_backend(storageBackendUri);
         TempFile staticFile{"/tmp/pbrt-lambda-master.STATIC0"};
 
@@ -602,7 +602,11 @@ int main(int argc, char *argv[]) {
               staticFile.name()}});
         cerr << "done." << endl;
 
-        scheduler = make_unique<StaticScheduler>(staticFile.name());
+        if (schedulerName == "static") {
+            scheduler = make_unique<StaticScheduler>(staticFile.name());
+        } else {
+            scheduler = make_unique<DynamicScheduler>(staticFile.name());
+        }
     } else if (schedulerName == "null") {
         scheduler = make_unique<NullScheduler>();
     } else {
