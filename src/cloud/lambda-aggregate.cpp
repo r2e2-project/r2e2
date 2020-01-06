@@ -1,5 +1,7 @@
+#include <fstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -13,9 +15,7 @@
 using namespace std;
 using namespace pbrt;
 
-void usage(const char *argv0) {
-    cerr << argv0 << " SCENE-DATA SAMPLES-INDEX" << endl;
-}
+void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA" << endl; }
 
 shared_ptr<Camera> loadCamera(const string &scenePath,
                               vector<unique_ptr<Transform>> &transformCache) {
@@ -31,13 +31,12 @@ int main(int argc, char const *argv[]) {
             abort();
         }
 
-        if (argc != 3) {
+        if (argc != 2) {
             usage(argv[0]);
             return EXIT_FAILURE;
         }
 
         const string scenePath{argv[1]};
-        const string samplesPath{argv[2]};
 
         global::manager.init(scenePath);
 
@@ -46,13 +45,27 @@ int main(int argc, char const *argv[]) {
         const Bounds2i sampleBounds = camera->film->GetSampleBounds();
         unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
 
-        protobuf::RecordReader finishedReader{samplesPath};
-        while (!finishedReader.eof()) {
-            protobuf::Sample proto;
-            if (finishedReader.read(&proto)) {
-                filmTile->AddSample(from_protobuf(proto.p_film()),
-                                    from_protobuf(proto.l()), proto.weight());
+        Sample sample;
+
+        for (string line; getline(cin, line);) {
+            cerr << "Processing " << line << "... ";
+            ifstream fin{line};
+            ostringstream buffer;
+            buffer << fin.rdbuf();
+            const string dataStr = buffer.str();
+            const char *data = dataStr.data();
+
+            for (size_t offset = 0; offset < dataStr.size();) {
+                const auto len =
+                    *reinterpret_cast<const uint32_t *>(data + offset);
+                offset += 4;
+
+                sample.Deserialize(data + offset, len);
+                filmTile->AddSample(sample.pFilm, sample.L, sample.weight);
+                offset += len;
             }
+
+            cerr << "done." << endl;
         }
 
         /* Create the final output */
