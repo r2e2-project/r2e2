@@ -12,6 +12,8 @@ using namespace PollerShortNames;
 constexpr milliseconds EXIT_GRACE_PERIOD{5'000};
 
 ResultType LambdaMaster::handleStatusMessage() {
+    ScopeTimer<TimeLog::Category::StatusBar> timer_;
+
     statusPrintTimer.reset();
 
     const auto now = steady_clock::now();

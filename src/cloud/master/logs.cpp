@@ -85,6 +85,8 @@ void LambdaMaster::recordDequeue(const WorkerId workerId,
 }
 
 ResultType LambdaMaster::handleWorkerStats() {
+    ScopeTimer<TimeLog::Category::WorkerStats> timer_;
+
     workerStatsWriteTimer.reset();
 
     const auto t =

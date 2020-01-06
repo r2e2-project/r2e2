@@ -109,6 +109,7 @@ ResultType LambdaMaster::handleReschedule() {
 }
 
 ResultType LambdaMaster::handleWorkerInvocation() {
+    ScopeTimer<TimeLog::Category::Invocation> timer_;
     workerInvocationTimer.reset();
 
     /* let's start as many workers as we can right now */

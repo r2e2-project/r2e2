@@ -20,15 +20,23 @@ public:
   enum class Category
   {
     QueuedRayBags,
-    ProcessMessage,
+    HandleMessages,
     Schedule,
-    count
+    WorkerStats,
+    Invocation,
+    AcceptWorker,
+    CloseWorker,
+    TCPReceive,
+    StatusBar,
+    COUNT
   };
 
-  constexpr static size_t num_categories = static_cast<size_t>( Category::count );
+  constexpr static size_t num_categories = static_cast<size_t>( Category::COUNT );
 
   constexpr static std::array<const char*, num_categories> _category_names {
-    { "QueuedRayBags", "ProcessMessage", "Schedule" }
+    { "QueuedRayBags", "HandleMessages", "Schedule", "WorkerStats",
+      "Invocation",  "AcceptWorker", "CloseWorker", "TCPReceive",
+      "StatusBar" }
   };
 
 private:

@@ -13,7 +13,6 @@ using namespace pbrt;
 using namespace meow;
 using namespace PollerShortNames;
 
-using T = TimeLog::Category;
 using OpCode = Message::OpCode;
 
 /* if (tiles.canSendTiles && tiles.cameraRaysRemaining() &&
@@ -24,6 +23,8 @@ using OpCode = Message::OpCode;
 } */
 
 ResultType LambdaMaster::handleMessages() {
+    ScopeTimer<TimeLog::Category::HandleMessages> _timer;
+
     while (!incomingMessages.empty()) {
         auto &front = incomingMessages.front();
         processMessage(front.first, front.second);
@@ -35,7 +36,6 @@ ResultType LambdaMaster::handleMessages() {
 
 void LambdaMaster::processMessage(const uint64_t workerId,
                                   const Message &message) {
-    ScopeTimer<T::ProcessMessage> _timer;
     /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
          << "] from worker " << workerId << endl; */
 

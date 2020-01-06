@@ -203,6 +203,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     loop.make_listener({"0.0.0.0", listenPort}, [this, maxWorkers](
                                                     ExecutionLoop &loop,
                                                     TCPSocket &&socket) {
+        ScopeTimer<TimeLog::Category::AcceptWorker> timer_;
         /* do we want this worker? */
         if (Worker::nextId > this->rayGenerators && treeletsToSpawn.empty()) {
             socket.close();
@@ -212,6 +213,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
         const WorkerId workerId = Worker::nextId++;
 
         auto connectionCloseHandler = [this, workerId]() {
+            ScopeTimer<TimeLog::Category::CloseWorker> timer_;
+
             auto workerIt = workers.find(workerId);
 
             if (workerIt == workers.end()) {
@@ -252,6 +255,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
         auto connection = loop.add_connection<TCPSocket>(
             move(socket),
             [this, workerId, parser](auto, string &&data) {
+                ScopeTimer<TimeLog::Category::TCPReceive> timer_;
                 parser->parse(data);
 
                 while (!parser->empty()) {

@@ -8,7 +8,6 @@ using namespace pbrt;
 using namespace meow;
 using namespace PollerShortNames;
 
-using T = TimeLog::Category;
 using OpCode = Message::OpCode;
 
 bool LambdaMaster::assignWork(Worker& worker) {
@@ -46,7 +45,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
 }
 
 ResultType LambdaMaster::handleQueuedRayBags() {
-    ScopeTimer<T::QueuedRayBags> _timer;
+    ScopeTimer<TimeLog::Category::QueuedRayBags> _timer;
 
     random_device rd{};
     mt19937 g{rd()};
