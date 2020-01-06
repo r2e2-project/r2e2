@@ -177,7 +177,9 @@ for cmd, dir, scene, nlambdas, spp in cmds:
         graph_title = "{scene}: {nworkers} - {spp}spp".format(scene=scene, nworkers=nlambdas, spp=spp)
         os.mkdir('graphs')
         subprocess.run(os.path.join(os.path.join(pbrt_scripts_path, 'benchmarks'),
-            "detail-graphs.py") + " -i . -o graphs -t \"{title}\"".format(title=graph_title),
+            "detail-graphs.py") + " -x {num_generators} -i . -o graphs -t \"{title}\"".format(
+                title=graph_title,
+                num_generators=args.ray_generators),
             shell=True, check=True)
 
     os.chdir(cwd)

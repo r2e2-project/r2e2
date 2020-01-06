@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', required=True)
 parser.add_argument('-t', '--title', required=True)
 parser.add_argument('-o', '--out', required=True)
+parser.add_argument('-x', '--num-exclude', default=0, type=int)
 
 args = parser.parse_args()
 
@@ -173,6 +174,7 @@ def ray_throughput_over_time(df, out):
 
 treelet_data = pd.read_csv(os.path.join(args.input, 'treelets.csv'))
 worker_data = pd.read_csv(os.path.join(args.input, 'workers.csv'))
+worker_data = worker_data[worker_data.workerId >= args.num_exclude]
 
 treelet_data['timestampS'] = (treelet_data.timestamp / 1000).astype('int32')
 worker_data['timestampS'] = (worker_data.timestamp / 1000).astype('int32')
