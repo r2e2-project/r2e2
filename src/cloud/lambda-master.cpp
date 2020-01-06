@@ -83,6 +83,15 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     const string scenePath = sceneDir.name();
     roost::create_directories(scenePath);
 
+    protobuf::InvocationPayload invocationProto;
+    invocationProto.set_storage_backend(storageBackendUri);
+    invocationProto.set_coordinator(publicAddress);
+    invocationProto.set_samples_per_pixel(config.samplesPerPixel);
+    invocationProto.set_ray_actions_log_rate(config.rayActionsLogRate);
+    invocationProto.set_directional_treelets(PbrtOptions.directionalTreelets);
+
+    invocationPayload = protoutil::to_json(invocationProto);
+
     /* download required scene objects from the bucket */
     auto getSceneObjectRequest = [&scenePath](const ObjectType type) {
         return storage::GetRequest{

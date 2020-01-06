@@ -171,6 +171,7 @@ class LambdaMaster {
 
     std::unique_ptr<Scheduler> scheduler;
     std::deque<TreeletId> treeletsToSpawn;
+    std::string invocationPayload;
 
     ////////////////////////////////////////////////////////////////////////////
     // Worker <-> Object Assignments                                          //

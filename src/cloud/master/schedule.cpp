@@ -25,40 +25,28 @@ using ResultType = Poller::Action::Result::Type;
 void LambdaMaster::invokeWorkers(const size_t nWorkers) {
     if (nWorkers == 0) return;
 
-    /* invocation payload (same for Lambda & custom engines) */
-    // XXX this can be factored out of this function
-    protobuf::InvocationPayload proto;
-    proto.set_storage_backend(storageBackendUri);
-    proto.set_coordinator(publicAddress);
-    proto.set_samples_per_pixel(config.samplesPerPixel);
-    proto.set_ray_actions_log_rate(config.rayActionsLogRate);
-    proto.set_directional_treelets(PbrtOptions.directionalTreelets);
-
-    const string invocationJson = protoutil::to_json(proto);
-
     if (config.engines.empty()) {
-        auto generateRequest = [this, &invocationJson]() -> HTTPRequest {
-            return LambdaInvocationRequest(
-                       awsCredentials, awsRegion, lambdaFunctionName,
-                       invocationJson,
-                       LambdaInvocationRequest::InvocationType::EVENT,
-                       LambdaInvocationRequest::LogType::NONE)
+        HTTPRequest invocationRequest =
+            LambdaInvocationRequest(
+                awsCredentials, awsRegion, lambdaFunctionName,
+                invocationPayload,
+                LambdaInvocationRequest::InvocationType::EVENT,
+                LambdaInvocationRequest::LogType::NONE)
                 .to_http_request();
-        };
 
         for (size_t i = 0; i < nWorkers; i++) {
             loop.make_http_request<SSLConnection>(
-                "start-worker", awsAddress, generateRequest(),
+                "start-worker", awsAddress, invocationRequest,
                 [](const uint64_t, const string &, const HTTPResponse &) {},
                 [](const uint64_t, const string &) {});
         }
     } else {
         HTTPRequest request;
         request.set_first_line("POST /new_worker HTTP/1.1");
-        request.add_header(
-            HTTPHeader{"Content-Length", to_string(invocationJson.length())});
+        request.add_header(HTTPHeader{"Content-Length",
+                                      to_string(invocationPayload.length())});
         request.done_with_headers();
-        request.read_in_body(invocationJson);
+        request.read_in_body(invocationPayload);
 
         size_t launchedWorkers = 0;
 
