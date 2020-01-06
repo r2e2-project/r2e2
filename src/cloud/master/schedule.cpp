@@ -178,8 +178,7 @@ void LambdaMaster::executeSchedule(const Schedule &schedule) {
     for (const WorkerId workerId : workersToTakeDown) {
         auto &worker = workers.at(workerId);
         worker.state = Worker::State::FinishingUp;
-        workers.at(workerId).connection->enqueue_write(
-            Message::str(0, OpCode::FinishUp, ""));
+        worker.connection->enqueue_write(Message::str(0, OpCode::FinishUp, ""));
     }
 
     /* the rest will have to wait until we have available capacity */

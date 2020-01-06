@@ -27,6 +27,7 @@ Optional<Schedule> DynamicScheduler::schedule(
 
         break;
     }
+
     case STATIC:
         return staticScheduler.schedule(maxWorkers, stats);
     }

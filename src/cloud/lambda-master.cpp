@@ -230,6 +230,12 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                    let's not panic! */
                 worker.state = Worker::State::Terminated;
                 Worker::activeCount[worker.role]--;
+
+                if (this->config.workerStatsWriteInterval == 0) {
+                    workers.erase(workerIt);
+                    /* otherwise, we have to leave it to stats writer */
+                }
+
                 return;
             }
 
