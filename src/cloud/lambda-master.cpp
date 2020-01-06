@@ -568,8 +568,8 @@ int main(int argc, char *argv[]) {
         case 'i': publicIp = optarg; break;
         case 'r': region = optarg; break;
         case 'b': storageBackendUri = optarg; break;
-        case 'm': maxWorkers = stoul(optarg); break;
-        case 'G': rayGenerators = stoul(optarg); break;
+        case 'm': maxWorkers = stoi(optarg); break;
+        case 'G': rayGenerators = stoi(optarg); break;
         case 'a': schedulerName = optarg; break;
         case 'g': collectDebugLogs = true; break;
         case 'w': workerStatsWriteInterval = stoul(optarg); break;
@@ -637,12 +637,8 @@ int main(int argc, char *argv[]) {
         usage(argv[0], EXIT_FAILURE);
     }
 
-    if (rayGenerators < -1) {
-        rayGenerators = maxWorkers / 2;
-    }
-
-    if (scheduler == nullptr || listenPort == 0 || maxWorkers < 0 ||
-        rayGenerators == 0 || samplesPerPixel < 0 || maxPathDepth < 0 ||
+    if (scheduler == nullptr || listenPort == 0 || maxWorkers <= 0 ||
+        rayGenerators <= 0 || samplesPerPixel < 0 || maxPathDepth < 0 ||
         rayActionsLogRate < 0 || rayActionsLogRate > 1.0 || publicIp.empty() ||
         storageBackendUri.empty() || region.empty() || newTileThreshold == 0 ||
         (cropWindow.initialized() && pixelsPerTile != 0 &&
