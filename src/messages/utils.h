@@ -76,7 +76,6 @@ protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 protobuf::Scene to_protobuf(const Scene& scene);
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
 protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey);
-protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics);
 protobuf::Sample to_protobuf(const Sample& sample);
 protobuf::RayBagInfo to_protobuf(const RayBagInfo& RayBagInfo);
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats);

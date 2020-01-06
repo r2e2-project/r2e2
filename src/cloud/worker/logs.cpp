@@ -28,21 +28,6 @@ ResultType LambdaWorker::handleWorkerStats() {
     return ResultType::Continue;
 }
 
-ResultType LambdaWorker::handleDiagnostics() {
-    RECORD_INTERVAL("handleDiagnostics");
-    workerDiagnosticsTimer.reset();
-
-    const auto timestamp =
-        duration_cast<microseconds>(now() - workerDiagnostics.startTime)
-            .count();
-
-    auto proto = to_protobuf(workerDiagnostics);
-    TLOG(DIAG) << timestamp << " " << protoutil::to_json(proto);
-
-    workerDiagnostics.reset();
-    return ResultType::Continue;
-}
-
 void LambdaWorker::uploadLogs() {
     if (!workerId.initialized()) return;
 

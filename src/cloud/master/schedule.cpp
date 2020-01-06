@@ -32,7 +32,6 @@ void LambdaMaster::invokeWorkers(const size_t nWorkers) {
     proto.set_coordinator(publicAddress);
     proto.set_samples_per_pixel(config.samplesPerPixel);
     proto.set_ray_actions_log_rate(config.rayActionsLogRate);
-    proto.set_collect_diagnostics(config.collectDiagnostics);
     proto.set_directional_treelets(PbrtOptions.directionalTreelets);
 
     const string invocationJson = protoutil::to_json(proto);

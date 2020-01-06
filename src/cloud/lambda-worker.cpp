@@ -37,13 +37,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     FLAGS_log_prefix = false;
     google::InitGoogleLogging(logBase.c_str());
 
-    if (config.collectDiagnostics) {
-        TLOG(DIAG) << "start "
-                   << duration_cast<microseconds>(
-                          workerDiagnostics.startTime.time_since_epoch())
-                          .count();
-    }
-
     if (trackRays) {
         TLOG(RAY) << "timestamp,pathId,hop,shadowRay,remainingBounces,workerId,"
                      "treeletId,action,bag";
@@ -58,7 +51,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     coordinatorConnection = loop.make_connection<TCPConnection>(
         coordinatorAddr,
         [this](shared_ptr<TCPConnection>, string&& data) {
-            RECORD_INTERVAL("parseTCP");
             this->messageParser.parse(data);
             return true;
         },
@@ -116,15 +108,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         workerStatsTimer, Direction::In,
         bind(&LambdaWorker::handleWorkerStats, this), [this]() { return true; },
         []() { throw runtime_error("handle worker stats failed"); }));
-
-    /* record diagnostics */
-    if (config.collectDiagnostics) {
-        loop.poller().add_action(Poller::Action(
-            workerDiagnosticsTimer, Direction::In,
-            bind(&LambdaWorker::handleDiagnostics, this),
-            [this]() { return true; },
-            []() { throw runtime_error("handle diagnostics failed"); }));
-    }
 }
 
 void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
@@ -161,7 +144,6 @@ void usage(const char* argv0, int exitCode) {
          << "  -p --port PORT             port of coordinator" << endl
          << "  -s --storage-backend NAME  storage backend URI" << endl
          << "  -S --samples N             number of samples per pixel" << endl
-         << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -L --log-rays RATE         log ray actions" << endl
          << "  -h --help                  show help information" << endl;
 
@@ -177,14 +159,12 @@ int main(int argc, char* argv[]) {
 
     int samplesPerPixel = 0;
     float rayActionsLogRate = 0.0;
-    bool collectDiagnostics = false;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
         {"ip", required_argument, nullptr, 'i'},
         {"storage-backend", required_argument, nullptr, 's'},
         {"samples", required_argument, nullptr, 'S'},
-        {"diagnostics", no_argument, nullptr, 'd'},
         {"log-rays", required_argument, nullptr, 'L'},
         {"directional", no_argument, nullptr, 'I'},
         {"help", no_argument, nullptr, 'h'},
@@ -193,7 +173,7 @@ int main(int argc, char* argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:s:S:L:hdI", long_options, nullptr);
+            getopt_long(argc, argv, "p:i:s:S:L:hI", long_options, nullptr);
 
         if (opt == -1) break;
 
@@ -203,7 +183,6 @@ int main(int argc, char* argv[]) {
         case 'i': publicIp = optarg; break;
         case 's': storageUri = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
-        case 'd': collectDiagnostics = true; break;
         case 'L': rayActionsLogRate = stof(optarg); break;
         case 'I': PbrtOptions.directionalTreelets = true; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
@@ -221,7 +200,6 @@ int main(int argc, char* argv[]) {
     WorkerConfiguration config{
         samplesPerPixel,
         rayActionsLogRate,
-        collectDiagnostics,
     };
 
     try {

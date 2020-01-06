@@ -14,8 +14,6 @@ using PollerResult = Poller::Result::Type;
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 ResultType LambdaWorker::handleMessages() {
-    RECORD_INTERVAL("handleMessages");
-
     while (!messageParser.empty()) {
         processMessage(messageParser.front());
         messageParser.pop();
@@ -59,7 +57,6 @@ void LambdaWorker::processMessage(const Message& message) {
     }
 
     case OpCode::GenerateRays: {
-        RECORD_INTERVAL("generateRays");
         protobuf::GenerateRays proto;
         protoutil::from_string(message.payload(), proto);
         generateRays(from_protobuf(proto.crop_window()));

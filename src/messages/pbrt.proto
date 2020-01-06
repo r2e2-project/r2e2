@@ -230,8 +230,7 @@ message InvocationPayload {
     string coordinator = 2;
     int32 samples_per_pixel = 3;
     float ray_actions_log_rate = 4;
-    bool collect_diagnostics = 5;
-    bool directional_treelets = 6;
+    bool directional_treelets = 5;
 }
 
 message ObjectKey {
@@ -316,19 +315,6 @@ message TrafficData {
 message TreeletData {
     uint32 treelet_id = 1;
     uint32 queued_rays = 2;
-}
-
-message WorkerDiagnostics {
-    uint64 bytes_sent = 1;
-    uint64 bytes_received = 2;
-    uint64 outstanding_udp = 3;
-
-    repeated Action time_per_action = 4;
-    repeated ActionIntervals intervals_per_action = 5;
-    repeated Metrics metrics_over_time = 6;
-
-    repeated TrafficData traffic_data = 7;
-    repeated TreeletData treelet_data = 8;
 }
 
 // For stat output to logs.

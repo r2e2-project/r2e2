@@ -30,9 +30,6 @@ def handler(event, context):
     if event['rayActionsLogRate']:
         command += ['--log-rays', str(event['rayActionsLogRate'])]
 
-    if event['collectDiagnostics']:
-        command += ['--diagnostics']
-
     if event['directionalTreelets']:
         command += ['--directional']
 

@@ -39,8 +39,6 @@ namespace pbrt {
 
 constexpr std::chrono::milliseconds SEND_QUEUE_INTERVAL{250};
 constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL{1'000};
-
-constexpr std::chrono::milliseconds WORKER_DIAGNOSTICS_INTERVAL{2'000};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
 
 constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024};  // 4 MiB
@@ -48,7 +46,6 @@ constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024};  // 4 MiB
 struct WorkerConfiguration {
     int samplesPerPixel;
     float rayActionsLogRate;
-    bool collectDiagnostics;
 };
 
 /* Relationship between different queues in LambdaWorker:
@@ -201,14 +198,10 @@ class LambdaWorker {
     TransferAgent transferAgent;
 
     ////////////////////////////////////////////////////////////////////////////
-    // Stats & Diagnostics                                                    //
+    // Stats                                                                  //
     ////////////////////////////////////////////////////////////////////////////
 
     Poller::Action::Result::Type handleWorkerStats();
-
-    Poller::Action::Result::Type handleDiagnostics();
-
-    WorkerDiagnostics lastDiagnostics;
 
     ////////////////////////////////////////////////////////////////////////////
     // Logging                                                                //
@@ -252,7 +245,6 @@ class LambdaWorker {
     TimerFD sendQueueTimer{SEND_QUEUE_INTERVAL};
     TimerFD sampleBagsTimer{SAMPLE_BAGS_INTERVAL};
     TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
-    TimerFD workerDiagnosticsTimer{WORKER_DIAGNOSTICS_INTERVAL};
 
     ////////////////////////////////////////////////////////////////////////////
     // Local Stats                                                            //

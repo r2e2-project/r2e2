@@ -44,8 +44,6 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 }
 
 ResultType LambdaWorker::handleTraceQueue() {
-    RECORD_INTERVAL("handleTraceQueue");
-
     queue<RayStatePtr> processedRays;
 
     constexpr size_t MAX_RAYS = 100'000;

@@ -120,8 +120,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                   scene.sampler->samplesPerPixel, rayGenerators};
 
     /* are we logging anything? */
-    if (config.collectDebugLogs || config.collectDiagnostics ||
-        config.workerStatsWriteInterval > 0 || config.rayActionsLogRate > 0) {
+    if (config.collectDebugLogs || config.workerStatsWriteInterval > 0 ||
+        config.rayActionsLogRate > 0) {
         roost::create_directories(config.logsDirectory);
     }
 
@@ -398,7 +398,7 @@ void LambdaMaster::run() {
         const auto &worker = workerkv.second;
         worker.connection->socket().close();
 
-        if (config.collectDebugLogs || config.collectDiagnostics ||
+        if (config.collectDebugLogs ||
             config.rayActionsLogRate) {
             getRequests.emplace_back(
                 logPrefix + to_string(worker.id) + ".INFO",
@@ -433,7 +433,6 @@ void usage(const char *argv0, int exitCode) {
          << "  -m --max-workers N         maximum number of workers" << endl
          << "  -G --ray-generators N      number of ray generators" << endl
          << "  -g --debug-logs            collect worker debug logs" << endl
-         << "  -d --diagnostics           collect worker diagnostics" << endl
          << "  -w --worker-stats N        log worker stats every N seconds"
          << endl
          << "  -L --log-rays RATE         log ray actions" << endl
@@ -488,7 +487,6 @@ int main(int argc, char *argv[]) {
     string storageBackendUri;
     string region{"us-west-2"};
     uint64_t workerStatsWriteInterval = 0;
-    bool collectDiagnostics = false;
     bool collectDebugLogs = false;
     float rayActionsLogRate = 0.0;
     string logsDirectory = "logs/";
@@ -516,7 +514,6 @@ int main(int argc, char *argv[]) {
         {"ray-generators", required_argument, nullptr, 'G'},
         {"scheduler", required_argument, nullptr, 'a'},
         {"debug-logs", no_argument, nullptr, 'g'},
-        {"diagnostics", no_argument, nullptr, 'd'},
         {"worker-stats", required_argument, nullptr, 'w'},
         {"log-rays", required_argument, nullptr, 'L'},
         {"logs-dir", required_argument, nullptr, 'D'},
@@ -535,7 +532,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:m:G:w:D:a:S:L:c:t:j:T:n:J:E:ghd",
+            getopt_long(argc, argv, "p:i:r:b:m:G:w:D:a:S:L:c:t:j:T:n:J:E:gh",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -553,7 +550,6 @@ int main(int argc, char *argv[]) {
         case 'a': schedulerName = optarg; break;
         case 'g': collectDebugLogs = true; break;
         case 'w': workerStatsWriteInterval = stoul(optarg); break;
-        case 'd': collectDiagnostics = true; break;
         case 'D': logsDirectory = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'L': rayActionsLogRate = stof(optarg); break;
@@ -633,12 +629,11 @@ int main(int argc, char *argv[]) {
     unique_ptr<LambdaMaster> master;
 
     // TODO clean this up
-    MasterConfiguration config = {samplesPerPixel,    collectDebugLogs,
-                                  collectDiagnostics, workerStatsWriteInterval,
-                                  rayActionsLogRate,  logsDirectory,
-                                  cropWindow,         tileSize,
-                                  seconds{timeout},   jobSummaryPath,
-                                  newTileThreshold,   move(engines)};
+    MasterConfiguration config = {
+        samplesPerPixel,   collectDebugLogs, workerStatsWriteInterval,
+        rayActionsLogRate, logsDirectory,    cropWindow,
+        tileSize,          seconds{timeout}, jobSummaryPath,
+        newTileThreshold,  move(engines)};
 
     try {
         master = make_unique<LambdaMaster>(

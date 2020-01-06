@@ -42,7 +42,6 @@ constexpr size_t MAX_OUTSTANDING_BAGS{12};
 struct MasterConfiguration {
     int samplesPerPixel;
     bool collectDebugLogs;
-    bool collectDiagnostics;
     uint64_t workerStatsWriteInterval;
     float rayActionsLogRate;
     std::string logsDirectory;

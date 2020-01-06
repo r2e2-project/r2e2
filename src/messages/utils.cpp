@@ -256,44 +256,6 @@ protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey) {
     return proto;
 }
 
-protobuf::WorkerDiagnostics to_protobuf(const WorkerDiagnostics& diagnostics) {
-    protobuf::WorkerDiagnostics proto;
-
-    proto.set_bytes_sent(diagnostics.bytesSent);
-    proto.set_bytes_received(diagnostics.bytesReceived);
-    proto.set_outstanding_udp(diagnostics.outstandingUdp);
-
-    for (const auto& kv : diagnostics.timePerAction) {
-        protobuf::Action* action = proto.add_time_per_action();
-        action->set_name(kv.first);
-        action->set_time(kv.second);
-    }
-
-    for (const auto& kv : diagnostics.intervalsPerAction) {
-        protobuf::ActionIntervals* action_intervals =
-            proto.add_intervals_per_action();
-        action_intervals->set_name(kv.first);
-        for (std::tuple<uint64_t, uint64_t> interval : kv.second) {
-            protobuf::Interval* proto_interval =
-                action_intervals->add_intervals();
-            proto_interval->set_start(std::get<0>(interval));
-            proto_interval->set_end(std::get<1>(interval));
-        }
-    }
-
-    for (const auto& kv : diagnostics.metricsOverTime) {
-        protobuf::Metrics* metrics = proto.add_metrics_over_time();
-        metrics->set_name(kv.first);
-        for (std::tuple<uint64_t, double> point : kv.second) {
-            protobuf::MetricPoint* metric_point = metrics->add_points();
-            metric_point->set_time(std::get<0>(point));
-            metric_point->set_value(std::get<1>(point));
-        }
-    }
-
-    return proto;
-}
-
 protobuf::Sample to_protobuf(const Sample& sample) {
     protobuf::Sample proto;
     proto.set_sample_id(sample.sampleId);
@@ -818,34 +780,6 @@ protobuf::SpectrumTexture spectrum_texture::to_protobuf(
         pbrt::to_protobuf(tex2world.GetMatrix()));
     texture.mutable_texture_params()->CopyFrom(pbrt::to_protobuf(tp));
     return texture;
-}
-
-WorkerDiagnostics from_protobuf(const protobuf::WorkerDiagnostics& proto) {
-    WorkerDiagnostics diagnostics;
-
-    diagnostics.bytesSent = proto.bytes_sent();
-    diagnostics.bytesReceived = proto.bytes_received();
-    diagnostics.outstandingUdp = proto.outstanding_udp();
-
-    for (const auto& kv : proto.time_per_action()) {
-        diagnostics.timePerAction[kv.name()] = kv.time();
-    }
-    for (const auto& action_interval : proto.intervals_per_action()) {
-        const std::string& name = action_interval.name();
-        for (const auto& interval : action_interval.intervals()) {
-            diagnostics.intervalsPerAction[name].push_back(
-                std::make_tuple(interval.start(), interval.end()));
-        }
-    }
-    for (const auto& metrics : proto.metrics_over_time()) {
-        const std::string& name = metrics.name();
-        for (const auto& metric_point : metrics.points()) {
-            diagnostics.metricsOverTime[name].push_back(
-                std::make_tuple(metric_point.time(), metric_point.value()));
-        }
-    }
-
-    return diagnostics;
 }
 
 RayBagInfo from_protobuf(const protobuf::RayBagInfo& proto) {
