@@ -27,6 +27,9 @@ def handler(event, context):
     if event['samplesPerPixel']:
         command += ['--samples', str(event['samplesPerPixel'])]
 
+    if event['maxPathDepth']:
+        command += ['--max-depth', str(event['maxPathDepth'])]
+
     if event['rayActionsLogRate']:
         command += ['--log-rays', str(event['rayActionsLogRate'])]
 

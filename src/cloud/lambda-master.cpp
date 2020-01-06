@@ -87,6 +87,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     invocationProto.set_storage_backend(storageBackendUri);
     invocationProto.set_coordinator(publicAddress);
     invocationProto.set_samples_per_pixel(config.samplesPerPixel);
+    invocationProto.set_max_path_depth(config.maxPathDepth);
     invocationProto.set_ray_actions_log_rate(config.rayActionsLogRate);
     invocationProto.set_directional_treelets(PbrtOptions.directionalTreelets);
 
@@ -458,6 +459,7 @@ void usage(const char *argv0, int exitCode) {
          << "  -D --logs-dir DIR          set logs directory (default: logs/)"
          << endl
          << "  -S --samples N             number of samples per pixel" << endl
+         << "  -M --max-depth N           maximum path depth" << endl
          << "  -a --scheduler TYPE        indicate scheduler type:" << endl
          << "                               - uniform (default)" << endl
          << "                               - static" << endl
@@ -519,6 +521,7 @@ int main(int argc, char *argv[]) {
     string schedulerName;
 
     int samplesPerPixel = 0;
+    int maxPathDepth = 5;
     int tileSize = 0;
 
     uint32_t maxJobsOnEngine = 1;
@@ -537,6 +540,7 @@ int main(int argc, char *argv[]) {
         {"log-rays", required_argument, nullptr, 'L'},
         {"logs-dir", required_argument, nullptr, 'D'},
         {"samples", required_argument, nullptr, 'S'},
+        {"max-depth", required_argument, nullptr, 'M'},
         {"crop-window", required_argument, nullptr, 'c'},
         {"timeout", required_argument, nullptr, 't'},
         {"job-summary", required_argument, nullptr, 'j'},
@@ -551,7 +555,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:r:b:m:G:w:D:a:S:L:c:t:j:T:n:J:E:gh",
+            getopt_long(argc, argv, "p:i:r:b:m:G:w:D:a:S:M:L:c:t:j:T:n:J:E:gh",
                         long_options, nullptr);
 
         if (opt == -1) {
@@ -571,6 +575,7 @@ int main(int argc, char *argv[]) {
         case 'w': workerStatsWriteInterval = stoul(optarg); break;
         case 'D': logsDirectory = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
+        case 'M': maxPathDepth = stoi(optarg); break;
         case 'L': rayActionsLogRate = stof(optarg); break;
         case 't': timeout = stoul(optarg); break;
         case 'j': jobSummaryPath = optarg; break;
@@ -637,8 +642,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (scheduler == nullptr || listenPort == 0 || maxWorkers < 0 ||
-        rayGenerators == 0 || samplesPerPixel < 0 || rayActionsLogRate < 0 ||
-        rayActionsLogRate > 1.0 || publicIp.empty() ||
+        rayGenerators == 0 || samplesPerPixel < 0 || maxPathDepth < 0 ||
+        rayActionsLogRate < 0 || rayActionsLogRate > 1.0 || publicIp.empty() ||
         storageBackendUri.empty() || region.empty() || newTileThreshold == 0 ||
         (cropWindow.initialized() && pixelsPerTile != 0 &&
          pixelsPerTile != numeric_limits<typeof(pixelsPerTile)>::max() &&
@@ -652,11 +657,12 @@ int main(int argc, char *argv[]) {
     unique_ptr<LambdaMaster> master;
 
     // TODO clean this up
-    MasterConfiguration config = {
-        samplesPerPixel,   collectDebugLogs, workerStatsWriteInterval,
-        rayActionsLogRate, logsDirectory,    cropWindow,
-        tileSize,          seconds{timeout}, jobSummaryPath,
-        newTileThreshold,  move(engines)};
+    MasterConfiguration config = {samplesPerPixel,   maxPathDepth,
+                                  collectDebugLogs,  workerStatsWriteInterval,
+                                  rayActionsLogRate, logsDirectory,
+                                  cropWindow,        tileSize,
+                                  seconds{timeout},  jobSummaryPath,
+                                  newTileThreshold,  move(engines)};
 
     try {
         master = make_unique<LambdaMaster>(

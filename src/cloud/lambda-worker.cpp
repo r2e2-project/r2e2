@@ -46,6 +46,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     PbrtOptions.nThreads = 1;
     scene.bvh = make_unique<CloudBVH>();
     scene.samplesPerPixel = config.samplesPerPixel;
+    scene.maxDepth = config.maxPathDepth;
+
     manager.init(".");
 
     coordinatorConnection = loop.make_connection<TCPConnection>(
@@ -144,6 +146,7 @@ void usage(const char* argv0, int exitCode) {
          << "  -p --port PORT             port of coordinator" << endl
          << "  -s --storage-backend NAME  storage backend URI" << endl
          << "  -S --samples N             number of samples per pixel" << endl
+         << "  -M --max-depth N           maximum path depth"
          << "  -L --log-rays RATE         log ray actions" << endl
          << "  -h --help                  show help information" << endl;
 
@@ -158,6 +161,7 @@ int main(int argc, char* argv[]) {
     string storageUri;
 
     int samplesPerPixel = 0;
+    int maxPathDepth = 0;
     float rayActionsLogRate = 0.0;
 
     struct option long_options[] = {
@@ -165,6 +169,7 @@ int main(int argc, char* argv[]) {
         {"ip", required_argument, nullptr, 'i'},
         {"storage-backend", required_argument, nullptr, 's'},
         {"samples", required_argument, nullptr, 'S'},
+        {"max-depth", required_argument, nullptr, 'M'},
         {"log-rays", required_argument, nullptr, 'L'},
         {"directional", no_argument, nullptr, 'I'},
         {"help", no_argument, nullptr, 'h'},
@@ -173,7 +178,7 @@ int main(int argc, char* argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:s:S:L:hI", long_options, nullptr);
+            getopt_long(argc, argv, "p:i:s:S:M:L:hI", long_options, nullptr);
 
         if (opt == -1) break;
 
@@ -183,6 +188,7 @@ int main(int argc, char* argv[]) {
         case 'i': publicIp = optarg; break;
         case 's': storageUri = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
+        case 'M': maxPathDepth = stoi(optarg); break;
         case 'L': rayActionsLogRate = stof(optarg); break;
         case 'I': PbrtOptions.directionalTreelets = true; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
@@ -191,16 +197,15 @@ int main(int argc, char* argv[]) {
         // clang-format on
     }
 
-    if (listenPort == 0 || rayActionsLogRate < 0 || rayActionsLogRate > 1.0 ||
-        publicIp.empty() || storageUri.empty()) {
+    if (listenPort == 0 || samplesPerPixel < 0 || maxPathDepth < 0 ||
+        rayActionsLogRate < 0 || rayActionsLogRate > 1.0 || publicIp.empty() ||
+        storageUri.empty()) {
         usage(argv[0], EXIT_FAILURE);
     }
 
     unique_ptr<LambdaWorker> worker;
-    WorkerConfiguration config{
-        samplesPerPixel,
-        rayActionsLogRate,
-    };
+    WorkerConfiguration config{samplesPerPixel, maxPathDepth,
+                               rayActionsLogRate};
 
     try {
         worker =

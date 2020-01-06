@@ -45,6 +45,7 @@ constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024};  // 4 MiB
 
 struct WorkerConfiguration {
     int samplesPerPixel;
+    int maxPathDepth;
     float rayActionsLogRate;
 };
 
@@ -100,7 +101,7 @@ class LambdaWorker {
       public:
         bool initialized{false};
 
-        const uint8_t maxDepth{5};
+        uint8_t maxDepth{5};
         int samplesPerPixel{1};
         Vector2i sampleExtent{};
         std::shared_ptr<Camera> camera{};

@@ -229,8 +229,9 @@ message InvocationPayload {
     string storage_backend = 1;
     string coordinator = 2;
     int32 samples_per_pixel = 3;
-    float ray_actions_log_rate = 4;
-    bool directional_treelets = 5;
+    int32 max_path_depth = 4;
+    float ray_actions_log_rate = 5;
+    bool directional_treelets = 6;
 }
 
 message ObjectKey {

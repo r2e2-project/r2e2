@@ -41,6 +41,7 @@ constexpr size_t MAX_OUTSTANDING_BAGS{8};
 
 struct MasterConfiguration {
     int samplesPerPixel;
+    int maxPathDepth;
     bool collectDebugLogs;
     uint64_t workerStatsWriteInterval;
     float rayActionsLogRate;
