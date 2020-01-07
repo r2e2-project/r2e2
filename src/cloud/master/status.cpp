@@ -77,8 +77,7 @@ ResultType LambdaMaster::handleStatusMessage() {
         << BG() << " \u03bb " << Worker::activeCount[Worker::Role::Tracer]
                 << "/" << maxWorkers << " "
 
-        << BG() << " \u03a3 " << Worker::activeCount[Worker::Role::Aggregator]
-                << " "
+        << BG() << " \u29d6 " << treeletsToSpawn.size() << " "
 
         // lagging workers
         << BG() << " \u203c " << laggingWorkers << " "
