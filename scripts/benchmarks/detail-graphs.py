@@ -174,6 +174,13 @@ def ray_throughput_over_time(df, out):
     plt.clf()
 
 def combined_progress_rate(df, out):
+    def pseudo_eng(divisor, suffix):
+        def formatter(val, tick):
+            trunc = val / divisor
+            return '{0:g}'.format(trunc) + suffix
+
+        return formatter
+
     maxtime = df['timestampS'].max()
     data = df.groupby(['timestampS']).sum()
     enqueued_per_sec = data.raysEnqueued
@@ -185,23 +192,18 @@ def combined_progress_rate(df, out):
     fig, (ax, cax) = plt.subplots(nrows=2, sharex=True, gridspec_kw={'hspace': 0, 'wspace': 0})
     ax.grid(b=True, linewidth=0.5, color='#F6F6F6')
     cax.grid(b=True, linewidth=0.5, color='#F6F6F6')
-    ax.spines['top'].set_bounds(-33, maxtime + 33)
     ax.spines['bottom'].set_visible(False)
-    cax.spines['top'].set_bounds(-33, maxtime + 33)
-    cax.spines['bottom'].set_bounds(-33, maxtime + 33)
+    overshoot = maxtime / 7
+    ax.spines['top'].set_bounds(-overshoot, maxtime + overshoot)
+    cax.spines['top'].set_bounds(-overshoot, maxtime + overshoot)
+    cax.spines['bottom'].set_bounds(-overshoot, maxtime + overshoot)
 
     ax.set_ylabel("Number of Rays", fontsize=9)
-    ax.yaxis.set_major_formatter(matplotlib.ticker.EngFormatter(sep='', places=0))
-    deq_line = ax.plot(dequeued_per_sec, label='Rays Dequeued', linewidth=0.7, color='tab:blue')
-    enq_line = ax.plot(enqueued_per_sec, label='Rays Enqueued', linewidth=0.7, color='tab:orange')
-
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(pseudo_eng(1e6, 'M')))
     altax = ax.twinx()
     altax.set_ylabel('Avg. Bag Bytes', fontsize=9, labelpad=12)
-    altax.yaxis.set_major_formatter(matplotlib.ticker.EngFormatter(sep='', places=0))
 
-    bag_line = altax.plot(data.bytesEnqueued / data.bagsEnqueued, label='Avg. Bytes per Bag', linewidth=0.7, color='#76B7B2')
-
-    completion_line = cax.plot(percent_complete, label='% Paths Finished', linewidth=0.7, color='#E25C5E')
+    altax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(pseudo_eng(1e3, 'K')))
 
     cax.set_xlabel("Timestamp (s)", fontsize=9)
     cax.set_ylabel("Percent Paths Finished", fontsize=9)
@@ -213,6 +215,11 @@ def combined_progress_rate(df, out):
     cax.tick_params(axis='both', which='major', labelsize=7)
 
     plt.title(args.title, fontsize=11)
+
+    enq_line = ax.plot(enqueued_per_sec, label='Rays Enqueued', linewidth=0.7, color='tab:orange')
+    deq_line = ax.plot(dequeued_per_sec, label='Rays Dequeued', linewidth=0.7, color='tab:blue')
+    bag_line = altax.plot(data.bytesEnqueued / data.bagsEnqueued, label='Avg. Bytes per Bag', linewidth=0.7, color='#76B7B2')
+    completion_line = cax.plot(percent_complete, label='% Paths Finished', linewidth=0.7, color='#E25C5E')
 
     lines = enq_line + deq_line + bag_line + completion_line
     labels = [l.get_label() for l in lines]
