@@ -171,20 +171,74 @@ def ray_throughput_over_time(df, out):
     plt.ylabel("Throughput (rays / worker / s)")
     plt.gcf().subplots_adjust(left=0.2)
     plt.savefig(out, dpi=300)
+    plt.clf()
+
+def combined_progress_rate(df, out):
+    maxtime = df['timestampS'].max()
+    data = df.groupby(['timestampS']).sum()
+    enqueued_per_sec = data.raysEnqueued
+    dequeued_per_sec = data.raysDequeued
+    total_paths = data.pathsFinished.sum()
+    running_completion = data.pathsFinished.cumsum();
+    percent_complete = running_completion / total_paths * 100
+
+    fig, (ax, cax) = plt.subplots(nrows=2, sharex=True, gridspec_kw={'hspace': 0, 'wspace': 0})
+    ax.grid(b=True, linewidth=0.5, color='#F6F6F6')
+    cax.grid(b=True, linewidth=0.5, color='#F6F6F6')
+    ax.spines['top'].set_bounds(-33, maxtime + 33)
+    ax.spines['bottom'].set_visible(False)
+    cax.spines['top'].set_bounds(-33, maxtime + 33)
+    cax.spines['bottom'].set_bounds(-33, maxtime + 33)
+
+    ax.set_ylabel("Number of Rays", fontsize=9)
+    ax.yaxis.set_major_formatter(matplotlib.ticker.EngFormatter(sep='', places=0))
+    deq_line = ax.plot(dequeued_per_sec, label='Rays Dequeued', linewidth=0.7, color='tab:blue')
+    enq_line = ax.plot(enqueued_per_sec, label='Rays Enqueued', linewidth=0.7, color='tab:orange')
+
+    altax = ax.twinx()
+    altax.set_ylabel('Avg. Bag Bytes', fontsize=9, labelpad=12)
+    altax.yaxis.set_major_formatter(matplotlib.ticker.EngFormatter(sep='', places=0))
+
+    bag_line = altax.plot(data.bytesEnqueued / data.bagsEnqueued, label='Avg. Bytes per Bag', linewidth=0.7, color='#76B7B2')
+
+    completion_line = cax.plot(percent_complete, label='% Paths Finished', linewidth=0.7, color='#E25C5E')
+
+    cax.set_xlabel("Timestamp (s)", fontsize=9)
+    cax.set_ylabel("Percent Paths Finished", fontsize=9)
+    cax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter())
+
+    plt.margins(x=0.0126)
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    altax.tick_params(axis='both', which='major', labelsize=7)
+    cax.tick_params(axis='both', which='major', labelsize=7)
+
+    plt.title(args.title, fontsize=11)
+
+    lines = enq_line + deq_line + bag_line + completion_line
+    labels = [l.get_label() for l in lines]
+    squares = [matplotlib.patches.Rectangle((0, 0), 1, 1, facecolor=l.get_color()) for l in lines]
+    plt.legend(squares, labels, loc='lower left', bbox_to_anchor=(1, -1), handlelength=1, handleheight=1, prop={'size': 8})
+
+    fig.tight_layout()
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.clf()
+
 
 treelet_data = pd.read_csv(os.path.join(args.input, 'treelets.csv'))
 worker_data = pd.read_csv(os.path.join(args.input, 'workers.csv'))
-worker_data = worker_data[worker_data.workerId >= args.num_exclude]
 
 treelet_data['timestampS'] = (treelet_data.timestamp / 1000).astype('int32')
 worker_data['timestampS'] = (worker_data.timestamp / 1000).astype('int32')
+
+tracer_worker_data = worker_data[worker_data.workerId >= args.num_exclude]
 
 TIMESTEP = get_timestep(worker_data)
 
 gen_per_second_per_treelet(treelet_data, os.path.join(args.out, "per-treelet.png"))
 gen_per_second_per_worker(worker_data, os.path.join(args.out, "per-worker.png"))
 sent_bytes(worker_data, os.path.join(args.out, "per-worker-outrate.png"))
-received_bytes(worker_data, os.path.join(args.out, "per-worker-inrate.png"))
+received_bytes(tracer_worker_data, os.path.join(args.out, "per-worker-inrate.png"))
 gen_ray_queue(worker_data, os.path.join(args.out, "aggregate-ray-queue.png"), True)
 gen_ray_queue(worker_data, os.path.join(args.out, "individual-ray-queue.png"), False)
 ray_throughput_over_time(worker_data, os.path.join(args.out, "ray-throughput.png"))
+combined_progress_rate(worker_data, os.path.join(args.out, "progress-rate.png"))

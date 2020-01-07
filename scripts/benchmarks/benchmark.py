@@ -30,6 +30,7 @@ parser.add_argument('-F', '--install-function', action='store_true')
 parser.add_argument('-G', '--ray-generators', required=True)
 parser.add_argument('-M', '--max-depth', default=4, type=int)
 parser.add_argument('-r', '--aws-region', required=True, type=str)
+parser.add_argument('-a', '--num-attempts', default=1, type=int)
 
 args = parser.parse_args()
 
@@ -86,7 +87,7 @@ for i, scene in enumerate(scenes):
     cmdprefix = (
               "{master_path} --ip {ip} --timeout 60"
               " --storage-backend s3://{s3_path}/{scene}?region={region}"
-              " --aws-region {region} -T auto --worker-stats 2 -G {ray_generators} -M {max_depth}".format(
+              " --aws-region {region} -T auto --worker-stats 1 -G {ray_generators} -M {max_depth}".format(
                   master_path=master_path,
                   ip=ip,
                   s3_path=args.s3_path,
@@ -147,7 +148,7 @@ for cmd, dir, scene, nlambdas, spp in cmds:
 
     while not os.path.isfile(master) or not job_finished(master):
         shutil.rmtree(dir, ignore_errors=True)
-        if i > 2:
+        if i > args.num_attempts - 1:
             break
         os.mkdir(dir)
 
