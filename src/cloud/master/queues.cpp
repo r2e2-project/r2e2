@@ -11,6 +11,9 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 
 bool LambdaMaster::assignWork(Worker& worker) {
+    /* return, if worker is not active anymore */
+    if (worker.state != Worker::State::Active) return false;
+
     /* return, if the worker doesn't have any treelets */
     if (worker.treelets.empty()) return false;
 

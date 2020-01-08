@@ -276,7 +276,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
 
                 return true;
             },
-            connectionCloseHandler, connectionCloseHandler);
+            [workerId]() {
+                throw runtime_error("worker died unexpected: " +
+                                    to_string(workerId));
+            },
+            connectionCloseHandler);
 
         if (workerId <= this->rayGenerators) {
             /* This worker is a ray generator
