@@ -36,6 +36,7 @@ TreeletDumpBVH::TreeletDumpBVH(vector<shared_ptr<Primitive>> &&p,
                                SplitMethod splitMethod,
                                bool dumpBVH,
                                const string &dumpBVHPath)
+//need this constructor 
         : BVHAccel(p, maxPrimsInNode, splitMethod),
           rootBVH(rootBVH),
           traversalAlgo(travAlgo),
@@ -86,6 +87,7 @@ TreeletDumpBVH::TreeletDumpBVH(vector<shared_ptr<Primitive>> &&p,
     throw runtime_error("Unimplemented");
 }
 
+//need this creator for api.cpp 
 shared_ptr<TreeletDumpBVH> CreateTreeletDumpBVH(
     vector<shared_ptr<Primitive>> prims, const ParamSet &ps) {
     int maxTreeletBytes = ps.FindOneInt("maxtreeletbytes", 1'000'000'000);

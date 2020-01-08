@@ -118,6 +118,7 @@
 #include "cloud/integrator.h"
 #include "cloud/bvh.h"
 #include "cloud/treeletdumpbvh.h"
+#include "cloud/visualbvh.h"
 #include "cloud/manager.h"
 
 #include <map>
@@ -902,6 +903,9 @@ std::shared_ptr<Primitive> MakeAccelerator(
         accel = CreateCloudBVH(paramSet);
     else if (name == "treeletdumpbvh")
         accel = CreateTreeletDumpBVH(std::move(prims), paramSet);
+    //add new bvh accel structure here
+    else if (name == "visualbvh")
+        accel = CreateVisualBVH(std::move(prims),paramSet);
     else
         Warning("Accelerator \"%s\" unknown.", name.c_str());
     paramSet.ReportUnused();
