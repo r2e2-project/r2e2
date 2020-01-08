@@ -64,12 +64,12 @@ void LambdaMaster::recordDequeue(const WorkerId workerId,
 
     worker.lastStats.first = true;
 
-    if (worker.outstandingRayBags.size() == MAX_OUTSTANDING_BAGS) {
-        freeWorkers.push_back(workerId);
-    }
-
     worker.outstandingRayBags.erase(info);
     worker.outstandingBytes -= info.bagSize;
+
+    if (worker.outstandingBytes < MAX_OUTSTANDING_BYTES) {
+        freeWorkers.push_back(workerId);
+    }
 
     treelets[info.treeletId].lastStats.first = true;
 

@@ -18,7 +18,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
     if (worker.treelets.empty()) return false;
 
     /* return if the worker already has enough work */
-    if (worker.outstandingRayBags.size() >= MAX_OUTSTANDING_BAGS) return false;
+    if (worker.outstandingBytes >= MAX_OUTSTANDING_BYTES) return false;
 
     const TreeletId treeletId = *worker.treelets.begin();
 
@@ -30,8 +30,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
     protobuf::RayBags proto;
     auto& bags = bagsQueueIt->second;
 
-    while (!bags.empty() &&
-           worker.outstandingRayBags.size() < MAX_OUTSTANDING_BAGS) {
+    while (!bags.empty() && worker.outstandingBytes < MAX_OUTSTANDING_BYTES) {
         *proto.add_items() = to_protobuf(bags.front());
         recordAssign(worker.id, bags.front());
         bags.pop();
@@ -44,7 +43,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
     worker.connection->enqueue_write(
         Message::str(0, OpCode::ProcessRayBag, protoutil::to_string(proto)));
 
-    return worker.outstandingRayBags.size() < MAX_OUTSTANDING_BAGS;
+    return worker.outstandingBytes < MAX_OUTSTANDING_BYTES;
 }
 
 ResultType LambdaMaster::handleQueuedRayBags() {

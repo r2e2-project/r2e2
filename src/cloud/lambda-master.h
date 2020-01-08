@@ -37,7 +37,7 @@ namespace pbrt {
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WORKER_INVOCATION_INTERVAL{2'000};
-constexpr size_t MAX_OUTSTANDING_BAGS{8};
+constexpr size_t MAX_OUTSTANDING_BYTES{25 * 1024 * 1024}; /* 25 MiB */
 
 struct MasterConfiguration {
     int samplesPerPixel;
