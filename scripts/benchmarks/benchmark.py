@@ -147,9 +147,10 @@ for cmd, dir, scene, nlambdas, spp in cmds:
     i = 0
 
     while not os.path.isfile(master) or not job_finished(master):
-        shutil.rmtree(dir, ignore_errors=True)
         if i > args.num_attempts - 1:
             break
+
+        shutil.rmtree(dir, ignore_errors=True)
         os.mkdir(dir)
 
         with open(os.path.join(dir, 'COMMAND'), 'w') as fout:
