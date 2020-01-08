@@ -198,33 +198,39 @@ def combined_progress_rate(df, out):
     cax.spines['top'].set_bounds(-overshoot, maxtime + overshoot)
     cax.spines['bottom'].set_bounds(-overshoot, maxtime + overshoot)
 
-    ax.set_ylabel("Number of Rays", fontsize=9)
+    ax.set_ylabel("Number of Rays", fontsize=8)
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(pseudo_eng(1e6, 'M')))
     altax = ax.twinx()
-    altax.set_ylabel('Avg. Bag Bytes', fontsize=9, labelpad=12)
+    altax.set_ylabel('Avg. Bag Bytes', fontsize=8, labelpad=12)
 
     altax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(pseudo_eng(1e3, 'K')))
 
-    cax.set_xlabel("Timestamp (s)", fontsize=9)
-    cax.set_ylabel("Percent Paths Finished", fontsize=9)
+    cax.set_xlabel("Timestamp (s)", fontsize=8)
+    cax.set_ylabel("Percent Paths Finished", fontsize=8)
     cax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter())
+
+    caltax = cax.twinx()
+    caltax.set_ylabel("Bytes Transferred", fontsize=8)
+    caltax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(pseudo_eng(1e6, 'M')))
 
     plt.margins(x=0.0126)
     ax.tick_params(axis='both', which='major', labelsize=7)
     altax.tick_params(axis='both', which='major', labelsize=7)
     cax.tick_params(axis='both', which='major', labelsize=7)
+    caltax.tick_params(axis='both', which='major', labelsize=7)
 
-    plt.title(args.title, fontsize=11)
 
     enq_line = ax.plot(enqueued_per_sec, label='Rays Enqueued', linewidth=0.7, color='tab:orange')
     deq_line = ax.plot(dequeued_per_sec, label='Rays Dequeued', linewidth=0.7, color='tab:blue')
     bag_line = altax.plot(data.bytesEnqueued / data.bagsEnqueued, label='Avg. Bytes per Bag', linewidth=0.7, color='#76B7B2')
     completion_line = cax.plot(percent_complete, label='% Paths Finished', linewidth=0.7, color='#E25C5E')
+    bw_line = caltax.plot(data.bytesEnqueued + data.bytesDequeued, label='Network Bandwidth', linewidth=0.7, color='tab:green')
 
-    lines = enq_line + deq_line + bag_line + completion_line
+    lines = enq_line + deq_line + bag_line + completion_line + bw_line
     labels = [l.get_label() for l in lines]
     squares = [matplotlib.patches.Rectangle((0, 0), 1, 1, facecolor=l.get_color()) for l in lines]
-    plt.legend(squares, labels, loc='lower left', bbox_to_anchor=(1, -1), handlelength=1, handleheight=1, prop={'size': 8})
+    fig.legend(squares, labels, loc='upper left', bbox_to_anchor=(0.96, 1), handlelength=1, handleheight=1, prop={'size': 8})
+    fig.suptitle(args.title, fontsize=11, y=1.01)
 
     fig.tight_layout()
     plt.savefig(out, dpi=300, bbox_inches='tight')
