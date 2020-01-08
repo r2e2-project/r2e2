@@ -228,7 +228,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
             auto workerIt = workers.find(workerId);
 
             if (workerIt == workers.end()) {
-                throw runtime_error("unexpected worker id");
+                throw runtime_error("unexpected worker id: " +
+                                    to_string(workerId));
             }
 
             auto &worker = workerIt->second;
@@ -241,6 +242,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
 
                 /* it's okay for this worker to go away,
                    let's not panic! */
+                cleanlyTerminatedWorkers.insert(worker.id);
                 worker.state = Worker::State::Terminated;
                 Worker::activeCount[worker.role]--;
 
@@ -276,7 +278,13 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
 
                 return true;
             },
-            connectionCloseHandler, connectionCloseHandler);
+            [this, workerId]() {
+                if (cleanlyTerminatedWorkers.count(workerId) == 0) {
+                    throw runtime_error("Worker died unexpectedly: " +
+                                        to_string(workerId));
+                }
+            },
+            connectionCloseHandler);
 
         if (workerId <= this->rayGenerators) {
             /* This worker is a ray generator
