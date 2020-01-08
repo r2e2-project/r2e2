@@ -115,6 +115,7 @@ class LambdaMaster {
         std::set<ObjectKey> objects{};
 
         std::set<RayBagInfo> outstandingRayBags{};
+        size_t outstandingBytes{0};
 
         // Statistics
         WorkerStats stats{};
