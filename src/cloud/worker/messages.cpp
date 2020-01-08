@@ -81,7 +81,8 @@ void LambdaWorker::processMessage(const Message& message) {
         loop.poller().add_action(Poller::Action(
             alwaysOnFd, Direction::Out,
             [this]() {
-                /* TODO let's send the latest worker stats */
+                sendWorkerStats();
+
                 coordinatorConnection->enqueue_write(
                     Message::str(*workerId, OpCode::Bye, ""));
 
