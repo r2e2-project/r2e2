@@ -616,7 +616,7 @@ int main(int argc, char *argv[]) {
 
     if (schedulerName == "uniform") {
         scheduler = make_unique<UniformScheduler>();
-    } else if (schedulerName == "static" || schedulerName == "dynamic") {
+    } else if (schedulerName == "static") {
         auto storage = StorageBackend::create_backend(storageBackendUri);
         TempFile staticFile{"/tmp/pbrt-lambda-master.STATIC0"};
 
@@ -626,11 +626,9 @@ int main(int argc, char *argv[]) {
               staticFile.name()}});
         cerr << "done." << endl;
 
-        if (schedulerName == "static") {
-            scheduler = make_unique<StaticScheduler>(staticFile.name());
-        } else {
-            scheduler = make_unique<DynamicScheduler>(staticFile.name());
-        }
+        scheduler = make_unique<StaticScheduler>(staticFile.name());
+    } else if (schedulerName == "dynamic") {
+        scheduler = make_unique<DynamicScheduler>();
     } else if (schedulerName == "null") {
         scheduler = make_unique<NullScheduler>();
     } else {
