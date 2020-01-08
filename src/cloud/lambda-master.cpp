@@ -244,6 +244,12 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                 worker.state = Worker::State::Terminated;
                 Worker::activeCount[worker.role]--;
 
+                if (!worker.outstandingRayBags.empty()) {
+                    throw runtime_error(
+                        "worker died without finishing its work: " +
+                        to_string(workerId));
+                }
+
                 if (this->config.workerStatsWriteInterval == 0) {
                     workers.erase(workerIt);
                     /* otherwise, we have to leave it to stats writer */
