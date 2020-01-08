@@ -12,11 +12,7 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
-ResultType LambdaWorker::handleWorkerStats() {
-    workerStatsTimer.reset();
-
-    if (!workerId.initialized()) return ResultType::Continue;
-
+void LambdaWorker::sendWorkerStats() {
     WorkerStats stats;
     stats.finishedPaths = finishedPathIds.size();
 
@@ -25,6 +21,14 @@ ResultType LambdaWorker::handleWorkerStats() {
         *workerId, OpCode::WorkerStats, protoutil::to_string(proto)));
 
     finishedPathIds = {};
+}
+
+ResultType LambdaWorker::handleWorkerStats() {
+    workerStatsTimer.reset();
+
+    if (!workerId.initialized()) return ResultType::Continue;
+
+    sendWorkerStats();
     return ResultType::Continue;
 }
 
