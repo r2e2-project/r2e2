@@ -36,6 +36,10 @@ Optional<Schedule> DynamicScheduler::schedule(
         waitingBytes.begin(), waitingBytes.end(), 0ull,
         [](const auto &res, const auto &a) { return res + a.second; });
 
+    if (totalWaiting == 0) {
+        return {false};
+    }
+
     size_t remainingWorkers = maxWorkers;
 
     for (auto &item : waitingBytes) {
