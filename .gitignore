@@ -6,3 +6,6 @@ src/objs
 
 /build
 /build-debug
+scenes/output.txt
+scenes/log.txt
+scenes/output.txt

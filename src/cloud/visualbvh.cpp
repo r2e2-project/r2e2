@@ -19,11 +19,12 @@ VisualBVH::VisualBVH(vector<shared_ptr<Primitive>> &&p,
                    bool rootBVH,
                    int maxPrimsInNode,
                    SplitMethod splitMethod,
+                   int depth_limit,
                    const string &VisualBVHPath):
                    BVHAccel(p, maxPrimsInNode, splitMethod),
           		   rootBVH(rootBVH){
 
-    VisualBVHSerializer(VisualBVHPath);
+    VisualBVHSerializer(VisualBVHPath,depth_limit);
 
 }
 
@@ -43,7 +44,6 @@ void VisualBVH::VisualBVHSerializer(const string &VisualBVHPath,int depth_limit)
 		cout << "[";
 		cout << output;
 		cout << "]";
-
 	}
 
 }
@@ -57,31 +57,34 @@ string toString(const Bounds3f &bounds) {
     return oss.str();
 }
 
-void VisualBVH::VisualBVHDepthLimitedTraversal(uint32_t curr_idx,int depth,int depth_limit,string &output){
+void VisualBVH::VisualBVHDepthLimitedTraversal(const uint32_t curr_idx,
+											   const int depth,
+											   const int depth_limit,
+											   string &output){
 	if (depth == depth_limit) {
         return;
     }
-
     // save the current node to string output
     const LinearBVHNode &curr_node = nodes[curr_idx];
     output += "[";
-    output += toString(curr_node.bounds);
-    output += ",";
-    output += to_string(curr_node.secondChildOffset);
+    output += "Bounds: " + toString(curr_node.bounds) + ",";
+    output += "2COffset: " + to_string(curr_node.secondChildOffset) + ",";
+    output += "depth: " + to_string(depth);
     output += "],\n";
+    
     // go to left value, if there's one
-    if (curr_idx + 1 < nodeCount) {
-        uint32_t leftID = curr_idx + 1;
-        VisualBVHDepthLimitedTraversal(leftID, depth + 1, depth_limit, output);
-    }
+    if(curr_node.nPrimitives == 0){
+	    if (curr_idx + 1 < nodeCount) {
+	        VisualBVHDepthLimitedTraversal(curr_idx + 1, depth + 1, depth_limit, output);
+	    }
 
-    // go to right value, if there's one
-    if (curr_node.secondChildOffset != 0) {
-        uint32_t rightID = curr_node.secondChildOffset;
-        VisualBVHDepthLimitedTraversal(rightID, depth + 1, depth_limit, output);
+	    // curr_node = nodes[curr_idx];
 
-    }
-
+	    // go to right value, if there's one
+	    if (curr_node.secondChildOffset != 0) {
+	        VisualBVHDepthLimitedTraversal(curr_node.secondChildOffset, depth + 1, depth_limit, output);
+	    }
+	}
 }
 
 shared_ptr<VisualBVH> CreateVisualBVH(
@@ -105,16 +108,19 @@ shared_ptr<VisualBVH> CreateVisualBVH(
 	    splitMethod = BVHAccel::SplitMethod::SAH;
 	}
 	int maxPrimsInNode = ps.FindOneInt("maxnodeprims", 4);
+	int depth_limit = ps.FindOneInt("depth_limit",10);
 	const string VisualBVHPath = ps.FindOneString("visualbvhpath", "");
 	if (VisualBVHPath != "") {
             return make_shared<VisualBVH>(move(prims), maxTreeletBytes,
                                                copyableThreshold, rootBVH,
                                                maxPrimsInNode, splitMethod,
+                                               depth_limit,
  											   VisualBVHPath);
         } else {
             return make_shared<VisualBVH>(move(prims), maxTreeletBytes,
                                                copyableThreshold, rootBVH,
                                                maxPrimsInNode, splitMethod,
+                                               depth_limit,
                                                VisualBVHPath);
 }
 }

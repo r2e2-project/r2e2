@@ -17,13 +17,14 @@ class VisualBVH : public BVHAccel {
                    bool rootBVH,
                    int maxPrimsInNode = 1,
                    SplitMethod splitMethod =SplitMethod::SAH,
+                   int depth_limit = 10,
                    const std::string &VisualBVHPath = "");
     private: 
     	bool rootBVH;
-    	void VisualBVHSerializer(const std::string &VisualBVHPath, int depth_limit = 4);
-    	void VisualBVHDepthLimitedTraversal(uint32_t curr_idx,
-    												   int depth, 
-    												   int depth_limit,
+    	void VisualBVHSerializer(const std::string &VisualBVHPath, int depth_limit = 10);
+    	void VisualBVHDepthLimitedTraversal(const uint32_t curr_idx,
+    												   const int depth, 
+    												   const int depth_limit,
     												   std::string &output);
     			
 };
