@@ -23,6 +23,7 @@
 #include "cloud/raystate.h"
 #include "cloud/schedulers/dynamic.h"
 #include "cloud/schedulers/null.h"
+#include "cloud/schedulers/rootonly.h"
 #include "cloud/schedulers/static.h"
 #include "cloud/schedulers/uniform.h"
 #include "core/camera.h"
@@ -639,6 +640,8 @@ int main(int argc, char *argv[]) {
         scheduler = make_unique<StaticScheduler>(staticFile.name());
     } else if (schedulerName == "dynamic") {
         scheduler = make_unique<DynamicScheduler>();
+    } else if (schedulerName == "rootonly") {
+        scheduler = make_unique<RootOnlyScheduler>();
     } else if (schedulerName == "null") {
         scheduler = make_unique<NullScheduler>();
     } else {
