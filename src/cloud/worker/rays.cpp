@@ -22,8 +22,6 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
     for (size_t sample = 0; sample < scene.sampler->samplesPerPixel; sample++) {
         for (const Point2i pixel : bounds) {
-            if (!InsideExclusive(pixel, sampleBounds)) continue;
-
             RayStatePtr statePtr = graphics::GenerateCameraRay(
                 scene.camera, pixel, sample, scene.maxDepth, scene.sampleExtent,
                 scene.sampler);

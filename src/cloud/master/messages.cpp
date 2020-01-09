@@ -69,6 +69,22 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             }
         }
 
+        /* If this is a ray generating worker, give a new tile if available */
+        if (worker.role == Worker::Role::Generator) {
+            if (tiles.cameraRaysRemaining()) {
+                if (tiles.workerReadyForTile(worker)) {
+                    /* Tell the worker to generate rays */
+                    tiles.sendWorkerTile(worker);
+                }
+            } else {
+                /* Tell worker to finish up */
+                worker.connection->enqueue_write(
+                        Message::str(0, OpCode::FinishUp, ""));
+
+                worker.state = Worker::State::FinishingUp;
+            }
+        }
+
         break;
     }
 

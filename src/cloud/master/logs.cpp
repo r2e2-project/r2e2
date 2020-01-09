@@ -38,6 +38,10 @@ void LambdaMaster::recordEnqueue(const WorkerId workerId,
         aggregatedStats.enqueued.rays += info.rayCount;
         aggregatedStats.enqueued.bytes += info.bagSize;
         aggregatedStats.enqueued.count++;
+
+        if (worker.role == Worker::Role::Generator) {
+            worker.outstandingNewRays -= info.rayCount;
+        }
     }
 }
 
