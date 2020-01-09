@@ -283,16 +283,21 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
 
                 return true;
             },
-            [workerId]() {
-                throw runtime_error("worker died unexpected: " +
-                                    to_string(workerId));
+            [this, workerId]() {
+                auto &worker = workers.at(workerId);
+
+                throw runtime_error(
+                    "worker died unexpected: " + to_string(workerId) +
+                    (worker.awsLogStream.empty()
+                         ? ""s
+                         : (" ("s + worker.awsLogStream + ")"s)));
             },
             connectionCloseHandler);
 
         if (workerId <= this->rayGenerators) {
             /* This worker is a ray generator
                Let's (1) say hi, (2) tell the worker to fetch the scene,
-               (3) generate rays for its tile, and (4) finish up. */
+               (3) generate rays for its tile */
 
             /* (0) create the entry for the worker */
             auto &worker =
@@ -320,16 +325,16 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
             worker.connection->enqueue_write(Message::str(
                 0, OpCode::GetObjects, protoutil::to_string(objsProto)));
 
-            /* (3) tell the worker to generate rays */
+            /* (3) Tell the worker to generate rays */
             if (tiles.cameraRaysRemaining()) {
                 tiles.sendWorkerTile(worker);
+            } else {
+                /* Too many ray launchers for tile size,
+                 * so just finish immediately */
+                worker.connection->enqueue_write(
+                    Message::str(0, OpCode::FinishUp, ""));
+                worker.state = Worker::State::FinishingUp;
             }
-
-            /* and finally, (4) finish up */
-            worker.connection->enqueue_write(
-                Message::str(0, OpCode::FinishUp, ""));
-
-            worker.state = Worker::State::FinishingUp;
         } else {
             /* this is a normal worker */
             if (!treeletsToSpawn.empty()) {
