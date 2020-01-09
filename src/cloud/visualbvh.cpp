@@ -67,6 +67,7 @@ void VisualBVH::VisualBVHDepthLimitedTraversal(const uint32_t curr_idx,
     // save the current node to string output
     const LinearBVHNode &curr_node = nodes[curr_idx];
     output += "[";
+    output += "node_idx: " + to_string(curr_idx) + ",";
     output += "Bounds: " + toString(curr_node.bounds) + ",";
     output += "2COffset: " + to_string(curr_node.secondChildOffset) + ",";
     output += "depth: " + to_string(depth);
