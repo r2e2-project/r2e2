@@ -55,6 +55,8 @@ class TransferAgent {
     static constexpr size_t MAX_THREADS{8};
     static constexpr size_t MAX_REQUESTS_ON_CONNECTION{1};
 
+    const size_t threadCount;
+
     std::chrono::steady_clock::time_point lastAddrUpdate{};
 
     std::vector<std::thread> threads{};
@@ -74,7 +76,9 @@ class TransferAgent {
     EventFD eventFD{false};
 
   public:
-    TransferAgent(const S3StorageBackend& backend);
+    TransferAgent(const S3StorageBackend& backend,
+                  const size_t threadCount = MAX_THREADS);
+
     uint64_t requestDownload(const std::string& key);
     uint64_t requestUpload(const std::string& key, std::string&& data);
     ~TransferAgent();
@@ -91,8 +95,8 @@ class TransferAgent {
 };
 
 template <class Container>
-size_t TransferAgent::tryPopBulk(
-    std::back_insert_iterator<Container> insertIt, const size_t maxCount) {
+size_t TransferAgent::tryPopBulk(std::back_insert_iterator<Container> insertIt,
+                                 const size_t maxCount) {
     std::unique_lock<std::mutex> lock{resultsMutex};
 
     if (results.empty()) return 0;

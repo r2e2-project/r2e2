@@ -9,7 +9,13 @@ using namespace pbrt;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
-TransferAgent::TransferAgent(const S3StorageBackend& backend) {
+TransferAgent::TransferAgent(const S3StorageBackend& backend,
+                             const size_t threadCount)
+    : threadCount(threadCount) {
+    if (threadCount == 0) {
+        throw runtime_error("thread count cannot be zero");
+    }
+
     clientConfig.credentials = backend.client().credentials();
     clientConfig.region = backend.client().config().region;
     clientConfig.bucket = backend.bucket();
@@ -20,7 +26,7 @@ TransferAgent::TransferAgent(const S3StorageBackend& backend) {
 
     clientConfig.address.store(Address{clientConfig.endpoint, "http"});
 
-    for (size_t i = 0; i < MAX_THREADS; i++) {
+    for (size_t i = 0; i < threadCount; i++) {
         threads.emplace_back(&TransferAgent::workerThread, this, i);
     }
 }
@@ -103,7 +109,7 @@ void TransferAgent::workerThread(const size_t threadId) {
                     actions.push_back(move(outstanding.front()));
                     outstanding.pop();
                 } while (!outstanding.empty() &&
-                         outstanding.size() / MAX_THREADS >= 1 &&
+                         outstanding.size() / threadCount >= 1 &&
                          actions.size() < capacity);
             }
 
