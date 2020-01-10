@@ -1,5 +1,6 @@
 #include <chrono>
 #include <iostream>
+#include <sstream>
 
 #include "execution/loop.h"
 #include "messages/utils.h"
@@ -7,6 +8,7 @@
 #include "net/socket.h"
 #include "net/util.h"
 #include "storage/backend.h"
+#include "util/status_bar.h"
 
 using namespace std;
 using namespace chrono;
@@ -26,6 +28,8 @@ int main(const int argc, char const *argv[]) {
         return EXIT_FAILURE;
     }
 
+    StatusBar::get();
+
     const size_t nWorkers = stoull(argv[1]);
     const string backendUri = argv[2];
     const size_t bagSize = stoull(argv[3]);
@@ -39,6 +43,7 @@ int main(const int argc, char const *argv[]) {
 
     ExecutionLoop loop;
     FileDescriptor alwaysOnFd{STDOUT_FILENO};
+    TimerFD printStatusTimer{1s};
 
     protobuf::BenchmarkRequest proto;
     proto.set_storage_uri(backendUri);
@@ -48,10 +53,26 @@ int main(const int argc, char const *argv[]) {
 
     size_t remainingWorkers = nWorkers;
 
+    const auto start = steady_clock::now();
+
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out, []() { return ResultType::Exit; },
         [&remainingWorkers]() { return remainingWorkers == 0; },
-        []() { throw runtime_error("terminator failed"); }));
+        []() { throw runtime_error("terminator"); }));
+
+    loop.poller().add_action(Poller::Action(
+        printStatusTimer, Direction::In,
+        [&]() {
+            printStatusTimer.reset();
+
+            ostringstream oss;
+            oss << remainingWorkers << " | "
+                << duration_cast<seconds>(steady_clock::now() - start).count();
+
+            StatusBar::set_text(oss.str());
+            return ResultType::Continue;
+        },
+        []() { return true; }, []() { throw runtime_error("status"); }));
 
     cout << "timestamp,workerId,bagsSent,bytesSent,bagsReceived,bytesReceived"
          << endl;
