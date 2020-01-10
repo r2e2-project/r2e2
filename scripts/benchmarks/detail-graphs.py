@@ -173,14 +173,14 @@ def ray_throughput_over_time(df, out):
     plt.savefig(out, dpi=300)
     plt.clf()
 
+def pseudo_eng(divisor, suffix):
+    def formatter(val, tick):
+        trunc = val / divisor
+        return '{0:g}'.format(trunc) + suffix
+
+    return formatter
+
 def combined_progress_rate(df, out):
-    def pseudo_eng(divisor, suffix):
-        def formatter(val, tick):
-            trunc = val / divisor
-            return '{0:g}'.format(trunc) + suffix
-
-        return formatter
-
     maxtime = df['timestampS'].max()
     data = df.groupby(['timestampS']).sum()
     enqueued_per_sec = data.raysEnqueued
@@ -236,14 +236,47 @@ def combined_progress_rate(df, out):
     plt.savefig(out, dpi=300, bbox_inches='tight')
     plt.clf()
 
+def percentile_throughput(data, out):
+    total_workers = data.workerId.nunique()
+    print(total_workers)
+    data = data.sort_values(by=['timestampS', 'totalTransferred'], ascending=False)
+    data = data.groupby(['timestampS']).totalTransferred
+    data_100th = data.nth(0)
+    idx_95th = int(total_workers * (1 - 0.95))
+    data_95th = data.nth(idx_95th)
+    idx_90th = int(total_workers * (1 - 0.9))
+    data_90th = data.nth(idx_90th)
+    idx_50th = int(total_workers * (1 - 0.5))
+    data_50th = data.nth(idx_50th)
+
+    fig, ax = plt.subplots(nrows=1)
+    plt.margins(x=0.0126)
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    ax.grid(b=True, linewidth=0.5, color='#F6F6F6')
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(pseudo_eng(1e6, 'M')))
+    ax.set_xlabel("Timestamp (s)", fontsize=8)
+    ax.set_ylabel("Throughput to S3", fontsize=8)
+
+    ax.plot(data_100th, label='Max', linewidth=0.7)
+    ax.plot(data_95th, label='95th Percentile', linewidth=0.7)
+    ax.plot(data_90th, label='90th Percentile', linewidth=0.7)
+    ax.plot(data_50th, label='50th Percentile', linewidth=0.7)
+
+    fig.legend(loc='upper left', bbox_to_anchor=(0.96, 1), handlelength=1, handleheight=1, prop={'size': 8})
+    fig.suptitle(args.title, fontsize=11, y=1.01)
+
+    fig.tight_layout()
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.clf()
 
 treelet_data = pd.read_csv(os.path.join(args.input, 'treelets.csv'))
 worker_data = pd.read_csv(os.path.join(args.input, 'workers.csv'))
 
 treelet_data['timestampS'] = (treelet_data.timestamp / 1000).astype('int32')
 worker_data['timestampS'] = (worker_data.timestamp / 1000).astype('int32')
+worker_data['totalTransferred'] = worker_data.bytesEnqueued + worker_data.bytesDequeued
 
-tracer_worker_data = worker_data[worker_data.workerId >= args.num_exclude]
+tracer_worker_data = worker_data[worker_data.workerId > args.num_exclude]
 
 TIMESTEP = get_timestep(worker_data)
 
@@ -255,3 +288,4 @@ gen_ray_queue(worker_data, os.path.join(args.out, "aggregate-ray-queue.png"), Tr
 gen_ray_queue(worker_data, os.path.join(args.out, "individual-ray-queue.png"), False)
 ray_throughput_over_time(worker_data, os.path.join(args.out, "ray-throughput.png"))
 combined_progress_rate(worker_data, os.path.join(args.out, "progress-rate.png"))
+percentile_throughput(tracer_worker_data, os.path.join(args.out, "percentile-throughput.png"))
