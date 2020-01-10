@@ -74,7 +74,8 @@ int main(const int argc, char const *argv[]) {
         },
         []() { return true; }, []() { throw runtime_error("status"); }));
 
-    cout << "timestamp,workerId,bagsSent,bytesSent,bagsReceived,bytesReceived"
+    cout << "timestamp,workerId,bagsEnqueued,bytesEnqueued,bagsDequeued,"
+            "bytesDequeued"
          << endl;
 
     /* we launch N workers */
