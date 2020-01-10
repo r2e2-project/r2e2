@@ -413,6 +413,8 @@ message BenchmarkRequest {
     uint64 bag_size = 3;
     uint32 threads = 4;
     uint32 duration = 5;
+    uint32 send = 6;
+    uint32 recv = 7;
 }
 
 message BenchmarkResponse {

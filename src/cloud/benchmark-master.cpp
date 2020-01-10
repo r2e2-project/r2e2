@@ -18,12 +18,12 @@ using namespace PollerShortNames;
 void usage(const char *argv0) {
     cerr << argv0
          << " <num-workers> <storage-backend> <bag-size_B> <threads>"
-            " <duration_s> <region>"
+            " <duration_s> <region> <send> <receive>"
          << endl;
 }
 
 int main(const int argc, char const *argv[]) {
-    if (argc != 7) {
+    if (argc != 9) {
         usage(argv[0]);
         return EXIT_FAILURE;
     }
@@ -36,6 +36,8 @@ int main(const int argc, char const *argv[]) {
     const size_t threads = stoull(argv[4]);
     const size_t duration{stoull(argv[5])};
     const string awsRegion{argv[6]};
+    const bool send = (stoull(argv[7]) == 1);
+    const bool recv = (stoull(argv[8]) == 1);
 
     const AWSCredentials awsCredentials{};
     const Address awsAddress{LambdaInvocationRequest::endpoint(awsRegion),
@@ -50,6 +52,8 @@ int main(const int argc, char const *argv[]) {
     proto.set_bag_size(bagSize);
     proto.set_threads(threads);
     proto.set_duration(duration);
+    proto.set_send(send);
+    proto.set_recv(recv);
 
     size_t remainingWorkers = nWorkers;
 

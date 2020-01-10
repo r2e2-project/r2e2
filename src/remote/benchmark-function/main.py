@@ -9,7 +9,8 @@ os.environ['PATH'] = "{}:{}".format(curdir, os.environ.get('PATH', ''))
 
 def handler(event, context):
     command = ["benchmark-worker",
-               event['workerId'], event['storageUri'], event['bagSize'], event['threads'], event['duration']]
+               event['workerId'], event['storageUri'], event['bagSize'], event['threads'], event['duration'], event['send'],
+               event['recv']]
 
     command = [str(x) for x in command]
 

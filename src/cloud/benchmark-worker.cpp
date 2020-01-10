@@ -28,14 +28,15 @@ string randomString(const size_t length) {
 
 void usage(const char* argv0) {
     cerr << argv0
-         << " <id> <storage-backend> <bag-size_B> <threads> <duration_s>"
+         << " <id> <storage-backend> <bag-size_B> <threads> <duration_s> "
+            "<send> <receive>"
          << endl;
 }
 
 enum class Action { Upload, Download };
 
 int main(const int argc, const char* argv[]) {
-    if (argc != 6) {
+    if (argc != 8) {
         usage(argv[0]);
         return EXIT_FAILURE;
     }
@@ -47,6 +48,8 @@ int main(const int argc, const char* argv[]) {
     const size_t bagSize = stoull(argv[3]);
     const size_t threads = stoull(argv[4]);
     const seconds duration{stoull(argv[5])};
+    const bool send = (stoull(argv[6]) == 1);
+    const bool recv = (stoull(argv[7]) == 1);
 
     auto storageBackend = StorageBackend::create_backend(backendUri);
 
@@ -69,12 +72,26 @@ int main(const int argc, const char* argv[]) {
 
     unordered_map<size_t, pair<Action, string>> outstandingTasks;
 
-    const string key = "temp/W" + to_string(workerId) + "/T" +
-                       to_string(rand() % threads) + "/B" +
-                       to_string(currentIndex++);
+    if (send && recv) {
+        const string key = "temp/W" + to_string(workerId) + "/T" +
+                           to_string(rand() % threads) + "/B" +
+                           to_string(currentIndex++);
 
-    outstandingTasks.emplace(agent.requestUpload(key, randomString(bagSize)),
-                             make_pair(Action::Upload, key));
+        outstandingTasks.emplace(
+            agent.requestUpload(key, randomString(bagSize)),
+            make_pair(Action::Upload, key));
+    } else {
+        /* first we need to upload a bunch of things */
+        for (size_t i = 0; i < MAX_OUTSTANDING; i++) {
+            const string key = "temp/W" + to_string(workerId) + "/T" +
+                               to_string(rand() % threads) + "/B" +
+                               to_string(i);
+
+            outstandingTasks.emplace(
+                agent.requestUpload(key, randomString(bagSize)),
+                make_pair(Action::Upload, key));
+        }
+    }
 
     poller.add_action(Poller::Action(
         terminationTimer, Direction::In,
@@ -122,23 +139,38 @@ int main(const int argc, const char* argv[]) {
                     stats.sent.bytes += bagSize;
                     stats.sent.count += 1;
 
-                    outstandingTasks.emplace(agent.requestDownload(key),
-                                             make_pair(Action::Download, key));
+                    if (recv) {
+                        outstandingTasks.emplace(
+                            agent.requestDownload(key),
+                            make_pair(Action::Download, key));
+                    } else if (send) {
+                        outstandingTasks.emplace(
+                            agent.requestUpload(key, randomString(bagSize)),
+                            make_pair(Action::Upload, key));
+                    }
+
                     break;
 
                 case Action::Download:
                     stats.recv.bytes += bagSize;
                     stats.recv.count += 1;
 
-                    outstandingTasks.emplace(
-                        agent.requestUpload(key, randomString(bagSize)),
-                        make_pair(Action::Upload, key));
+                    if (send) {
+                        outstandingTasks.emplace(
+                            agent.requestUpload(key, randomString(bagSize)),
+                            make_pair(Action::Upload, key));
+                    } else if (recv) {
+                        outstandingTasks.emplace(
+                            agent.requestDownload(key),
+                            make_pair(Action::Download, key));
+                    }
+
                     break;
                 }
 
                 outstandingTasks.erase(task.first);
 
-                if (outstandingTasks.size() < MAX_OUTSTANDING) {
+                if (send && recv && outstandingTasks.size() < MAX_OUTSTANDING) {
                     switch (action) {
                     case Action::Upload: {
                         const string key = "temp/W" + to_string(workerId) +
