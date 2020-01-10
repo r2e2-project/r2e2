@@ -57,7 +57,8 @@ int main(const int argc, const char* argv[]) {
     TimerFD printStatsTimer{1s};
     TimerFD terminationTimer{duration};
 
-    const size_t initialBagCount = static_cast<size_t>(threads * 2);
+    const size_t MAX_OUTSTANDING = static_cast<size_t>(threads * 2);
+    size_t currentIndex = 0;
 
     struct Stats {
         struct {
@@ -68,15 +69,12 @@ int main(const int argc, const char* argv[]) {
 
     unordered_map<size_t, pair<Action, string>> outstandingTasks;
 
-    /* filling the transfer pipeline */
-    for (size_t i = 0; i < initialBagCount; i++) {
-        const string key = "temp/W" + to_string(workerId) + "/T" +
-                           to_string(rand() % threads) + "/B" + to_string(i);
+    const string key = "temp/W" + to_string(workerId) + "/T" +
+                       to_string(rand() % threads) + "/B" +
+                       to_string(currentIndex++);
 
-        string data = randomString(bagSize);
-        const size_t taskId = agent.requestUpload(key, move(data));
-        outstandingTasks.emplace(taskId, make_pair(Action::Upload, key));
-    }
+    outstandingTasks.emplace(agent.requestUpload(key, randomString(bagSize)),
+                             make_pair(Action::Upload, key));
 
     poller.add_action(Poller::Action(
         terminationTimer, Direction::In,
@@ -119,29 +117,46 @@ int main(const int argc, const char* argv[]) {
                 const auto& key = oa.second;
 
                 switch (action) {
-                case Action::Upload: {
+                case Action::Upload:
                     stats.sent.bytes += bagSize;
                     stats.sent.count += 1;
 
-                    const auto taskId = agent.requestDownload(key);
-                    outstandingTasks.emplace(taskId,
+                    outstandingTasks.emplace(agent.requestDownload(key),
                                              make_pair(Action::Download, key));
                     break;
-                }
 
-                case Action::Download: {
+                case Action::Download:
                     stats.recv.bytes += bagSize;
                     stats.recv.count += 1;
 
-                    const auto taskId =
-                        agent.requestUpload(key, randomString(bagSize));
-                    outstandingTasks.emplace(taskId,
-                                             make_pair(Action::Upload, key));
+                    outstandingTasks.emplace(
+                        agent.requestUpload(key, randomString(bagSize)),
+                        make_pair(Action::Upload, key));
                     break;
-                }
                 }
 
                 outstandingTasks.erase(task.first);
+
+                if (outstandingTasks.size() < MAX_OUTSTANDING) {
+                    switch (action) {
+                    case Action::Upload: {
+                        const string key = "temp/W" + to_string(workerId) +
+                                           "/T" + to_string(rand() % threads) +
+                                           "/B" + to_string(currentIndex++);
+
+                        outstandingTasks.emplace(
+                            agent.requestUpload(key, randomString(bagSize)),
+                            make_pair(Action::Upload, key));
+                        break;
+                    }
+
+                    case Action::Download:
+                        outstandingTasks.emplace(
+                            agent.requestDownload(key),
+                            make_pair(Action::Download, key));
+                        break;
+                    }
+                }
             }
 
             return ResultType::Continue;
