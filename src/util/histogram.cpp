@@ -17,22 +17,35 @@ void Histogram<T>::add(const T value) {
         throw runtime_error("value < minimum || value > maximum");
     }
 
+    count++;
+    maxValue = max(value, maxValue);
+    minValue = min(value, minValue);
+    sum += value;
+    squaresSum += value * value;
+
     const size_t bin = static_cast<size_t>((value - minimum) / width);
     bins[bin]++;
 }
 
 template <class T>
 string Histogram<T>::str() const {
-    ostringstream oss;
+    if (count == 0) {
+        return "{}";
+    }
 
+    ostringstream oss;
     size_t lastPos;
 
     for (lastPos = bins.size() - 1; lastPos < bins.size(); lastPos--) {
         if (bins[lastPos] != 0) break;
     }
 
-    oss << R"({"width":)" << width << R"(,"min":)" << minimum << R"(,"max":)"
-        << maximum << R"(,"bins":[)";
+    const double average = 1.0 * sum / count;
+    const double stddev = 1.0 * squaresSum / count - average * average;
+
+    oss << R"({"width":)" << width << R"(,"min":)" << minValue << R"(,"max":)"
+        << maxValue << R"(,"count":)" << count << R"(,"avg":)" << average
+        << R"(,"std":)" << stddev << R"(,"bins":[)";
 
     for (size_t i = 0; i < bins.size() && i <= lastPos; i++) {
         if (i > 0) oss << ',';
