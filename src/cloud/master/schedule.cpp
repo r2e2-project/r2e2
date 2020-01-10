@@ -159,9 +159,7 @@ void LambdaMaster::executeSchedule(const Schedule &schedule) {
     }
 
     /* shuffling treeletsToSpawn */
-    random_device rd{};
-    mt19937 g{rd()};
-    shuffle(treeletsToSpawn.begin(), treeletsToSpawn.end(), g);
+    shuffle(treeletsToSpawn.begin(), treeletsToSpawn.end(), randEngine);
 
     /* let's kill the workers we can kill */
     for (const WorkerId workerId : workersToTakeDown) {

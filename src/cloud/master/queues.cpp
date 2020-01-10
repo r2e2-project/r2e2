@@ -20,24 +20,35 @@ bool LambdaMaster::assignWork(Worker& worker) {
     /* return if the worker already has enough work */
     if (worker.outstandingBytes >= MAX_OUTSTANDING_BYTES) return false;
 
-    const TreeletId treeletId = *worker.treelets.begin();
-
-    auto bagsQueueIt = queuedRayBags.find(treeletId);
-
-    /* we don't have any work for this dude */
-    if (bagsQueueIt == queuedRayBags.end()) return true;
-
-    protobuf::RayBags proto;
-    auto& bags = bagsQueueIt->second;
-
-    while (!bags.empty() && worker.outstandingBytes < MAX_OUTSTANDING_BYTES) {
-        *proto.add_items() = to_protobuf(bags.front());
-        recordAssign(worker.id, bags.front());
-        bags.pop();
+    vector<TreeletId> shuffledTreelets;
+    shuffledTreelets.reserve(worker.treelets.size());
+    for (TreeletId id : worker.treelets) {
+        shuffledTreelets.push_back(id);
     }
 
-    if (bags.empty()) {
-        queuedRayBags.erase(bagsQueueIt);
+    shuffle(shuffledTreelets.begin(), shuffledTreelets.end(), randEngine);
+
+    protobuf::RayBags proto;
+    while (worker.outstandingBytes < MAX_OUTSTANDING_BYTES) {
+        bool availableBytes = false;
+        for (TreeletId treeletId : shuffledTreelets) {
+            auto bagsQueueIt = queuedRayBags.find(treeletId);
+
+            /* we don't have any work for this treelet */
+            if (bagsQueueIt == queuedRayBags.end()) continue;
+            availableBytes = true;
+
+            auto &bags = bagsQueueIt->second;
+            *proto.add_items() = to_protobuf(bags.front());
+            recordAssign(worker.id, bags.front());
+            bags.pop();
+
+            if (bags.empty()) {
+                queuedRayBags.erase(bagsQueueIt);
+            }
+        }
+
+        if (!availableBytes) break;
     }
 
     worker.connection->enqueue_write(
@@ -49,9 +60,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
 ResultType LambdaMaster::handleQueuedRayBags() {
     ScopeTimer<TimeLog::Category::QueuedRayBags> _timer;
 
-    random_device rd{};
-    mt19937 g{rd()};
-    shuffle(freeWorkers.begin(), freeWorkers.end(), g);
+    shuffle(freeWorkers.begin(), freeWorkers.end(), randEngine);
 
     auto it = freeWorkers.begin();
 
