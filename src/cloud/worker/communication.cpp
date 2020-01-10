@@ -119,6 +119,7 @@ ResultType LambdaWorker::handleReceiveQueue() {
 
         /* (2) let's unpack this treelet and add the rays to the trace queue */
         const char* data = bag.data.data();
+        auto& rays = traceQueue[bag.info.treeletId];
 
         for (size_t offset = 0; offset < bag.data.size();) {
             const auto len = *reinterpret_cast<const uint32_t*>(data + offset);
@@ -132,7 +133,7 @@ ResultType LambdaWorker::handleReceiveQueue() {
 
             logRay(RayAction::Unbagged, *ray, bag.info);
 
-            traceQueue.push(move(ray));
+            rays.push(move(ray));
         }
     }
 

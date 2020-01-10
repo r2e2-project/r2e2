@@ -110,7 +110,6 @@ class LambdaWorker {
         std::vector<std::unique_ptr<Transform>> transformCache{};
         std::unique_ptr<Scene> fakeScene{};
         std::vector<std::shared_ptr<Light>> lights{};
-        std::unique_ptr<CloudBVH> bvh{nullptr};
 
         void initialize();
 
@@ -121,15 +120,14 @@ class LambdaWorker {
         void loadFakeScene();
     } scene;
 
-    std::set<uint32_t> treeletIds{};
-
     /*** Ray Tracing **********************************************************/
 
     Poller::Action::Result::Type handleTraceQueue();
 
     void generateRays(const Bounds2i& cropWindow);
 
-    std::queue<RayStatePtr> traceQueue{};
+    std::map<TreeletId, std::unique_ptr<CloudBVH>> treelets{};
+    std::map<TreeletId, std::queue<RayStatePtr>> traceQueue{};
     std::map<TreeletId, std::queue<RayStatePtr>> outQueue{};
     std::queue<Sample> samples{};
     size_t outQueueSize{0};

@@ -44,7 +44,6 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     }
 
     PbrtOptions.nThreads = 1;
-    scene.bvh = make_unique<CloudBVH>();
     scene.samplesPerPixel = config.samplesPerPixel;
     scene.maxDepth = config.maxPathDepth;
 
@@ -121,9 +120,11 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
             /* triangle meshes are packed into treelets, so ignore */
             continue;
         }
+
         if (id.type == ObjectType::Treelet) {
-            treeletIds.insert(id.id);
+            treelets.emplace(id.id, make_unique<CloudBVH>(id.id));
         }
+
         const string filePath = id.to_string();
         requests.emplace_back(filePath, filePath);
     }
