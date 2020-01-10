@@ -11,6 +11,8 @@ def handler(event, context):
     command = ["benchmark-worker",
                event['workerId'], event['storageUri'], event['bagSize'], event['threads'], event['duration']]
 
+    command = [str(x) for x in command]
+
     output = sub.check_output(command)
 
     return {'output': output}
