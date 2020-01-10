@@ -86,14 +86,15 @@ int main(const int argc, const char* argv[]) {
 
     poller.add_action(Poller::Action(
         printStatsTimer, Direction::In,
-        [&stats, &printStatsTimer, &start]() {
+        [&]() {
             printStatsTimer.reset();
 
             const auto T =
                 duration_cast<seconds>(steady_clock::now() - start).count();
 
-            cout << T << ',' << stats.sent.count << ',' << stats.sent.bytes
-                 << ',' << stats.recv.count << ',' << stats.recv.bytes << '\n';
+            cout << T << ',' << workerId << ',' << stats.sent.count << ','
+                 << stats.sent.bytes << ',' << stats.recv.count << ','
+                 << stats.recv.bytes << '\n';
 
             stats = {};
 
