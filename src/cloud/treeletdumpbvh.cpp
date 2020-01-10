@@ -4,6 +4,7 @@
 #include "stats.h"
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 
 #include "messages/utils.h"
 #include "pbrt.pb.h"
@@ -35,7 +36,8 @@ TreeletDumpBVH::TreeletDumpBVH(vector<shared_ptr<Primitive>> &&p,
                                int maxPrimsInNode,
                                SplitMethod splitMethod,
                                bool dumpBVH,
-                               const string &dumpBVHPath)
+                               const string &dumpBVHPath,
+                               const string &treeletDumpPath)
 //need this constructor 
         : BVHAccel(p, maxPrimsInNode, splitMethod),
           rootBVH(rootBVH),
@@ -52,6 +54,23 @@ TreeletDumpBVH::TreeletDumpBVH(vector<shared_ptr<Primitive>> &&p,
     if (rootBVH) {
         SetNodeInfo(maxTreeletBytes);
         allTreelets = AllocateTreelets(maxTreeletBytes);
+        ofstream file(treeletDumpPath,ofstream::out);
+        int i = 0; 
+        file << "[";
+        for (auto &TreeletInf : allTreelets){
+            file << "[";
+            file << "treelet_idx: " << i << ",";
+            file << "nodes: ";
+            file << "[";
+            for (int &node : TreeletInf.nodes){
+                file << node << ",";
+            }
+            file << "]";
+            file << "],\n";
+            i++; 
+        }
+        file << "]";
+
         if (PbrtOptions.dumpScene) {
             DumpTreelets(true);
         }
@@ -124,7 +143,7 @@ shared_ptr<TreeletDumpBVH> CreateTreeletDumpBVH(
     }
 
     bool rootBVH = ps.FindOneBool("sceneaccelerator", false);
-
+    string treeletDumpPath = ps.FindOneString("treeletdumppath","");
     string serializedBVHPath = ps.FindOneString("bvhnodes", "");
     if (serializedBVHPath != "") {
         ifstream bvhfile(serializedBVHPath);
@@ -164,12 +183,12 @@ shared_ptr<TreeletDumpBVH> CreateTreeletDumpBVH(
                                                copyableThreshold, rootBVH,
                                                travAlgo, partAlgo,
                                                maxPrimsInNode, splitMethod,
-                                               true, dumpBVHPath);
+                                               true, dumpBVHPath,treeletDumpPath);
         } else {
             return make_shared<TreeletDumpBVH>(move(prims), maxTreeletBytes,
                                                copyableThreshold, rootBVH,
                                                travAlgo, partAlgo,
-                                               maxPrimsInNode, splitMethod);
+                                               maxPrimsInNode, splitMethod,false,dumpBVHPath,treeletDumpPath);
         }
     }
 }

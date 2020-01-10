@@ -14,7 +14,7 @@ Sampler "halton" "integer pixelsamples" [1]
 
 Integrator "path" "integer maxdepth" [5]
 
-Accelerator "visualbvh" "integer maxtreeletbytes" [10000000]  "string traversal" ["sendcheck"] "integer copyablethreshold" [0] "string visualbvhpath" ["./output.txt"] "integer depth_limit" [1024]
+Accelerator "treeletdumpbvh" "integer maxtreeletbytes" [10000000]  "string traversal" ["sendcheck"] "integer copyablethreshold" [0] "string visualbvhpath" ["./output.txt"] "integer depth_limit" [1024] "string treeletdumppath" ["./output_treelet.txt"] "bool sceneaccelerator" ["true"]
 
 WorldBegin
 

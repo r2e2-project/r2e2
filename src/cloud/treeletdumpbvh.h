@@ -10,7 +10,6 @@
 #include <set>
 #include <unordered_map>
 #include <vector>
-
 namespace pbrt {
 
 struct InstanceMask {
@@ -131,7 +130,8 @@ class TreeletDumpBVH : public BVHAccel {
                    int maxPrimsInNode = 1,
                    SplitMethod splitMethod = SplitMethod::SAH,
                    bool dumpBVH = false,
-                   const std::string &dumpBVHPath = "");
+                   const std::string &dumpBVHPath = "",
+                   const std::string &treeletDumpPath = "");
 
     TreeletDumpBVH(std::vector<std::shared_ptr<Primitive>> &&p,
                    LinearBVHNode *deserializedNodes,
