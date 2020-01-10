@@ -612,6 +612,14 @@ ENDIF()
 
 TARGET_LINK_LIBRARIES ( pbrt_lambda_worker ${ALL_PBRT_LIBS} dl z unwind lzma -static -Wl,-allow-multiple-definition ${STRIP_SYMBOLS} -Wl,--whole-archive -lpthread -Wl,--no-whole-archive)
 
+# benchmark-master
+ADD_EXECUTABLE ( benchmark_master src/cloud/benchmark-master.cpp )
+ADD_SANITIZERS ( benchmark_master )
+
+SET_TARGET_PROPERTIES ( benchmark_master PROPERTIES OUTPUT_NAME "benchmark-master" )
+TARGET_COMPILE_FEATURES ( benchmark_master PRIVATE ${PBRT_CXX11_FEATURES} )
+TARGET_LINK_LIBRARIES ( benchmark_master ${ALL_PBRT_LIBS} -ldl -luuid )
+
 # benchmark-worker
 ADD_EXECUTABLE ( benchmark_worker src/cloud/benchmark-worker.cpp )
 SET_TARGET_PROPERTIES ( benchmark_worker PROPERTIES OUTPUT_NAME "benchmark-worker" )
