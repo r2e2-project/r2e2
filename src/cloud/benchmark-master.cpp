@@ -71,8 +71,14 @@ int main(const int argc, char const *argv[]) {
         loop.make_http_request<SSLConnection>(
             "start-worker", awsAddress, invocationRequest,
             [&](const uint64_t, const string &, const HTTPResponse &response) {
-                cerr << "X";
-                cout << response.body() << endl;
+                if (response.status_code()[0] != '2') {
+                    cerr << response.body() << endl;
+                    throw runtime_error("invalid response");
+                }
+
+                protobuf::BenchmarkResponse resp;
+                protoutil::from_json(response.body(), resp);
+                cout << resp.output();
                 remainingWorkers--;
             },
             [](const uint64_t, const string &) {

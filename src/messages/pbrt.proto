@@ -415,6 +415,6 @@ message BenchmarkRequest {
     uint32 duration = 5;
 }
 
-message BenchmarkResult {
+message BenchmarkResponse {
     string output = 1;
 }
