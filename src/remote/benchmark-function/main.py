@@ -13,6 +13,6 @@ def handler(event, context):
 
     command = [str(x) for x in command]
 
-    output = sub.check_output(command)
+    output = sub.check_output(command).decode('ascii')
 
     return {'output': output}
