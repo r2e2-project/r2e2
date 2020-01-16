@@ -4,7 +4,6 @@
 #include <fstream>
 #include <map>
 #include <memory>
-#include <random>
 #include <set>
 #include <stack>
 #include <string>
@@ -312,9 +311,6 @@ class LambdaMaster {
     TimerFD workerStatsWriteTimer;
 
     std::unique_ptr<TimerFD> exitTimer;
-
-    /* Random state */
-    std::mt19937 randEngine{std::random_device{}()};
 };
 
 }  // namespace pbrt
