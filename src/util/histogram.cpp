@@ -3,58 +3,72 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "messages/utils.h"
+
 using namespace std;
+using namespace pbrt;
 
 template <class T>
-Histogram<T>::Histogram(const T width, const T lowerBound, const T upperBound)
-    : width(width), lowerBound(lowerBound), upperBound(upperBound) {
-    bins.resize(static_cast<size_t>((upperBound - lowerBound + width) / width));
+Histogram<T>::Histogram(const T width, const T lower_bound, const T upper_bound)
+    : width_(width), lower_bound_(lower_bound), upper_bound_(upper_bound) {
+    bins_.resize(
+        static_cast<size_t>((upper_bound_ - lower_bound_ + width_) / width_));
 }
 
 template <class T>
 void Histogram<T>::add(const T value) {
-    if (value < lowerBound || value > upperBound) {
-        throw runtime_error("value < lowerBound || value > upperBound");
+    if (value < lower_bound_ || value > upper_bound_) {
+        throw runtime_error("value < lower_bound || value > upper_bound");
     }
 
-    count++;
-    maxValue = max(value, maxValue);
-    minValue = min(value, minValue);
-    sum += value;
-    squaresSum += value * value;
+    count_++;
+    min_value_ = min(value, min_value_);
+    max_value_ = max(value, max_value_);
+    sum_ += value;
+    squares_sum_ += value * value;
 
-    const size_t bin = static_cast<size_t>((value - lowerBound) / width);
-    bins[bin]++;
+    const size_t bin = static_cast<size_t>((value - lower_bound_) / width_);
+    bins_[bin]++;
 }
 
-template <class T>
-string Histogram<T>::str() const {
-    if (count == 0) {
-        return "{}";
+template <>
+Histogram<uint64_t>::Histogram(const protobuf::HistogramUInt64& proto) {
+    width_ = proto.width();
+    lower_bound_ = proto.lower_bound();
+    upper_bound_ = proto.upper_bound();
+    count_ = proto.count();
+    min_value_ = proto.min();
+    max_value_ = proto.max();
+    sum_ = proto.sum();
+    squares_sum_ = proto.squares_sum();
+
+    bins_.reserve(proto.bins().size());
+
+    for (const auto bin : proto.bins()) {
+        bins_.push_back(bin);
     }
+}
 
-    ostringstream oss;
-    size_t lastPos;
+template <>
+protobuf::HistogramUInt64 Histogram<uint64_t>::to_protobuf() const {
+    protobuf::HistogramUInt64 proto;
 
-    for (lastPos = bins.size() - 1; lastPos < bins.size(); lastPos--) {
-        if (bins[lastPos] != 0) break;
-    }
+    proto.set_width(width());
+    proto.set_lower_bound(lower_bound());
+    proto.set_upper_bound(upper_bound());
+    proto.set_count(count());
+    proto.set_min(min_value());
+    proto.set_max(max_value());
+    proto.set_sum(sum());
+    proto.set_squares_sum(squares_sum());
+    *proto.mutable_bins() = {bins_.begin(), bins_.end()};
 
-    const double average = 1.0 * sum / count;
-    const double stddev = 1.0 * squaresSum / count - average * average;
+    return proto;
+}
 
-    oss << R"({"width":)" << width << R"(,"min":)" << minValue << R"(,"max":)"
-        << maxValue << R"(,"count":)" << count << R"(,"avg":)" << average
-        << R"(,"std":)" << stddev << R"(,"bins":[)";
-
-    for (size_t i = 0; i < bins.size() && i <= lastPos; i++) {
-        if (i > 0) oss << ',';
-        oss << bins[i];
-    }
-
-    oss << "]}";
-
-    return oss.str();
+template <>
+string Histogram<uint64_t>::str() const {
+    return protoutil::to_json(to_protobuf());
 }
 
 template class Histogram<uint8_t>;

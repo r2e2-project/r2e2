@@ -420,3 +420,17 @@ message BenchmarkRequest {
 message BenchmarkResponse {
     string output = 1;
 }
+
+message HistogramUInt64 {
+    uint64 width = 1;
+    uint64 lower_bound = 2;
+    uint64 upper_bound = 3;
+
+    repeated uint64 bins = 4;
+
+    uint64 count = 5;
+    uint64 min = 6;
+    uint64 max = 7;
+    uint64 sum = 8;
+    uint64 squares_sum = 9;
+}

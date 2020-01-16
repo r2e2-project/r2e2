@@ -784,12 +784,11 @@ protobuf::SpectrumTexture spectrum_texture::to_protobuf(
 
 RayBagInfo from_protobuf(const protobuf::RayBagInfo& proto) {
     return {proto.worker_id(), proto.treelet_id(), proto.bag_id(),
-            proto.ray_count(), proto.bag_size(), proto.sample_bag()};
+            proto.ray_count(), proto.bag_size(),   proto.sample_bag()};
 }
 
 WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
     return {proto.finished_paths()};
 }
-
 
 }  // namespace pbrt
