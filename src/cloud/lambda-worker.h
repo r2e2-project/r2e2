@@ -46,7 +46,7 @@ constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024};  // 4 MiB
 struct WorkerConfiguration {
     int samplesPerPixel;
     int maxPathDepth;
-    float rayActionsLogRate;
+    float rayLogRate;
 };
 
 /* Relationship between different queues in LambdaWorker:
@@ -227,7 +227,7 @@ class LambdaWorker {
     const std::string logBase{"pbrt-worker"};
     const std::string infoLogName{logBase + ".INFO"};
     std::string logPrefix{"logs/"};
-    const bool trackRays{config.rayActionsLogRate > 0};
+    const bool trackRays{config.rayLogRate > 0};
 
     std::bernoulli_distribution coin{0.5};
     std::mt19937 randEngine{std::random_device{}()};

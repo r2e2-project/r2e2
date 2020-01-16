@@ -30,8 +30,8 @@ def handler(event, context):
     if event['maxPathDepth']:
         command += ['--max-depth', str(event['maxPathDepth'])]
 
-    if event['rayActionsLogRate']:
-        command += ['--log-rays', str(event['rayActionsLogRate'])]
+    if event['rayLogRate']:
+        command += ['--log-rays', str(event['rayLogRate'])]
 
     if event['directionalTreelets']:
         command += ['--directional']

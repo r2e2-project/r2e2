@@ -44,7 +44,7 @@ struct MasterConfiguration {
     int maxPathDepth;
     bool collectDebugLogs;
     uint64_t workerStatsWriteInterval;
-    float rayActionsLogRate;
+    float rayLogRate;
     std::string logsDirectory;
     Optional<Bounds2i> cropWindow;
     int tileSize;

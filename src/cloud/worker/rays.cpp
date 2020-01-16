@@ -18,7 +18,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
     const Bounds2i sampleBounds = scene.camera->film->GetSampleBounds();
 
     /* for ray tracking */
-    bernoulli_distribution bd{config.rayActionsLogRate};
+    bernoulli_distribution bd{config.rayLogRate};
 
     for (size_t sample = 0; sample < scene.sampler->samplesPerPixel; sample++) {
         for (const Point2i pixel : bounds) {

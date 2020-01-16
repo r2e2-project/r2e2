@@ -163,7 +163,7 @@ int main(int argc, char* argv[]) {
 
     int samplesPerPixel = 0;
     int maxPathDepth = 0;
-    float rayActionsLogRate = 0.0;
+    float rayLogRate = 0.0;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
@@ -190,7 +190,7 @@ int main(int argc, char* argv[]) {
         case 's': storageUri = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'M': maxPathDepth = stoi(optarg); break;
-        case 'L': rayActionsLogRate = stof(optarg); break;
+        case 'L': rayLogRate = stof(optarg); break;
         case 'I': PbrtOptions.directionalTreelets = true; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
         default: usage(argv[0], EXIT_FAILURE);
@@ -199,14 +199,14 @@ int main(int argc, char* argv[]) {
     }
 
     if (listenPort == 0 || samplesPerPixel < 0 || maxPathDepth < 0 ||
-        rayActionsLogRate < 0 || rayActionsLogRate > 1.0 || publicIp.empty() ||
+        rayLogRate < 0 || rayLogRate > 1.0 || publicIp.empty() ||
         storageUri.empty()) {
         usage(argv[0], EXIT_FAILURE);
     }
 
     unique_ptr<LambdaWorker> worker;
     WorkerConfiguration config{samplesPerPixel, maxPathDepth,
-                               rayActionsLogRate};
+                               rayLogRate};
 
     try {
         worker =

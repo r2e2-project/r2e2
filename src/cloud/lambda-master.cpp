@@ -89,7 +89,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     invocationProto.set_coordinator(publicAddress);
     invocationProto.set_samples_per_pixel(config.samplesPerPixel);
     invocationProto.set_max_path_depth(config.maxPathDepth);
-    invocationProto.set_ray_actions_log_rate(config.rayActionsLogRate);
+    invocationProto.set_ray_actions_log_rate(config.rayLogRate);
     invocationProto.set_directional_treelets(PbrtOptions.directionalTreelets);
 
     invocationPayload = protoutil::to_json(invocationProto);
@@ -133,7 +133,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
 
     /* are we logging anything? */
     if (config.collectDebugLogs || config.workerStatsWriteInterval > 0 ||
-        config.rayActionsLogRate > 0) {
+        config.rayLogRate > 0) {
         roost::create_directories(config.logsDirectory);
     }
 
@@ -435,7 +435,7 @@ void LambdaMaster::run() {
         const auto &worker = workerkv.second;
         worker.connection->socket().close();
 
-        if (config.collectDebugLogs || config.rayActionsLogRate) {
+        if (config.collectDebugLogs || config.rayLogRate) {
             getRequests.emplace_back(
                 logPrefix + to_string(worker.id) + ".INFO",
                 config.logsDirectory + "/" + to_string(worker.id) + ".INFO");
@@ -525,7 +525,7 @@ int main(int argc, char *argv[]) {
     string region{"us-west-2"};
     uint64_t workerStatsWriteInterval = 0;
     bool collectDebugLogs = false;
-    float rayActionsLogRate = 0.0;
+    float rayLogRate = 0.0;
     string logsDirectory = "logs/";
     Optional<Bounds2i> cropWindow;
     uint32_t timeout = 0;
@@ -592,7 +592,7 @@ int main(int argc, char *argv[]) {
         case 'D': logsDirectory = optarg; break;
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'M': maxPathDepth = stoi(optarg); break;
-        case 'L': rayActionsLogRate = stof(optarg); break;
+        case 'L': rayLogRate = stof(optarg); break;
         case 't': timeout = stoul(optarg); break;
         case 'j': jobSummaryPath = optarg; break;
         case 'n': newTileThreshold = stoull(optarg); break;
@@ -655,7 +655,7 @@ int main(int argc, char *argv[]) {
 
     if (scheduler == nullptr || listenPort == 0 || maxWorkers <= 0 ||
         rayGenerators <= 0 || samplesPerPixel < 0 || maxPathDepth < 0 ||
-        rayActionsLogRate < 0 || rayActionsLogRate > 1.0 || publicIp.empty() ||
+        rayLogRate < 0 || rayLogRate > 1.0 || publicIp.empty() ||
         storageBackendUri.empty() || region.empty() || newTileThreshold == 0 ||
         (cropWindow.initialized() && pixelsPerTile != 0 &&
          pixelsPerTile != numeric_limits<typeof(pixelsPerTile)>::max() &&
@@ -671,7 +671,7 @@ int main(int argc, char *argv[]) {
     // TODO clean this up
     MasterConfiguration config = {samplesPerPixel,   maxPathDepth,
                                   collectDebugLogs,  workerStatsWriteInterval,
-                                  rayActionsLogRate, logsDirectory,
+                                  rayLogRate, logsDirectory,
                                   cropWindow,        tileSize,
                                   seconds{timeout},  jobSummaryPath,
                                   newTileThreshold,  move(engines)};
