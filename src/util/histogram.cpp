@@ -6,15 +6,15 @@
 using namespace std;
 
 template <class T>
-Histogram<T>::Histogram(const T width, const T minimum, const T maximum)
-    : width(width), minimum(minimum), maximum(maximum) {
-    bins.resize(static_cast<size_t>((maximum - minimum + width) / width));
+Histogram<T>::Histogram(const T width, const T lowerBound, const T upperBound)
+    : width(width), lowerBound(lowerBound), upperBound(upperBound) {
+    bins.resize(static_cast<size_t>((upperBound - lowerBound + width) / width));
 }
 
 template <class T>
 void Histogram<T>::add(const T value) {
-    if (value < minimum || value > maximum) {
-        throw runtime_error("value < minimum || value > maximum");
+    if (value < lowerBound || value > upperBound) {
+        throw runtime_error("value < lowerBound || value > upperBound");
     }
 
     count++;
@@ -23,7 +23,7 @@ void Histogram<T>::add(const T value) {
     sum += value;
     squaresSum += value * value;
 
-    const size_t bin = static_cast<size_t>((value - minimum) / width);
+    const size_t bin = static_cast<size_t>((value - lowerBound) / width);
     bins[bin]++;
 }
 

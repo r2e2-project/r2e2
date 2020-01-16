@@ -9,18 +9,18 @@ template <class T>
 class Histogram {
   private:
     T width;
-    T minimum;
-    T maximum;
+    T lowerBound;
+    T upperBound;
     std::vector<size_t> bins;
 
-    T count = 0;
+    uint64_t count = 0;
     T maxValue = std::numeric_limits<T>::min();
     T minValue = std::numeric_limits<T>::max();
     T sum = 0;
     T squaresSum = 0;
 
   public:
-    Histogram(const T width, const T minimum, const T maximum);
+    Histogram(const T width, const T lowerBound, const T upperBound);
     void add(const T value);
 
     std::string str() const;
