@@ -40,6 +40,9 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     if (trackRays) {
         TLOG(RAY) << "timestamp,pathId,hop,shadowRay,remainingBounces,workerId,"
                      "treeletId,action,bag";
+    }
+
+    if (trackBags) {
         TLOG(BAG) << "timestamp,bag,workerId,count,size,action";
     }
 

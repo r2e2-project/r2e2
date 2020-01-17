@@ -10,6 +10,8 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 
 ResultType LambdaWorker::handleOutQueue() {
+    bernoulli_distribution bd{config.bagLogRate};
+
     for (auto it = outQueue.begin(); it != outQueue.end();
          it = outQueue.erase(it)) {
         const TreeletId treeletId = it->first;
@@ -19,12 +21,18 @@ ResultType LambdaWorker::handleOutQueue() {
         while (!rayList.empty()) {
             auto& ray = rayList.front();
 
-            if (queue.empty() ||
-                queue.back().info.bagSize + ray->MaxCompressedSize() >
-                    MAX_BAG_SIZE) {
+            if (queue.empty() || (queue.back().info.bagSize +
+                                  ray->MaxCompressedSize()) > MAX_BAG_SIZE) {
+                if (!queue.empty()) {
+                    logBag(BagAction::Sealed, queue.back().info);
+                }
+
                 /* let's create an empty bag */
                 queue.emplace(*workerId, treeletId, currentBagId[treeletId]++,
                               false, MAX_BAG_SIZE);
+
+                queue.back().info.tracked = bd(randEngine);
+                logBag(BagAction::Created, queue.back().info);
             }
 
             auto& bag = queue.back();
@@ -82,6 +90,8 @@ ResultType LambdaWorker::handleSendQueue() {
             bag.data.erase(bag.info.bagSize);
             bag.data.shrink_to_fit();
 
+            logBag(BagAction::Submitted, bag.info);
+
             const auto id = transferAgent.requestUpload(
                 bag.info.str(rayBagsKeyPrefix), move(bag.data));
 
@@ -135,6 +145,8 @@ ResultType LambdaWorker::handleReceiveQueue() {
 
             rays.push(move(ray));
         }
+
+        logBag(BagAction::Opened, bag.info);
     }
 
     return ResultType::Continue;

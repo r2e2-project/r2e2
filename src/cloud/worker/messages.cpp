@@ -72,6 +72,8 @@ void LambdaWorker::processMessage(const Message& message) {
             const auto id =
                 transferAgent.requestDownload(info.str(rayBagsKeyPrefix));
             pendingRayBags[id] = make_pair(Task::Download, info);
+
+            logBag(BagAction::Requested, info);
         }
 
         break;

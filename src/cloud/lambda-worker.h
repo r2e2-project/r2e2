@@ -218,7 +218,15 @@ class LambdaWorker {
         Finished
     };
 
-    enum class BagAction { Enqueued, Dequeued };
+    enum class BagAction {
+        Created,
+        Sealed,
+        Submitted,
+        Enqueued,
+        Requested,
+        Dequeued,
+        Opened
+    };
 
     void logRay(const RayAction action, const RayState& state,
                 const RayBagInfo& info = RayBagInfo::EmptyBag());

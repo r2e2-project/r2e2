@@ -76,7 +76,7 @@ void LambdaWorker::logRay(const RayAction action, const RayState& state,
 }
 
 void LambdaWorker::logBag(const BagAction action, const RayBagInfo& info) {
-    if (!trackRays) return;
+    if (!trackBags || !info.tracked) return;
 
     ostringstream oss;
 
@@ -88,8 +88,13 @@ void LambdaWorker::logBag(const BagAction action, const RayBagInfo& info) {
 
     // clang-format off
     switch(action) {
-    case BagAction::Enqueued: oss << "Enqueued"; break;
-    case BagAction::Dequeued: oss << "Dequeued"; break;
+    case BagAction::Created:   oss << "Created"; break;
+    case BagAction::Sealed:    oss << "Sealed"; break;
+    case BagAction::Submitted: oss << "Submitted"; break;
+    case BagAction::Enqueued:  oss << "Enqueued"; break;
+    case BagAction::Requested: oss << "Requested"; break;
+    case BagAction::Dequeued:  oss << "Dequeued"; break;
+    case BagAction::Opened:    oss << "Opened"; break;
     }
     // clang-format on
 
