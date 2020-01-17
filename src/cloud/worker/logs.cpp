@@ -24,7 +24,7 @@ void LambdaWorker::sendWorkerStats() {
 }
 
 ResultType LambdaWorker::handleWorkerStats() {
-    workerStatsTimer.reset();
+    workerStatsTimer.read_event();
 
     if (!workerId.initialized()) return ResultType::Continue;
 

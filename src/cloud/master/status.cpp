@@ -14,7 +14,7 @@ constexpr milliseconds EXIT_GRACE_PERIOD{5'000};
 ResultType LambdaMaster::handleStatusMessage() {
     ScopeTimer<TimeLog::Category::StatusBar> timer_;
 
-    statusPrintTimer.reset();
+    statusPrintTimer.read_event();
 
     const auto now = steady_clock::now();
 

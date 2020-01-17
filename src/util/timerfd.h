@@ -16,25 +16,28 @@ class TimerFD : public FileDescriptor {
 
   public:
     template <class DurationA, class DurationB>
-    TimerFD(const DurationA& duration, const DurationB& initial)
+    TimerFD(const DurationA& interval, const DurationB& initial)
         : FileDescriptor(CheckSystemCall(
               "timerfd", timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK))) {
-        timerspec.it_interval = to_timespec(duration);
+        set(interval, initial);
+    }
+
+    template <class Duration>
+    TimerFD(const Duration& interval) : TimerFD(interval, interval) {}
+
+    template <class DurationA, class DurationB>
+    void set(const DurationA& interval, const DurationB& initial) {
+        timerspec.it_interval = to_timespec(interval);
         timerspec.it_value = to_timespec(initial);
         CheckSystemCall("timerfd_settime",
                         timerfd_settime(fd_num(), 0, &timerspec, nullptr));
     }
 
-    template <class Duration>
-    TimerFD(const Duration& duration) : TimerFD(duration, duration) {}
+    void disarm() { set(std::chrono::seconds{0}, std::chrono::seconds{0}); }
 
-    void reset() { read(8); }
+    void read_event() { read(8); }
 
-    ~TimerFD() {
-        std::memset(&timerspec, 0, sizeof(itimerspec));
-        CheckSystemCall("timerfd_settime",
-                        timerfd_settime(fd_num(), 0, &timerspec, nullptr));
-    }
+    ~TimerFD() { disarm(); }
 };
 
 #endif /* PBRT_UTIL_TIMERFD_H */

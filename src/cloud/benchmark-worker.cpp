@@ -96,7 +96,7 @@ int main(const int argc, const char* argv[]) {
     poller.add_action(Poller::Action(
         terminationTimer, Direction::In,
         [&terminationTimer]() {
-            terminationTimer.reset();
+            terminationTimer.read_event();
             return ResultType::Exit;
         },
         []() { return true; }, []() { throw runtime_error("termination"); }));
@@ -104,7 +104,7 @@ int main(const int argc, const char* argv[]) {
     poller.add_action(Poller::Action(
         printStatsTimer, Direction::In,
         [&]() {
-            printStatsTimer.reset();
+            printStatsTimer.read_event();
 
             const auto T =
                 duration_cast<seconds>(steady_clock::now() - start).count();

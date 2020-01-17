@@ -78,7 +78,7 @@ ResultType LambdaWorker::handleSamples() {
 }
 
 ResultType LambdaWorker::handleSendQueue() {
-    sendQueueTimer.reset();
+    sendQueueTimer.read_event();
 
     for (auto it = sendQueue.begin(); it != sendQueue.end();
          it = sendQueue.erase(it)) {
@@ -104,7 +104,7 @@ ResultType LambdaWorker::handleSendQueue() {
 }
 
 ResultType LambdaWorker::handleSampleBags() {
-    sampleBagsTimer.reset();
+    sampleBagsTimer.read_event();
 
     while (!sampleBags.empty()) {
         RayBag& bag = sampleBags.front();

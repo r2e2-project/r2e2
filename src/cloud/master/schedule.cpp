@@ -73,7 +73,7 @@ void LambdaMaster::invokeWorkers(const size_t nWorkers) {
 }
 
 ResultType LambdaMaster::handleReschedule() {
-    rescheduleTimer.reset();
+    rescheduleTimer.read_event();
 
     ScopeTimer<T::Schedule> _timer;
 
@@ -98,7 +98,7 @@ ResultType LambdaMaster::handleReschedule() {
 
 ResultType LambdaMaster::handleWorkerInvocation() {
     ScopeTimer<TimeLog::Category::Invocation> timer_;
-    workerInvocationTimer.reset();
+    workerInvocationTimer.read_event();
 
     /* let's start as many workers as we can right now */
     const auto runningCount = Worker::activeCount[Worker::Role::Tracer];

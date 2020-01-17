@@ -67,7 +67,7 @@ int main(const int argc, char const *argv[]) {
     loop.poller().add_action(Poller::Action(
         printStatusTimer, Direction::In,
         [&]() {
-            printStatusTimer.reset();
+            printStatusTimer.read_event();
 
             ostringstream oss;
             oss << remainingWorkers << " | "
