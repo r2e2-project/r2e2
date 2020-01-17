@@ -149,6 +149,7 @@ void usage(const char* argv0, int exitCode) {
          << "  -S --samples N             number of samples per pixel" << endl
          << "  -M --max-depth N           maximum path depth"
          << "  -L --log-rays RATE         log ray actions" << endl
+         << "  -L --log-bags RATE         log bag actions" << endl
          << "  -h --help                  show help information" << endl;
 
     exit(exitCode);
@@ -164,6 +165,7 @@ int main(int argc, char* argv[]) {
     int samplesPerPixel = 0;
     int maxPathDepth = 0;
     float rayLogRate = 0.0;
+    float bagLogRate = 0.0;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
@@ -172,6 +174,7 @@ int main(int argc, char* argv[]) {
         {"samples", required_argument, nullptr, 'S'},
         {"max-depth", required_argument, nullptr, 'M'},
         {"log-rays", required_argument, nullptr, 'L'},
+        {"log-bags", required_argument, nullptr, 'B'},
         {"directional", no_argument, nullptr, 'I'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
@@ -179,7 +182,7 @@ int main(int argc, char* argv[]) {
 
     while (true) {
         const int opt =
-            getopt_long(argc, argv, "p:i:s:S:M:L:hI", long_options, nullptr);
+            getopt_long(argc, argv, "p:i:s:S:M:L:B:hI", long_options, nullptr);
 
         if (opt == -1) break;
 
@@ -191,6 +194,7 @@ int main(int argc, char* argv[]) {
         case 'S': samplesPerPixel = stoi(optarg); break;
         case 'M': maxPathDepth = stoi(optarg); break;
         case 'L': rayLogRate = stof(optarg); break;
+        case 'B': bagLogRate = stof(optarg); break;
         case 'I': PbrtOptions.directionalTreelets = true; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
         default: usage(argv[0], EXIT_FAILURE);
@@ -199,14 +203,14 @@ int main(int argc, char* argv[]) {
     }
 
     if (listenPort == 0 || samplesPerPixel < 0 || maxPathDepth < 0 ||
-        rayLogRate < 0 || rayLogRate > 1.0 || publicIp.empty() ||
-        storageUri.empty()) {
+        rayLogRate < 0 || rayLogRate > 1.0 || bagLogRate < 0 ||
+        bagLogRate > 1.0 || publicIp.empty() || storageUri.empty()) {
         usage(argv[0], EXIT_FAILURE);
     }
 
     unique_ptr<LambdaWorker> worker;
-    WorkerConfiguration config{samplesPerPixel, maxPathDepth,
-                               rayLogRate};
+    WorkerConfiguration config{samplesPerPixel, maxPathDepth, rayLogRate,
+                               bagLogRate};
 
     try {
         worker =

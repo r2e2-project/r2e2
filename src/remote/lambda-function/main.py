@@ -33,6 +33,9 @@ def handler(event, context):
     if event['rayLogRate']:
         command += ['--log-rays', str(event['rayLogRate'])]
 
+    if event['bagLogRate']:
+        command += ['--log-bags', str(event['bagLogRate'])]
+
     if event['directionalTreelets']:
         command += ['--directional']
 

@@ -47,6 +47,7 @@ struct WorkerConfiguration {
     int samplesPerPixel;
     int maxPathDepth;
     float rayLogRate;
+    float bagLogRate;
 };
 
 /* Relationship between different queues in LambdaWorker:
@@ -228,6 +229,7 @@ class LambdaWorker {
     const std::string infoLogName{logBase + ".INFO"};
     std::string logPrefix{"logs/"};
     const bool trackRays{config.rayLogRate > 0};
+    const bool trackBags{config.bagLogRate > 0};
 
     std::bernoulli_distribution coin{0.5};
     std::mt19937 randEngine{std::random_device{}()};
