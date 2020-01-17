@@ -23,15 +23,12 @@ inline std::string pluralize( const std::string & word, const size_t count ) {
 }
 
 template <typename Duration>
-inline timespec to_timespec(Duration&& d) {
+inline void to_timespec(Duration&& d, timespec &tv) {
     const auto sec = std::chrono::duration_cast<std::chrono::seconds>(d);
 
-    struct timespec tv;
     tv.tv_sec = sec.count();
     tv.tv_nsec =
         std::chrono::duration_cast<std::chrono::nanoseconds>(d - sec).count();
-
-    return tv;
 }
 
 #endif /* PBRT_UTIL_UTIL_HH */

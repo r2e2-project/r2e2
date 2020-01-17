@@ -31,13 +31,13 @@ class TimerFD : public FileDescriptor {
 
     template <class DurationA, class DurationB>
     void set(const DurationA& interval, const DurationB& initial) {
-        timerspec_.it_interval = to_timespec(interval);
-        timerspec_.it_value = to_timespec(initial);
+        to_timespec(interval, timerspec_.it_interval);
+        to_timespec(initial, timerspec_.it_value);
         CheckSystemCall("timerfd_settime",
                         timerfd_settime(fd_num(), 0, &timerspec_, nullptr));
 
-        armed_ = (initial != std::chrono::seconds{0});
-        recurring_ = (interval != std::chrono::seconds{0});
+        armed_ = (initial != std::chrono::nanoseconds::zero());
+        recurring_ = (interval != std::chrono::nanoseconds::zero());
     }
 
     void disarm() { set(std::chrono::seconds{0}, std::chrono::seconds{0}); }
