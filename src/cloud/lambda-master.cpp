@@ -179,6 +179,21 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
         []() { throw runtime_error("rescheduler failed"); }));
 
     loop.poller().add_action(Poller::Action(
+        alwaysOnFd, Direction::Out,
+        [&]() {
+            jobExitTimer = make_unique<TimerFD>(14min + 50s);
+
+            loop.poller().add_action(Poller::Action(
+                *jobExitTimer, Direction::In,
+                [&]() { return ResultType::Exit; }, []() { return true; },
+                []() { throw runtime_error("job exit failed"); }));
+
+            return ResultType::Cancel;
+        },
+        [this]() { return finishedRayGenerators == this->rayGenerators; },
+        []() { throw runtime_error("job exit failed"); }));
+
+    loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleMessages, this),
         [this]() { return !incomingMessages.empty(); },
         []() { throw runtime_error("messages failed"); }));

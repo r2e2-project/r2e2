@@ -21,18 +21,18 @@ ResultType LambdaMaster::handleStatusMessage() {
     if (config.timeout.count() && now - lastActionTime >= config.timeout) {
         cerr << "Job terminated due to inactivity." << endl;
         return ResultType::Exit;
-    } else if (exitTimer == nullptr &&
+    } else if (jobTimeoutTimer == nullptr &&
                scene.totalPaths == aggregatedStats.finishedPaths) {
         cerr << "Done! Terminating the job in "
              << duration_cast<seconds>(EXIT_GRACE_PERIOD).count() << "s..."
              << endl;
 
-        exitTimer = make_unique<TimerFD>(EXIT_GRACE_PERIOD);
+        jobTimeoutTimer = make_unique<TimerFD>(EXIT_GRACE_PERIOD);
 
         loop.poller().add_action(
-            Poller::Action(*exitTimer, Direction::In,
+            Poller::Action(*jobTimeoutTimer, Direction::In,
                            [this]() {
-                               exitTimer = nullptr;
+                               jobTimeoutTimer = nullptr;
                                return ResultType::Exit;
                            },
                            [this]() { return true; },

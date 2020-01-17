@@ -311,7 +311,8 @@ class LambdaMaster {
                             std::chrono::milliseconds{500}};
     TimerFD workerStatsWriteTimer;
 
-    std::unique_ptr<TimerFD> exitTimer;
+    std::unique_ptr<TimerFD> jobExitTimer;
+    std::unique_ptr<TimerFD> jobTimeoutTimer;
 };
 
 }  // namespace pbrt
