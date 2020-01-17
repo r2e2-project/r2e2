@@ -25,7 +25,7 @@ clen = 4 + len(args.tag)
 
 subprocess.run("cat {firstfile} | grep \"\\[{tag}\\]\" | head -n1 |"
                "cut -c {clen}- > {ofile}".format(
-                   firstfile=os.path.join(args.info_directory, "1.INFO"),
+                   firstfile=os.path.join(args.info_directory, "*.INFO"),
                    tag=args.tag, clen=clen, ofile=args.output_csv),
                shell=True, check=True)
 
