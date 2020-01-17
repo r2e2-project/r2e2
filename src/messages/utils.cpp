@@ -265,14 +265,15 @@ protobuf::Sample to_protobuf(const Sample& sample) {
     return proto;
 }
 
-protobuf::RayBagInfo to_protobuf(const RayBagInfo& RayBagInfo) {
+protobuf::RayBagInfo to_protobuf(const RayBagInfo& info) {
     protobuf::RayBagInfo proto;
-    proto.set_worker_id(RayBagInfo.workerId);
-    proto.set_treelet_id(RayBagInfo.treeletId);
-    proto.set_bag_id(RayBagInfo.bagId);
-    proto.set_ray_count(RayBagInfo.rayCount);
-    proto.set_bag_size(RayBagInfo.bagSize);
-    proto.set_sample_bag(RayBagInfo.sampleBag);
+    proto.set_tracked(info.tracked);
+    proto.set_worker_id(info.workerId);
+    proto.set_treelet_id(info.treeletId);
+    proto.set_bag_id(info.bagId);
+    proto.set_ray_count(info.rayCount);
+    proto.set_bag_size(info.bagSize);
+    proto.set_sample_bag(info.sampleBag);
     return proto;
 }
 
@@ -783,8 +784,11 @@ protobuf::SpectrumTexture spectrum_texture::to_protobuf(
 }
 
 RayBagInfo from_protobuf(const protobuf::RayBagInfo& proto) {
-    return {proto.worker_id(), proto.treelet_id(), proto.bag_id(),
-            proto.ray_count(), proto.bag_size(),   proto.sample_bag()};
+    RayBagInfo res{proto.worker_id(), proto.treelet_id(), proto.bag_id(),
+                   proto.ray_count(), proto.bag_size(),   proto.sample_bag()};
+
+    res.tracked = proto.tracked();
+    return res;
 }
 
 WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {

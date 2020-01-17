@@ -390,12 +390,13 @@ message JobSummary {
 // Ray Bags
 
 message RayBagInfo {
-    uint64 worker_id = 1;
-    uint32 treelet_id = 2;
-    uint64 bag_id = 3;
-    uint64 ray_count = 4;
-    uint64 bag_size = 5;
-    bool sample_bag = 6;
+    bool tracked = 1;
+    uint64 worker_id = 2;
+    uint32 treelet_id = 3;
+    uint64 bag_id = 4;
+    uint64 ray_count = 5;
+    uint64 bag_size = 6;
+    bool sample_bag = 7;
 }
 
 message RayBags {

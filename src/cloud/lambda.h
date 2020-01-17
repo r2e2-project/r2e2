@@ -10,6 +10,8 @@ using TreeletId = uint32_t;
 using BagId = uint64_t;
 
 struct RayBagInfo {
+    bool tracked{false};
+
     WorkerId workerId{};
     TreeletId treeletId{};
     BagId bagId{};
