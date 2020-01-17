@@ -15,6 +15,8 @@ class TimerFD : public FileDescriptor {
     itimerspec timerspec;
 
   public:
+    TimerFD() : TimerFD(std::chrono::seconds{0}, std::chrono::seconds{0}) {}
+
     template <class DurationA, class DurationB>
     TimerFD(const DurationA& interval, const DurationB& initial)
         : FileDescriptor(CheckSystemCall(
