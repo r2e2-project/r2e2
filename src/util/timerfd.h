@@ -12,7 +12,9 @@
 
 class TimerFD : public FileDescriptor {
   private:
-    itimerspec timerspec;
+    itimerspec timerspec_;
+    bool armed_{false};
+    bool recurring_{false};
 
   public:
     TimerFD() : TimerFD(std::chrono::seconds{0}, std::chrono::seconds{0}) {}
@@ -29,15 +31,24 @@ class TimerFD : public FileDescriptor {
 
     template <class DurationA, class DurationB>
     void set(const DurationA& interval, const DurationB& initial) {
-        timerspec.it_interval = to_timespec(interval);
-        timerspec.it_value = to_timespec(initial);
+        timerspec_.it_interval = to_timespec(interval);
+        timerspec_.it_value = to_timespec(initial);
         CheckSystemCall("timerfd_settime",
-                        timerfd_settime(fd_num(), 0, &timerspec, nullptr));
+                        timerfd_settime(fd_num(), 0, &timerspec_, nullptr));
+
+        armed_ = (initial != std::chrono::seconds{0});
+        recurring_ = (interval != std::chrono::seconds{0});
     }
 
     void disarm() { set(std::chrono::seconds{0}, std::chrono::seconds{0}); }
 
-    void read_event() { read(8); }
+    bool armed() const { return armed_; }
+    bool recurring() const { return recurring_; }
+
+    void read_event() {
+        read(8);
+        if (!recurring_) armed_ = false;
+    }
 
     ~TimerFD() { disarm(); }
 };
