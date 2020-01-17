@@ -42,10 +42,12 @@ Histogram<uint64_t>::Histogram(const protobuf::HistogramUInt64& proto) {
     sum_ = proto.sum();
     squares_sum_ = proto.squares_sum();
 
-    bins_.reserve(proto.bins().size());
+    bins_.resize(
+        static_cast<size_t>((upper_bound_ - lower_bound_ + width_) / width_));
 
+    size_t i = 0;
     for (const auto bin : proto.bins()) {
-        bins_.push_back(bin);
+        bins_[i++] = bin;
     }
 }
 
@@ -61,7 +63,13 @@ protobuf::HistogramUInt64 Histogram<uint64_t>::to_protobuf() const {
     proto.set_max(max_value());
     proto.set_sum(sum());
     proto.set_squares_sum(squares_sum());
-    *proto.mutable_bins() = {bins_.begin(), bins_.end()};
+
+    size_t lastPos;
+    for (lastPos = bins_.size() - 1; lastPos < bins_.size(); lastPos--) {
+        if (bins_[lastPos] != 0) break;
+    }
+
+    *proto.mutable_bins() = {bins_.begin(), bins_.begin() + lastPos};
 
     return proto;
 }
