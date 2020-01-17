@@ -78,11 +78,15 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return !samples.empty(); },
         []() { throw runtime_error("send queue failed"); }));
 
-    loop.poller().add_action(
-        Poller::Action(sendQueueTimer, Direction::In,
-                       bind(&LambdaWorker::handleSendQueue, this),
-                       [this]() { return !sendQueue.empty(); },
-                       []() { throw runtime_error("send queue failed"); }));
+    loop.poller().add_action(Poller::Action(
+        sealBagsTimer, Direction::In, bind(&LambdaWorker::handleOpenBags, this),
+        [this]() { return !openBags.empty(); },
+        []() { throw runtime_error("open bags failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        alwaysOnFd, Direction::Out, bind(&LambdaWorker::handleSealedBags, this),
+        [this]() { return !sealedBags.empty(); },
+        []() { throw runtime_error("send queue failed"); }));
 
     loop.poller().add_action(
         Poller::Action(sampleBagsTimer, Direction::In,

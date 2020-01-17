@@ -12,30 +12,38 @@ using OpCode = Message::OpCode;
 ResultType LambdaWorker::handleOutQueue() {
     bernoulli_distribution bd{config.bagLogRate};
 
+    auto createNewBag = [&](const TreeletId treeletId) -> RayBag {
+        RayBag bag{*workerId, treeletId, currentBagId[treeletId]++, false,
+                   MAX_BAG_SIZE};
+
+        bag.info.tracked = bd(randEngine);
+        logBag(BagAction::Created, bag.info);
+        return bag;
+    };
+
     for (auto it = outQueue.begin(); it != outQueue.end();
          it = outQueue.erase(it)) {
         const TreeletId treeletId = it->first;
         auto& rayList = it->second;
-        auto& queue = sendQueue[treeletId];
+
+        auto bagIt = openBags.find(treeletId);
+
+        if (bagIt == openBags.end()) {
+            auto result = openBags.emplace(treeletId, createNewBag(treeletId));
+            bagIt = result.first;
+        }
 
         while (!rayList.empty()) {
             auto& ray = rayList.front();
+            auto& bag = bagIt->second;
 
-            if (queue.empty() || (queue.back().info.bagSize +
-                                  ray->MaxCompressedSize()) > MAX_BAG_SIZE) {
-                if (!queue.empty()) {
-                    logBag(BagAction::Sealed, queue.back().info);
-                }
+            if (bag.info.bagSize + ray->MaxCompressedSize() > MAX_BAG_SIZE) {
+                logBag(BagAction::Sealed, bag.info);
+                sealedBags.push(move(bag));
 
                 /* let's create an empty bag */
-                queue.emplace(*workerId, treeletId, currentBagId[treeletId]++,
-                              false, MAX_BAG_SIZE);
-
-                queue.back().info.tracked = bd(randEngine);
-                logBag(BagAction::Created, queue.back().info);
+                bag = createNewBag(treeletId);
             }
-
-            auto& bag = queue.back();
 
             const auto len = ray->Serialize(&bag.data[0] + bag.info.bagSize);
             bag.info.rayCount++;
@@ -46,6 +54,18 @@ ResultType LambdaWorker::handleOutQueue() {
             rayList.pop();
             outQueueSize--;
         }
+    }
+
+    return ResultType::Continue;
+}
+
+ResultType LambdaWorker::handleOpenBags() {
+    sealBagsTimer.read_event();
+
+    for (auto it = openBags.begin(); it != openBags.end();) {
+        logBag(BagAction::Sealed, it->second.info);
+        sealedBags.push(move(it->second));
+        it = openBags.erase(it);
     }
 
     return ResultType::Continue;
@@ -77,27 +97,19 @@ ResultType LambdaWorker::handleSamples() {
     return ResultType::Continue;
 }
 
-ResultType LambdaWorker::handleSendQueue() {
-    sendQueueTimer.read_event();
+ResultType LambdaWorker::handleSealedBags() {
+    while (!sealedBags.empty()) {
+        auto& bag = sealedBags.front();
 
-    for (auto it = sendQueue.begin(); it != sendQueue.end();
-         it = sendQueue.erase(it)) {
-        const auto treeletId = it->first;
-        auto& queue = it->second;
+        bag.data.erase(bag.info.bagSize);
+        bag.data.shrink_to_fit();
+        logBag(BagAction::Submitted, bag.info);
 
-        while (!queue.empty()) {
-            auto& bag = queue.front();
-            bag.data.erase(bag.info.bagSize);
-            bag.data.shrink_to_fit();
+        const auto id = transferAgent.requestUpload(
+            bag.info.str(rayBagsKeyPrefix), move(bag.data));
 
-            logBag(BagAction::Submitted, bag.info);
-
-            const auto id = transferAgent.requestUpload(
-                bag.info.str(rayBagsKeyPrefix), move(bag.data));
-
-            pendingRayBags[id] = make_pair(Task::Upload, bag.info);
-            queue.pop();
-        }
+        pendingRayBags[id] = make_pair(Task::Upload, bag.info);
+        sealedBags.pop();
     }
 
     return ResultType::Continue;

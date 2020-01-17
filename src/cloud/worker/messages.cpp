@@ -92,9 +92,9 @@ void LambdaWorker::processMessage(const Message& message) {
             },
             [this]() {
                 return traceQueue.empty() && outQueue.empty() &&
-                       samples.empty() && sendQueue.empty() &&
-                       receiveQueue.empty() && pendingRayBags.empty() &&
-                       sampleBags.empty();
+                       samples.empty() && openBags.empty() &&
+                       sealedBags.empty() && receiveQueue.empty() &&
+                       pendingRayBags.empty() && sampleBags.empty();
             },
             []() { throw runtime_error("terminating failed"); }));
 

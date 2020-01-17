@@ -37,7 +37,7 @@
 
 namespace pbrt {
 
-constexpr std::chrono::milliseconds SEND_QUEUE_INTERVAL{250};
+constexpr std::chrono::milliseconds SEAL_BAGS_INTERVAL{250};
 constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
 
@@ -157,7 +157,10 @@ class LambdaWorker {
     Poller::Action::Result::Type handleOutQueue();
 
     /* sending the rays out */
-    Poller::Action::Result::Type handleSendQueue();
+    Poller::Action::Result::Type handleOpenBags();
+
+    /* sending the rays out */
+    Poller::Action::Result::Type handleSealedBags();
 
     /* opening up received ray bags */
     Poller::Action::Result::Type handleReceiveQueue();
@@ -172,8 +175,11 @@ class LambdaWorker {
 
     /* queues */
 
-    /* ray bags ready to be sent out */
-    std::map<TreeletId, std::queue<RayBag>> sendQueue{};
+    /* current bag for each treelet */
+    std::map<TreeletId, RayBag> openBags{};
+
+    /* bags that are sealed and ready to be sent out */
+    std::queue<RayBag> sealedBags{};
 
     /* sample bags ready to be sent out */
     std::queue<RayBag> sampleBags{};
@@ -253,7 +259,7 @@ class LambdaWorker {
     FileDescriptor alwaysOnFd{STDOUT_FILENO};
 
     /* Timers */
-    TimerFD sendQueueTimer{SEND_QUEUE_INTERVAL};
+    TimerFD sealBagsTimer{SEAL_BAGS_INTERVAL};
     TimerFD sampleBagsTimer{SAMPLE_BAGS_INTERVAL};
     TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
 
