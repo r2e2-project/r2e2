@@ -65,8 +65,8 @@ protobuf::HistogramUInt64 Histogram<uint64_t>::to_protobuf() const {
     proto.set_squares_sum(squares_sum());
 
     size_t lastPos;
-    for (lastPos = bins_.size() - 1; lastPos < bins_.size(); lastPos--) {
-        if (bins_[lastPos] != 0) break;
+    for (lastPos = bins_.size(); lastPos > 0; lastPos--) {
+        if (bins_[lastPos - 1] != 0) break;
     }
 
     *proto.mutable_bins() = {bins_.begin(), bins_.begin() + lastPos};
