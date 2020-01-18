@@ -1,6 +1,7 @@
 #ifndef PBRT_CLOUD_LAMBDA_H
 #define PBRT_CLOUD_LAMBDA_H
 
+#include <chrono>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -60,6 +61,9 @@ struct RayBagInfo {
 };
 
 struct RayBag {
+    std::chrono::steady_clock::time_point createdAt{
+        std::chrono::steady_clock::now()};
+
     RayBagInfo info;
     std::string data;
 

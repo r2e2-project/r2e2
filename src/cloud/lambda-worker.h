@@ -37,7 +37,7 @@
 
 namespace pbrt {
 
-constexpr std::chrono::milliseconds SEAL_BAGS_INTERVAL{250};
+constexpr std::chrono::milliseconds SEAL_BAGS_INTERVAL{100};
 constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
 
@@ -259,7 +259,7 @@ class LambdaWorker {
     FileDescriptor alwaysOnFd{STDOUT_FILENO};
 
     /* Timers */
-    TimerFD sealBagsTimer{SEAL_BAGS_INTERVAL};
+    TimerFD sealBagsTimer{};
     TimerFD sampleBagsTimer{SAMPLE_BAGS_INTERVAL};
     TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
 

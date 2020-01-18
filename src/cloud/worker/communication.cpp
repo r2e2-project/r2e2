@@ -3,6 +3,7 @@
 #include "messages/utils.h"
 
 using namespace std;
+using namespace chrono;
 using namespace pbrt;
 using namespace meow;
 using namespace PollerShortNames;
@@ -18,6 +19,11 @@ ResultType LambdaWorker::handleOutQueue() {
 
         bag.info.tracked = bd(randEngine);
         logBag(BagAction::Created, bag.info);
+
+        if (!sealBagsTimer.armed()) {
+            sealBagsTimer.set(0s, SEAL_BAGS_INTERVAL);
+        }
+
         return bag;
     };
 
@@ -62,10 +68,28 @@ ResultType LambdaWorker::handleOutQueue() {
 ResultType LambdaWorker::handleOpenBags() {
     sealBagsTimer.read_event();
 
+    nanoseconds nextExpiry = nanoseconds::max();
+    const auto now = steady_clock::now();
+
     for (auto it = openBags.begin(); it != openBags.end();) {
+        const auto timeSinceCreation = now - it->second.createdAt;
+
+        if (timeSinceCreation < SEAL_BAGS_INTERVAL) {
+            it++;
+            nextExpiry = min(nextExpiry,
+                             1ns + duration_cast<nanoseconds>(
+                                       SEAL_BAGS_INTERVAL - timeSinceCreation));
+
+            continue;
+        }
+
         logBag(BagAction::Sealed, it->second.info);
         sealedBags.push(move(it->second));
         it = openBags.erase(it);
+    }
+
+    if (!openBags.empty()) {
+        sealBagsTimer.set(0s, nextExpiry);
     }
 
     return ResultType::Continue;
