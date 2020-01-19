@@ -9,6 +9,26 @@ using namespace pbrt;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
+TransferAgent::TransferAgent(const GoogleStorageBackend& backend,
+                             const size_t threadCount)
+    : threadCount(threadCount) {
+    if (threadCount == 0) {
+        throw runtime_error("thread count cannot be zero");
+    }
+
+    clientConfig.credentials = backend.client().credentials();
+    clientConfig.region = backend.client().config().region;
+    clientConfig.bucket = backend.bucket();
+    clientConfig.prefix = backend.prefix();
+    clientConfig.endpoint = backend.client().config().endpoint;
+
+    clientConfig.address.store(Address{clientConfig.endpoint, "http"});
+
+    for (size_t i = 0; i < threadCount; i++) {
+        threads.emplace_back(&TransferAgent::workerThread, this, i);
+    }
+}
+
 TransferAgent::TransferAgent(const S3StorageBackend& backend,
                              const size_t threadCount)
     : threadCount(threadCount) {

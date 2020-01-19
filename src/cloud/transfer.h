@@ -16,6 +16,7 @@
 #include "net/s3.h"
 #include "net/secure_socket.h"
 #include "net/socket.h"
+#include "storage/backend_gs.h"
 #include "storage/backend_s3.h"
 #include "util/eventfd.h"
 #include "util/optional.h"
@@ -77,6 +78,9 @@ class TransferAgent {
 
   public:
     TransferAgent(const S3StorageBackend& backend,
+                  const size_t threadCount = MAX_THREADS);
+
+    TransferAgent(const GoogleStorageBackend& backend,
                   const size_t threadCount = MAX_THREADS);
 
     uint64_t requestDownload(const std::string& key);
