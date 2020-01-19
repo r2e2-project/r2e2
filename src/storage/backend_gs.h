@@ -1,13 +1,13 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_STORAGE_BACKEND_S3_HH
-#define PBRT_STORAGE_BACKEND_S3_HH
+#ifndef STORAGE_BACKEND_GS_HH
+#define STORAGE_BACKEND_GS_HH
 
 #include "storage/backend.h"
 #include "net/aws.h"
 #include "net/s3.h"
 
-class S3StorageBackend : public StorageBackend
+class GoogleStorageBackend : public StorageBackend
 {
 private:
   S3Client client_;
@@ -15,10 +15,9 @@ private:
   std::string prefix_;
 
 public:
-  S3StorageBackend( const AWSCredentials & credentials,
-                    const std::string & s3_bucket,
-                    const std::string & s3_region,
-                    const std::string & prefix = {} );
+  GoogleStorageBackend( const AWSCredentials & credentials,
+                        const std::string & bucket,
+                        const std::string & prefix = {} );
 
   void put( const std::vector<storage::PutRequest> & requests,
             const PutCallback & success_callback = []( const storage::PutRequest & ){} ) override;
@@ -32,4 +31,4 @@ public:
 
 };
 
-#endif /* PBRT_STORAGE_BACKEND_S3_HH */
+#endif /* STORAGE_BACKEND_GS_HH */
