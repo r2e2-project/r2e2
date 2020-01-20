@@ -77,10 +77,7 @@ class TransferAgent {
     EventFD eventFD{false};
 
   public:
-    TransferAgent(const S3StorageBackend& backend,
-                  const size_t threadCount = MAX_THREADS);
-
-    TransferAgent(const GoogleStorageBackend& backend,
+    TransferAgent(const std::unique_ptr<StorageBackend>& backend,
                   const size_t threadCount = MAX_THREADS);
 
     uint64_t requestDownload(const std::string& key);

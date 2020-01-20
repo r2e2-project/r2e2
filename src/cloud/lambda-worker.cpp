@@ -26,7 +26,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
       coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
       storageBackend(StorageBackend::create_backend(storageUri)),
-      transferAgent(*dynamic_cast<S3StorageBackend*>(storageBackend.get())) {
+      transferAgent(storageBackend) {
     // let the program handle SIGPIPE
     signal(SIGPIPE, SIG_IGN);
 

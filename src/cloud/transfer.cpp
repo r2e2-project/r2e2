@@ -9,42 +9,39 @@ using namespace pbrt;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
-TransferAgent::TransferAgent(const GoogleStorageBackend& backend,
+TransferAgent::TransferAgent(const unique_ptr<StorageBackend>& backend,
                              const size_t threadCount)
     : threadCount(threadCount) {
     if (threadCount == 0) {
         throw runtime_error("thread count cannot be zero");
     }
 
-    clientConfig.credentials = backend.client().credentials();
-    clientConfig.region = backend.client().config().region;
-    clientConfig.bucket = backend.bucket();
-    clientConfig.prefix = backend.prefix();
-    clientConfig.endpoint = backend.client().config().endpoint;
+    auto s3Backend = dynamic_cast<S3StorageBackend*>(backend.get());
 
-    clientConfig.address.store(Address{clientConfig.endpoint, "http"});
+    if (s3Backend != nullptr) {
+        clientConfig.credentials = s3Backend->client().credentials();
+        clientConfig.region = s3Backend->client().config().region;
+        clientConfig.bucket = s3Backend->bucket();
+        clientConfig.prefix = s3Backend->prefix();
 
-    for (size_t i = 0; i < threadCount; i++) {
-        threads.emplace_back(&TransferAgent::workerThread, this, i);
+        clientConfig.endpoint =
+            S3::endpoint(clientConfig.region, clientConfig.bucket);
+
+        clientConfig.address.store(Address{clientConfig.endpoint, "http"});
+    } else {
+        auto gsBackend = dynamic_cast<GoogleStorageBackend*>(backend.get());
+
+        if (gsBackend != nullptr) {
+            clientConfig.credentials = gsBackend->client().credentials();
+            clientConfig.region = gsBackend->client().config().region;
+            clientConfig.bucket = gsBackend->bucket();
+            clientConfig.prefix = gsBackend->prefix();
+            clientConfig.endpoint = gsBackend->client().config().endpoint;
+            clientConfig.address.store(Address{clientConfig.endpoint, "http"});
+        } else {
+            throw runtime_error("unsupported backend");
+        }
     }
-}
-
-TransferAgent::TransferAgent(const S3StorageBackend& backend,
-                             const size_t threadCount)
-    : threadCount(threadCount) {
-    if (threadCount == 0) {
-        throw runtime_error("thread count cannot be zero");
-    }
-
-    clientConfig.credentials = backend.client().credentials();
-    clientConfig.region = backend.client().config().region;
-    clientConfig.bucket = backend.bucket();
-    clientConfig.prefix = backend.prefix();
-
-    clientConfig.endpoint =
-        S3::endpoint(clientConfig.region, clientConfig.bucket);
-
-    clientConfig.address.store(Address{clientConfig.endpoint, "http"});
 
     for (size_t i = 0; i < threadCount; i++) {
         threads.emplace_back(&TransferAgent::workerThread, this, i);

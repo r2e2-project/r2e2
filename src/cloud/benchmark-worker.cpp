@@ -54,7 +54,7 @@ int main(const int argc, const char* argv[]) {
     auto storageBackend = StorageBackend::create_backend(backendUri);
 
     Poller poller;
-    TransferAgent agent{*dynamic_cast<S3StorageBackend*>(storageBackend.get())};
+    TransferAgent agent{storageBackend};
 
     const auto start = steady_clock::now();
     TimerFD printStatsTimer{1s};
