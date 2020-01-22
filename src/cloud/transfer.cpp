@@ -168,6 +168,7 @@ void TransferAgent::workerThread(const size_t threadId) {
                         eventFD.write_event();
                         break;
 
+                    case '4':
                     case '5':  // we need to slow down
                         connectionOkay = false;
                         tryCount++;

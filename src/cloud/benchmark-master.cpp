@@ -40,7 +40,7 @@ int main(const int argc, char const *argv[]) {
     const bool recv = (stoull(argv[8]) == 1);
 
     const AWSCredentials awsCredentials{};
-    const Address awsAddress{LambdaInvocationRequest::endpoint(awsRegion),
+    const Address awsAddress{"us-central1-stanfordsnr-gg.cloudfunctions.net",
                              "https"};
 
     ExecutionLoop loop;
@@ -85,20 +85,37 @@ int main(const int argc, char const *argv[]) {
     /* we launch N workers */
     for (size_t i = 0; i < nWorkers; i++) {
         proto.set_worker_id(i);
+        const string payload = protoutil::to_json(proto);
 
-        HTTPRequest invocationRequest =
-            LambdaInvocationRequest(
-                awsCredentials, awsRegion, "r2t2-s3-benchmark",
-                protoutil::to_json(proto),
-                LambdaInvocationRequest::InvocationType::REQUEST_RESPONSE,
-                LambdaInvocationRequest::LogType::NONE)
-                .to_http_request();
+        // HTTPRequest invocationRequest =
+        //     LambdaInvocationRequest(
+        //         awsCredentials, awsRegion, "r2t2-s3-benchmark",
+        //         protoutil::to_json(proto),
+        //         LambdaInvocationRequest::InvocationType::REQUEST_RESPONSE,
+        //         LambdaInvocationRequest::LogType::NONE)
+        //         .to_http_request();
+
+        HTTPRequest invocationRequest;
+        invocationRequest.set_first_line("POST /pbrt-gcloud-function HTTP/1.1");
+
+        invocationRequest.add_header(HTTPHeader{
+            "Host", "us-central1-stanfordsnr-gg.cloudfunctions.net"});
+
+        invocationRequest.add_header(
+            HTTPHeader{"Content-Length", to_string(payload.length())});
+
+        invocationRequest.add_header(
+            HTTPHeader{"Content-Type", "application/json"});
+
+        invocationRequest.done_with_headers();
+
+        invocationRequest.read_in_body(payload);
 
         loop.make_http_request<SSLConnection>(
             "start-worker", awsAddress, invocationRequest,
             [&](const uint64_t, const string &, const HTTPResponse &response) {
                 if (response.status_code()[0] != '2') {
-                    cerr << response.body() << endl;
+                    cerr << response.str() << endl;
                     throw runtime_error("invalid response");
                 }
 
