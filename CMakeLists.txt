@@ -655,6 +655,14 @@ SET_TARGET_PROPERTIES ( pbrt_gen_sphere PROPERTIES OUTPUT_NAME "pbrt-gen-sphere"
 TARGET_COMPILE_FEATURES ( pbrt_gen_sphere PRIVATE ${PBRT_CXX11_FEATURES} )
 TARGET_LINK_LIBRARIES ( pbrt_gen_sphere ${ALL_PBRT_LIBS} )
 
+# cloud-simulate
+ADD_EXECUTABLE ( cloud_simulate src/cloud/simulator.cpp )
+ADD_SANITIZERS ( cloud_simulate )
+
+SET_TARGET_PROPERTIES ( cloud_simulate PROPERTIES OUTPUT_NAME "cloud-simulate" )
+TARGET_COMPILE_FEATURES ( cloud_simulate PRIVATE ${PBRT_CXX11_FEATURES} )
+TARGET_LINK_LIBRARIES ( cloud_simulate ${ALL_PBRT_LIBS} )
+
 # pbrt-lambda-master
 ADD_EXECUTABLE ( pbrt_lambda_aggregate src/cloud/lambda-aggregate.cpp )
 ADD_SANITIZERS ( pbrt_lambda_aggregate )
