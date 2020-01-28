@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <list>
-#include <deque>
+#include <list>
 #include <string>
 #include <sstream>
 #include <fstream>
@@ -66,6 +66,7 @@ Scene loadFakeScene() {
 struct SimRayMsg {
     RayStatePtr ray;
     uint64_t bytesRemaining;
+    bool delivered;
     uint64_t deliveryDelay;
     uint64_t ackDelay;
 
@@ -76,7 +77,7 @@ struct SimRayMsg {
 struct Worker {
     uint64_t id;
 
-    deque<RayStatePtr> inQueue;
+    list<RayStatePtr> inQueue;
     uint64_t outstanding = 0;
 };
 
@@ -138,6 +139,56 @@ public:
         setTiles();
     }
 
+    void simulate() {
+        bool isWork = true;
+
+        while (isWork) {
+            statsPerMS.push_back(TimeStats());
+            if (curMS % msPerRebalance == 0) {
+            }
+
+            transmitRays();
+
+            for (uint64_t workerID = 0; workerID < numWorkers; workerID++) {
+                processRays(workers[workerID]);
+            }
+
+            isWork = false;
+            for (uint64_t workerID = 0; workerID < numWorkers; workerID++) {
+                const Worker &worker  = workers[workerID];
+                if (worker.inQueue.size() > 0 || worker.outstanding > 0) {
+                    isWork = true;
+                    break;
+                }
+            }
+
+            curMS++;
+            cout << curMS << "ms" << endl;
+        }
+    }
+
+    void dump_stats() {
+        cout << "Total rays transferred: " << totalRaysTransferred << endl;
+        cout << "Total bytes transferred: " << totalBytesTransferred << endl;
+        cout << "Camera rays launched: " << totalCameraRaysLaunched << endl;
+        cout << "Shadow rays launched: " << totalShadowRaysLaunched << endl;
+        cout << "Total rays launched: " << totalRaysLaunched << endl;
+        cout << "Average transfers/ray: " << (double)totalRaysTransferred / (double)totalRaysLaunched << endl;
+        cout << "Average bytes/ray: " << totalBytesTransferred / totalRaysTransferred << endl;
+
+        ofstream csv("/tmp/stats.csv");
+        csv << "ms, rays_in_flight, rays_enqueued, rays_dequeued, bytes_transferred, network_utilization" << endl;
+        uint64_t ms = 0;
+        for (const TimeStats &stats : statsPerMS) {
+            csv << ms << ", " << stats.raysInFlight << ", " << stats.raysEnqueued << ", " <<
+                stats.raysDequeued << ", " << stats.bytesTransferred << ", " <<
+                (double)stats.bytesTransferred / (double)(numWorkers * (workerBandwidth / 1000)) << endl;
+
+            ms++;
+        }
+    }
+
+private:
     void setTiles() {
         tileSize = ceil(sqrt(sampleBounds.Area() / numWorkers));
 
@@ -186,6 +237,7 @@ public:
         SimRayMsg msg;
         msg.ray = move(ray);
         msg.bytesRemaining = getNetworkLen(msg.ray);
+        msg.delivered = false;
         msg.deliveryDelay = workerLatency;
         msg.ackDelay = workerLatency;
         msg.srcWorkerID = worker.id;
@@ -193,6 +245,9 @@ public:
 
         worker.outstanding++;
         inTransit.emplace_back(move(msg));
+
+        curStats().raysEnqueued++;
+        totalBytesTransferred += msg.bytesRemaining;
     }
 
     void generateRays(Worker &worker) {
@@ -205,6 +260,9 @@ public:
                     camera, pixel, sample, pathDepth - 1, sampleExtent, sampler);
 
                 enqueueRay(worker, move(ray));
+
+                totalRaysLaunched++;
+                totalCameraRaysLaunched++;
             }
         }
     }
@@ -212,6 +270,9 @@ public:
     void transmitRays() {
         vector<uint64_t> remainingIngress(numWorkers, workerBandwidth / 1000);
         vector<uint64_t> remainingEgress(numWorkers, workerBandwidth / 1000);
+
+        uint64_t allBytesTransferred = 0;
+
         auto iter = inTransit.begin();
         while (iter != inTransit.end()) {
             auto nextIter = next(iter);
@@ -226,20 +287,31 @@ public:
                     uint64_t &srcRemaining = remainingEgress[msg.srcWorkerID];
                     uint64_t &dstRemaining = remainingIngress[msg.dstWorkerID];
                     uint64_t transferBytes = min(msg.bytesRemaining, min(srcRemaining, dstRemaining));
+
                     srcRemaining -= transferBytes;
                     dstRemaining -= transferBytes;
                     msg.bytesRemaining -= transferBytes;
+
+                    allBytesTransferred += transferBytes;
                 }
+            } else if (!msg.delivered) {
+                msg.delivered = true;
+                workers[msg.dstWorkerID].inQueue.push_back(move(msg.ray));
+                curStats().raysDequeued++;
             } else if (msg.ackDelay > 0) {
                 msg.ackDelay--;
-            } else { // Delivered
-                workers[msg.dstWorkerID].inQueue.push_back(move(msg.ray));
+            } else { // Ack delivered
                 workers[msg.srcWorkerID].outstanding--;
                 inTransit.erase(iter);
+
+                totalRaysTransferred++;
             }
 
             iter = nextIter;
         }
+
+        curStats().raysInFlight = inTransit.size();
+        curStats().bytesTransferred = allBytesTransferred;
     }
 
     void processRays(Worker &worker) {
@@ -249,11 +321,12 @@ public:
         }
 
         MemoryArena arena;
+        list<RayStatePtr> rays;
+
         while (worker.inQueue.size() > 0) {
             RayStatePtr origRayPtr = move(worker.inQueue.front());
             worker.inQueue.pop_front();
 
-            deque<RayStatePtr> rays;
             rays.emplace_back(move(origRayPtr));
 
             while (!rays.empty()) {
@@ -296,10 +369,13 @@ public:
 
                     if (bounceRay != nullptr) {
                         rays.push_back(move(bounceRay));
+                        totalRaysLaunched++;
                     }
 
                     if (shadowRay != nullptr) {
                         rays.push_back(move(shadowRay));
+                        totalRaysLaunched++;
+                        totalShadowRaysLaunched++;
                     }
                 }
             }
@@ -307,36 +383,6 @@ public:
         
     }
 
-    void simulate() {
-        bool isWork = true;
-
-        while (isWork) {
-            if (curMS % msPerRebalance == 0) {
-
-            }
-
-            transmitRays();
-
-            for (uint64_t workerID = 0; workerID < numWorkers; workerID++) {
-                processRays(workers[workerID]);
-            }
-
-            for (uint64_t workerID = 0; workerID < numWorkers; workerID++) {
-                const Worker &worker  = workers[workerID];
-                if (worker.inQueue.size() > 0 || worker.outstanding > 0) {
-                    isWork = true;
-                    break;
-                }
-            }
-
-            curMS++;
-
-            cout << curMS << "ms" << endl;
-        }
-    }
-
-    void dump_stats() {
-    }
 private:
     uint64_t numWorkers;
     uint64_t workerBandwidth;
@@ -362,7 +408,7 @@ private:
 
     vector<unique_ptr<CloudBVH>> treelets;
 
-    deque<SimRayMsg> inTransit;
+    list<SimRayMsg> inTransit;
 
     uint64_t curCameraTile {0};
     Point2i nCameraTiles;
@@ -376,7 +422,21 @@ private:
     mt19937 randgen {rd()};
 
     // Stats
-    uint64_t totalRayTransfers = 0;
+    uint64_t totalRaysTransferred = 0;
+    uint64_t totalBytesTransferred = 0;
+    uint64_t totalRaysLaunched = 0;
+    uint64_t totalCameraRaysLaunched = 0;
+    uint64_t totalShadowRaysLaunched = 0;
+
+    struct TimeStats {
+        uint64_t raysInFlight = 0;
+        uint64_t bytesTransferred = 0;
+        uint64_t raysEnqueued = 0;
+        uint64_t raysDequeued = 0;
+    };
+
+    list<TimeStats> statsPerMS;
+    TimeStats &curStats() { return statsPerMS.back(); }
 };
 
 int main(int argc, char const *argv[]) {
