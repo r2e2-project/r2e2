@@ -112,7 +112,8 @@ public:
           transformCache(), sampler(loadSampler()), camera(loadCamera(transformCache)),
           lights(loadLights()), fakeScene(loadFakeScene()),
           sampleBounds(camera->film->GetSampleBounds()),
-          sampleExtent(sampleBounds.Diagonal())
+          sampleExtent(sampleBounds.Diagonal()),
+          statsCSV("/tmp/stats.csv")
     {
         CHECK_EQ(workerToTreelets.size(), numWorkers);
         for (auto &kv : workerToTreelets) {
@@ -137,13 +138,13 @@ public:
         }
 
         setTiles();
+        statsCSV << "ms, rays_in_flight, rays_enqueued, rays_dequeued, rays_launched, rays_completed, bytes_transferred, network_utilization" << endl;
     }
 
     void simulate() {
         bool isWork = true;
-
         while (isWork) {
-            statsPerMS.push_back(TimeStats());
+            curStats = TimeStats();
             if (curMS % msPerRebalance == 0) {
             }
 
@@ -162,6 +163,12 @@ public:
                 }
             }
 
+            statsCSV << curMS << ", " << curStats.raysInFlight << ", " << curStats.raysEnqueued << ", " <<
+                curStats.raysDequeued << ", " <<
+                curStats.raysLaunched << ", " << curStats.raysCompleted << ", " <<
+                curStats.bytesTransferred << ", " <<
+                (double)curStats.bytesTransferred / (double)(numWorkers * (workerBandwidth / 1000)) << endl;
+
             curMS++;
             cout << curMS << "ms" << endl;
         }
@@ -175,17 +182,6 @@ public:
         cout << "Total rays launched: " << totalRaysLaunched << endl;
         cout << "Average transfers/ray: " << (double)totalRaysTransferred / (double)totalRaysLaunched << endl;
         cout << "Average bytes/ray: " << totalBytesTransferred / totalRaysTransferred << endl;
-
-        ofstream csv("/tmp/stats.csv");
-        csv << "ms, rays_in_flight, rays_enqueued, rays_dequeued, bytes_transferred, network_utilization" << endl;
-        uint64_t ms = 0;
-        for (const TimeStats &stats : statsPerMS) {
-            csv << ms << ", " << stats.raysInFlight << ", " << stats.raysEnqueued << ", " <<
-                stats.raysDequeued << ", " << stats.bytesTransferred << ", " <<
-                (double)stats.bytesTransferred / (double)(numWorkers * (workerBandwidth / 1000)) << endl;
-
-            ms++;
-        }
     }
 
 private:
@@ -246,7 +242,7 @@ private:
         worker.outstanding++;
         inTransit.emplace_back(move(msg));
 
-        curStats().raysEnqueued++;
+        curStats.raysEnqueued++;
         totalBytesTransferred += msg.bytesRemaining;
     }
 
@@ -297,7 +293,7 @@ private:
             } else if (!msg.delivered) {
                 msg.delivered = true;
                 workers[msg.dstWorkerID].inQueue.push_back(move(msg.ray));
-                curStats().raysDequeued++;
+                curStats.raysDequeued++;
             } else if (msg.ackDelay > 0) {
                 msg.ackDelay--;
             } else { // Ack delivered
@@ -310,8 +306,8 @@ private:
             iter = nextIter;
         }
 
-        curStats().raysInFlight = inTransit.size();
-        curStats().bytesTransferred = allBytesTransferred;
+        curStats.raysInFlight = inTransit.size();
+        curStats.bytesTransferred = allBytesTransferred;
     }
 
     void processRays(Worker &worker) {
@@ -351,6 +347,8 @@ private:
                             newRay.Ld = hit ? 0.f : newRay.Ld;
                             // FIXME handle samples
                             //samples.emplace_back(*newRayPtr);
+                            totalRaysCompleted++;
+                            curStats.raysCompleted++;
                         } else {
                             rays.push_back(move(newRayPtr));
                         }
@@ -360,6 +358,8 @@ private:
                         newRay.Ld = 0.f;
                         // FIXME handle samples
                         //samples.emplace_back(*newRayPtr);
+                        totalRaysCompleted++;
+                        curStats.raysCompleted++;
                     }
                 } else if (rayPtr->HasHit()) {
                     RayStatePtr bounceRay, shadowRay;
@@ -370,12 +370,14 @@ private:
                     if (bounceRay != nullptr) {
                         rays.push_back(move(bounceRay));
                         totalRaysLaunched++;
+                        curStats.raysLaunched++;
                     }
 
                     if (shadowRay != nullptr) {
                         rays.push_back(move(shadowRay));
                         totalRaysLaunched++;
                         totalShadowRaysLaunched++;
+                        curStats.raysLaunched++;
                     }
                 }
             }
@@ -383,7 +385,6 @@ private:
         
     }
 
-private:
     uint64_t numWorkers;
     uint64_t workerBandwidth;
     uint64_t workerLatency;
@@ -422,21 +423,22 @@ private:
     mt19937 randgen {rd()};
 
     // Stats
+    ofstream statsCSV;
     uint64_t totalRaysTransferred = 0;
     uint64_t totalBytesTransferred = 0;
     uint64_t totalRaysLaunched = 0;
     uint64_t totalCameraRaysLaunched = 0;
     uint64_t totalShadowRaysLaunched = 0;
+    uint64_t totalRaysCompleted = 0;
 
     struct TimeStats {
         uint64_t raysInFlight = 0;
         uint64_t bytesTransferred = 0;
         uint64_t raysEnqueued = 0;
         uint64_t raysDequeued = 0;
-    };
-
-    list<TimeStats> statsPerMS;
-    TimeStats &curStats() { return statsPerMS.back(); }
+        uint64_t raysLaunched = 0;
+        uint64_t raysCompleted = 0;
+    } curStats;
 };
 
 int main(int argc, char const *argv[]) {
