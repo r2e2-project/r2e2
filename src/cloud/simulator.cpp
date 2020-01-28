@@ -151,8 +151,8 @@ public:
     
         tileSize = min(tileSize, safeTileLimit);
     
-        nTiles = Point2i((sampleBounds.Diagonal().x + tileSize - 1) / tileSize,
-                        (sampleBounds.Diagonal().y + tileSize - 1) / tileSize);
+        nCameraTiles = Point2i((sampleBounds.Diagonal().x + tileSize - 1) / tileSize,
+                               (sampleBounds.Diagonal().y + tileSize - 1) / tileSize);
     }
 
     bool shouldGenNewRays(const Worker &worker) {
@@ -242,83 +242,75 @@ public:
         }
     }
 
-    bool processRays(Worker &worker) {
-        bool isWork = false;
+    void processRays(Worker &worker) {
 
         if (shouldGenNewRays(worker)) {
             generateRays(worker);
-            isWork = true;
         }
 
-        if (worker.inQueue.size() > 0) {
-            isWork = true;
+        MemoryArena arena;
+        while (worker.inQueue.size() > 0) {
+            RayStatePtr origRayPtr = move(worker.inQueue.front());
+            worker.inQueue.pop_front();
 
-            MemoryArena arena;
-            while (worker.inQueue.size() > 0) {
-                RayStatePtr origRayPtr = move(worker.inQueue.front());
-                worker.inQueue.pop_front();
+            deque<RayStatePtr> rays;
+            rays.emplace_back(move(origRayPtr));
 
-                deque<RayStatePtr> rays;
-                rays.emplace_back(move(origRayPtr));
+            while (!rays.empty()) {
+                RayStatePtr rayPtr = move(rays.front());
+                rays.pop_front();
 
-                while (!rays.empty()) {
-                    RayStatePtr rayPtr = move(rays.front());
-                    rays.pop_front();
+                const TreeletId rayTreeletId = rayPtr->CurrentTreelet();
+                if (workerToTreelets.at(worker.id).count(rayTreeletId) == 0) {
+                    enqueueRay(worker, move(rayPtr));
+                    continue;
+                }
+                if (!rayPtr->toVisitEmpty()) {
+                    auto newRayPtr = graphics::TraceRay(move(rayPtr),
+                                                        *treelets[rayTreeletId]);
+                    auto &newRay = *newRayPtr;
 
-                    const TreeletId rayTreeletId = rayPtr->CurrentTreelet();
-                    if (workerToTreelets.at(worker.id).count(rayTreeletId) == 0) {
-                        enqueueRay(worker, move(rayPtr));
-                        continue;
-                    }
-                    if (!rayPtr->toVisitEmpty()) {
-                        auto newRayPtr = graphics::TraceRay(move(rayPtr),
-                                                            *treelets[rayTreeletId]);
-                        auto &newRay = *newRayPtr;
+                    const bool hit = newRay.HasHit();
+                    const bool emptyVisit = newRay.toVisitEmpty();
 
-                        const bool hit = newRay.HasHit();
-                        const bool emptyVisit = newRay.toVisitEmpty();
-
-                        if (newRay.IsShadowRay()) {
-                            if (hit || emptyVisit) {
-                                newRay.Ld = hit ? 0.f : newRay.Ld;
-                                // FIXME handle samples
-                                //samples.emplace_back(*newRayPtr);
-                            } else {
-                                rays.push_back(move(newRayPtr));
-                            }
-                        } else if (!emptyVisit || hit) {
-                            rays.push_back(move(newRayPtr));
-                        } else if (emptyVisit) {
-                            newRay.Ld = 0.f;
+                    if (newRay.IsShadowRay()) {
+                        if (hit || emptyVisit) {
+                            newRay.Ld = hit ? 0.f : newRay.Ld;
                             // FIXME handle samples
                             //samples.emplace_back(*newRayPtr);
+                        } else {
+                            rays.push_back(move(newRayPtr));
                         }
-                    } else if (rayPtr->HasHit()) {
-                        RayStatePtr bounceRay, shadowRay;
-                        tie(bounceRay, shadowRay) =
-                            graphics::ShadeRay(move(rayPtr), *treelets[rayTreeletId],
-                                               lights, sampleExtent, sampler, arena);
+                    } else if (!emptyVisit || hit) {
+                        rays.push_back(move(newRayPtr));
+                    } else if (emptyVisit) {
+                        newRay.Ld = 0.f;
+                        // FIXME handle samples
+                        //samples.emplace_back(*newRayPtr);
+                    }
+                } else if (rayPtr->HasHit()) {
+                    RayStatePtr bounceRay, shadowRay;
+                    tie(bounceRay, shadowRay) =
+                        graphics::ShadeRay(move(rayPtr), *treelets[rayTreeletId],
+                                           lights, sampleExtent, sampler, arena);
 
-                        if (bounceRay != nullptr) {
-                            rays.push_back(move(bounceRay));
-                        }
+                    if (bounceRay != nullptr) {
+                        rays.push_back(move(bounceRay));
+                    }
 
-                        if (shadowRay != nullptr) {
-                            rays.push_back(move(shadowRay));
-                        }
+                    if (shadowRay != nullptr) {
+                        rays.push_back(move(shadowRay));
                     }
                 }
             }
         }
-
-        return isWork;
+        
     }
 
     void simulate() {
         bool isWork = true;
 
         while (isWork) {
-            isWork = false;
             if (curMS % msPerRebalance == 0) {
 
             }
@@ -326,10 +318,20 @@ public:
             transmitRays();
 
             for (uint64_t workerID = 0; workerID < numWorkers; workerID++) {
-                isWork |= processRays(workers[workerID]);
+                processRays(workers[workerID]);
+            }
+
+            for (uint64_t workerID = 0; workerID < numWorkers; workerID++) {
+                const Worker &worker  = workers[workerID];
+                if (worker.inQueue.size() > 0 || worker.outstanding > 0) {
+                    isWork = true;
+                    break;
+                }
             }
 
             curMS++;
+
+            cout << curMS << "ms" << endl;
         }
     }
 
@@ -356,7 +358,6 @@ private:
 
     Bounds2i sampleBounds;
     const Vector2i sampleExtent;
-    Point2i nTiles;
     int tileSize;
 
     vector<unique_ptr<CloudBVH>> treelets;
