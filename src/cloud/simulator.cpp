@@ -78,6 +78,7 @@ struct Worker {
     uint64_t id;
 
     list<RayStatePtr> inQueue;
+    list<SimRayMsg> inTransit;
     uint64_t outstanding = 0;
 };
 
@@ -138,7 +139,7 @@ public:
         }
 
         setTiles();
-        statsCSV << "ms, rays_in_flight, rays_enqueued, rays_dequeued, rays_launched, rays_completed, bytes_transferred, network_utilization" << endl;
+        statsCSV << "ms, rays_in_flight, rays_enqueued, rays_dequeued, camera_rays_launched, bounce_rays_launched, shadow_rays_launched, rays_completed, bytes_transferred, network_utilization" << endl;
     }
 
     void simulate() {
@@ -165,7 +166,10 @@ public:
 
             statsCSV << curMS << ", " << curStats.raysInFlight << ", " << curStats.raysEnqueued << ", " <<
                 curStats.raysDequeued << ", " <<
-                curStats.raysLaunched << ", " << curStats.raysCompleted << ", " <<
+                curStats.cameraRaysLaunched << ", " <<
+                curStats.bounceRaysLaunched << ", " <<
+                curStats.shadowRaysLaunched << ", " <<
+                curStats.raysCompleted << ", " <<
                 curStats.bytesTransferred << ", " <<
                 (double)curStats.bytesTransferred / (double)(numWorkers * (workerBandwidth / 1000)) << endl;
 
@@ -240,7 +244,7 @@ private:
         msg.dstWorkerID = getNextWorker(msg.ray);
 
         worker.outstanding++;
-        inTransit.emplace_back(move(msg));
+        worker.inTransit.emplace_back(move(msg));
 
         curStats.raysEnqueued++;
         totalBytesTransferred += msg.bytesRemaining;
@@ -257,6 +261,7 @@ private:
 
                 enqueueRay(worker, move(ray));
 
+                curStats.cameraRaysLaunched++;
                 totalRaysLaunched++;
                 totalCameraRaysLaunched++;
             }
@@ -266,47 +271,67 @@ private:
     void transmitRays() {
         vector<uint64_t> remainingIngress(numWorkers, workerBandwidth / 1000);
         vector<uint64_t> remainingEgress(numWorkers, workerBandwidth / 1000);
+        list<pair<list<SimRayMsg>::iterator, list<SimRayMsg>::iterator>> activeWork;
+        for (uint64_t workerID = 0; workerID < numWorkers; workerID++) {
+            Worker &worker = workers[workerID];
+            if (!worker.inTransit.empty()) {
+                activeWork.emplace_back(worker.inTransit.begin(), worker.inTransit.end());
+                curStats.raysInFlight += workers[workerID].inTransit.size();
+            }
+        }
 
         uint64_t allBytesTransferred = 0;
 
-        auto iter = inTransit.begin();
-        while (iter != inTransit.end()) {
-            auto nextIter = next(iter);
+        while (activeWork.size() > 0) {
+            auto iter = activeWork.begin();
+            while (iter != activeWork.end()) {
+                auto nextIter = next(iter);
 
-            auto &msg = *iter;
+                auto &cur = iter->first;
+                auto nextInQueue = next(cur);
+                auto &end = iter->second;
 
-            if (msg.deliveryDelay > 0) {
-                msg.deliveryDelay--;
-            } else if (msg.bytesRemaining > 0) {
-                const Worker &dstWorker = workers[msg.dstWorkerID];
-                if (dstWorker.inQueue.size() + dstWorker.outstanding < maxRays * 2) {
-                    uint64_t &srcRemaining = remainingEgress[msg.srcWorkerID];
-                    uint64_t &dstRemaining = remainingIngress[msg.dstWorkerID];
-                    uint64_t transferBytes = min(msg.bytesRemaining, min(srcRemaining, dstRemaining));
+                auto &msg = *cur;
+                uint64_t srcWorkerID = msg.srcWorkerID;
+                uint64_t dstWorkerID = msg.dstWorkerID;
 
-                    srcRemaining -= transferBytes;
-                    dstRemaining -= transferBytes;
-                    msg.bytesRemaining -= transferBytes;
+                if (msg.bytesRemaining > 0) {
+                    const Worker &dstWorker = workers[msg.dstWorkerID];
+                    if (dstWorker.inQueue.size() + dstWorker.outstanding < maxRays * 2) {
+                        uint64_t &srcRemaining = remainingEgress[srcWorkerID];
+                        uint64_t &dstRemaining = remainingIngress[dstWorkerID];
+                        uint64_t transferBytes = min(msg.bytesRemaining, min(srcRemaining, dstRemaining));
 
-                    allBytesTransferred += transferBytes;
+                        srcRemaining -= transferBytes;
+                        dstRemaining -= transferBytes;
+                        msg.bytesRemaining -= transferBytes;
+
+                        allBytesTransferred += transferBytes;
+                    }
+                } else if (msg.deliveryDelay > 0) {
+                    msg.deliveryDelay--;
+                } else if (!msg.delivered) {
+                    msg.delivered = true;
+                    workers[msg.dstWorkerID].inQueue.push_back(move(msg.ray));
+                    curStats.raysDequeued++;
+                } else if (msg.ackDelay > 0) {
+                    msg.ackDelay--;
+                } else { // Ack delivered
+                    workers[srcWorkerID].outstanding--;
+                    workers[srcWorkerID].inTransit.erase(cur);
+
+                    totalRaysTransferred++;
                 }
-            } else if (!msg.delivered) {
-                msg.delivered = true;
-                workers[msg.dstWorkerID].inQueue.push_back(move(msg.ray));
-                curStats.raysDequeued++;
-            } else if (msg.ackDelay > 0) {
-                msg.ackDelay--;
-            } else { // Ack delivered
-                workers[msg.srcWorkerID].outstanding--;
-                inTransit.erase(iter);
 
-                totalRaysTransferred++;
+                cur = nextInQueue;
+                if (cur == end || remainingEgress[srcWorkerID] == 0) {
+                    activeWork.erase(iter);
+                }
+
+                iter = nextIter;
             }
-
-            iter = nextIter;
         }
 
-        curStats.raysInFlight = inTransit.size();
         curStats.bytesTransferred = allBytesTransferred;
     }
 
@@ -370,14 +395,14 @@ private:
                     if (bounceRay != nullptr) {
                         rays.push_back(move(bounceRay));
                         totalRaysLaunched++;
-                        curStats.raysLaunched++;
+                        curStats.bounceRaysLaunched++;
                     }
 
                     if (shadowRay != nullptr) {
                         rays.push_back(move(shadowRay));
                         totalRaysLaunched++;
                         totalShadowRaysLaunched++;
-                        curStats.raysLaunched++;
+                        curStats.shadowRaysLaunched++;
                     }
                 }
             }
@@ -436,7 +461,9 @@ private:
         uint64_t bytesTransferred = 0;
         uint64_t raysEnqueued = 0;
         uint64_t raysDequeued = 0;
-        uint64_t raysLaunched = 0;
+        uint64_t cameraRaysLaunched = 0;
+        uint64_t shadowRaysLaunched = 0;
+        uint64_t bounceRaysLaunched = 0;
         uint64_t raysCompleted = 0;
     } curStats;
 };
