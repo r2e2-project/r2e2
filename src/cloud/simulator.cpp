@@ -314,6 +314,7 @@ private:
                     msg.delivered = true;
                     workers[msg.dstWorkerID].inQueue.push_back(move(msg.ray));
                     curStats.raysDequeued++;
+                    msg.ackDelay--;
                 } else if (msg.ackDelay > 0) {
                     msg.ackDelay--;
                 } else { // Ack delivered
