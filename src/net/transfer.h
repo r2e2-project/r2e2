@@ -1,5 +1,5 @@
-#ifndef PBRT_CLOUD_TRANSFER_H
-#define PBRT_CLOUD_TRANSFER_H
+#ifndef PBRT_CNET_TRANSFER_H
+#define PBRT_CNET_TRANSFER_H
 
 #include <atomic>
 #include <condition_variable>
@@ -13,23 +13,15 @@
 #include <string>
 
 #include "net/address.h"
-#include "net/s3.h"
-#include "net/secure_socket.h"
 #include "net/socket.h"
-#include "storage/backend_gs.h"
-#include "storage/backend_s3.h"
 #include "util/eventfd.h"
 #include "util/optional.h"
-
-namespace pbrt {
-
-constexpr std::chrono::seconds ADDR_UPDATE_INTERVAL{25};
 
 class TransferAgent {
   public:
     enum class Task { Download, Upload };
 
-  private:
+  protected:
     struct Action {
         uint64_t id;
         Task task;
@@ -43,46 +35,29 @@ class TransferAgent {
 
     uint64_t nextId{1};
 
-    struct S3Config {
-        AWSCredentials credentials{};
-        std::string region{};
-        std::string bucket{};
-        std::string prefix{};
-
-        std::string endpoint{};
-        std::atomic<Address> address{Address{}};
-    } clientConfig;
-
     static constexpr size_t MAX_THREADS{8};
-    static constexpr size_t MAX_REQUESTS_ON_CONNECTION{1};
-
-    const size_t threadCount;
-
-    std::chrono::steady_clock::time_point lastAddrUpdate{};
+    const size_t threadCount{MAX_THREADS};
 
     std::vector<std::thread> threads{};
     std::atomic<bool> terminated{false};
-    std::mutex resultsMutex;
-    std::mutex outstandingMutex;
-    std::condition_variable cv;
+    std::mutex resultsMutex{};
+    std::mutex outstandingMutex{};
+    std::condition_variable cv{};
 
     std::queue<Action> outstanding{};
     std::queue<std::pair<uint64_t, std::string>> results{};
 
-    HTTPRequest getRequest(const Action& action);
-    void doAction(Action&& action);
-
-    void workerThread(const size_t threadId);
-
     EventFD eventFD{false};
 
+    virtual void doAction(Action&& action);
+    virtual void workerThread(const size_t threadId) = 0;
+
   public:
-    TransferAgent(const std::unique_ptr<StorageBackend>& backend,
-                  const size_t threadCount = MAX_THREADS);
+    TransferAgent() {}
 
     uint64_t requestDownload(const std::string& key);
     uint64_t requestUpload(const std::string& key, std::string&& data);
-    ~TransferAgent();
+    virtual ~TransferAgent();
 
     EventFD& eventfd() { return eventFD; }
 
@@ -111,6 +86,4 @@ size_t TransferAgent::tryPopBulk(std::back_insert_iterator<Container> insertIt,
     return count;
 }
 
-}  // namespace pbrt
-
-#endif /* PBRT_CLOUD_TRANSFER_H */
+#endif /* PBRT_NET_TRANSFER_H */

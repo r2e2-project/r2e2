@@ -16,7 +16,6 @@
 #include "cloud/lambda.h"
 #include "cloud/raystate.h"
 #include "cloud/stats.h"
-#include "cloud/transfer.h"
 #include "core/camera.h"
 #include "core/geometry.h"
 #include "core/light.h"
@@ -26,6 +25,8 @@
 #include "execution/meow/message.h"
 #include "net/address.h"
 #include "net/s3.h"
+#include "net/transfer.h"
+#include "net/transfer_s3.h"
 #include "storage/backend.h"
 #include "util/histogram.h"
 #include "util/seq_no_set.h"
@@ -201,7 +202,7 @@ class LambdaWorker {
 
     /*** Transfer Agent *******************************************************/
 
-    TransferAgent transferAgent;
+    std::unique_ptr<TransferAgent> transferAgent;
 
     ////////////////////////////////////////////////////////////////////////////
     // Stats                                                                  //

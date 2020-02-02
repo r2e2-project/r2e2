@@ -3,10 +3,12 @@
 
 #include <sys/eventfd.h>
 #include <unistd.h>
+
 #include <cerrno>
 #include <cstdint>
 #include <string>
 
+#include "util/exception.h"
 #include "util/file_descriptor.h"
 
 class EventFD : public FileDescriptor {

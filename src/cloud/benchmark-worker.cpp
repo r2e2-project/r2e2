@@ -7,7 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "cloud/transfer.h"
+#include "net/transfer.h"
+#include "net/transfer_s3.h"
 #include "storage/backend.h"
 #include "util/eventfd.h"
 #include "util/histogram.h"
@@ -54,7 +55,8 @@ int main(const int argc, const char* argv[]) {
     auto storageBackend = StorageBackend::create_backend(backendUri);
 
     Poller poller;
-    TransferAgent agent{storageBackend};
+    unique_ptr<TransferAgent> agent =
+        make_unique<S3TransferAgent>(storageBackend, threads);
 
     const auto start = steady_clock::now();
     TimerFD printStatsTimer{1s};
@@ -78,7 +80,7 @@ int main(const int argc, const char* argv[]) {
                            to_string(currentIndex++);
 
         outstandingTasks.emplace(
-            agent.requestUpload(key, randomString(bagSize)),
+            agent->requestUpload(key, randomString(bagSize)),
             make_pair(Action::Upload, key));
     } else {
         /* first we need to upload a bunch of things */
@@ -88,7 +90,7 @@ int main(const int argc, const char* argv[]) {
                                to_string(i);
 
             outstandingTasks.emplace(
-                agent.requestUpload(key, randomString(bagSize)),
+                agent->requestUpload(key, randomString(bagSize)),
                 make_pair(Action::Upload, key));
         }
     }
@@ -120,14 +122,14 @@ int main(const int argc, const char* argv[]) {
         []() { return true; }, []() { throw runtime_error("statstimer"); }));
 
     poller.add_action(Poller::Action(
-        agent.eventfd(), Direction::In,
+        agent->eventfd(), Direction::In,
         [&]() {
-            if (!agent.eventfd().read_event()) {
+            if (!agent->eventfd().read_event()) {
                 return ResultType::Continue;
             }
 
             vector<pair<uint64_t, string>> tasks;
-            agent.tryPopBulk(back_inserter(tasks));
+            agent->tryPopBulk(back_inserter(tasks));
 
             for (const auto& task : tasks) {
                 const auto& oa = outstandingTasks.at(task.first);
@@ -141,11 +143,11 @@ int main(const int argc, const char* argv[]) {
 
                     if (recv) {
                         outstandingTasks.emplace(
-                            agent.requestDownload(key),
+                            agent->requestDownload(key),
                             make_pair(Action::Download, key));
                     } else if (send) {
                         outstandingTasks.emplace(
-                            agent.requestUpload(key, randomString(bagSize)),
+                            agent->requestUpload(key, randomString(bagSize)),
                             make_pair(Action::Upload, key));
                     }
 
@@ -157,11 +159,11 @@ int main(const int argc, const char* argv[]) {
 
                     if (send) {
                         outstandingTasks.emplace(
-                            agent.requestUpload(key, randomString(bagSize)),
+                            agent->requestUpload(key, randomString(bagSize)),
                             make_pair(Action::Upload, key));
                     } else if (recv) {
                         outstandingTasks.emplace(
-                            agent.requestDownload(key),
+                            agent->requestDownload(key),
                             make_pair(Action::Download, key));
                     }
 
@@ -178,14 +180,14 @@ int main(const int argc, const char* argv[]) {
                                            "/B" + to_string(currentIndex++);
 
                         outstandingTasks.emplace(
-                            agent.requestUpload(key, randomString(bagSize)),
+                            agent->requestUpload(key, randomString(bagSize)),
                             make_pair(Action::Upload, key));
                         break;
                     }
 
                     case Action::Download:
                         outstandingTasks.emplace(
-                            agent.requestDownload(key),
+                            agent->requestDownload(key),
                             make_pair(Action::Download, key));
                         break;
                     }

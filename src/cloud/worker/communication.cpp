@@ -1,5 +1,4 @@
 #include "cloud/lambda-worker.h"
-
 #include "messages/utils.h"
 
 using namespace std;
@@ -129,7 +128,7 @@ ResultType LambdaWorker::handleSealedBags() {
         bag.data.shrink_to_fit();
         logBag(BagAction::Submitted, bag.info);
 
-        const auto id = transferAgent.requestUpload(
+        const auto id = transferAgent->requestUpload(
             bag.info.str(rayBagsKeyPrefix), move(bag.data));
 
         pendingRayBags[id] = make_pair(Task::Upload, bag.info);
@@ -146,7 +145,7 @@ ResultType LambdaWorker::handleSampleBags() {
         RayBag& bag = sampleBags.front();
         bag.data.erase(bag.info.bagSize);
 
-        const auto id = transferAgent.requestUpload(
+        const auto id = transferAgent->requestUpload(
             bag.info.str(rayBagsKeyPrefix), move(bag.data));
 
         pendingRayBags[id] = make_pair(Task::Upload, bag.info);
@@ -192,12 +191,12 @@ ResultType LambdaWorker::handleTransferResults() {
     protobuf::RayBags enqueuedProto;
     protobuf::RayBags dequeuedProto;
 
-    if (!transferAgent.eventfd().read_event()) {
+    if (!transferAgent->eventfd().read_event()) {
         return ResultType::Continue;
     }
 
     vector<pair<uint64_t, string>> actions;
-    transferAgent.tryPopBulk(back_inserter(actions));
+    transferAgent->tryPopBulk(back_inserter(actions));
 
     for (auto& action : actions) {
         auto infoIt = pendingRayBags.find(action.first);

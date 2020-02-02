@@ -1,60 +1,52 @@
-#include "cloud/transfer.h"
+#include "transfer_s3.h"
 
 #include "net/http_response_parser.h"
 #include "util/optional.h"
 
 using namespace std;
 using namespace chrono;
-using namespace pbrt;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
-TransferAgent::TransferAgent(const unique_ptr<StorageBackend>& backend,
-                             const size_t threadCount)
-    : threadCount(threadCount) {
+S3TransferAgent::S3Config::S3Config(const unique_ptr<StorageBackend>& backend) {
+    auto s3Backend = dynamic_cast<S3StorageBackend*>(backend.get());
+
+    if (s3Backend != nullptr) {
+        credentials = s3Backend->client().credentials();
+        region = s3Backend->client().config().region;
+        bucket = s3Backend->bucket();
+        prefix = s3Backend->prefix();
+        endpoint = S3::endpoint(region, bucket);
+        address.store(Address{endpoint, "http"});
+    } else {
+        auto gsBackend = dynamic_cast<GoogleStorageBackend*>(backend.get());
+
+        if (gsBackend == nullptr) {
+            throw runtime_error("unsupported backend");
+        }
+
+        credentials = gsBackend->client().credentials();
+        region = gsBackend->client().config().region;
+        bucket = gsBackend->bucket();
+        prefix = gsBackend->prefix();
+        endpoint = gsBackend->client().config().endpoint;
+        address.store(Address{endpoint, "http"});
+    }
+}
+
+S3TransferAgent::S3TransferAgent(const unique_ptr<StorageBackend>& backend,
+                                 const size_t threadCount)
+    : TransferAgent(), clientConfig(backend) {
     if (threadCount == 0) {
         throw runtime_error("thread count cannot be zero");
     }
 
-    auto s3Backend = dynamic_cast<S3StorageBackend*>(backend.get());
-
-    if (s3Backend != nullptr) {
-        clientConfig.credentials = s3Backend->client().credentials();
-        clientConfig.region = s3Backend->client().config().region;
-        clientConfig.bucket = s3Backend->bucket();
-        clientConfig.prefix = s3Backend->prefix();
-
-        clientConfig.endpoint =
-            S3::endpoint(clientConfig.region, clientConfig.bucket);
-
-        clientConfig.address.store(Address{clientConfig.endpoint, "http"});
-    } else {
-        auto gsBackend = dynamic_cast<GoogleStorageBackend*>(backend.get());
-
-        if (gsBackend != nullptr) {
-            clientConfig.credentials = gsBackend->client().credentials();
-            clientConfig.region = gsBackend->client().config().region;
-            clientConfig.bucket = gsBackend->bucket();
-            clientConfig.prefix = gsBackend->prefix();
-            clientConfig.endpoint = gsBackend->client().config().endpoint;
-            clientConfig.address.store(Address{clientConfig.endpoint, "http"});
-        } else {
-            throw runtime_error("unsupported backend");
-        }
-    }
-
     for (size_t i = 0; i < threadCount; i++) {
-        threads.emplace_back(&TransferAgent::workerThread, this, i);
+        threads.emplace_back(&S3TransferAgent::workerThread, this, i);
     }
 }
 
-TransferAgent::~TransferAgent() {
-    terminated = true;
-    cv.notify_all();
-    for (auto& t : threads) t.join();
-}
-
-HTTPRequest TransferAgent::getRequest(const Action& action) {
+HTTPRequest S3TransferAgent::getRequest(const Action& action) {
     switch (action.task) {
     case Task::Upload:
         return S3PutRequest(clientConfig.credentials, clientConfig.endpoint,
@@ -82,7 +74,7 @@ HTTPRequest TransferAgent::getRequest(const Action& action) {
         y;                      \
     }
 
-void TransferAgent::workerThread(const size_t threadId) {
+void S3TransferAgent::workerThread(const size_t threadId) {
     constexpr milliseconds backoff{50};
     size_t tryCount = 0;
 
@@ -186,38 +178,11 @@ void TransferAgent::workerThread(const size_t threadId) {
     }
 }
 
-void TransferAgent::doAction(Action&& action) {
+void S3TransferAgent::doAction(Action&& action) {
     if (steady_clock::now() - lastAddrUpdate >= ADDR_UPDATE_INTERVAL) {
         clientConfig.address.store(Address{clientConfig.endpoint, "http"});
         lastAddrUpdate = steady_clock::now();
     }
 
-    {
-        unique_lock<mutex> lock{outstandingMutex};
-        outstanding.push(move(action));
-    }
-
-    cv.notify_one();
-    return;
-}
-
-uint64_t TransferAgent::requestDownload(const string& key) {
-    doAction({nextId, Task::Download, key, string()});
-    return nextId++;
-}
-
-uint64_t TransferAgent::requestUpload(const string& key, string&& data) {
-    doAction({nextId, Task::Upload, key, move(data)});
-    return nextId++;
-}
-
-bool TransferAgent::tryPop(pair<uint64_t, string>& output) {
-    unique_lock<mutex> lock{resultsMutex};
-
-    if (results.empty()) return false;
-
-    output = move(results.front());
-    results.pop();
-
-    return true;
+    TransferAgent::doAction(move(action));
 }

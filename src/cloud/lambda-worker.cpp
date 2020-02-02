@@ -25,10 +25,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     : config(config),
       coordinatorAddr(coordinatorIP, coordinatorPort),
       workingDirectory("/tmp/pbrt-worker"),
-      storageBackend(StorageBackend::create_backend(storageUri)),
-      transferAgent(storageBackend) {
+      storageBackend(StorageBackend::create_backend(storageUri)) {
     // let the program handle SIGPIPE
     signal(SIGPIPE, SIG_IGN);
+
+    transferAgent = make_unique<S3TransferAgent>(storageBackend);
 
     cerr << "* starting worker in " << workingDirectory.name() << endl;
     roost::chdir(workingDirectory.name());
@@ -88,20 +89,20 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         [this]() { return !sealedBags.empty(); },
         []() { throw runtime_error("send queue failed"); }));
 
-    loop.poller().add_action(
-        Poller::Action(sampleBagsTimer, Direction::In,
-                       bind(&LambdaWorker::handleSampleBags, this),
-                       [this]() { return !sampleBags.empty(); },
-                       []() { throw runtime_error("sample bags failed"); }));
-
-    loop.poller().add_action(
-        Poller::Action(alwaysOnFd, Direction::Out,
-                       bind(&LambdaWorker::handleReceiveQueue, this),
-                       [this]() { return !receiveQueue.empty(); },
-                       []() { throw runtime_error("receive queue failed"); }));
+    loop.poller().add_action(Poller::Action(
+        sampleBagsTimer, Direction::In,
+        bind(&LambdaWorker::handleSampleBags, this),
+        [this]() { return !sampleBags.empty(); },
+        []() { throw runtime_error("sample bags failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        transferAgent.eventfd(), Direction::In,
+        alwaysOnFd, Direction::Out,
+        bind(&LambdaWorker::handleReceiveQueue, this),
+        [this]() { return !receiveQueue.empty(); },
+        []() { throw runtime_error("receive queue failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        transferAgent->eventfd(), Direction::In,
         bind(&LambdaWorker::handleTransferResults, this),
         [this]() { return !pendingRayBags.empty(); },
         []() { throw runtime_error("handle transfer results failed"); }));

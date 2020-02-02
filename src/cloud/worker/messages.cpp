@@ -1,5 +1,4 @@
 #include "cloud/lambda-worker.h"
-
 #include "messages/utils.h"
 
 using namespace std;
@@ -70,7 +69,7 @@ void LambdaWorker::processMessage(const Message& message) {
         for (const protobuf::RayBagInfo& item : proto.items()) {
             RayBagInfo info{from_protobuf(item)};
             const auto id =
-                transferAgent.requestDownload(info.str(rayBagsKeyPrefix));
+                transferAgent->requestDownload(info.str(rayBagsKeyPrefix));
             pendingRayBags[id] = make_pair(Task::Download, info);
 
             logBag(BagAction::Requested, info);
