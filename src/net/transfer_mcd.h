@@ -207,7 +207,7 @@ class TransferAgent : public ::TransferAgent {
     void workerThread(const size_t threadId) override;
 
   public:
-    TransferAgent(std::vector<Address>&& servers,
+    TransferAgent(const std::vector<Address>& servers,
                   const size_t threadCount = MAX_THREADS);
 };
 

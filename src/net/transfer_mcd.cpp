@@ -7,9 +7,9 @@ using namespace chrono;
 
 namespace memcached {
 
-TransferAgent::TransferAgent(vector<Address> &&s, const size_t tc)
+TransferAgent::TransferAgent(const vector<Address> &s, const size_t tc)
     : ::TransferAgent(),
-      servers(move(s)),
+      servers(s),
       outstandings(servers.size()),
       outstandingMutexes(servers.size()),
       cvs(servers.size()) {
