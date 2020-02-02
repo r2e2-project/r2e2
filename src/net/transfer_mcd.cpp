@@ -1,13 +1,14 @@
-#include "memcached.h"
+#include "transfer_mcd.h"
 
 #include "util/optional.h"
 
 using namespace std;
 using namespace chrono;
-using namespace memcached;
 
-TransferAgent::TransferAgent(const size_t threadCount)
-    : threadCount(threadCount) {
+namespace memcached {
+
+TransferAgent::TransferAgent(const size_t tc) : ::TransferAgent() {
+    threadCount = tc;
     if (threadCount == 0) {
         throw runtime_error("thread count cannot be zero");
     }
@@ -15,12 +16,6 @@ TransferAgent::TransferAgent(const size_t threadCount)
     for (size_t i = 0; i < threadCount; i++) {
         threads.emplace_back(&TransferAgent::workerThread, this, i);
     }
-}
-
-TransferAgent::~TransferAgent() {
-    terminated = true;
-    cv.notify_all();
-    for (auto& t : threads) t.join();
 }
 
 #define TRY_OPERATION(x, y)     \
@@ -130,33 +125,4 @@ void TransferAgent::workerThread(const size_t threadId) {
     }
 }
 
-void TransferAgent::doAction(Action&& action) {
-    {
-        unique_lock<mutex> lock{outstandingMutex};
-        outstanding.push(move(action));
-    }
-
-    cv.notify_one();
-    return;
-}
-
-uint64_t TransferAgent::requestDownload(const string& key) {
-    doAction({nextId, Task::Download, key, string()});
-    return nextId++;
-}
-
-uint64_t TransferAgent::requestUpload(const string& key, string&& data) {
-    doAction({nextId, Task::Upload, key, move(data)});
-    return nextId++;
-}
-
-bool TransferAgent::tryPop(pair<uint64_t, string>& output) {
-    unique_lock<mutex> lock{resultsMutex};
-
-    if (results.empty()) return false;
-
-    output = move(results.front());
-    results.pop();
-
-    return true;
-}
+}  // namespace memcached

@@ -1,26 +1,9 @@
 #ifndef PBRT_NET_MEMCACHED_H
 #define PBRT_NET_MEMCACHED_H
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <cstdint>
 #include <cstring>
-#include <future>
-#include <iterator>
-#include <limits>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <queue>
-#include <string>
 
-#include "net/address.h"
-#include "net/s3.h"
-#include "net/secure_socket.h"
-#include "net/socket.h"
-#include "util/eventfd.h"
-#include "util/optional.h"
+#include "transfer.h"
 #include "util/tokenize.h"
 
 namespace memcached {
@@ -212,42 +195,13 @@ class ResponseParser {
     void pop() { responses_.pop(); }
 };
 
-class TransferAgent {
-  public:
-    enum class Task { Download, Upload };
-
-  private:
-    struct Action {
-        uint64_t id;
-        Task task;
-        std::string key;
-        std::string data;
-
-        Action(const uint64_t id, const Task task, const std::string& key,
-               std::string&& data)
-            : id(id), task(task), key(key), data(move(data)) {}
-    };
-
-    uint64_t nextId{1};
-
+class TransferAgent : public ::TransferAgent {
+  protected:
     Address address{"171.67.76.25", 11211};
 
-    static constexpr size_t MAX_THREADS{8};
     static constexpr size_t MAX_REQUESTS_ON_CONNECTION{10000};
 
-    const size_t threadCount;
-
-    std::vector<std::thread> threads{};
-    std::atomic<bool> terminated{false};
-    std::mutex resultsMutex;
-    std::mutex outstandingMutex;
-    std::condition_variable cv;
-
-    std::queue<Action> outstanding{};
-    std::queue<std::pair<uint64_t, std::string>> results{};
-
-    void doAction(Action&& action);
-    void workerThread(const size_t threadId);
+    void workerThread(const size_t threadId) override;
     EventFD eventFD{false};
 
   public:

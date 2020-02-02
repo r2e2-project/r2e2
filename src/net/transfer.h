@@ -36,7 +36,7 @@ class TransferAgent {
     uint64_t nextId{1};
 
     static constexpr size_t MAX_THREADS{8};
-    const size_t threadCount{MAX_THREADS};
+    size_t threadCount{MAX_THREADS};
 
     std::vector<std::thread> threads{};
     std::atomic<bool> terminated{false};
