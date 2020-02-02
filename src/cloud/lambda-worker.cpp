@@ -7,6 +7,8 @@
 #include "core/light.h"
 #include "core/sampler.h"
 #include "messages/utils.h"
+#include "net/transfer_mcd.h"
+#include "net/transfer_s3.h"
 
 using namespace std;
 using namespace chrono;
@@ -29,7 +31,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     // let the program handle SIGPIPE
     signal(SIGPIPE, SIG_IGN);
 
-    transferAgent = make_unique<S3TransferAgent>(storageBackend);
+    if (!config.memcachedServers.empty()) {
+        transferAgent = make_unique<memcached::TransferAgent>(
+            move(config.memcachedServers));
+    } else {
+        transferAgent = make_unique<S3TransferAgent>(storageBackend);
+    }
 
     cerr << "* starting worker in " << workingDirectory.name() << endl;
     roost::chdir(workingDirectory.name());
@@ -157,7 +164,8 @@ void usage(const char* argv0, int exitCode) {
          << "  -S --samples N             number of samples per pixel" << endl
          << "  -M --max-depth N           maximum path depth"
          << "  -L --log-rays RATE         log ray actions" << endl
-         << "  -L --log-bags RATE         log bag actions" << endl
+         << "  -B --log-bags RATE         log bag actions" << endl
+         << "  -d --memcached-server      address for memcached" << endl
          << "  -h --help                  show help information" << endl;
 
     exit(exitCode);
@@ -175,6 +183,8 @@ int main(int argc, char* argv[]) {
     float rayLogRate = 0.0;
     float bagLogRate = 0.0;
 
+    vector<Address> memcachedServers;
+
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
         {"ip", required_argument, nullptr, 'i'},
@@ -184,13 +194,14 @@ int main(int argc, char* argv[]) {
         {"log-rays", required_argument, nullptr, 'L'},
         {"log-bags", required_argument, nullptr, 'B'},
         {"directional", no_argument, nullptr, 'I'},
+        {"memcached-server", required_argument, nullptr, 'd'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
 
     while (true) {
-        const int opt =
-            getopt_long(argc, argv, "p:i:s:S:M:L:B:hI", long_options, nullptr);
+        const int opt = getopt_long(argc, argv, "p:i:s:S:M:L:B:d:hI",
+                                    long_options, nullptr);
 
         if (opt == -1) break;
 
@@ -205,6 +216,15 @@ int main(int argc, char* argv[]) {
         case 'B': bagLogRate = stof(optarg); break;
         case 'I': PbrtOptions.directionalTreelets = true; break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
+
+        case 'd': {
+            string host;
+            uint16_t port = 11211;
+            tie(host, port) = Address::decompose(optarg);
+            memcachedServers.emplace_back(host, port);
+            break;
+        }
+
         default: usage(argv[0], EXIT_FAILURE);
         }
         // clang-format on
@@ -218,7 +238,7 @@ int main(int argc, char* argv[]) {
 
     unique_ptr<LambdaWorker> worker;
     WorkerConfiguration config{samplesPerPixel, maxPathDepth, rayLogRate,
-                               bagLogRate};
+                               bagLogRate, move(memcachedServers)};
 
     try {
         worker =

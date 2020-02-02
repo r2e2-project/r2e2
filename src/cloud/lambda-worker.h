@@ -26,7 +26,6 @@
 #include "net/address.h"
 #include "net/s3.h"
 #include "net/transfer.h"
-#include "net/transfer_s3.h"
 #include "storage/backend.h"
 #include "util/histogram.h"
 #include "util/seq_no_set.h"
@@ -49,6 +48,7 @@ struct WorkerConfiguration {
     int maxPathDepth;
     float rayLogRate;
     float bagLogRate;
+    std::vector<Address> memcachedServers;
 };
 
 /* Relationship between different queues in LambdaWorker:
