@@ -28,6 +28,11 @@ TransferAgent::TransferAgent(const vector<Address> &s, const size_t tc)
     }
 }
 
+TransferAgent::~TransferAgent() {
+    terminated = true;
+    for (auto &cv : cvs) cv.notify_all();
+}
+
 size_t getHash(const string &key) {
     size_t result = 5381;
     for (const char c : key) result = ((result << 5) + result) + c;
@@ -63,10 +68,10 @@ void TransferAgent::workerThread(const size_t threadId) {
 
     const size_t serverId = threadId % servers.size();
 
-    const Address address = servers[serverId];
-    auto &outstanding = outstandings[serverId];
-    auto &outstandingMutex = outstandingMutexes[serverId];
-    auto &cv = cvs[serverId];
+    const Address address = servers.at(serverId);
+    auto &outstanding = outstandings.at(serverId);
+    auto &outstandingMutex = outstandingMutexes.at(serverId);
+    auto &cv = cvs.at(serverId);
 
     deque<Action> actions;
 
