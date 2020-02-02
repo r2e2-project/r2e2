@@ -61,7 +61,8 @@ void TransferAgent::workerThread(const size_t threadId) {
     constexpr milliseconds backoff{50};
     size_t tryCount = 0;
 
-    const size_t serverId = threadId % threads.size();
+    const size_t serverId = threadId % servers.size();
+
     const Address address = servers[serverId];
     auto &outstanding = outstandings[serverId];
     auto &outstandingMutex = outstandingMutexes[serverId];
@@ -101,8 +102,8 @@ void TransferAgent::workerThread(const size_t threadId) {
             for (const auto &action : actions) {
                 string request =
                     (action.task == Task::Download)
-                        ? GetRequest{action.key}.str() +
-                              DeleteRequest{action.key}.str()
+                        ? (GetRequest{action.key}.str() +
+                           DeleteRequest{action.key}.str())
                         : SetRequest{action.key, action.data}.str();
 
                 TRY_OPERATION(sock.write(request), break);
