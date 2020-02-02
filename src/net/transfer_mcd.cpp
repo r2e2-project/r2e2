@@ -28,6 +28,25 @@ TransferAgent::TransferAgent(vector<Address> &&s, const size_t tc)
     }
 }
 
+size_t getHash(const string &key) {
+    size_t result = 5381;
+    for (const char c : key) result = ((result << 5) + result) + c;
+    return result;
+}
+
+void TransferAgent::doAction(Action &&action) {
+    /* what is the server id for this key? */
+    const size_t serverId = getHash(action.key) % servers.size();
+
+    {
+        unique_lock<mutex> lock{outstandingMutexes[serverId]};
+        outstandings[serverId].push(move(action));
+    }
+
+    cvs[serverId].notify_one();
+    return;
+}
+
 #define TRY_OPERATION(x, y)     \
     try {                       \
         x;                      \
