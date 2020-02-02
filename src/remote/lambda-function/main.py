@@ -39,6 +39,9 @@ def handler(event, context):
     if event['directionalTreelets']:
         command += ['--directional']
 
+    for server in event.get('memcachedServers', []):
+        command += ['--memcached-server', server]
+
     retcode = run_command(command)
     print("retcode={}".format(retcode))
 
