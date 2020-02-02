@@ -82,7 +82,7 @@ class LambdaMaster {
 
     const MasterConfiguration config;
     const TempDirectory sceneDir{"/tmp/pbrt-lambda-master"};
-    const std::string jobId{uuid::generate()};
+    const std::string jobId;
 
     ////////////////////////////////////////////////////////////////////////////
     // Cloud                                                                  //

@@ -2,9 +2,11 @@
 
 #include <getopt.h>
 #include <glog/logging.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <ctime>
 #include <deque>
 #include <fstream>
 #include <iomanip>
@@ -71,6 +73,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                            unique_ptr<Scheduler> &&scheduler,
                            const MasterConfiguration &config)
     : config(config),
+      jobId([] {
+          ostringstream oss;
+          oss << hex << setfill('0') << setw(8) << time(nullptr);
+          return oss.str();
+      }()),
       maxWorkers(maxWorkers),
       rayGenerators(rayGenerators),
       scheduler(move(scheduler)),
@@ -221,11 +228,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
         },
         []() { throw runtime_error("worker invocation failed"); }));
 
-    loop.poller().add_action(
-        Poller::Action(statusPrintTimer, Direction::In,
-                       bind(&LambdaMaster::handleStatusMessage, this),
-                       [this]() { return true; },
-                       []() { throw runtime_error("status print failed"); }));
+    loop.poller().add_action(Poller::Action(
+        statusPrintTimer, Direction::In,
+        bind(&LambdaMaster::handleStatusMessage, this),
+        [this]() { return true; },
+        []() { throw runtime_error("status print failed"); }));
 
     loop.make_listener({"0.0.0.0", listenPort}, [this, maxWorkers](
                                                     ExecutionLoop &loop,
