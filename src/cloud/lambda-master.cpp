@@ -514,6 +514,8 @@ void usage(const char *argv0, int exitCode) {
          << endl
          << "  -j --job-summary FILE      output the job summary in JSON format"
          << endl
+         << "  -d --memcached-server      address for memcached" << endl
+         << "                             (can be repeated)" << endl
          << "  -h --help                  show help information" << endl;
 
     exit(exitCode);
@@ -566,6 +568,7 @@ int main(int argc, char *argv[]) {
     int tileSize = 0;
 
     uint32_t maxJobsOnEngine = 1;
+    vector<string> memcachedServers;
     vector<pair<string, uint32_t>> engines;
 
     struct option long_options[] = {
@@ -590,6 +593,7 @@ int main(int argc, char *argv[]) {
         {"new-tile-send", required_argument, nullptr, 'n'},
         {"directional", no_argument, nullptr, 'I'},
         {"jobs", required_argument, nullptr, 'J'},
+        {"memcached-server", required_argument, nullptr, 'd'},
         {"engine", required_argument, nullptr, 'E'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
@@ -597,7 +601,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt = getopt_long(
-            argc, argv, "p:i:r:b:m:G:w:D:a:S:M:L:c:t:j:T:n:J:E:B:gh",
+            argc, argv, "p:i:r:b:m:G:w:D:a:S:M:L:c:t:j:T:n:J:d:E:B:gh",
             long_options, nullptr);
 
         if (opt == -1) {
@@ -625,6 +629,7 @@ int main(int argc, char *argv[]) {
         case 'n': newTileThreshold = stoull(optarg); break;
         case 'I': PbrtOptions.directionalTreelets = true; break;
         case 'J': maxJobsOnEngine = stoul(optarg); break;
+        case 'd': memcachedServers.emplace_back(optarg); break;
         case 'E': engines.emplace_back(optarg, maxJobsOnEngine); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
 
@@ -697,12 +702,19 @@ int main(int argc, char *argv[]) {
     unique_ptr<LambdaMaster> master;
 
     // TODO clean this up
-    MasterConfiguration config = {samplesPerPixel,  maxPathDepth,
-                                  collectDebugLogs, workerStatsWriteInterval,
-                                  rayLogRate,       bagLogRate,
-                                  logsDirectory,    cropWindow,
-                                  tileSize,         seconds{timeout},
-                                  jobSummaryPath,   newTileThreshold,
+    MasterConfiguration config = {samplesPerPixel,
+                                  maxPathDepth,
+                                  collectDebugLogs,
+                                  workerStatsWriteInterval,
+                                  rayLogRate,
+                                  bagLogRate,
+                                  logsDirectory,
+                                  cropWindow,
+                                  tileSize,
+                                  seconds{timeout},
+                                  jobSummaryPath,
+                                  newTileThreshold,
+                                  move(memcachedServers),
                                   move(engines)};
 
     try {

@@ -53,6 +53,7 @@ struct MasterConfiguration {
     std::string jobSummaryPath;
     uint64_t newTileThreshold;
 
+    std::vector<std::string> memcachedServers;
     std::vector<std::pair<std::string, uint32_t>> engines;
 };
 
