@@ -7,8 +7,18 @@ using namespace chrono;
 
 namespace memcached {
 
-TransferAgent::TransferAgent(const size_t tc) : ::TransferAgent() {
+TransferAgent::TransferAgent(vector<Address> &&s, const size_t tc)
+    : ::TransferAgent(),
+      servers(move(s)),
+      outstandings(servers.size()),
+      outstandingMutexes(servers.size()),
+      cvs(servers.size()) {
     threadCount = tc;
+
+    if (servers.size() == 0) {
+        throw runtime_error("no servers specified");
+    }
+
     if (threadCount == 0) {
         throw runtime_error("thread count cannot be zero");
     }
@@ -32,6 +42,12 @@ void TransferAgent::workerThread(const size_t threadId) {
     constexpr milliseconds backoff{50};
     size_t tryCount = 0;
 
+    const size_t serverId = threadId % threads.size();
+    const Address address = servers[serverId];
+    auto &outstanding = outstandings[serverId];
+    auto &outstandingMutex = outstandingMutexes[serverId];
+    auto &cv = cvs[serverId];
+
     deque<Action> actions;
 
     while (!terminated) {
@@ -52,23 +68,18 @@ void TransferAgent::workerThread(const size_t threadId) {
             if (actions.empty()) {
                 unique_lock<mutex> lock{outstandingMutex};
 
-                cv.wait(lock, [this]() {
-                    return terminated || !outstanding.empty();
-                });
+                cv.wait(lock,
+                        [&]() { return terminated || !outstanding.empty(); });
 
                 if (terminated) return;
-
-                const auto capacity = MAX_REQUESTS_ON_CONNECTION - requestCount;
 
                 do {
                     actions.push_back(move(outstanding.front()));
                     outstanding.pop();
-                } while (!outstanding.empty() &&
-                         outstanding.size() / threadCount >= 1 &&
-                         actions.size() < capacity);
+                } while (false);
             }
 
-            for (const auto& action : actions) {
+            for (const auto &action : actions) {
                 string request =
                     (action.task == Task::Download)
                         ? GetRequest{action.key}.str() +
@@ -116,10 +127,6 @@ void TransferAgent::workerThread(const size_t threadId) {
                         throw runtime_error("transfer failed: " + status);
                     }
                 }
-            }
-
-            if (requestCount >= MAX_REQUESTS_ON_CONNECTION) {
-                connectionOkay = false;
             }
         }
     }

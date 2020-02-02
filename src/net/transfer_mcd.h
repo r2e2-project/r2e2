@@ -197,46 +197,19 @@ class ResponseParser {
 
 class TransferAgent : public ::TransferAgent {
   protected:
-    Address address{"171.67.76.25", 11211};
+    std::vector<Address> servers{};
 
-    static constexpr size_t MAX_REQUESTS_ON_CONNECTION{10000};
+    std::vector<std::queue<Action>> outstandings{};
+    std::vector<std::mutex> outstandingMutexes{};
+    std::vector<std::condition_variable> cvs{};
 
+    void doAction(Action&& action) override;
     void workerThread(const size_t threadId) override;
-    EventFD eventFD{false};
 
   public:
-    TransferAgent(const size_t threadCount = MAX_THREADS);
-
-    uint64_t requestDownload(const std::string& key);
-    uint64_t requestUpload(const std::string& key, std::string&& data);
-    ~TransferAgent();
-
-    EventFD& eventfd() { return eventFD; }
-
-    bool empty() const;
-    bool tryPop(std::pair<uint64_t, std::string>& output);
-
-    template <class Container>
-    size_t tryPopBulk(
-        std::back_insert_iterator<Container> insertIt,
-        const size_t maxCount = std::numeric_limits<size_t>::max());
+    TransferAgent(std::vector<Address>&& servers,
+                  const size_t threadCount = MAX_THREADS);
 };
-
-template <class Container>
-size_t TransferAgent::tryPopBulk(std::back_insert_iterator<Container> insertIt,
-                                 const size_t maxCount) {
-    std::unique_lock<std::mutex> lock{resultsMutex};
-
-    if (results.empty()) return 0;
-
-    size_t count;
-    for (count = 0; !results.empty() && count < maxCount; count++) {
-        insertIt = std::move(results.front());
-        results.pop();
-    }
-
-    return count;
-}
 
 }  // namespace memcached
 
