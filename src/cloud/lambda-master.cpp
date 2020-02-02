@@ -100,6 +100,10 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     invocationProto.set_bag_log_rate(config.bagLogRate);
     invocationProto.set_directional_treelets(PbrtOptions.directionalTreelets);
 
+    for (const auto &memcachedServer : config.memcachedServers) {
+        *invocationProto.add_memcached_servers() = memcachedServer;
+    }
+
     invocationPayload = protoutil::to_json(invocationProto);
 
     /* download required scene objects from the bucket */

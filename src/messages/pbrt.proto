@@ -233,6 +233,7 @@ message InvocationPayload {
     float ray_log_rate = 5;
     float bag_log_rate = 6;
     bool directional_treelets = 7;
+    repeated string memcached_servers = 8;
 }
 
 message ObjectKey {
