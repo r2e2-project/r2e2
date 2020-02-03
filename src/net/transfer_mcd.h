@@ -221,7 +221,7 @@ class TransferAgent : public ::TransferAgent {
 
   public:
     TransferAgent(const std::vector<Address>& servers,
-                  const size_t threadCount = MAX_THREADS,
+                  const size_t threadCount = 0,
                   const bool autoDelete = true);
 
     ~TransferAgent();

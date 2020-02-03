@@ -15,7 +15,7 @@ TransferAgent::TransferAgent(const vector<Address> &s, const size_t tc,
       outstandingMutexes(servers.size()),
       cvs(servers.size()),
       autoDelete(autoDelete) {
-    threadCount = tc;
+    threadCount = tc ? tc : servers.size() * 2;
 
     if (servers.size() == 0) {
         throw runtime_error("no servers specified");
