@@ -17,6 +17,10 @@ def handler(event, context):
 
     command = [str(x) for x in command]
 
-    output = sub.check_output(command).decode('ascii')
+    pipes = sub.Popen(command, stdout=sub.PIPE, stderr=sub.PIPE)
+    stdout, stderr = pipes.communicate()
 
-    return {'output': output}
+    output = stdout.decode('ascii')
+    error = stderr.decode('utf-8')
+
+    return {'output': output, 'error': error, 'command': " ".join(command), 'retcode': pipes.returncode}

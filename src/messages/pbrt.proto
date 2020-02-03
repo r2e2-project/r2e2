@@ -423,6 +423,9 @@ message BenchmarkRequest {
 
 message BenchmarkResponse {
     string output = 1;
+    string error = 2;
+    string command = 3;
+    int32 retcode = 4;
 }
 
 message HistogramUInt64 {

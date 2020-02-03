@@ -106,6 +106,12 @@ int main(const int argc, char const *argv[]) {
 
                 protobuf::BenchmarkResponse resp;
                 protoutil::from_json(response.body(), resp);
+
+                if (resp.retcode() != 0) {
+                    cerr << response.body() << endl;
+                    throw runtime_error("worker failed");
+                }
+
                 cout << resp.output();
                 remainingWorkers--;
             },
