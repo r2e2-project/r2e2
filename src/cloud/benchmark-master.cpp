@@ -18,12 +18,12 @@ using namespace PollerShortNames;
 void usage(const char *argv0) {
     cerr << argv0
          << " <num-workers> <storage-backend> <bag-size_B> <threads>"
-            " <duration_s> <region> <send> <receive>"
+            " <duration_s> <region> <send> <receive> [<memcached-server>]..."
          << endl;
 }
 
 int main(const int argc, char const *argv[]) {
-    if (argc != 9) {
+    if (argc < 9) {
         usage(argv[0]);
         return EXIT_FAILURE;
     }
@@ -38,6 +38,7 @@ int main(const int argc, char const *argv[]) {
     const string awsRegion{argv[6]};
     const bool send = (stoull(argv[7]) == 1);
     const bool recv = (stoull(argv[8]) == 1);
+    const vector<string> memcachedServers{argv + 9, argv + argc};
 
     const AWSCredentials awsCredentials{};
     const Address awsAddress{LambdaInvocationRequest::endpoint(awsRegion),
@@ -54,6 +55,7 @@ int main(const int argc, char const *argv[]) {
     proto.set_duration(duration);
     proto.set_send(send);
     proto.set_recv(recv);
+    for (const auto &s : memcachedServers) *proto.add_memcached_servers() = s;
 
     size_t remainingWorkers = nWorkers;
 

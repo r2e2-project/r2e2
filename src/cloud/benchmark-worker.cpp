@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "net/transfer.h"
+#include "net/transfer_mcd.h"
 #include "net/transfer_s3.h"
 #include "storage/backend.h"
 #include "util/eventfd.h"
@@ -30,14 +31,14 @@ string randomString(const size_t length) {
 void usage(const char* argv0) {
     cerr << argv0
          << " <id> <storage-backend> <bag-size_B> <threads> <duration_s> "
-            "<send> <receive>"
+            "<send> <receive> [<memcached-server>]..."
          << endl;
 }
 
 enum class Action { Upload, Download };
 
 int main(const int argc, const char* argv[]) {
-    if (argc != 8) {
+    if (argc < 8) {
         usage(argv[0]);
         return EXIT_FAILURE;
     }
@@ -51,12 +52,26 @@ int main(const int argc, const char* argv[]) {
     const seconds duration{stoull(argv[5])};
     const bool send = (stoull(argv[6]) == 1);
     const bool recv = (stoull(argv[7]) == 1);
+    const vector<string> memcachedServersStr{argv + 8, argv + argc};
 
-    auto storageBackend = StorageBackend::create_backend(backendUri);
+    unique_ptr<TransferAgent> agent;
+
+    if (memcachedServersStr.empty()) {
+        auto storageBackend = StorageBackend::create_backend(backendUri);
+        agent = make_unique<S3TransferAgent>(storageBackend, threads);
+    } else {
+        vector<Address> servers;
+        for (const auto& s : memcachedServersStr) {
+            string host;
+            uint16_t port = 11211;
+            tie(host, port) = Address::decompose(s);
+            servers.emplace_back(host, port);
+        }
+
+        agent = make_unique<memcached::TransferAgent>(servers, threads, false);
+    }
 
     Poller poller;
-    unique_ptr<TransferAgent> agent =
-        make_unique<S3TransferAgent>(storageBackend, threads);
 
     const auto start = steady_clock::now();
     TimerFD printStatsTimer{1s};

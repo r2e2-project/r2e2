@@ -12,6 +12,9 @@ def handler(event, context):
                event['workerId'], event['storageUri'], event['bagSize'], event['threads'], event['duration'], event['send'],
                event['recv']]
 
+    for s in event.get('memcachedServers', []):
+        command += [s]
+
     command = [str(x) for x in command]
 
     output = sub.check_output(command).decode('ascii')

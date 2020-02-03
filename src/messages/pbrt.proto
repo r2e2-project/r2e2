@@ -418,6 +418,7 @@ message BenchmarkRequest {
     uint32 duration = 5;
     uint32 send = 6;
     uint32 recv = 7;
+    repeated string memcached_servers = 8;
 }
 
 message BenchmarkResponse {
