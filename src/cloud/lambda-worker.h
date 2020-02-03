@@ -172,7 +172,7 @@ class LambdaWorker {
     /* sending sample bags out */
     Poller::Action::Result::Type handleSampleBags();
 
-    Poller::Action::Result::Type handleTransferResults();
+    Poller::Action::Result::Type handleTransferResults(const bool fromSmall);
 
     /* queues */
 
@@ -202,7 +202,16 @@ class LambdaWorker {
 
     /*** Transfer Agent *******************************************************/
 
-    std::unique_ptr<TransferAgent> transferAgent;
+    struct {
+        std::unique_ptr<TransferAgent> large{};
+        std::unique_ptr<TransferAgent> small{};
+    } transferAgents{};
+
+    std::unique_ptr<TransferAgent>& getTransferAgent(const size_t objSize) {
+        return (transferAgents.small == nullptr || objSize > 1 * 1024 * 1024)
+                   ? transferAgents.large
+                   : transferAgents.small;
+    }
 
     ////////////////////////////////////////////////////////////////////////////
     // Stats                                                                  //

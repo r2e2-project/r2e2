@@ -572,8 +572,8 @@ int main(int argc, char *argv[]) {
     int tileSize = 0;
 
     uint32_t maxJobsOnEngine = 1;
-    vector<string> memcachedServers;
-    vector<pair<string, uint32_t>> engines;
+    vector<string> memcachedServers{};
+    vector<pair<string, uint32_t>> engines{};
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},

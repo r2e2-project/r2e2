@@ -68,8 +68,8 @@ void LambdaWorker::processMessage(const Message& message) {
 
         for (const protobuf::RayBagInfo& item : proto.items()) {
             RayBagInfo info{from_protobuf(item)};
-            const auto id =
-                transferAgent->requestDownload(info.str(rayBagsKeyPrefix));
+            const auto id = getTransferAgent(info.bagSize)
+                                ->requestDownload(info.str(rayBagsKeyPrefix));
             pendingRayBags[id] = make_pair(Task::Download, info);
 
             logBag(BagAction::Requested, info);
