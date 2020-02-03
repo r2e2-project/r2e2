@@ -203,12 +203,15 @@ class TransferAgent : public ::TransferAgent {
     std::vector<std::mutex> outstandingMutexes{};
     std::vector<std::condition_variable> cvs{};
 
+    const bool autoDelete{true};
+
     void doAction(Action&& action) override;
     void workerThread(const size_t threadId) override;
 
   public:
     TransferAgent(const std::vector<Address>& servers,
-                  const size_t threadCount = MAX_THREADS);
+                  const size_t threadCount = MAX_THREADS,
+                  const bool autoDelete = true);
 
     ~TransferAgent();
 };

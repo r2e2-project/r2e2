@@ -7,12 +7,14 @@ using namespace chrono;
 
 namespace memcached {
 
-TransferAgent::TransferAgent(const vector<Address> &s, const size_t tc)
+TransferAgent::TransferAgent(const vector<Address> &s, const size_t tc,
+                             const bool autoDelete)
     : ::TransferAgent(),
       servers(s),
       outstandings(servers.size()),
       outstandingMutexes(servers.size()),
-      cvs(servers.size()) {
+      cvs(servers.size()),
+      autoDelete(autoDelete) {
     threadCount = tc;
 
     if (servers.size() == 0) {
@@ -108,7 +110,8 @@ void TransferAgent::workerThread(const size_t threadId) {
                 string request =
                     (action.task == Task::Download)
                         ? (GetRequest{action.key}.str() +
-                           DeleteRequest{action.key}.str())
+                           (autoDelete ? DeleteRequest{action.key}.str()
+                                       : string()))
                         : SetRequest{action.key, action.data}.str();
 
                 TRY_OPERATION(sock.write(request), break);
