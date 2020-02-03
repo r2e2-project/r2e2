@@ -64,6 +64,7 @@ class Response {
         NOT_STORED,
         VALUE,
         DELETED,
+        ERROR,
     };
 
   private:
@@ -85,6 +86,7 @@ class Response {
 
 class ResponseParser {
   private:
+    std::queue<std::string> requests_;
     std::queue<Response> responses_;
 
     std::string raw_buffer_{};
@@ -97,6 +99,11 @@ class ResponseParser {
     Response response_;
 
   public:
+    template <class T>
+    void new_request(const T& req) {
+        requests_.push(req.first_line());
+    }
+
     void parse(const std::string& data) {
         auto startswith = [](const std::string& token,
                              const char* cstr) -> bool {
@@ -144,11 +151,15 @@ class ResponseParser {
                         response_.type_ = Response::Type::NOT_STORED;
                     } else if (first_word == "DELETED") {
                         response_.type_ = Response::Type::DELETED;
+                    } else if (first_word == "ERROR") {
+                        response_.type_ = Response::Type::ERROR;
                     } else {
-                        throw std::runtime_error("invalid response: " +
-                                                 response_.first_line_);
+                        throw std::runtime_error(
+                            "invalid response: " + response_.first_line_ +
+                            " (request: " + requests_.front() + ")");
                     }
 
+                    requests_.pop();
                     responses_.push(std::move(response_));
 
                     state_ = State::FirstLinePending;

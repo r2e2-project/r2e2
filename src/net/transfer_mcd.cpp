@@ -81,7 +81,6 @@ void TransferAgent::workerThread(const size_t threadId) {
         TCPSocket sock;
         auto parser = make_unique<ResponseParser>();
         bool connectionOkay = true;
-        size_t requestCount = 0;
 
         if (tryCount > 0) {
             tryCount = min<size_t>(tryCount, 7u);  // caps at 3.2s
@@ -107,15 +106,19 @@ void TransferAgent::workerThread(const size_t threadId) {
             }
 
             for (const auto &action : actions) {
-                string request =
-                    (action.task == Task::Download)
-                        ? (GetRequest{action.key}.str() +
-                           (autoDelete ? DeleteRequest{action.key}.str()
-                                       : string()))
-                        : SetRequest{action.key, action.data}.str();
+                string requestStr;
 
-                TRY_OPERATION(sock.write(request), break);
-                requestCount++;
+                if (action.task == Task::Download) {
+                    auto request = GetRequest{action.key};
+                    parser->new_request(request);
+                    requestStr = request.str();
+                } else {
+                    auto request = SetRequest{action.key, action.data};
+                    parser->new_request(request);
+                    requestStr = request.str();
+                }
+
+                TRY_OPERATION(sock.write(requestStr), break);
             }
 
             while (!terminated && connectionOkay && !actions.empty()) {
@@ -149,6 +152,12 @@ void TransferAgent::workerThread(const size_t threadId) {
                         tryCount = 0;
                         actions.pop_front();
                         eventFD.write_event();
+                        break;
+
+                    case Response::Type::NOT_STORED:
+                    case Response::Type::ERROR:
+                        connectionOkay = false;
+                        tryCount++;
                         break;
 
                     default:  // unexpected response, like 404 or something
