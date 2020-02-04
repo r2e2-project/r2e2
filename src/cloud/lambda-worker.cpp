@@ -38,6 +38,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         transferAgent = make_unique<S3TransferAgent>(storageBackend);
     }
 
+    samplesTransferAgent = make_unique<S3TransferAgent>(storageBackend, 2);
+
     cerr << "* starting worker in " << workingDirectory.name() << endl;
     roost::chdir(workingDirectory.name());
 
@@ -110,7 +112,13 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
 
     loop.poller().add_action(Poller::Action(
         transferAgent->eventfd(), Direction::In,
-        bind(&LambdaWorker::handleTransferResults, this),
+        bind(&LambdaWorker::handleTransferResults, this, false),
+        [this]() { return !pendingRayBags.empty(); },
+        []() { throw runtime_error("handle transfer results failed"); }));
+
+    loop.poller().add_action(Poller::Action(
+        samplesTransferAgent->eventfd(), Direction::In,
+        bind(&LambdaWorker::handleTransferResults, this, true),
         [this]() { return !pendingRayBags.empty(); },
         []() { throw runtime_error("handle transfer results failed"); }));
 
