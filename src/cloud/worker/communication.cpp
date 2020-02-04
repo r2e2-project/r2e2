@@ -128,9 +128,8 @@ ResultType LambdaWorker::handleSealedBags() {
         bag.data.shrink_to_fit();
         logBag(BagAction::Submitted, bag.info);
 
-        const auto id =
-            getTransferAgent(bag.info.bagSize)
-                ->requestUpload(bag.info.str(rayBagsKeyPrefix), move(bag.data));
+        const auto id = transferAgent->requestUpload(
+            bag.info.str(rayBagsKeyPrefix), move(bag.data));
 
         pendingRayBags[id] = make_pair(Task::Upload, bag.info);
         sealedBags.pop();
@@ -146,7 +145,7 @@ ResultType LambdaWorker::handleSampleBags() {
         RayBag& bag = sampleBags.front();
         bag.data.erase(bag.info.bagSize);
 
-        const auto id = transferAgents.large->requestUpload(
+        const auto id = transferAgent->requestUpload(
             bag.info.str(rayBagsKeyPrefix), move(bag.data));
 
         pendingRayBags[id] = make_pair(Task::Upload, bag.info);
@@ -188,19 +187,16 @@ ResultType LambdaWorker::handleReceiveQueue() {
     return ResultType::Continue;
 }
 
-ResultType LambdaWorker::handleTransferResults(const bool fromSmall) {
+ResultType LambdaWorker::handleTransferResults() {
     protobuf::RayBags enqueuedProto;
     protobuf::RayBags dequeuedProto;
 
-    unique_ptr<TransferAgent>& agent =
-        fromSmall ? transferAgents.small : transferAgents.large;
-
-    if (!agent->eventfd().read_event()) {
+    if (!transferAgent->eventfd().read_event()) {
         return ResultType::Continue;
     }
 
     vector<pair<uint64_t, string>> actions;
-    agent->tryPopBulk(back_inserter(actions));
+    transferAgent->tryPopBulk(back_inserter(actions));
 
     for (auto& action : actions) {
         auto infoIt = pendingRayBags.find(action.first);

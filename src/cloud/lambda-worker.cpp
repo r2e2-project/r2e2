@@ -31,11 +31,11 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     // let the program handle SIGPIPE
     signal(SIGPIPE, SIG_IGN);
 
-    transferAgents.large = make_unique<S3TransferAgent>(storageBackend);
-
     if (!config.memcachedServers.empty()) {
-        transferAgents.small =
-            make_unique<memcached::TransferAgent>(config.memcachedServers);
+        transferAgent = make_unique<memcached::TransferAgent>(
+            move(config.memcachedServers));
+    } else {
+        transferAgent = make_unique<S3TransferAgent>(storageBackend);
     }
 
     cerr << "* starting worker in " << workingDirectory.name() << endl;
@@ -109,18 +109,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { throw runtime_error("receive queue failed"); }));
 
     loop.poller().add_action(Poller::Action(
-        transferAgents.large->eventfd(), Direction::In,
-        bind(&LambdaWorker::handleTransferResults, this, false),
+        transferAgent->eventfd(), Direction::In,
+        bind(&LambdaWorker::handleTransferResults, this),
         [this]() { return !pendingRayBags.empty(); },
         []() { throw runtime_error("handle transfer results failed"); }));
-
-    if (transferAgents.small != nullptr) {
-        loop.poller().add_action(Poller::Action(
-            transferAgents.small->eventfd(), Direction::In,
-            bind(&LambdaWorker::handleTransferResults, this, true),
-            [this]() { return !pendingRayBags.empty(); },
-            []() { throw runtime_error("handle transfer results failed"); }));
-    }
 
     /* handle received messages */
     loop.poller().add_action(Poller::Action(
@@ -191,7 +183,7 @@ int main(int argc, char* argv[]) {
     float rayLogRate = 0.0;
     float bagLogRate = 0.0;
 
-    vector<Address> memcachedServers{};
+    vector<Address> memcachedServers;
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
