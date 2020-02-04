@@ -41,7 +41,7 @@ constexpr std::chrono::milliseconds SEAL_BAGS_INTERVAL{100};
 constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
 
-constexpr size_t MAX_BAG_SIZE{2 * 1024 * 1024};  // 2 MiB
+constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024};  // 4 MiB
 
 struct WorkerConfiguration {
     int samplesPerPixel;

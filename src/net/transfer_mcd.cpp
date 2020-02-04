@@ -112,6 +112,10 @@ void TransferAgent::workerThread(const size_t threadId) {
                     auto request = GetRequest{action.key};
                     parser->new_request(request);
                     requestStr = request.str();
+
+                    if (autoDelete) {
+                        requestStr += DeleteRequest{action.key}.str();
+                    }
                 } else {
                     auto request = SetRequest{action.key, action.data};
                     parser->new_request(request);
