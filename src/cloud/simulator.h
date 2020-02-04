@@ -25,9 +25,20 @@
 
 namespace pbrt {
 
+struct RayData {
+    RayStatePtr ray;
+    uint64_t srcTreelet;
+    uint64_t dstTreelet;
+
+    RayData(RayStatePtr &&r, uint64_t src, uint64_t dst)
+        : ray(move(r)), srcTreelet(src), dstTreelet(dst)
+    {}
+};
+
 struct Packet {
     uint64_t bytesRemaining = 0;
-    bool delivered = 0;
+    bool transferStarted = false;
+    bool delivered = false;
     union {
         uint64_t deliveryDelay;
         uint64_t msStarted = 0;
@@ -39,13 +50,13 @@ struct Packet {
 
     uint64_t numRays = 0;
 
-    std::list<RayStatePtr> rays;
+    std::list<RayData> rays;
 };
 
 struct Worker {
     uint64_t id;
 
-    std::list<RayStatePtr> inQueue;
+    std::list<RayData> inQueue;
     std::list<Packet> inTransit;
     uint64_t outstanding = 0;
 
@@ -69,17 +80,19 @@ private:
 
     Bounds2i nextCameraTile();
 
-    uint64_t getNextWorker(const RayStatePtr &ray);
+    uint64_t getRandomWorker(uint32_t treelet);
 
     uint64_t getNetworkLen(const RayStatePtr &ray);
 
     void sendCurPacket(Worker &worker, uint64_t dstID);
 
-    void enqueueRay(Worker &worker, RayStatePtr &&ray);
+    void enqueueRay(Worker &worker, RayStatePtr &&ray, uint32_t srcTreelet);
 
     void generateRays(Worker &worker);
 
     void transmitRays();
+
+    void rebalance();
 
     void processRays(Worker &worker);
 
@@ -124,6 +137,16 @@ private:
 
     uint64_t maxPacketSize = 4096;
     uint64_t maxPacketDelay = 2;
+
+    uint64_t numTreelets;
+
+    struct Demand {
+        std::vector<uint64_t> perTreelet;
+        std::vector<std::vector<uint64_t>> pairwise;
+
+        void addDemand(uint32_t srcTreelet, uint32_t dstTreelet);
+        void removeDemand(uint32_t srcTreelet, uint32_t dstTreelet);
+    } curDemand;
 
     // Stats
     std::ofstream statsCSV;

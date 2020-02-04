@@ -9,6 +9,23 @@ void usage(const char *argv0) {
 
 namespace pbrt {
 
+unordered_map<uint64_t, unordered_set<uint32_t>> loadInitMapping(const string &fname) {
+    unordered_map<uint64_t, unordered_set<uint32_t>> workerToTreelets;
+    string line;
+    ifstream initAllocFile(fname);
+    int workerIdx = 0;
+    while (getline(initAllocFile, line)) {
+        stringstream strm(line);
+        string treeletStr;
+        while (getline(strm, treeletStr)) {
+            workerToTreelets[workerIdx].emplace(stoul(treeletStr));
+        }
+        workerIdx++;
+    }
+
+    return workerToTreelets;
+}
+
 vector<shared_ptr<Light>> loadLights() {
     vector<shared_ptr<Light>> lights;
     auto reader = global::manager.GetReader(ObjectType::Lights);
@@ -43,24 +60,6 @@ Scene loadFakeScene() {
     return from_protobuf(proto_scene);
 }
 
-unordered_map<uint64_t, unordered_set<uint32_t>> loadInitMapping(const string &fname) {
-    unordered_map<uint64_t, unordered_set<uint32_t>> workerToTreelets;
-    string line;
-    ifstream initAllocFile(fname);
-    int workerIdx = 0;
-    while (getline(initAllocFile, line)) {
-        stringstream strm(line);
-        string treeletStr;
-        while (getline(strm, treeletStr)) {
-            workerToTreelets[workerIdx].emplace(stoul(treeletStr));
-        }
-        workerIdx++;
-    }
-
-    return workerToTreelets;
-}
-
-
 Simulator::Simulator(uint64_t numWorkers_, uint64_t workerBandwidth_,
               uint64_t workerLatency_, uint64_t msPerRebalance_,
               uint64_t samplesPerPixel_, uint64_t pathDepth_,
@@ -73,6 +72,7 @@ Simulator::Simulator(uint64_t numWorkers_, uint64_t workerBandwidth_,
           lights(loadLights()), fakeScene(loadFakeScene()),
           sampleBounds(camera->film->GetSampleBounds()),
           sampleExtent(sampleBounds.Diagonal()),
+          numTreelets(global::manager.treeletCount()),
           statsCSV("/tmp/stats.csv")
 {
     CHECK_EQ(workerToTreelets.size(), numWorkers);
@@ -80,6 +80,14 @@ Simulator::Simulator(uint64_t numWorkers_, uint64_t workerBandwidth_,
         for (uint32_t treelet : kv.second) {
             treeletToWorkers[treelet].push_back(kv.first);
         }
+    }
+
+    CHECK_EQ(numTreelets, treeletToWorkers.size());
+
+    curDemand.perTreelet.resize(numTreelets);
+    curDemand.pairwise.resize(numTreelets);
+    for (uint64_t i = 0; i < numTreelets; i++) {
+        curDemand.pairwise[i].resize(numTreelets);
     }
 
     for (uint64_t id = 0; id < numWorkers; id++) {
@@ -106,10 +114,12 @@ void Simulator::simulate() {
     bool isWork = true;
     while (isWork) {
         curStats = TimeStats();
-        if (curMS % msPerRebalance == 0) {
-        }
 
         transmitRays();
+
+        if (curMS % msPerRebalance == 0) {
+            rebalance();
+        }
 
         for (uint64_t workerID = 0; workerID < numWorkers; workerID++) {
             processRays(workers[workerID]);
@@ -184,8 +194,8 @@ Bounds2i Simulator::nextCameraTile() {
     return Bounds2i(Point2i{x0, y0}, Point2i{x1, y1});
 }
 
-uint64_t Simulator::getNextWorker(const RayStatePtr &ray) {
-    vector<uint64_t> &treelet_workers = treeletToWorkers.at(ray->CurrentTreelet());
+uint64_t Simulator::getRandomWorker(uint32_t treelet) {
+    vector<uint64_t> &treelet_workers = treeletToWorkers.at(treelet);
     uniform_int_distribution<> dis(0, treelet_workers.size() - 1);
     return treelet_workers[dis(randgen)];
 }
@@ -209,9 +219,24 @@ void Simulator::sendCurPacket(Worker &worker, uint64_t dstID) {
     curPacket = Packet();
 }
 
-void Simulator::enqueueRay(Worker &worker, RayStatePtr &&ray) {
+void Simulator::Demand::addDemand(uint32_t srcTreelet, uint32_t dstTreelet) {
+    perTreelet[dstTreelet]++;
+    if (srcTreelet != -1) {
+        pairwise[srcTreelet][dstTreelet]++;
+    }
+}
+
+void Simulator::Demand::removeDemand(uint32_t srcTreelet, uint32_t dstTreelet) {
+    perTreelet[dstTreelet]--;
+    if (srcTreelet != -1) {
+        pairwise[srcTreelet][dstTreelet]--;
+    }
+}
+
+void Simulator::enqueueRay(Worker &worker, RayStatePtr &&ray, uint32_t srcTreelet) {
     uint64_t raySize = getNetworkLen(ray);
-    uint64_t dstWorkerID = getNextWorker(ray);
+    uint32_t dstTreelet = ray->CurrentTreelet();
+    uint64_t dstWorkerID = getRandomWorker(dstTreelet);
     Packet &curPacket = worker.nextPackets[dstWorkerID];
 
     if (curPacket.bytesRemaining + raySize > maxPacketSize) {
@@ -223,13 +248,15 @@ void Simulator::enqueueRay(Worker &worker, RayStatePtr &&ray) {
     }
 
     curPacket.bytesRemaining += getNetworkLen(ray);
-    curPacket.rays.emplace_back(move(ray));
+    curPacket.rays.emplace_back(move(ray), srcTreelet, dstTreelet);
     // Store size separately so outstanding can be updated after packet.rays
     // has been spliced away.
     curPacket.numRays++; 
 
     worker.outstanding++;
     curStats.raysEnqueued++;
+
+    curDemand.addDemand(srcTreelet, dstTreelet);
 }
 
 void Simulator::generateRays(Worker &worker) {
@@ -241,7 +268,7 @@ void Simulator::generateRays(Worker &worker) {
             RayStatePtr ray = graphics::GenerateCameraRay(
                 camera, pixel, sample, pathDepth - 1, sampleExtent, sampler);
 
-            enqueueRay(worker, move(ray));
+            enqueueRay(worker, move(ray), -1);
 
             curStats.cameraRaysLaunched++;
             totalRaysLaunched++;
@@ -289,6 +316,13 @@ void Simulator::transmitRays() {
                     packet.bytesRemaining -= transferBytes;
 
                     allBytesTransferred += transferBytes;
+
+                    if (!packet.transferStarted) {
+                        for (RayData &ray : packet.rays) {
+                            curDemand.removeDemand(ray.srcTreelet, ray.dstTreelet);
+                        }
+                        packet.transferStarted = true;
+                    }
                 }
             } else if (packet.deliveryDelay > 0) {
                 packet.deliveryDelay--;
@@ -319,6 +353,9 @@ void Simulator::transmitRays() {
     curStats.bytesTransferred = allBytesTransferred;
 }
 
+void Simulator::rebalance() {
+}
+
 void Simulator::processRays(Worker &worker) {
     if (shouldGenNewRays(worker)) {
         generateRays(worker);
@@ -328,7 +365,7 @@ void Simulator::processRays(Worker &worker) {
     list<RayStatePtr> rays;
 
     while (worker.inQueue.size() > 0) {
-        RayStatePtr origRayPtr = move(worker.inQueue.front());
+        RayStatePtr origRayPtr = move(worker.inQueue.front().ray);
         worker.inQueue.pop_front();
 
         rays.emplace_back(move(origRayPtr));
@@ -339,7 +376,7 @@ void Simulator::processRays(Worker &worker) {
 
             const TreeletId rayTreeletId = rayPtr->CurrentTreelet();
             if (workerToTreelets.at(worker.id).count(rayTreeletId) == 0) {
-                enqueueRay(worker, move(rayPtr));
+                enqueueRay(worker, move(rayPtr), rayTreeletId);
                 continue;
             }
             if (!rayPtr->toVisitEmpty()) {
