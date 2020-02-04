@@ -114,7 +114,9 @@ void TransferAgent::workerThread(const size_t threadId) {
                     requestStr = request.str();
 
                     if (autoDelete) {
-                        requestStr += DeleteRequest{action.key}.str();
+                        auto delRequest = DeleteRequest{action.key};
+                        parser->new_request(delRequest);
+                        requestStr += delRequest.str();
                     }
                 } else {
                     auto request = SetRequest{action.key, action.data};
@@ -141,19 +143,19 @@ void TransferAgent::workerThread(const size_t threadId) {
 
                 while (!parser->empty()) {
                     const auto type = parser->front().type();
-                    const auto status = move(parser->front().first_line());
-                    const auto data = move(parser->front().unstructured_data());
-
-                    parser->pop();
 
                     switch (type) {
                     case Response::Type::STORED:
-                    case Response::Type::VALUE: {
-                        unique_lock<mutex> lock{resultsMutex};
-                        results.emplace(actions.front().id, move(data));
-                    }
-
+                    case Response::Type::VALUE:
                         tryCount = 0;
+
+                        {
+                            unique_lock<mutex> lock{resultsMutex};
+                            results.emplace(
+                                actions.front().id,
+                                move(parser->front().unstructured_data()));
+                        }
+
                         actions.pop_front();
                         eventFD.write_event();
                         break;
@@ -164,9 +166,16 @@ void TransferAgent::workerThread(const size_t threadId) {
                         tryCount++;
                         break;
 
-                    default:  // unexpected response, like 404 or something
-                        throw runtime_error("transfer failed: " + status);
+                    case Response::Type::DELETED:
+                    case Response::Type::NOT_FOUND:
+                        break;
+
+                    default:
+                        throw runtime_error("transfer failed: " +
+                                            parser->front().first_line());
                     }
+
+                    parser->pop();
                 }
             }
         }

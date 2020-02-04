@@ -11,6 +11,9 @@ namespace memcached {
 static constexpr const char* CRLF = "\r\n";
 
 class Request {
+  public:
+    enum class Type { SET, GET, DELETE };
+
   private:
     std::string first_line_{};
     std::string unstructured_data_{};
@@ -44,28 +47,27 @@ class SetRequest : public Request {
     SetRequest(const std::string& key, const std::string& data)
         : Request("set " + key + " 0 0 " + std::to_string(data.length()),
                   data) {}
+
+    constexpr Request::Type type() const { return Request::Type::SET; }
 };
 
 class GetRequest : public Request {
   public:
     GetRequest(const std::string& key) : Request("get " + key, "") {}
+
+    constexpr Request::Type type() const { return Request::Type::GET; }
 };
 
 class DeleteRequest : public Request {
   public:
-    DeleteRequest(const std::string& key)
-        : Request("delete " + key + " noreply", "") {}
+    DeleteRequest(const std::string& key) : Request("delete " + key, "") {}
+
+    constexpr Request::Type type() const { return Request::Type::DELETE; }
 };
 
 class Response {
   public:
-    enum class Type {
-        STORED,
-        NOT_STORED,
-        VALUE,
-        DELETED,
-        ERROR,
-    };
+    enum class Type { STORED, NOT_STORED, NOT_FOUND, VALUE, DELETED, ERROR };
 
   private:
     Type type_;
@@ -86,7 +88,7 @@ class Response {
 
 class ResponseParser {
   private:
-    std::queue<std::string> requests_;
+    std::queue<Request::Type> requests_;
     std::queue<Response> responses_;
 
     std::string raw_buffer_{};
@@ -101,7 +103,7 @@ class ResponseParser {
   public:
     template <class T>
     void new_request(const T& req) {
-        requests_.push(req.first_line());
+        requests_.push(req.type());
     }
 
     void parse(const std::string& data) {
@@ -153,10 +155,15 @@ class ResponseParser {
                         response_.type_ = Response::Type::DELETED;
                     } else if (first_word == "ERROR") {
                         response_.type_ = Response::Type::ERROR;
+                    } else if (first_word == "NOT_FOUND") {
+                        response_.type_ = Response::Type::NOT_FOUND;
                     } else {
                         throw std::runtime_error(
                             "invalid response: " + response_.first_line_ +
-                            " (request: " + requests_.front() + ")");
+                            " (request: " +
+                            std::to_string(
+                                static_cast<int>(requests_.front())) +
+                            ")");
                     }
 
                     requests_.pop();
@@ -221,8 +228,7 @@ class TransferAgent : public ::TransferAgent {
 
   public:
     TransferAgent(const std::vector<Address>& servers,
-                  const size_t threadCount = 0,
-                  const bool autoDelete = true);
+                  const size_t threadCount = 0, const bool autoDelete = true);
 
     ~TransferAgent();
 };
