@@ -32,8 +32,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     signal(SIGPIPE, SIG_IGN);
 
     if (!config.memcachedServers.empty()) {
-        transferAgent = make_unique<memcached::TransferAgent>(
-            move(config.memcachedServers));
+        transferAgent =
+            make_unique<memcached::TransferAgent>(config.memcachedServers);
     } else {
         transferAgent = make_unique<S3TransferAgent>(storageBackend);
     }
