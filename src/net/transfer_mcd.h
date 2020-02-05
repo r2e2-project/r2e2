@@ -215,20 +215,20 @@ class ResponseParser {
 
 class TransferAgent : public ::TransferAgent {
   protected:
-    std::vector<Address> servers{};
-
-    std::vector<std::queue<Action>> outstandings{};
-    std::vector<std::mutex> outstandingMutexes{};
-    std::vector<std::condition_variable> cvs{};
+    std::vector<Address> servers;
+    std::vector<EventFD> workEvents;
 
     const bool autoDelete{true};
+
+    std::vector<std::queue<Action>> outstandings;
+    std::vector<std::mutex> outstandingMutexes;
 
     void doAction(Action&& action) override;
     void workerThread(const size_t threadId) override;
 
   public:
     TransferAgent(const std::vector<Address>& servers,
-                  const size_t threadCount = 0, const bool autoDelete = true);
+                  const size_t threadCount = 1, const bool autoDelete = true);
 
     ~TransferAgent();
 };
