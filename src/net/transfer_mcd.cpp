@@ -76,6 +76,7 @@ void TransferAgent::workerThread(const size_t threadId) {
     auto &cv = cvs.at(serverId);
 
     deque<Action> actions;
+    deque<Action> secondaryActions;
 
     while (!terminated) {
         TCPSocket sock;
@@ -112,16 +113,23 @@ void TransferAgent::workerThread(const size_t threadId) {
                     auto request = GetRequest{action.key};
                     parser->new_request(request);
                     requestStr = request.str();
-
-                    if (autoDelete) {
-                        auto delRequest = DeleteRequest{action.key};
-                        parser->new_request(delRequest);
-                        requestStr += delRequest.str();
-                    }
                 } else {
                     auto request = SetRequest{action.key, action.data};
                     parser->new_request(request);
                     requestStr = request.str();
+                }
+
+                /* piggybacking of delete requests */
+                if (!secondaryActions.empty()) {
+                    auto &front = secondaryActions.front();
+
+                    if (front.task == Task::Delete) {
+                        auto request = DeleteRequest{front.key};
+                        parser->new_request(request);
+                        requestStr += request.str();
+                    }
+
+                    secondaryActions.pop_front();
                 }
 
                 TRY_OPERATION(sock.write(requestStr), break);
@@ -145,8 +153,15 @@ void TransferAgent::workerThread(const size_t threadId) {
                     const auto type = parser->front().type();
 
                     switch (type) {
-                    case Response::Type::STORED:
                     case Response::Type::VALUE:
+                        if (autoDelete) {
+                            /* tell the memcached server to remove the object */
+                            secondaryActions.emplace_back(
+                                0, Task::Delete, actions.front().key, "");
+                            /* fall-through */
+                        }
+
+                    case Response::Type::STORED:
                         tryCount = 0;
 
                         {

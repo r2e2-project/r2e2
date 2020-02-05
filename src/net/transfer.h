@@ -19,7 +19,7 @@
 
 class TransferAgent {
   public:
-    enum class Task { Download, Upload };
+    enum class Task { Download, Upload, Delete };
 
   protected:
     struct Action {
