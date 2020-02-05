@@ -8,6 +8,7 @@
 
 #include "address.h"
 #include "util/file_descriptor.h"
+#include "util/util.h"
 
 /* class for network sockets (UDP, TCP, etc.) */
 class Socket : public FileDescriptor
@@ -91,6 +92,20 @@ public:
 
     /* are there pending errors on a nonblocking socket? */
     void verify_no_errors() const;
+
+    template <class Duration>
+    void set_write_timeout( const Duration & d ) {
+        timeval tv;
+        to_timeval( d, tv );
+        setsockopt( SOL_SOCKET, SO_SNDTIMEO, tv );
+    }
+
+    template <class Duration>
+    void set_read_timeout( const Duration & d ) {
+        timeval tv;
+        to_timeval( d, tv );
+        setsockopt( SOL_SOCKET, SO_RCVTIMEO, tv );
+    }
 };
 
 #endif /* PBRT_NET_SOCKET_H */
