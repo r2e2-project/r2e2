@@ -232,3 +232,5 @@ void TCPSocket::verify_no_errors() const
         throw unix_error( "nonblocking socket", socket_error );
     }
 }
+
+template void Socket::setsockopt( const int level, const int option, const timeval & option_value );

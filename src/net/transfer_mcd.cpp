@@ -83,6 +83,9 @@ void TransferAgent::workerThread(const size_t threadId) {
         auto parser = make_unique<ResponseParser>();
         bool connectionOkay = true;
 
+        sock.set_read_timeout(1s);
+        sock.set_write_timeout(1s);
+
         if (tryCount > 0) {
             tryCount = min<size_t>(tryCount, 7u);  // caps at 3.2s
             this_thread::sleep_for(backoff * (1 << (tryCount - 1)));
