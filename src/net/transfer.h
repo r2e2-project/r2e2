@@ -31,6 +31,10 @@ class TransferAgent {
         Action(const uint64_t id, const Task task, const std::string& key,
                std::string&& data)
             : id(id), task(task), key(key), data(move(data)) {}
+
+        Action(const Action &) = delete;
+        Action& operator=(const Action&) = delete;
+        Action(Action &&) = default;
     };
 
     uint64_t nextId{1};
