@@ -178,7 +178,8 @@ void Simulator::setTiles() {
 }
 
 bool Simulator::shouldGenNewRays(const Worker &worker) {
-    return worker.inQueue.size() + worker.outstanding < maxRays / 10 &&
+    return workerToTreelets.at(worker.id).count(0) &&
+        worker.inQueue.size() + worker.outstanding < maxRays / 10 &&
         curCameraTile < nCameraTiles.x * nCameraTiles.y;
 }
 
