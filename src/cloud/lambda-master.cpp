@@ -549,7 +549,7 @@ int main(int argc, char *argv[]) {
 
     uint16_t listenPort = 50000;
     int32_t maxWorkers = -1;
-    int32_t rayGenerators = -1;
+    int32_t rayGenerators = 0;
     string publicIp;
     string storageBackendUri;
     string region{"us-west-2"};
@@ -690,7 +690,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (scheduler == nullptr || listenPort == 0 || maxWorkers <= 0 ||
-        rayGenerators <= 0 || samplesPerPixel < 0 || maxPathDepth < 0 ||
+        rayGenerators < 0 || samplesPerPixel < 0 || maxPathDepth < 0 ||
         rayLogRate < 0 || rayLogRate > 1.0 || bagLogRate < 0 ||
         bagLogRate > 1.0 || publicIp.empty() || storageBackendUri.empty() ||
         region.empty() || newTileThreshold == 0 ||
