@@ -1,4 +1,5 @@
 #include "cloud/lambda-worker.h"
+
 #include "cloud/r2t2.h"
 #include "messages/utils.h"
 #include "net/util.h"
@@ -40,13 +41,6 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             activeRays++;
         }
     }
-}
-
-ResultType LambdaWorker::handleGeneration() {
-    Bounds2i& bounds = generationQueue.front();
-    generateRays(bounds);
-    generationQueue.pop();
-    return ResultType::Continue;
 }
 
 ResultType LambdaWorker::handleTraceQueue() {

@@ -58,7 +58,7 @@ void LambdaWorker::processMessage(const Message& message) {
     case OpCode::GenerateRays: {
         protobuf::GenerateRays proto;
         protoutil::from_string(message.payload(), proto);
-        generationQueue.push(from_protobuf(proto.crop_window()));
+        generateRays(from_protobuf(proto.crop_window()));
         break;
     }
 
