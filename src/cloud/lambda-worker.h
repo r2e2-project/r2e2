@@ -125,8 +125,11 @@ class LambdaWorker {
     /*** Ray Tracing **********************************************************/
 
     Poller::Action::Result::Type handleTraceQueue();
+    Poller::Action::Result::Type handleGeneration();
 
     void generateRays(const Bounds2i& cropWindow);
+
+    std::queue<Bounds2i> generationQueue{};
 
     std::map<TreeletId, std::unique_ptr<CloudBVH>> treelets{};
     std::map<TreeletId, std::queue<RayStatePtr>> traceQueue{};
