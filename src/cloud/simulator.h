@@ -53,6 +53,12 @@ struct Packet {
     std::list<RayData> rays;
 };
 
+struct TreeletData {
+    uint32_t loadID;
+    uint32_t dropID;
+    uint64_t bytesRemaining;
+};
+
 struct Worker {
     uint64_t id;
 
@@ -61,6 +67,8 @@ struct Worker {
     uint64_t outstanding = 0;
 
     std::vector<Packet> nextPackets;
+
+    std::list<TreeletData> newTreelets;
 };
 
 class Simulator {
@@ -90,7 +98,11 @@ private:
 
     void generateRays(Worker &worker);
 
-    void transmitRays();
+    void updateTreeletMapping(const TreeletData &treelet);
+
+    void transmitTreelets(std::vector<uint64_t> &remainingIngress);
+
+    void transmitRays(std::vector<uint64_t> &remainingIngress, std::vector<uint64_t> &remainingEgress);
 
     void rebalance();
 

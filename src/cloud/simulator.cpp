@@ -115,7 +115,12 @@ void Simulator::simulate() {
     while (isWork) {
         curStats = TimeStats();
 
-        transmitRays();
+        vector<uint64_t> remainingIngress(numWorkers, workerBandwidth / 1000);
+        vector<uint64_t> remainingEgress(numWorkers, workerBandwidth / 1000);
+
+        transmitTreelets(remainingIngress);
+
+        transmitRays(remainingIngress, remainingEgress);
 
         if (curMS % msPerRebalance == 0) {
             rebalance();
@@ -278,9 +283,36 @@ void Simulator::generateRays(Worker &worker) {
     }
 }
 
-void Simulator::transmitRays() {
-    vector<uint64_t> remainingIngress(numWorkers, workerBandwidth / 1000);
-    vector<uint64_t> remainingEgress(numWorkers, workerBandwidth / 1000);
+void Simulator::updateTreeletMapping(const TreeletData &treelet) {
+}
+
+void Simulator::transmitTreelets(vector<uint64_t> &remainingIngress) {
+    for (Worker &worker : workers) {
+        uint64_t &ingress = remainingIngress[worker.id];
+        auto iter = worker.newTreelets.begin();
+        while (iter != worker.newTreelets.end()) {
+            auto nextIter = next(iter);
+            TreeletData &treelet = *iter;
+
+            uint64_t sub = min(ingress, treelet.bytesRemaining);
+            treelet.bytesRemaining -= sub;
+            ingress -= sub;
+
+            if (treelet.bytesRemaining == 0) {
+                updateTreeletMapping(treelet);
+                worker.newTreelets.erase(iter);
+            }
+
+            if (ingress == 0) {
+                break;
+            }
+
+            iter = nextIter;
+        }
+    }
+}
+
+void Simulator::transmitRays(vector<uint64_t> &remainingIngress, vector<uint64_t> &remainingEgress) {
     list<pair<list<Packet>::iterator, list<Packet>::iterator>> activeWork;
     for (uint64_t workerID = 0; workerID < numWorkers; workerID++) {
         Worker &worker = workers[workerID];
