@@ -76,7 +76,8 @@ public:
     Simulator(uint64_t numWorkers_, uint64_t workerBandwidth_,
               uint64_t workerLatency_, uint64_t msPerRebalance_,
               uint64_t samplesPerPixel_, uint64_t pathDepth_,
-              const std::string &initAllocPath);
+              const std::string &initAllocPath,
+              const std::string &statsPath);
     void simulate();
 
     void dump_stats();
@@ -148,7 +149,7 @@ private:
     std::mt19937 randgen {rd()};
 
     uint64_t maxPacketSize = 4096;
-    uint64_t maxPacketDelay = 2;
+    uint64_t maxPacketDelay;
 
     uint64_t numTreelets;
 

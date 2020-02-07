@@ -3,7 +3,7 @@
 using namespace std;
 
 void usage(const char *argv0) {
-    cerr << argv0 << " SCENE-DATA NUM-WORKERS WORKER-BANDWIDTH WORKER-LATENCY REBALANCE-PERIOD SPP PATH-DEPTH INIT-MAPPING" << endl;
+    cerr << argv0 << " SCENE-DATA NUM-WORKERS WORKER-BANDWIDTH WORKER-LATENCY REBALANCE-PERIOD SPP PATH-DEPTH INIT-MAPPING STATS-PATH" << endl;
     exit(EXIT_FAILURE);
 }
 
@@ -63,7 +63,7 @@ Scene loadFakeScene() {
 Simulator::Simulator(uint64_t numWorkers_, uint64_t workerBandwidth_,
               uint64_t workerLatency_, uint64_t msPerRebalance_,
               uint64_t samplesPerPixel_, uint64_t pathDepth_,
-              const string &initAllocPath)
+              const string &initAllocPath, const string &statsPath)
         : numWorkers(numWorkers_), workerBandwidth(workerBandwidth_),
           workerLatency(workerLatency_), msPerRebalance(msPerRebalance_),
           samplesPerPixel(samplesPerPixel_), pathDepth(pathDepth_),
@@ -72,8 +72,9 @@ Simulator::Simulator(uint64_t numWorkers_, uint64_t workerBandwidth_,
           lights(loadLights()), fakeScene(loadFakeScene()),
           sampleBounds(camera->film->GetSampleBounds()),
           sampleExtent(sampleBounds.Diagonal()),
+          maxPacketDelay(workerLatency),
           numTreelets(global::manager.treeletCount()),
-          statsCSV("/tmp/stats.csv")
+          statsCSV(statsPath)
 {
     CHECK_EQ(workerToTreelets.size(), numWorkers);
     for (auto &kv : workerToTreelets) {
@@ -481,7 +482,7 @@ int main(int argc, char const *argv[]) {
 
     PbrtOptions.nThreads = 1;
 
-    if (argc < 9) usage(argv[0]);
+    if (argc < 10) usage(argv[0]);
 
     uint64_t numWorkers = stoul(argv[2]);
     uint64_t workerBandwidth = stoul(argv[3]);
@@ -493,7 +494,8 @@ int main(int argc, char const *argv[]) {
     global::manager.init(argv[1]);
 
     Simulator simulator(numWorkers, workerBandwidth, workerLatency,
-                        msPerRebalance, samplesPerPixel, maxDepth, argv[8]);
+                        msPerRebalance, samplesPerPixel, maxDepth,
+                        argv[8], argv[9]);
 
     simulator.simulate();
 
