@@ -216,6 +216,9 @@ class LambdaWorker {
 
     void sendWorkerStats();
 
+    /* number of active rays currently in this worker */
+    uint64_t activeRays{0};
+
     ////////////////////////////////////////////////////////////////////////////
     // Logging                                                                //
     ////////////////////////////////////////////////////////////////////////////

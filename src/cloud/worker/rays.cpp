@@ -36,6 +36,8 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
                 outQueue[nextTreelet].push(move(statePtr));
                 outQueueSize++;
             }
+
+            activeRays++;
         }
     }
 }
@@ -67,6 +69,7 @@ ResultType LambdaWorker::handleTraceQueue() {
             while (!rays.empty() && tracedCount++ < MAX_RAYS) {
                 RayStatePtr rayPtr = move(rays.front());
                 rays.pop();
+                activeRays--;
 
                 RayState& ray = *rayPtr;
                 const uint64_t pathId = ray.PathID();
@@ -86,6 +89,7 @@ ResultType LambdaWorker::handleTraceQueue() {
                             newRay.Ld = hit ? 0.f : newRay.Ld;
                             localStats.shadowRayHops.add(newRay.hop);
                             samples.emplace(*newRayPtr);
+                            activeRays++;
 
                             logRay(RayAction::Finished, newRay);
 
@@ -102,9 +106,10 @@ ResultType LambdaWorker::handleTraceQueue() {
                     } else if (emptyVisit) {
                         newRay.Ld = 0.f;
                         samples.emplace(*newRayPtr);
-                        localStats.rayHops.add(newRay.hop);
-
                         finishedPathIds.push(pathId);
+                        activeRays++;
+
+                        localStats.rayHops.add(newRay.hop);
                         localStats.pathHops.add(newRay.pathHop);
 
                         logRay(RayAction::Finished, newRay);
@@ -157,6 +162,8 @@ ResultType LambdaWorker::handleTraceQueue() {
             outQueue[nextTreelet].push(move(ray));
             outQueueSize++;
         }
+
+        activeRays++;
     }
 
     return ResultType::Continue;

@@ -210,6 +210,7 @@ ResultType LambdaWorker::handleTransferResults(const bool sampleBags) {
             case Task::Upload: {
                 /* we have to tell the master that we uploaded this */
                 *enqueuedProto.add_items() = to_protobuf(info);
+                activeRays -= info.rayCount;
 
                 logBag(BagAction::Enqueued, info);
                 break;
@@ -220,6 +221,7 @@ ResultType LambdaWorker::handleTransferResults(const bool sampleBags) {
                    and tell the master */
                 receiveQueue.emplace(info, move(action.second));
                 *dequeuedProto.add_items() = to_protobuf(info);
+                activeRays += info.rayCount;
 
                 logBag(BagAction::Dequeued, info);
                 break;

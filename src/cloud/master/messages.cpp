@@ -1,8 +1,7 @@
-#include "cloud/lambda-master.h"
-
 #include <chrono>
 #include <typeinfo>
 
+#include "cloud/lambda-master.h"
 #include "cloud/r2t2.h"
 #include "execution/meow/message.h"
 #include "messages/utils.h"
@@ -79,7 +78,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             } else if (worker.outstandingNewRays == 0) {
                 /* Tell worker to finish up */
                 worker.connection->enqueue_write(
-                        Message::str(0, OpCode::FinishUp, ""));
+                    Message::str(0, OpCode::FinishUp, ""));
 
                 worker.state = Worker::State::FinishingUp;
             }
