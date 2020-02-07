@@ -151,6 +151,8 @@ class LambdaWorker {
     /* downloads the necessary scene objects */
     void getObjects(const protobuf::GetObjects& objects);
 
+    Poller::Action::Result::Type handleGenerationDone();
+
     /* process incoming messages */
     Poller::Action::Result::Type handleMessages();
 
@@ -173,6 +175,8 @@ class LambdaWorker {
     Poller::Action::Result::Type handleSampleBags();
 
     Poller::Action::Result::Type handleTransferResults(const bool sampleBags);
+
+    bool generationPending{false};
 
     /* queues */
 

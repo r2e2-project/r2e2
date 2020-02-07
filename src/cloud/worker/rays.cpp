@@ -1,5 +1,4 @@
 #include "cloud/lambda-worker.h"
-
 #include "cloud/r2t2.h"
 #include "messages/utils.h"
 #include "net/util.h"
@@ -43,10 +42,19 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
     }
 }
 
+ResultType LambdaWorker::handleGenerationDone() {
+    coordinatorConnection->enqueue_write(
+        Message::str(*workerId, OpCode::GenerationDone, to_string(activeRays)));
+
+    generationPending = false;
+
+    return ResultType::Continue;
+}
+
 ResultType LambdaWorker::handleTraceQueue() {
     queue<RayStatePtr> processedRays;
 
-    constexpr size_t MAX_RAYS = 200'000;
+    constexpr size_t MAX_RAYS = WORKER_SAFE_RAY_LIMIT / 2;
     size_t tracedCount = 0;
     MemoryArena arena;
 

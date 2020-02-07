@@ -71,6 +71,12 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         []() { LOG(INFO) << "Connection to coordinator failed."; },
         [this]() { this->terminate(); });
 
+    loop.poller().add_action(Poller::Action(
+        alwaysOnFd, Direction::Out,
+        bind(&LambdaWorker::handleGenerationDone, this),
+        [this]() { return generationPending && activeRays < 100'000; },
+        []() { throw runtime_error("generation done error"); }));
+
     /* trace rays */
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out, bind(&LambdaWorker::handleTraceQueue, this),

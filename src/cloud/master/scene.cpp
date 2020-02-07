@@ -83,8 +83,7 @@ int defaultTileSize(int spp) {
 int autoTileSize(const Bounds2i &bounds, const long int spp, const size_t N) {
     int tileSize = ceil(sqrt(bounds.Area() / N));
     const Vector2i extent = bounds.Diagonal();
-    const int safeRaysLimit = 1'000'000;
-    const int safeTileLimit = ceil(sqrt(safeRaysLimit / spp));
+    const int safeTileLimit = ceil(sqrt(WORKER_SAFE_RAY_LIMIT / spp));
 
     while (ceil(1.0 * extent.x / tileSize) * ceil(1.0 * extent.y / tileSize) >
            N) {
@@ -125,16 +124,10 @@ Bounds2i LambdaMaster::Tiles::nextCameraTile() {
     return Bounds2i(Point2i{x0, y0}, Point2i{x1, y1});
 }
 
-bool LambdaMaster::Tiles::workerReadyForTile(const Worker &worker) {
-    return worker.outstandingNewRays < 500'000;
-}
-
 void LambdaMaster::Tiles::sendWorkerTile(Worker &worker) {
     protobuf::GenerateRays proto;
     Bounds2i nextTile = nextCameraTile();
     *proto.mutable_crop_window() = to_protobuf(nextTile);
-
-    worker.outstandingNewRays += nextTile.Area() * tileSpp;
 
     worker.connection->enqueue_write(
         Message::str(0, OpCode::GenerateRays, protoutil::to_string(proto)));

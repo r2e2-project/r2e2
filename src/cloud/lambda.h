@@ -6,6 +6,8 @@
 #include <sstream>
 #include <string>
 
+constexpr size_t WORKER_SAFE_RAY_LIMIT = 1'000'000;
+
 using WorkerId = uint64_t;
 using TreeletId = uint32_t;
 using BagId = uint64_t;

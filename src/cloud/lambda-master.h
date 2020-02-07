@@ -118,7 +118,6 @@ class LambdaMaster {
 
         std::set<RayBagInfo> outstandingRayBags{};
         size_t outstandingBytes{0};
-        size_t outstandingNewRays{0};
 
         // Statistics
         WorkerStats stats{};
@@ -280,7 +279,6 @@ class LambdaMaster {
       public:
         Bounds2i nextCameraTile();
         bool cameraRaysRemaining() const;
-        bool workerReadyForTile(const Worker &worker);
         void sendWorkerTile(Worker &worker);
 
         Tiles() = default;
