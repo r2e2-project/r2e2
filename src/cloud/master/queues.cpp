@@ -1,5 +1,4 @@
 #include "cloud/lambda-master.h"
-
 #include "messages/utils.h"
 #include "util/random.h"
 
@@ -13,6 +12,15 @@ using OpCode = Message::OpCode;
 bool LambdaMaster::assignWork(Worker& worker) {
     /* return, if worker is not active anymore */
     if (worker.state != Worker::State::Active) return false;
+
+    if (worker.role == Worker::Role::Generator) {
+        if (tiles.cameraRaysRemaining()) {
+            tiles.sendWorkerTile(worker);
+            return false;
+        } else {
+            worker.role = Worker::Role::Tracer;
+        }
+    }
 
     /* return, if the worker doesn't have any treelets */
     if (worker.treelets.empty()) return false;

@@ -141,7 +141,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     scene.initialize(config.samplesPerPixel, config.cropWindow);
 
     tiles = Tiles{config.tileSize, scene.sampleBounds,
-                  scene.sampler->samplesPerPixel, rayGenerators};
+                  scene.sampler->samplesPerPixel,
+                  rayGenerators ? rayGenerators : maxWorkers};
 
     /* are we logging anything? */
     if (config.collectDebugLogs || config.workerStatsWriteInterval > 0 ||
@@ -399,6 +400,12 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                 worker.connection->enqueue_write(Message::str(
                     0, OpCode::GetObjects, protoutil::to_string(objsProto)));
 
+                if (this->rayGenerators == 0 && worker.treelets.count(0) > 0 &&
+                    tiles.cameraRaysRemaining()) {
+                    /* this worker will take temporary role of a generator */
+                    worker.role = Worker::Role::Generator;
+                }
+
                 if (assignWork(worker)) {
                     freeWorkers.push_back(worker.id);
                 }
@@ -439,13 +446,14 @@ string LambdaMaster::Worker::toString() const {
 void LambdaMaster::run() {
     StatusBar::get();
 
-    /* let's invoke the ray generators */
-    cerr << "Launching " << rayGenerators << " ray "
-         << pluralize("generator", rayGenerators) << "... ";
+    if (rayGenerators > 0) {
+        /* let's invoke the ray generators */
+        cerr << "Launching " << rayGenerators << " ray "
+             << pluralize("generator", rayGenerators) << "... ";
 
-    invokeWorkers(rayGenerators + static_cast<size_t>(0.1 * rayGenerators));
-
-    cerr << "done." << endl;
+        invokeWorkers(rayGenerators + static_cast<size_t>(0.1 * rayGenerators));
+        cerr << "done." << endl;
+    }
 
     while (true) {
         auto res = loop.loop_once().result;

@@ -55,12 +55,15 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             if (tiles.cameraRaysRemaining()) {
                 /* Tell the worker to generate rays */
                 tiles.sendWorkerTile(worker);
-            } else {
+            } else if (rayGenerators > 0) {
                 /* Tell worker to finish up */
                 worker.connection->enqueue_write(
                     Message::str(0, OpCode::FinishUp, ""));
 
                 worker.state = Worker::State::FinishingUp;
+            } else {
+                worker.role = Worker::Role::Tracer;
+                freeWorkers.push_back(worker.id);
             }
         }
 
