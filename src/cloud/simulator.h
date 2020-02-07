@@ -22,6 +22,7 @@
 #include "util/exception.h"
 #include "cloud/raystate.h"
 #include "messages/serialization.h"
+#include "schedulers/static.h"
 
 namespace pbrt {
 
@@ -118,6 +119,8 @@ private:
     uint64_t samplesPerPixel;
     uint64_t pathDepth;
 
+    uint64_t numTreelets;
+
     std::vector<Worker> workers;
 
     std::unordered_map<uint64_t, std::unordered_set<uint32_t>> workerToTreelets;
@@ -150,8 +153,6 @@ private:
 
     uint64_t maxPacketSize = 4096;
     uint64_t maxPacketDelay;
-
-    uint64_t numTreelets;
 
     struct Demand {
         std::vector<uint64_t> perTreelet;

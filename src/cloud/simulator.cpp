@@ -9,18 +9,22 @@ void usage(const char *argv0) {
 
 namespace pbrt {
 
-unordered_map<uint64_t, unordered_set<uint32_t>> loadInitMapping(const string &fname) {
+unordered_map<uint64_t, unordered_set<uint32_t>> loadInitMapping(const string &fname,
+                                                                 uint64_t numWorkers,
+                                                                 uint64_t numTreelets) {
+    StaticScheduler scheduler = StaticScheduler(fname);
+    vector<TreeletStats> treelets(numTreelets);
+    auto opt_schedule = scheduler.schedule(numWorkers, treelets);
+    auto &schedule = *opt_schedule;
+
     unordered_map<uint64_t, unordered_set<uint32_t>> workerToTreelets;
-    string line;
-    ifstream initAllocFile(fname);
-    int workerIdx = 0;
-    while (getline(initAllocFile, line)) {
-        stringstream strm(line);
-        string treeletStr;
-        while (getline(strm, treeletStr)) {
-            workerToTreelets[workerIdx].emplace(stoul(treeletStr));
+    uint64_t workerID = 0;
+    for (uint32_t treeletID = 0; treeletID < numTreelets; treeletID++) {
+        uint64_t numWorkers = schedule[treeletID];
+        for (uint64_t i = 0; i < numWorkers; i++) {
+            workerToTreelets[workerID].emplace(treeletID);
+            workerID++;
         }
-        workerIdx++;
     }
 
     return workerToTreelets;
@@ -67,13 +71,14 @@ Simulator::Simulator(uint64_t numWorkers_, uint64_t workerBandwidth_,
         : numWorkers(numWorkers_), workerBandwidth(workerBandwidth_),
           workerLatency(workerLatency_), msPerRebalance(msPerRebalance_),
           samplesPerPixel(samplesPerPixel_), pathDepth(pathDepth_),
-          workers(numWorkers), workerToTreelets(loadInitMapping(initAllocPath)),
+          numTreelets(global::manager.treeletCount()),
+          workers(numWorkers),
+          workerToTreelets(loadInitMapping(initAllocPath, numWorkers, numTreelets)),
           transformCache(), sampler(loadSampler()), camera(loadCamera(transformCache)),
           lights(loadLights()), fakeScene(loadFakeScene()),
           sampleBounds(camera->film->GetSampleBounds()),
           sampleExtent(sampleBounds.Diagonal()),
           maxPacketDelay(workerLatency),
-          numTreelets(global::manager.treeletCount()),
           statsCSV(statsPath)
 {
     CHECK_EQ(workerToTreelets.size(), numWorkers);
