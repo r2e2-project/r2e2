@@ -12,7 +12,7 @@ namespace pbrt {
 unordered_map<uint64_t, unordered_set<uint32_t>> loadInitMapping(const string &fname,
                                                                  uint64_t numWorkers,
                                                                  uint64_t numTreelets) {
-    StaticScheduler scheduler = StaticScheduler(fname);
+    StaticMultiScheduler scheduler = StaticMultiScheduler(fname);
     vector<TreeletStats> treelets(numTreelets);
     auto opt_schedule = scheduler.schedule(numWorkers, treelets);
     auto &schedule = *opt_schedule;
@@ -85,6 +85,7 @@ Simulator::Simulator(uint64_t numWorkers_, uint64_t workerBandwidth_,
     for (auto &kv : workerToTreelets) {
         for (uint32_t treelet : kv.second) {
             treeletToWorkers[treelet].push_back(kv.first);
+            treeletToWorkerLocs[treelet].emplace(kv.first, treeletToWorkers[treelet].end() - 1);
         }
     }
 
@@ -105,7 +106,8 @@ Simulator::Simulator(uint64_t numWorkers_, uint64_t workerBandwidth_,
         light->Preprocess(fakeScene);
     }
 
-    treelets.resize(global::manager.treeletCount());
+    treelets.resize(numTreelets);
+    treeletHits.resize(numTreelets);
 
     /* let's load all the treelets */
     for (size_t i = 0; i < treelets.size(); i++) {
@@ -164,11 +166,18 @@ void Simulator::simulate() {
 void Simulator::dump_stats() {
     cout << "Total rays transferred: " << totalRaysTransferred << endl;
     cout << "Total bytes transferred: " << totalBytesTransferred << endl;
+    cout << "Total bytes transferred for treelets: " << totalTreeletBytesTransferred << endl;
     cout << "Camera rays launched: " << totalCameraRaysLaunched << endl;
     cout << "Shadow rays launched: " << totalShadowRaysLaunched << endl;
     cout << "Total rays launched: " << totalRaysLaunched << endl;
     cout << "Average transfers/ray: " << (double)totalRaysTransferred / (double)totalRaysLaunched << endl;
     cout << "Average bytes/ray: " << totalBytesTransferred / totalRaysTransferred << endl;
+
+    ofstream treeletStatsCSV("/tmp/treelets.csv");
+    treeletStatsCSV << numTreelets << endl;
+    for (uint32_t treeletID = 0; treeletID < numTreelets; treeletID++) {
+        treeletStatsCSV << treeletID << " " << treeletHits[treeletID] << endl;
+    }
 }
 
 void Simulator::setTiles() {
@@ -207,7 +216,7 @@ Bounds2i Simulator::nextCameraTile() {
 }
 
 uint64_t Simulator::getRandomWorker(uint32_t treelet) {
-    vector<uint64_t> &treelet_workers = treeletToWorkers.at(treelet);
+    deque<uint64_t> &treelet_workers = treeletToWorkers.at(treelet);
     uniform_int_distribution<> dis(0, treelet_workers.size() - 1);
     return treelet_workers[dis(randgen)];
 }
@@ -289,7 +298,16 @@ void Simulator::generateRays(Worker &worker) {
     }
 }
 
-void Simulator::updateTreeletMapping(const TreeletData &treelet) {
+void Simulator::updateTreeletMapping(Worker &worker, const TreeletData &treelet) {
+    workerToTreelets.at(worker.id).erase(treelet.dropID);
+    workerToTreelets.at(worker.id).emplace(treelet.loadID);
+
+    auto iter = treeletToWorkerLocs.at(treelet.dropID).find(worker.id);
+    treeletToWorkers.at(treelet.dropID).erase(iter->second);
+    treeletToWorkerLocs.at(treelet.dropID).erase(iter);
+
+    treeletToWorkers.at(treelet.loadID).push_back(worker.id);
+    treeletToWorkerLocs.at(treelet.loadID).emplace(worker.id, treeletToWorkers.at(treelet.loadID).end() - 1);
 }
 
 void Simulator::transmitTreelets(vector<uint64_t> &remainingIngress) {
@@ -304,8 +322,11 @@ void Simulator::transmitTreelets(vector<uint64_t> &remainingIngress) {
             treelet.bytesRemaining -= sub;
             ingress -= sub;
 
+            curStats.treeletBytesTransferred += sub;
+            totalTreeletBytesTransferred += sub;
+
             if (treelet.bytesRemaining == 0) {
-                updateTreeletMapping(treelet);
+                updateTreeletMapping(worker, treelet);
                 worker.newTreelets.erase(iter);
             }
 
@@ -418,6 +439,9 @@ void Simulator::processRays(Worker &worker) {
                 enqueueRay(worker, move(rayPtr), rayTreeletId);
                 continue;
             }
+
+            treeletHits[rayTreeletId]++;
+
             if (!rayPtr->toVisitEmpty()) {
                 auto newRayPtr = graphics::TraceRay(move(rayPtr),
                                                     *treelets[rayTreeletId]);

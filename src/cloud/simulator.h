@@ -22,7 +22,7 @@
 #include "util/exception.h"
 #include "cloud/raystate.h"
 #include "messages/serialization.h"
-#include "schedulers/static.h"
+#include "schedulers/static_multi.h"
 
 namespace pbrt {
 
@@ -100,7 +100,7 @@ private:
 
     void generateRays(Worker &worker);
 
-    void updateTreeletMapping(const TreeletData &treelet);
+    void updateTreeletMapping(Worker &worker, const TreeletData &treelet);
 
     void transmitTreelets(std::vector<uint64_t> &remainingIngress);
 
@@ -124,7 +124,8 @@ private:
     std::vector<Worker> workers;
 
     std::unordered_map<uint64_t, std::unordered_set<uint32_t>> workerToTreelets;
-    std::unordered_map<uint32_t, std::vector<uint64_t>> treeletToWorkers;
+    std::unordered_map<uint32_t, std::deque<uint64_t>> treeletToWorkers;
+    std::unordered_map<uint32_t, std::unordered_map<uint64_t, std::deque<uint64_t>::iterator>> treeletToWorkerLocs;
 
     std::vector<std::unique_ptr<Transform>> transformCache;
     std::shared_ptr<GlobalSampler> sampler;
@@ -166,14 +167,18 @@ private:
     std::ofstream statsCSV;
     uint64_t totalRaysTransferred = 0;
     uint64_t totalBytesTransferred = 0;
+    uint64_t totalTreeletBytesTransferred = 0;
     uint64_t totalRaysLaunched = 0;
     uint64_t totalCameraRaysLaunched = 0;
     uint64_t totalShadowRaysLaunched = 0;
     uint64_t totalRaysCompleted = 0;
 
+    std::vector<uint64_t> treeletHits;
+
     struct TimeStats {
         uint64_t raysInFlight = 0;
         uint64_t bytesTransferred = 0;
+        uint64_t treeletBytesTransferred = 0;
         uint64_t raysEnqueued = 0;
         uint64_t raysDequeued = 0;
         uint64_t cameraRaysLaunched = 0;
