@@ -118,6 +118,7 @@ class LambdaMaster {
 
         std::set<RayBagInfo> outstandingRayBags{};
         size_t outstandingBytes{0};
+        size_t activeRays{0};
 
         // Statistics
         WorkerStats stats{};

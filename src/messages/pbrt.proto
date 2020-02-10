@@ -401,7 +401,9 @@ message RayBagInfo {
 }
 
 message RayBags {
-    repeated RayBagInfo items = 1;
+    uint64 active_rays = 1;
+
+    repeated RayBagInfo items = 2;
 }
 
 message WorkerStats {

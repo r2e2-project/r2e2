@@ -231,6 +231,9 @@ ResultType LambdaWorker::handleTransferResults(const bool sampleBags) {
         }
     }
 
+    enqueuedProto.set_active_rays(activeRays);
+    dequeuedProto.set_active_rays(activeRays);
+
     if (enqueuedProto.items_size() > 0) {
         coordinatorConnection->enqueue_write(
             Message::str(*workerId, OpCode::RayBagEnqueued,

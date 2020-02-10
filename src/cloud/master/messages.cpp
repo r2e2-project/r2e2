@@ -74,6 +74,8 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         protobuf::RayBags proto;
         protoutil::from_string(message.payload(), proto);
 
+        worker.activeRays = proto.active_rays();
+
         for (const auto &item : proto.items()) {
             const RayBagInfo info = from_protobuf(item);
             recordEnqueue(workerId, info);
@@ -95,6 +97,8 @@ void LambdaMaster::processMessage(const uint64_t workerId,
     case OpCode::RayBagDequeued: {
         protobuf::RayBags proto;
         protoutil::from_string(message.payload(), proto);
+
+        worker.activeRays = proto.active_rays();
 
         for (const auto &item : proto.items()) {
             const RayBagInfo info = from_protobuf(item);
