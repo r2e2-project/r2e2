@@ -83,7 +83,7 @@ int defaultTileSize(int spp) {
 int autoTileSize(const Bounds2i &bounds, const long int spp, const size_t N) {
     int tileSize = ceil(sqrt(bounds.Area() / N));
     const Vector2i extent = bounds.Diagonal();
-    const int safeTileLimit = ceil(sqrt(WORKER_SAFE_RAY_LIMIT / spp));
+    const int safeTileLimit = ceil(sqrt(WORKER_MAX_ACTIVE_RAYS / spp));
 
     while (ceil(1.0 * extent.x / tileSize) * ceil(1.0 * extent.y / tileSize) >
            N) {

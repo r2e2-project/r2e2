@@ -6,7 +6,7 @@
 #include <sstream>
 #include <string>
 
-constexpr size_t WORKER_SAFE_RAY_LIMIT = 1'000'000;
+constexpr size_t WORKER_MAX_ACTIVE_RAYS = 500'000; /* 600 MiB of rays */
 
 using WorkerId = uint64_t;
 using TreeletId = uint32_t;

@@ -56,6 +56,8 @@ void LambdaMaster::recordAssign(const WorkerId workerId,
     aggregatedStats.assigned.rays += info.rayCount;
     aggregatedStats.assigned.bytes += info.bagSize;
     aggregatedStats.assigned.count++;
+
+    worker.activeRays += info.rayCount;
 }
 
 void LambdaMaster::recordDequeue(const WorkerId workerId,
@@ -66,10 +68,6 @@ void LambdaMaster::recordDequeue(const WorkerId workerId,
 
     worker.outstandingRayBags.erase(info);
     worker.outstandingBytes -= info.bagSize;
-
-    if (worker.outstandingBytes < MAX_OUTSTANDING_BYTES) {
-        freeWorkers.push_back(workerId);
-    }
 
     treelets[info.treeletId].lastStats.first = true;
 
