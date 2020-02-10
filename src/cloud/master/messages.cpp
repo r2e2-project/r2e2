@@ -84,6 +84,10 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             }
         }
 
+        if (worker.activeRays() < WORKER_MAX_ACTIVE_RAYS) {
+            freeWorkers.push_back(workerId);
+        }
+
         break;
     }
 
