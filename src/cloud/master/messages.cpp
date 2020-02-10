@@ -49,27 +49,6 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         break;
     }
 
-    case OpCode::GenerationDone: {
-        /* If this is a ray generating worker, give a new tile if available */
-        if (worker.role == Worker::Role::Generator) {
-            if (tiles.cameraRaysRemaining()) {
-                /* Tell the worker to generate rays */
-                tiles.sendWorkerTile(worker);
-            } else if (rayGenerators > 0) {
-                /* Tell worker to finish up */
-                worker.connection->enqueue_write(
-                    Message::str(0, OpCode::FinishUp, ""));
-
-                worker.state = Worker::State::FinishingUp;
-            } else {
-                worker.role = Worker::Role::Tracer;
-                freeWorkers.push_back(worker.id);
-            }
-        }
-
-        break;
-    }
-
     case OpCode::RayBagEnqueued: {
         protobuf::RayBags proto;
         protoutil::from_string(message.payload(), proto);
@@ -89,6 +68,19 @@ void LambdaMaster::processMessage(const uint64_t workerId,
                 queuedRayBags[info.treeletId].push(info);
             } else {
                 pendingRayBags[info.treeletId].push(info);
+            }
+        }
+
+        if (worker.role == Worker::Role::Generator) {
+            if (tiles.cameraRaysRemaining()) {
+                /* Tell the worker to generate rays */
+                tiles.sendWorkerTile(worker);
+            } else if (worker.activeRays() == 0) {
+                /* Tell worker to finish up */
+                worker.connection->enqueue_write(
+                    Message::str(0, OpCode::FinishUp, ""));
+
+                worker.state = Worker::State::FinishingUp;
             }
         }
 
