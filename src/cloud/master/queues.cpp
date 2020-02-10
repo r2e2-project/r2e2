@@ -20,27 +20,26 @@ bool LambdaMaster::assignWork(Worker& worker) {
     if (worker.treelets.empty()) return false;
 
     const TreeletId treeletId = *worker.treelets.begin();
-    auto bagsQueueIt = queuedRayBags.find(treeletId);
+    auto queueIt = queuedRayBags.find(treeletId);
 
     /* Q1: do we have any rays to generate? */
     bool raysToGenerate =
         tiles.cameraRaysRemaining() && (worker.treelets.count(0) > 0);
 
     /* Q2: do we have any work for this worker? */
-    const bool workToDo = (bagsQueueIt != queuedRayBags.end());
+    const bool workToDo = (queueIt != queuedRayBags.end());
 
     if (!raysToGenerate && !workToDo) {
         return true;
     }
 
     protobuf::RayBags proto;
-    auto& bags = bagsQueueIt->second;
 
-    while ((raysToGenerate || workToDo && !bags.empty()) &&
+    while ((raysToGenerate || (workToDo && !queueIt->second.empty())) &&
            worker.activeRays() < WORKER_MAX_ACTIVE_RAYS) {
         if (raysToGenerate && workToDo) {
             /* we flip and coin and decide which one to do */
-            bernoulli_distribution coin{0.5};
+            bernoulli_distribution coin{1.0};
             if (coin(randEngine)) {
                 tiles.sendWorkerTile(worker);
                 raysToGenerate = tiles.cameraRaysRemaining();
@@ -53,17 +52,19 @@ bool LambdaMaster::assignWork(Worker& worker) {
         }
 
         /* if only workToDo or the coin flip returned false */
-        *proto.add_items() = to_protobuf(bags.front());
-        recordAssign(worker.id, bags.front());
-        bags.pop();
+        *proto.add_items() = to_protobuf(queueIt->second.front());
+        recordAssign(worker.id, queueIt->second.front());
+        queueIt->second.pop();
     }
 
-    if (bags.empty()) {
-        queuedRayBags.erase(bagsQueueIt);
+    if (workToDo && queueIt->second.empty()) {
+        queuedRayBags.erase(queueIt);
     }
 
-    worker.connection->enqueue_write(
-        Message::str(0, OpCode::ProcessRayBag, protoutil::to_string(proto)));
+    if (proto.items_size()) {
+        worker.connection->enqueue_write(Message::str(
+            0, OpCode::ProcessRayBag, protoutil::to_string(proto)));
+    }
 
     return worker.activeRays() < WORKER_MAX_ACTIVE_RAYS;
 }
