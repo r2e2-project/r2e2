@@ -117,7 +117,20 @@ class LambdaMaster {
 
         std::set<RayBagInfo> outstandingRayBags{};
         size_t outstandingBytes{0};
-        size_t activeRays{0};
+
+        struct {
+            uint64_t camera{0};
+            uint64_t generated{0};
+            uint64_t dequeued{0};
+
+            uint64_t terminated{0};
+            uint64_t enqueued{0};
+        } rays;
+
+        uint64_t activeRays() const {
+            return rays.camera + rays.generated + rays.dequeued -
+                   rays.terminated - rays.enqueued;
+        }
 
         // Statistics
         WorkerStats stats{};

@@ -151,8 +151,6 @@ class LambdaWorker {
     /* downloads the necessary scene objects */
     void getObjects(const protobuf::GetObjects& objects);
 
-    Poller::Action::Result::Type handleGenerationDone();
-
     /* process incoming messages */
     Poller::Action::Result::Type handleMessages();
 
@@ -175,8 +173,6 @@ class LambdaWorker {
     Poller::Action::Result::Type handleSampleBags();
 
     Poller::Action::Result::Type handleTransferResults(const bool sampleBags);
-
-    bool generationPending{false};
 
     /* queues */
 
@@ -217,8 +213,11 @@ class LambdaWorker {
 
     void sendWorkerStats();
 
-    /* number of active rays currently in this worker */
-    uint64_t activeRays{0};
+    struct {
+        uint64_t generated{0};
+        uint64_t terminated{0};
+    } rays;
+
 
     ////////////////////////////////////////////////////////////////////////////
     // Logging                                                                //

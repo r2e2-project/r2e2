@@ -1,7 +1,6 @@
-#include "cloud/lambda-master.h"
-
 #include <iomanip>
 
+#include "cloud/lambda-master.h"
 #include "messages/utils.h"
 
 using namespace std;
@@ -12,6 +11,7 @@ using namespace PollerShortNames;
 void LambdaMaster::recordEnqueue(const WorkerId workerId,
                                  const RayBagInfo &info) {
     auto &worker = workers.at(workerId);
+    worker.rays.enqueued += info.rayCount;
 
     worker.lastStats.first = true;
     treelets[info.treeletId].lastStats.first = true;
@@ -44,6 +44,7 @@ void LambdaMaster::recordEnqueue(const WorkerId workerId,
 void LambdaMaster::recordAssign(const WorkerId workerId,
                                 const RayBagInfo &info) {
     auto &worker = workers.at(workerId);
+    worker.rays.dequeued += info.rayCount;
 
     worker.outstandingRayBags.insert(info);
     worker.outstandingBytes += info.bagSize;
@@ -56,8 +57,6 @@ void LambdaMaster::recordAssign(const WorkerId workerId,
     aggregatedStats.assigned.rays += info.rayCount;
     aggregatedStats.assigned.bytes += info.bagSize;
     aggregatedStats.assigned.count++;
-
-    worker.activeRays += info.rayCount;
 }
 
 void LambdaMaster::recordDequeue(const WorkerId workerId,

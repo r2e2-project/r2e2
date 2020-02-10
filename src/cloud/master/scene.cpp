@@ -1,5 +1,4 @@
 #include "cloud/lambda-master.h"
-
 #include "cloud/manager.h"
 #include "execution/meow/message.h"
 #include "messages/utils.h"
@@ -128,6 +127,8 @@ void LambdaMaster::Tiles::sendWorkerTile(Worker &worker) {
     protobuf::GenerateRays proto;
     Bounds2i nextTile = nextCameraTile();
     *proto.mutable_crop_window() = to_protobuf(nextTile);
+
+    worker.rays.camera += nextTile.Area() * tileSpp;
 
     worker.connection->enqueue_write(
         Message::str(0, OpCode::GenerateRays, protoutil::to_string(proto)));
