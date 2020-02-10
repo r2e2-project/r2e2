@@ -4,6 +4,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <random>
 #include <set>
 #include <stack>
 #include <string>
@@ -299,7 +300,6 @@ class LambdaMaster {
               const uint32_t numWorkers);
 
         int tileSize{0};
-        bool canSendTiles{false};
 
       private:
         Bounds2i sampleBounds{};
@@ -325,6 +325,8 @@ class LambdaMaster {
 
     std::unique_ptr<TimerFD> jobExitTimer;
     std::unique_ptr<TimerFD> jobTimeoutTimer;
+
+    std::mt19937 randEngine{std::random_device{}()};
 };
 
 }  // namespace pbrt

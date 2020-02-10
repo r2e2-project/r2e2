@@ -400,12 +400,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                 worker.connection->enqueue_write(Message::str(
                     0, OpCode::GetObjects, protoutil::to_string(objsProto)));
 
-                if (this->rayGenerators == 0 && worker.treelets.count(0) > 0 &&
-                    tiles.cameraRaysRemaining()) {
-                    /* this worker will take temporary role of a generator */
-                    worker.role = Worker::Role::Generator;
-                }
-
                 if (assignWork(worker)) {
                     freeWorkers.push_back(worker.id);
                 }

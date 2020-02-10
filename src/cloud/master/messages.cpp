@@ -14,13 +14,6 @@ using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 
-/* if (tiles.canSendTiles && tiles.cameraRaysRemaining() &&
-    stats.queueStats.pending + stats.queueStats.out +
-            stats.queueStats.ray <
-        config.newTileThreshold) {
-    tiles.sendWorkerTile(worker);
-} */
-
 ResultType LambdaMaster::handleMessages() {
     ScopeTimer<TimeLog::Category::HandleMessages> _timer;
 
@@ -76,7 +69,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
                 /* Tell the worker to generate rays */
                 tiles.sendWorkerTile(worker);
             } else if (worker.activeRays() == 0) {
-                /* Tell worker to finish up */
+                /* Generator is done, tell worker to finish up */
                 worker.connection->enqueue_write(
                     Message::str(0, OpCode::FinishUp, ""));
 

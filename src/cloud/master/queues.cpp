@@ -13,23 +13,46 @@ bool LambdaMaster::assignWork(Worker& worker) {
     /* return, if worker is not active anymore */
     if (worker.state != Worker::State::Active) return false;
 
-    /* return, if the worker doesn't have any treelets */
-    if (worker.treelets.empty()) return false;
-
     /* return if the worker already has enough work */
     if (worker.activeRays() >= WORKER_MAX_ACTIVE_RAYS) return false;
 
-    const TreeletId treeletId = *worker.treelets.begin();
+    /* return, if the worker doesn't have any treelets */
+    if (worker.treelets.empty()) return false;
 
+    const TreeletId treeletId = *worker.treelets.begin();
     auto bagsQueueIt = queuedRayBags.find(treeletId);
 
-    /* we don't have any work for this dude */
-    if (bagsQueueIt == queuedRayBags.end()) return true;
+    /* Q1: do we have any rays to generate? */
+    bool raysToGenerate =
+        tiles.cameraRaysRemaining() && (worker.treelets.count(0) > 0);
+
+    /* Q2: do we have any work for this worker? */
+    const bool workToDo = (bagsQueueIt != queuedRayBags.end());
+
+    if (!raysToGenerate && !workToDo) {
+        return true;
+    }
 
     protobuf::RayBags proto;
     auto& bags = bagsQueueIt->second;
 
-    while (!bags.empty() && worker.activeRays() < WORKER_MAX_ACTIVE_RAYS) {
+    while ((raysToGenerate || workToDo && !bags.empty()) &&
+           worker.activeRays() < WORKER_MAX_ACTIVE_RAYS) {
+        if (raysToGenerate && workToDo) {
+            /* we flip and coin and decide which one to do */
+            bernoulli_distribution coin{0.5};
+            if (coin(randEngine)) {
+                tiles.sendWorkerTile(worker);
+                raysToGenerate = tiles.cameraRaysRemaining();
+                continue;
+            }
+        } else if (raysToGenerate) {
+            tiles.sendWorkerTile(worker);
+            raysToGenerate = tiles.cameraRaysRemaining();
+            continue;
+        }
+
+        /* if only workToDo or the coin flip returned false */
         *proto.add_items() = to_protobuf(bags.front());
         recordAssign(worker.id, bags.front());
         bags.pop();
@@ -48,9 +71,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
 ResultType LambdaMaster::handleQueuedRayBags() {
     ScopeTimer<TimeLog::Category::QueuedRayBags> _timer;
 
-    random_device rd{};
-    mt19937 g{rd()};
-    shuffle(freeWorkers.begin(), freeWorkers.end(), g);
+    shuffle(freeWorkers.begin(), freeWorkers.end(), randEngine);
 
     auto it = freeWorkers.begin();
 
