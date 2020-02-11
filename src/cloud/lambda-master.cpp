@@ -213,7 +213,11 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
     loop.poller().add_action(Poller::Action(
         alwaysOnFd, Direction::Out,
         bind(&LambdaMaster::handleQueuedRayBags, this),
-        [this]() { return !freeWorkers.empty() && !queuedRayBags.empty(); },
+        [this]() {
+            return initializedWorkers >= this->maxWorkers &&
+                   !freeWorkers.empty() &&
+                   (tiles.cameraRaysRemaining() || !queuedRayBags.empty());
+        },
         []() { throw runtime_error("queued ray bags failed"); }));
 
     if (config.workerStatsWriteInterval > 0) {
@@ -400,9 +404,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
                 worker.connection->enqueue_write(Message::str(
                     0, OpCode::GetObjects, protoutil::to_string(objsProto)));
 
-                if (assignWork(worker)) {
-                    freeWorkers.push_back(worker.id);
-                }
+                freeWorkers.push_back(worker.id);
             } else {
                 throw runtime_error("we accepted a useless worker");
             }

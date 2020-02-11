@@ -52,6 +52,10 @@ void LambdaWorker::processMessage(const Message& message) {
         protoutil::from_string(message.payload(), proto);
         getObjects(proto);
         scene.initialize();
+
+        coordinatorConnection->enqueue_write(
+            Message::str(*workerId, OpCode::GetObjects, ""));
+
         break;
     }
 

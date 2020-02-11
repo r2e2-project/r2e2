@@ -153,6 +153,7 @@ class LambdaMaster {
     const uint32_t maxWorkers;
     const uint32_t rayGenerators;
     uint32_t finishedRayGenerators{0};
+    uint32_t initializedWorkers{0};
 
     std::deque<WorkerId> freeWorkers{};
 

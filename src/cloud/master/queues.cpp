@@ -39,7 +39,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
            worker.activeRays() < WORKER_MAX_ACTIVE_RAYS) {
         if (raysToGenerate && workToDo) {
             /* we flip and coin and decide which one to do */
-            bernoulli_distribution coin{1.0};
+            bernoulli_distribution coin{0.0};
             if (coin(randEngine)) {
                 tiles.sendWorkerTile(worker);
                 raysToGenerate = tiles.cameraRaysRemaining();
@@ -76,7 +76,8 @@ ResultType LambdaMaster::handleQueuedRayBags() {
 
     auto it = freeWorkers.begin();
 
-    while (it != freeWorkers.end() && !queuedRayBags.empty()) {
+    while (it != freeWorkers.end() &&
+           (!queuedRayBags.empty() || tiles.cameraRaysRemaining())) {
         auto workerIt = workers.find(*it);
 
         if (workerIt == workers.end() || !assignWork(workerIt->second)) {

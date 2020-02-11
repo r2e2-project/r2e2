@@ -42,6 +42,10 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         break;
     }
 
+    case OpCode::GetObjects:
+        initializedWorkers++;
+        break;
+
     case OpCode::RayBagEnqueued: {
         protobuf::RayBags proto;
         protoutil::from_string(message.payload(), proto);
