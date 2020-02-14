@@ -663,6 +663,14 @@ SET_TARGET_PROPERTIES ( cloud_simulate PROPERTIES OUTPUT_NAME "cloud-simulate" )
 TARGET_COMPILE_FEATURES ( cloud_simulate PRIVATE ${PBRT_CXX11_FEATURES} )
 TARGET_LINK_LIBRARIES ( cloud_simulate ${ALL_PBRT_LIBS} )
 
+# static-generator
+ADD_EXECUTABLE ( static_generator src/cloud/static-generator.cpp )
+ADD_SANITIZERS ( static_generator )
+
+SET_TARGET_PROPERTIES ( static_generator PROPERTIES OUTPUT_NAME "static-generator" )
+TARGET_COMPILE_FEATURES ( static_generator PRIVATE ${PBRT_CXX11_FEATURES} )
+TARGET_LINK_LIBRARIES ( static_generator ${ALL_PBRT_LIBS} )
+
 # pbrt-lambda-master
 ADD_EXECUTABLE ( pbrt_lambda_aggregate src/cloud/lambda-aggregate.cpp )
 ADD_SANITIZERS ( pbrt_lambda_aggregate )
