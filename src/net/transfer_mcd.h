@@ -12,7 +12,7 @@ static constexpr const char* CRLF = "\r\n";
 
 class Request {
   public:
-    enum class Type { SET, GET, DELETE };
+    enum class Type { SET, GET, DELETE, FLUSH };
 
   private:
     std::string first_line_{};
@@ -65,9 +65,23 @@ class DeleteRequest : public Request {
     constexpr Request::Type type() const { return Request::Type::DELETE; }
 };
 
+class FlushRequest : public Request {
+  public:
+    FlushRequest() : Request("flush_all", "") {}
+    constexpr Request::Type type() const { return Request::Type::FLUSH; }
+};
+
 class Response {
   public:
-    enum class Type { STORED, NOT_STORED, NOT_FOUND, VALUE, DELETED, ERROR };
+    enum class Type {
+        STORED,
+        NOT_STORED,
+        NOT_FOUND,
+        VALUE,
+        DELETED,
+        ERROR,
+        OK
+    };
 
   private:
     Type type_;
@@ -157,6 +171,8 @@ class ResponseParser {
                         response_.type_ = Response::Type::ERROR;
                     } else if (first_word == "NOT_FOUND") {
                         response_.type_ = Response::Type::NOT_FOUND;
+                    } else if (first_word == "OK") {
+                        response_.type_ = Response::Type::OK;
                     } else {
                         throw std::runtime_error(
                             "invalid response: " + response_.first_line_ +
@@ -229,6 +245,8 @@ class TransferAgent : public ::TransferAgent {
   public:
     TransferAgent(const std::vector<Address>& servers,
                   const size_t threadCount = 0, const bool autoDelete = true);
+
+    void flushAll();
 
     ~TransferAgent();
 };

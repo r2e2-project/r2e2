@@ -41,6 +41,19 @@ size_t getHash(const string &key) {
     return result;
 }
 
+void TransferAgent::flushAll() {
+    for (size_t serverId = 0; serverId < servers.size(); serverId++) {
+        Action action{nextId++, Task::Flush, "", ""};
+
+        {
+            unique_lock<mutex> lock{outstandingMutexes[serverId]};
+            outstandings[serverId].push(move(action));
+        }
+
+        cvs[serverId].notify_one();
+    }
+}
+
 void TransferAgent::doAction(Action &&action) {
     /* what is the server id for this key? */
     const size_t serverId = getHash(action.key) % servers.size();
@@ -112,14 +125,27 @@ void TransferAgent::workerThread(const size_t threadId) {
             for (const auto &action : actions) {
                 string requestStr;
 
-                if (action.task == Task::Download) {
+                switch (action.task) {
+                case Task::Download: {
                     auto request = GetRequest{action.key};
                     parser->new_request(request);
                     requestStr = request.str();
-                } else {
+                    break;
+                }
+
+                case Task::Upload: {
                     auto request = SetRequest{action.key, action.data};
                     parser->new_request(request);
                     requestStr = request.str();
+                    break;
+                }
+
+                case Task::Flush: {
+                    auto request = FlushRequest{};
+                    parser->new_request(request);
+                    requestStr = request.str();
+                    break;
+                }
                 }
 
                 /* piggybacking of delete requests */
@@ -164,6 +190,7 @@ void TransferAgent::workerThread(const size_t threadId) {
                             /* fall-through */
                         }
 
+                    case Response::Type::OK:
                     case Response::Type::STORED:
                         tryCount = 0;
 
