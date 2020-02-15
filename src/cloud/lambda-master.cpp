@@ -37,6 +37,7 @@
 #include "net/lambda.h"
 #include "net/requests.h"
 #include "net/socket.h"
+#include "net/transfer_mcd.h"
 #include "net/util.h"
 #include "util/exception.h"
 #include "util/path.h"
@@ -441,6 +442,48 @@ string LambdaMaster::Worker::toString() const {
 
 void LambdaMaster::run() {
     StatusBar::get();
+
+    if (!config.memcachedServers.empty()) {
+        cerr << "Flushing " << config.memcachedServers.size() << " memcached "
+             << pluralize("server", config.memcachedServers.size()) << "... ";
+
+        vector<Address> servers;
+
+        for (auto &server : config.memcachedServers) {
+            string host;
+            uint16_t port = 11211;
+            tie(host, port) = Address::decompose(server);
+            servers.emplace_back(host, port);
+        }
+
+        Poller poller;
+        memcached::TransferAgent agent{servers};
+        size_t flushedCount = 0;
+
+        poller.add_action(Poller::Action(
+            agent.eventfd(), Direction::In,
+            [&]() {
+                if (!agent.eventfd().read_event()) return ResultType::Continue;
+
+                vector<pair<uint64_t, string>> actions;
+                agent.tryPopBulk(back_inserter(actions));
+
+                flushedCount += actions.size();
+                return ResultType::Continue;
+            },
+            []() { return true; }));
+
+        poller.add_action(Poller::Action(
+            alwaysOnFd, Direction::Out,
+            []() {
+                cerr << "done." << endl;
+                return ResultType::Exit;
+            },
+            [&]() { return flushedCount == config.memcachedServers.size(); }));
+
+        while (poller.poll(-1).result != Poller::Result::Type::Exit)
+            ;
+    }
 
     if (rayGenerators > 0) {
         /* let's invoke the ray generators */
