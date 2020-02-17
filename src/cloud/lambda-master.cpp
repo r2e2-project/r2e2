@@ -457,32 +457,35 @@ void LambdaMaster::run() {
         }
 
         Poller poller;
-        memcached::TransferAgent agent{servers};
+        unique_ptr<memcached::TransferAgent> agent =
+            make_unique<memcached::TransferAgent>(servers);
+
         size_t flushedCount = 0;
 
         poller.add_action(Poller::Action(
-            agent.eventfd(), Direction::In,
+            agent->eventfd(), Direction::In,
             [&]() {
-                if (!agent.eventfd().read_event()) return ResultType::Continue;
+                if (!agent->eventfd().read_event()) return ResultType::Continue;
 
                 vector<pair<uint64_t, string>> actions;
-                agent.tryPopBulk(back_inserter(actions));
+                agent->tryPopBulk(back_inserter(actions));
 
                 flushedCount += actions.size();
-                return ResultType::Continue;
+
+                if (flushedCount == config.memcachedServers.size()) {
+                    return ResultType::Exit;
+                } else {
+                    return ResultType::Continue;
+                }
             },
             []() { return true; }));
 
-        poller.add_action(Poller::Action(
-            alwaysOnFd, Direction::Out,
-            []() {
-                cerr << "done." << endl;
-                return ResultType::Exit;
-            },
-            [&]() { return flushedCount == config.memcachedServers.size(); }));
+        agent->flushAll();
 
-        while (poller.poll(-1).result != Poller::Result::Type::Exit)
+        while (poller.poll(-1).result == PollerResult::Success)
             ;
+
+        cerr << "done." << endl;
     }
 
     if (rayGenerators > 0) {
