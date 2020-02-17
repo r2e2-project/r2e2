@@ -233,9 +233,10 @@ class TransferAgent : public ::TransferAgent {
   protected:
     std::vector<Address> servers{};
 
-    std::vector<std::queue<Action>> outstandings{};
-    std::vector<std::mutex> outstandingMutexes{};
-    std::vector<std::condition_variable> cvs{};
+    std::vector<std::atomic<bool>> terminateds;
+    std::vector<std::queue<Action>> outstandings;
+    std::vector<std::mutex> outstandingMutexes;
+    std::vector<std::condition_variable> cvs;
 
     const bool autoDelete{true};
 

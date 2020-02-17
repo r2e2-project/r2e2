@@ -11,6 +11,7 @@ TransferAgent::TransferAgent(const vector<Address> &s, const size_t tc,
                              const bool autoDelete)
     : ::TransferAgent(),
       servers(s),
+      terminateds(servers.size()),
       outstandings(servers.size()),
       outstandingMutexes(servers.size()),
       cvs(servers.size()),
@@ -26,13 +27,20 @@ TransferAgent::TransferAgent(const vector<Address> &s, const size_t tc,
     }
 
     for (size_t i = 0; i < threadCount; i++) {
+        terminateds.at(i % servers.size()) = false;
         threads.emplace_back(&TransferAgent::workerThread, this, i);
     }
 }
 
 TransferAgent::~TransferAgent() {
-    terminated = true;
-    for (auto &cv : cvs) cv.notify_all();
+    for (size_t i = 0; i < servers.size(); i++) {
+        {
+            unique_lock<mutex> lock{outstandingMutexes.at(i)};
+            terminateds.at(i) = true;
+        }
+
+        cvs.at(i).notify_all();
+    };
 }
 
 size_t getHash(const string &key) {
@@ -87,6 +95,7 @@ void TransferAgent::workerThread(const size_t threadId) {
     auto &outstanding = outstandings.at(serverId);
     auto &outstandingMutex = outstandingMutexes.at(serverId);
     auto &cv = cvs.at(serverId);
+    auto &terminated = terminateds.at(serverId);
 
     deque<Action> actions;
     deque<Action> secondaryActions;

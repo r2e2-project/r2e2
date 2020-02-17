@@ -7,7 +7,11 @@ using namespace std;
 using namespace chrono;
 
 TransferAgent::~TransferAgent() {
-    terminated = true;
+    {
+        unique_lock<mutex> lock{outstandingMutex};
+        terminated = true;
+    }
+
     cv.notify_all();
     for (auto& t : threads) t.join();
 }
