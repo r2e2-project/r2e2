@@ -278,6 +278,10 @@ class CoefficientSpectrum {
         return c[i];
     }
 
+     // Add access to raw pointer for efficient serialization / deserialization
+     const Float *data() const { return c; }
+     Float *data() { return c; }
+
     // CoefficientSpectrum Public Data
     static const int nSamples = nSpectrumSamples;
 
