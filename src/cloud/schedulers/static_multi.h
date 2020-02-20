@@ -8,7 +8,6 @@ namespace pbrt {
 
 class StaticMultiScheduler : public Scheduler {
   private:
-    bool scheduledOnce{false};
     Allocator allocator;
 
   public:

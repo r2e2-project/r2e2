@@ -17,11 +17,14 @@ using timepoint_t = std::chrono::time_point<std::chrono::system_clock>;
 inline timepoint_t now() { return std::chrono::system_clock::now(); };
 
 struct TreeletStats {
-    struct {
+    struct Stats {
         uint64_t rays{0};
         uint64_t bytes{0};
         uint64_t count{0};
-    } enqueued{}, dequeued{};
+    };
+
+    Stats enqueued{}, dequeued{};
+    std::vector<Stats> enqueuedTo, dequeuedFrom;
 
     void merge(const TreeletStats& other);
     void reset();
