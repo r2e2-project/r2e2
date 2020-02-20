@@ -11,7 +11,6 @@ TransferAgent::TransferAgent(const vector<Address> &s, const size_t tc,
                              const bool autoDelete)
     : ::TransferAgent(),
       servers(s),
-      terminateds(servers.size()),
       outstandings(servers.size()),
       outstandingMutexes(servers.size()),
       cvs(servers.size()),
@@ -27,20 +26,21 @@ TransferAgent::TransferAgent(const vector<Address> &s, const size_t tc,
     }
 
     for (size_t i = 0; i < threadCount; i++) {
-        terminateds.at(i % servers.size()) = false;
         threads.emplace_back(&TransferAgent::workerThread, this, i);
     }
 }
 
 TransferAgent::~TransferAgent() {
-    for (size_t i = 0; i < servers.size(); i++) {
+    for (size_t serverId = 0; serverId < servers.size(); serverId++) {
         {
-            unique_lock<mutex> lock{outstandingMutexes.at(i)};
-            terminateds.at(i) = true;
+            unique_lock<mutex> lock{outstandingMutexes[serverId]};
+            outstandings[serverId].emplace(nextId++, Task::Terminate, "", "");
         }
 
-        cvs.at(i).notify_all();
-    };
+        cvs[serverId].notify_all();
+    }
+
+    for (auto &t : threads) t.join();
 }
 
 size_t getHash(const string &key) {
@@ -92,15 +92,11 @@ void TransferAgent::workerThread(const size_t threadId) {
     const size_t serverId = threadId % servers.size();
 
     const Address address = servers.at(serverId);
-    auto &outstanding = outstandings.at(serverId);
-    auto &outstandingMutex = outstandingMutexes.at(serverId);
-    auto &cv = cvs.at(serverId);
-    auto &terminated = terminateds.at(serverId);
 
     deque<Action> actions;
     deque<Action> secondaryActions;
 
-    while (!terminated) {
+    while (true) {
         TCPSocket sock;
         auto parser = make_unique<ResponseParser>();
         bool connectionOkay = true;
@@ -115,19 +111,20 @@ void TransferAgent::workerThread(const size_t threadId) {
 
         TRY_OPERATION(sock.connect(address), continue);
 
-        while (!terminated && connectionOkay) {
+        while (connectionOkay) {
             /* make sure we have an action to perfom */
             if (actions.empty()) {
-                unique_lock<mutex> lock{outstandingMutex};
+                unique_lock<mutex> lock{outstandingMutexes[serverId]};
 
-                cv.wait(lock,
-                        [&]() { return terminated || !outstanding.empty(); });
+                cvs[serverId].wait(
+                    lock, [&]() { return !outstandings[serverId].empty(); });
 
-                if (terminated) return;
+                if (outstandings[serverId].front().task == Task::Terminate)
+                    return;
 
                 do {
-                    actions.push_back(move(outstanding.front()));
-                    outstanding.pop();
+                    actions.push_back(move(outstandings[serverId].front()));
+                    outstandings[serverId].pop();
                 } while (false);
             }
 
@@ -173,7 +170,7 @@ void TransferAgent::workerThread(const size_t threadId) {
                 TRY_OPERATION(sock.write(requestStr), break);
             }
 
-            while (!terminated && connectionOkay && !actions.empty()) {
+            while (connectionOkay && !actions.empty()) {
                 string result;
                 TRY_OPERATION(result = sock.read(), break);
 

@@ -458,7 +458,7 @@ void LambdaMaster::run() {
 
         Poller poller;
         unique_ptr<memcached::TransferAgent> agent =
-            make_unique<memcached::TransferAgent>(servers);
+            make_unique<memcached::TransferAgent>(servers, servers.size());
 
         size_t flushedCount = 0;
 

@@ -46,6 +46,16 @@ S3TransferAgent::S3TransferAgent(const unique_ptr<StorageBackend>& backend,
     }
 }
 
+S3TransferAgent::~S3TransferAgent() {
+    {
+        unique_lock<mutex> lock{outstandingMutex};
+        outstanding.emplace(nextId++, Task::Terminate, "", "");
+    }
+
+    cv.notify_all();
+    for (auto& t : threads) t.join();
+}
+
 HTTPRequest S3TransferAgent::getRequest(const Action& action) {
     switch (action.task) {
     case Task::Upload:
@@ -83,7 +93,7 @@ void S3TransferAgent::workerThread(const size_t threadId) {
     auto lastAddrUpdate = steady_clock::now() + seconds{threadId};
     Address s3Address = clientConfig.address.load();
 
-    while (!terminated) {
+    while (true) {
         TCPSocket s3;
         auto parser = make_unique<HTTPResponseParser>();
         bool connectionOkay = true;
@@ -101,16 +111,14 @@ void S3TransferAgent::workerThread(const size_t threadId) {
 
         TRY_OPERATION(s3.connect(s3Address), continue);
 
-        while (!terminated && connectionOkay) {
+        while (connectionOkay) {
             /* make sure we have an action to perfom */
             if (actions.empty()) {
                 unique_lock<mutex> lock{outstandingMutex};
 
-                cv.wait(lock, [this]() {
-                    return terminated || !outstanding.empty();
-                });
+                cv.wait(lock, [this]() { return !outstanding.empty(); });
 
-                if (terminated) return;
+                if (outstanding.front().task == Task::Terminate) return;
 
                 const auto capacity = MAX_REQUESTS_ON_CONNECTION - requestCount;
 
@@ -129,7 +137,7 @@ void S3TransferAgent::workerThread(const size_t threadId) {
                 requestCount++;
             }
 
-            while (!terminated && connectionOkay && !actions.empty()) {
+            while (connectionOkay && !actions.empty()) {
                 string result;
                 TRY_OPERATION(result = s3.read(), break);
 

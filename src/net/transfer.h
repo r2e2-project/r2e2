@@ -19,7 +19,7 @@
 
 class TransferAgent {
   public:
-    enum class Task { Download, Upload, Delete, Flush };
+    enum class Task { Download, Upload, Delete, Flush, Terminate };
 
   protected:
     struct Action {
@@ -39,7 +39,6 @@ class TransferAgent {
     size_t threadCount{MAX_THREADS};
 
     std::vector<std::thread> threads{};
-    std::atomic<bool> terminated{false};
     std::mutex resultsMutex{};
     std::mutex outstandingMutex{};
     std::condition_variable cv{};

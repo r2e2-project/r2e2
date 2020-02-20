@@ -37,6 +37,8 @@ class S3TransferAgent : public TransferAgent {
   public:
     S3TransferAgent(const std::unique_ptr<StorageBackend>& backend,
                     const size_t threadCount = MAX_THREADS);
+
+    ~S3TransferAgent();
 };
 
 #endif /* PBRT_NET_TRANSFER_S3_H */
