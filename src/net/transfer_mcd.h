@@ -173,6 +173,9 @@ class ResponseParser {
                         response_.type_ = Response::Type::NOT_FOUND;
                     } else if (first_word == "OK") {
                         response_.type_ = Response::Type::OK;
+                    } else if (first_word == "END" &&
+                               requests_.front() == Request::Type::GET) {
+                        response_.type_ = Response::Type::NOT_FOUND;
                     } else {
                         throw std::runtime_error(
                             "invalid response: " + response_.first_line_ +
