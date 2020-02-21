@@ -183,6 +183,8 @@ struct Options {
     bool loadScene = false;
     bool directionalTreelets = false;
     bool dumpMaterials = true;
+    bool compressRays = false;
+    bool compressRayBags = true;
     std::string imageFile;
     // x0, x1, y0, y1
     Float cropWindow[2][2];

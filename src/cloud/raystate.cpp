@@ -51,11 +51,6 @@ void RayState::SetHit(const TreeletNode &node) {
     }
 }
 
-size_t RayState::Size() const {
-    return offset_of(*this, &RayState::toVisit) +
-           sizeof(RayState::TreeletNode) * toVisitHead;
-}
-
 /*******************************************************************************
  * SERIALIZATION                                                               *
  ******************************************************************************/
@@ -298,19 +293,19 @@ void UnPackRay(char *buffer, RayState &state) {
     }
 }
 
-static constexpr size_t maxPackedSize = sizeof(PackedRayFixedHdr) +
+const size_t RayState::MaxPackedSize = sizeof(PackedRayFixedHdr) +
     64 * sizeof(PackedTreeletNode) + sizeof(PackedTreeletNode) +
-    sizeof(PackedDifferentials) + 2 * sizeof(PackedTransform);
+    sizeof(PackedDifferentials) + 2 * sizeof(PackedTransform) + 4;
 
-size_t RayState::Serialize(char *data, const bool compress) {
-    static thread_local char packedBuffer[maxPackedSize];
+size_t RayState::Serialize(char *data) {
+    static thread_local char packedBuffer[RayState::MaxPackedSize];
 
     size_t packedBytes = PackRay(packedBuffer, *this);
 
-    constexpr size_t upperBound = LZ4_COMPRESSBOUND(maxPackedSize);
+    const size_t upperBound = LZ4_COMPRESSBOUND(RayState::MaxPackedSize);
     uint32_t len = packedBytes;
 
-    if (compress) {
+    if (PbrtOptions.compressRays) {
         len = LZ4_compress_default(packedBuffer, data + 4,
                                    packedBytes, upperBound);
 
@@ -327,21 +322,47 @@ size_t RayState::Serialize(char *data, const bool compress) {
     return len;
 }
 
-void RayState::Deserialize(const char *data, const size_t len,
-                           const bool decompress) {
-    static thread_local char packedBuffer[maxPackedSize];
+void RayState::Deserialize(const char *data, const size_t len) {
+    static thread_local char packedBuffer[RayState::MaxPackedSize];
 
-    if (decompress) {
+    if (PbrtOptions.compressRays) {
         if (LZ4_decompress_safe(data, packedBuffer, len,
-                                maxPackedSize) < 0) {
+                                RayState::MaxPackedSize) < 0) {
             throw runtime_error("ray decompression failed");
         }
     } else {
         memcpy(packedBuffer, data,
-               min(sizeof(RayState), len));
+               min(RayState::MaxPackedSize, len));
     }
 
     UnPackRay(packedBuffer, *this);
+}
+
+size_t RayState::MaxSize() const {
+    size_t size = 4 + sizeof(PackedRayFixedHdr) +
+        toVisitHead * sizeof(PackedTreeletNode);
+
+    if (hit) {
+        size += sizeof(PackedTreeletNode) + sizeof(PackedTransform);
+    }
+
+    if (!toVisitEmpty() && toVisitTop().transformed) {
+        size += sizeof(PackedTransform);
+    }
+
+    if (ray.hasDifferentials) {
+        size += sizeof(PackedDifferentials);
+    }
+
+    return size;
+}
+
+size_t RayState::MaxCompressedSize() const {
+    if (PbrtOptions.compressRays) {
+        return LZ4_COMPRESSBOUND(MaxSize());
+    } else {
+        return MaxSize();
+    }
 }
 
 /* Sample */

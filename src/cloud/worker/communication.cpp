@@ -1,5 +1,6 @@
 #include "cloud/lambda-worker.h"
 #include "messages/utils.h"
+#include <lz4.h>
 
 using namespace std;
 using namespace chrono;
@@ -124,8 +125,25 @@ ResultType LambdaWorker::handleSealedBags() {
     while (!sealedBags.empty()) {
         auto& bag = sealedBags.front();
 
+        if (PbrtOptions.compressRayBags) {
+            size_t upperBound = LZ4_COMPRESSBOUND(bag.info.bagSize);
+            std::string compressed(upperBound, '\0');
+            size_t compressedSize = LZ4_compress_default(bag.data.data(),
+                                                         &compressed[0],
+                                                         bag.info.bagSize,
+                                                         upperBound);
+
+            if (compressedSize == 0) {
+                throw runtime_error("bag compression failed");
+            }
+
+            bag.info.bagSize = compressedSize;
+            bag.data = move(compressed);
+        }
+
         bag.data.erase(bag.info.bagSize);
         bag.data.shrink_to_fit();
+
         logBag(BagAction::Submitted, bag.info);
 
         const auto id = transferAgent->requestUpload(
@@ -163,11 +181,30 @@ ResultType LambdaWorker::handleReceiveQueue() {
         /* (1) XXX do we have this treelet? */
 
         /* (2) let's unpack this treelet and add the rays to the trace queue */
-        const char* data = bag.data.data();
         auto& rays = traceQueue[bag.info.treeletId];
+        size_t totalSize = bag.data.size();
 
-        for (size_t offset = 0; offset < bag.data.size();) {
-            const auto len = *reinterpret_cast<const uint32_t*>(data + offset);
+        if (PbrtOptions.compressRayBags) {
+            string decompressed(bag.info.rayCount * RayState::MaxPackedSize, '\0');
+
+            int decompressedSize = LZ4_decompress_safe(bag.data.data(),
+                                                       &decompressed[0],
+                                                       totalSize,
+                                                       decompressed.size());
+
+            if (decompressedSize < 0) {
+                throw runtime_error("bag decompression failed");
+            }
+
+            totalSize = decompressedSize;
+            bag.data = move(decompressed);
+        }
+
+        const char* data = bag.data.data();
+
+        for (size_t offset = 0; offset < totalSize;) {
+            uint32_t len;
+            memcpy(&len, data + offset, sizeof(uint32_t));
             offset += 4;
 
             RayStatePtr ray = RayState::Create();

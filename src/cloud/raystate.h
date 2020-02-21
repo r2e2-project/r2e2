@@ -59,8 +59,7 @@ class RayState {
     uint8_t toVisitHead{0};
     TreeletNode toVisit[64];
 
-    /* RayState is serialized up until this point, and the serialized data
-       will be stored below */
+    static const size_t MaxPackedSize;
 
     bool IsShadowRay() const { return isShadowRay; }
     bool HasHit() const { return hit; }
@@ -80,12 +79,11 @@ class RayState {
     uint64_t PathID() const { return sample.id; }
 
     /* serialization */
-    size_t Size() const;
-    size_t Serialize(char *data, const bool compress = true);
-    void Deserialize(const char *data, const size_t len,
-                     const bool decompress = true);
+    size_t Serialize(char *data);
+    void Deserialize(const char *data, const size_t len);
 
-    size_t MaxCompressedSize() const { return 4 + LZ4_COMPRESSBOUND(Size()); }
+    size_t MaxSize() const;
+    size_t MaxCompressedSize() const;
 
     static RayStatePtr Create();
 };
