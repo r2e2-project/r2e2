@@ -245,8 +245,8 @@ uint64_t TreeletDumpBVH::GetInstancesBytes(const InstanceMask &mask) const {
 
     return totalInstanceSize;
 }
-
-unordered_map<uint32_t, TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::MergeDisjointTreelets(int dirIdx, int maxTreeletBytes, const TraversalGraph &graph) {
+// ** modifying this 
+unordered_map<uint32_t, TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::MergeDisjointTreelets(int dirIdx, int maxTreeletBytes, const AdjacencyGraph &graph) {
     unordered_map<uint32_t, TreeletInfo> treelets;
     for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
         uint32_t curTreelet = treeletAllocations[dirIdx][nodeIdx];
@@ -274,15 +274,23 @@ unordered_map<uint32_t, TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::MergeDisjoi
             }
         }
 
-        auto outgoingBounds = graph.outgoing[nodeIdx];
-        for (int edgeIdx = 0; edgeIdx < outgoingBounds.second; edgeIdx++) {
-            Edge *edge = outgoingBounds.first + edgeIdx;
-            uint32_t dstTreelet = treeletAllocations[dirIdx][edge->dst];
+        auto outgoingBounds = graph.vertexToEdges[nodeIdx];
+        for (auto &kv: outgoingBounds){
+                Edge edge = kv; 
+                uint32_t dstTreelet = treeletAllocations[dirIdx][edge.dst];
             if (curTreelet != dstTreelet) {
                 TreeletInfo &dstTreeletInfo = treelets[dstTreelet];
-                dstTreeletInfo.totalProb += edge->weight;
+                dstTreeletInfo.totalProb += edge.weight;
             }
         }
+        // for (int edgeIdx = 0; edgeIdx < outgoingBounds.size(); edgeIdx++) {
+        //     Edge *edge = outgoingBounds[edgeIdx];
+        //     uint32_t dstTreelet = treeletAllocations[dirIdx][edge->dst];
+        //     if (curTreelet != dstTreelet) {
+        //         TreeletInfo &dstTreeletInfo = treelets[dstTreelet];
+        //         dstTreeletInfo.totalProb += edge->weight;
+        //     }
+        // }
     }
     TreeletInfo &rootTreelet = treelets.at(treeletAllocations[dirIdx][0]);
     rootTreelet.totalProb += 1.0;
@@ -433,9 +441,11 @@ void TreeletDumpBVH::OrderTreeletNodesDepthFirst(int numDirs, vector<TreeletInfo
     }
 }
 
+//** probably need to modify this 
 vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateUnspecializedTreelets(int maxTreeletBytes) {
-    TraversalGraph graph;
-    graph.outgoing.resize(nodeCount);
+    //adjacency graph here 
+    AdjacencyGraph graph;
+    graph.vertexToEdges.resize(nodeCount);
     graph.incomingProb.resize(nodeCount);
 
     if (partitionAlgo == PartitionAlgorithm::MergedGraph) {
@@ -443,34 +453,41 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateUnspecializedTreelet
         mergedEdges.resize(nodeCount);
         for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
             Vector3f dir = ComputeRayDir(dirIdx);
-            TraversalGraph g = CreateTraversalGraph(dir, 0);
+            //adjacency graph here 
+            AdjacencyGraph g = CreateTraversalGraph(dir, 0);
             if (dirIdx == 0) {
                 graph.depthFirst = move(g.depthFirst);
             }
             for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
                 graph.incomingProb[nodeIdx] += g.incomingProb[nodeIdx];
 
-                const auto bounds = g.outgoing[nodeIdx];
-                for (Edge *edge = bounds.first; edge < bounds.first + bounds.second; edge++) {
-                    mergedEdges[edge->src][edge->dst] += edge->weight;
-                    mergedEdges[edge->dst][edge->src] += edge->weight;
+                const auto edgeList = g.vertexToEdges[nodeIdx];
+                // auto iter = edgeList.begin();
+                for (auto &edge : edgeList){
+                    mergedEdges[edge.src][edge.dst] += edge.weight;
+                    mergedEdges[edge.dst][edge.src] += edge.weight;
                 }
+                // for (Edge *edge = bounds.first; edge < bounds.first + bounds.second; edge++) {
+                //     mergedEdges[edge->src][edge->dst] += edge->weight;
+                //     mergedEdges[edge->dst][edge->src] += edge->weight;
+                // }
             }
         }
 
-        uint64_t totalEdges = 0;
-        for (auto &outgoing : mergedEdges) {
-            totalEdges += outgoing.size();
-        }
-        graph.edges.reserve(totalEdges);
         for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
             auto &outgoing = mergedEdges[nodeIdx];
-            size_t start = graph.edges.size();
-            for (auto &kv : outgoing) {
-                graph.edges.emplace_back(nodeIdx, kv.first, kv.second);
+            for (auto &kv: outgoing){
+                graph.vertexToEdges[nodeIdx].emplace_back(nodeIdx,kv.first,kv.second);
             }
-            graph.outgoing[nodeIdx] = make_pair(graph.edges.data() + start, outgoing.size());
         }
+        // for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
+        //     auto &outgoing = mergedEdges[nodeIdx];
+        //     size_t start = graph.edges.size();
+        //     for (auto &kv : outgoing) {
+        //         graph.edges.emplace_back(nodeIdx, kv.first, kv.second);
+        //     }
+        //     graph.outgoing[nodeIdx] = make_pair(graph.edges.data() + start, outgoing.size());
+        // }
     }
 
     treeletAllocations[0] = ComputeTreelets(graph, maxTreeletBytes);
@@ -514,7 +531,7 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateDirectionalTreelets(
 
     for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
         Vector3f dir = ComputeRayDir(dirIdx);
-        TraversalGraph graph = CreateTraversalGraph(dir, 0);
+        AdjacencyGraph graph = CreateTraversalGraph(dir, 0);
 
         //rayCounts[i].resize(nodeCount);
         //// Init rayCounts so unordered_map isn't modified during intersection
@@ -782,8 +799,8 @@ TreeletDumpBVH::CreateTraversalGraphCheckSend(const Vector3f &rayDir, int depthR
 
     return g;
 }
-
-TreeletDumpBVH::TraversalGraph
+//** need to modify this and all functions that call this 
+TreeletDumpBVH::AdjacencyGraph
 TreeletDumpBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction) const {
     cout << "Starting graph gen\n";
     IntermediateTraversalGraph intermediate;
@@ -800,29 +817,37 @@ TreeletDumpBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction)
     }
     cout << "Intermediate finished\n";
 
-    // Remake graph with contiguous vectors
-    TraversalGraph graph;
+    // Remake graph to final representation 
+    AdjacencyGraph graph;
+    graph.vertexToEdges.resize(nodeCount);
     auto edgeIter = intermediate.edges.begin();
-    while (edgeIter != intermediate.edges.end()) {
-        graph.edges.push_back(*edgeIter);
+    while(edgeIter != intermediate.edges.end()){
+        Edge curr_edge = *edgeIter;
+        graph.vertexToEdges[curr_edge.src].push_back(curr_edge);
+        graph.vertexToEdges[curr_edge.dst].push_back(curr_edge);
         edgeIter++;
-        intermediate.edges.pop_front();
+    
     }
+    // while (edgeIter != intermediate.edges.end()) {
+    //     graph.edges.push_back(*edgeIter);
+    //     edgeIter++;
+    //     intermediate.edges.pop_front();
+    // }
 
     graph.depthFirst = move(intermediate.depthFirst);
     graph.incomingProb = move(intermediate.incomingProb);
 
-    auto adjacencyIter = intermediate.outgoing.begin();
-    while (adjacencyIter != intermediate.outgoing.end()) {
-        uint64_t idx = adjacencyIter->first;
-        uint64_t weight = adjacencyIter->second;
-        graph.outgoing.emplace_back(&graph.edges[idx], weight);
-        adjacencyIter++;
-        intermediate.outgoing.pop_front();
-    }
+    // auto adjacencyIter = intermediate.outgoing.begin();
+    // // while (adjacencyIter != intermediate.outgoing.end()) {
+    // //     uint64_t idx = adjacencyIter->first;
+    // //     uint64_t weight = adjacencyIter->second;
+    // //     graph.outgoing.emplace_back(&graph.edges[idx], weight);
+    // //     adjacencyIter++;
+    // //     intermediate.outgoing.pop_front();
+    // // }
 
     printf("Graph gen complete: %lu verts %lu edges\n",
-           graph.depthFirst.size(), graph.edges.size());
+           graph.depthFirst.size(), graph.vertexToEdges.size());
 
     return graph;
 }
@@ -977,8 +1002,9 @@ A                if (srcSize + dstSize > maxTreeletBytes) {
 #endif
 }
 
+//** Brennan's computeTreelets, need to modify
 vector<uint32_t>
-TreeletDumpBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
+TreeletDumpBVH::ComputeTreeletsTopological(const AdjacencyGraph &graph,
                                            uint64_t maxTreeletBytes) const {
     struct OutEdge {
         float weight;
@@ -1052,9 +1078,10 @@ TreeletDumpBVH::ComputeTreeletsTopological(const TraversalGraph &graph,
         includedInstances |= nodeInstanceMasks[curNode];
 
         while (remainingBytes >= sizeof(CloudBVH::TreeletNode)) {
-            auto outgoingBounds = graph.outgoing[curNode];
-            for (int i = 0; i < outgoingBounds.second; i++) {
-                const Edge *edge = outgoingBounds.first + i;
+            auto outgoingBounds = graph.vertexToEdges[curNode];
+            // for (int i = 0; i < outgoingBounds.second; i++) {
+            for (auto &kv: outgoingBounds){
+                const Edge *edge = &kv;
 
                 uint64_t nodeSize = getAdditionalSize(edge->dst);
                 if (nodeSize > remainingBytes) continue;
@@ -1284,26 +1311,27 @@ TreeletDumpBVH::ComputeTreeletsGreedySize(
     return assignment;
 #endif
 }
-                                                       
+         
+//** definitely need to modify                                               
 vector<uint32_t>
-TreeletDumpBVH::ComputeTreelets(const TraversalGraph &graph,
+TreeletDumpBVH::ComputeTreelets(const AdjacencyGraph &graph,
                                 uint64_t maxTreeletBytes) const {
     vector<uint32_t> assignment;
     switch (partitionAlgo) {
         case PartitionAlgorithm::OneByOne:
-            assignment = ComputeTreeletsTopological(graph, maxTreeletBytes);
+            // assignment = ComputeTreeletsTopological(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::TopologicalHierarchical:
-            assignment = ComputeTreeletsTopologicalHierarchical(graph, maxTreeletBytes);
+            // assignment = ComputeTreeletsTopologicalHierarchical(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::GreedySize:
-            assignment = ComputeTreeletsGreedySize(graph, maxTreeletBytes);
+            // assignment = ComputeTreeletsGreedySize(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::PseudoAgglomerative:
-            assignment = ComputeTreeletsAgglomerative(graph, maxTreeletBytes);
+            // assignment = ComputeTreeletsAgglomerative(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::Nvidia:
-            assignment = OrigAssignTreelets(maxTreeletBytes);
+            // assignment = OrigAssignTreelets(maxTreeletBytes);
             break;
         case PartitionAlgorithm::MergedGraph:
             assignment = ComputeTreeletsTopological(graph, maxTreeletBytes);

@@ -14,7 +14,7 @@ Sampler "halton" "integer pixelsamples" [8]
 
 Integrator "cloud" "integer maxdepth" [5]
 
-Accelerator "cloudbvh"
+Accelerator "treeletdumpbvh"
 
 WorldBegin
 
