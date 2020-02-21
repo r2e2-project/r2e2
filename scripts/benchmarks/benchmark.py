@@ -16,7 +16,7 @@ from datetime import datetime
 parser = argparse.ArgumentParser()
 parser.add_argument('-s', '--samples', nargs='+', type=int)
 parser.add_argument('-l', '--lambdas', nargs='+', type=int, required=True)
-parser.add_argument('-S', '--s3-path', default='cloudrt-processed-scenes')
+parser.add_argument('-S', '--s3-path', default='r2t2-processed-scenes')
 parser.add_argument('-b', '--build-path', required=True)
 parser.add_argument('-x', '--exclude', nargs='+', type=str)
 parser.add_argument('-i', '--include', nargs='+', type=str)
@@ -81,14 +81,18 @@ samples = args.samples if args.samples else [1]
 out_dir = os.path.join(args.out_dir, args.run_name + datetime.now().strftime('-%H-%M-%S-%m-%d-%Y'))
 os.makedirs(out_dir)
 
+infra_dir = os.path.join(pbrt_path, 'infrastructure')
+memcached_args = subprocess.check_output(os.path.join(infra_dir, 'get-cmdline-args'), cwd=infra_dir).decode('utf-8').strip()
+
 cmds = []
 cur_port = args.start_port
 for i, scene in enumerate(scenes):
     cmdprefix = (
-              "{master_path} --ip {ip} --timeout 60"
+              "{master_path} {memcached_args} --ip {ip} --timeout 60"
               " --storage-backend s3://{s3_path}/{scene}?region={region}"
               " --aws-region {region} -T auto --worker-stats 1 -G {ray_generators} -M {max_depth}".format(
                   master_path=master_path,
+                  memcached_args=memcached_args,
                   ip=ip,
                   s3_path=args.s3_path,
                   scene=scene,
