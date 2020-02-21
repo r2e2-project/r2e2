@@ -65,6 +65,7 @@ TreeletDumpBVH::TreeletDumpBVH(vector<shared_ptr<Primitive>> &&p,
         if (totalBytes < copyableThreshold) {
             copyable = true;
         } else {
+
             SetNodeInfo(maxTreeletBytes);
             allTreelets = AllocateTreelets(maxTreeletBytes);
         }
@@ -206,13 +207,11 @@ void TreeletDumpBVH::SetNodeInfo(int maxTreeletBytes) {
         }
 
         nodeSizes[nodeIdx] = totalSize;
-
         if (node.nPrimitives == 0) {
             nodeParents[nodeIdx + 1] = nodeIdx;
             nodeParents[node.secondChildOffset] = nodeIdx;
         }
     }
-
     for (int nodeIdx = nodeCount - 1; nodeIdx >= 0; nodeIdx--) {
         const LinearBVHNode &node = nodes[nodeIdx];
         subtreeSizes[nodeIdx] = nodeSizes[nodeIdx];
@@ -274,8 +273,8 @@ unordered_map<uint32_t, TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::MergeDisjoi
             }
         }
 
-        auto outgoingBounds = graph.vertexToEdges[nodeIdx];
-        for (auto &kv: outgoingBounds){
+        auto edgeList = graph.vertexToEdges[nodeIdx];
+        for (auto &kv: edgeList){
                 Edge edge = kv; 
                 uint32_t dstTreelet = treeletAllocations[dirIdx][edge.dst];
             if (curTreelet != dstTreelet) {
@@ -283,14 +282,6 @@ unordered_map<uint32_t, TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::MergeDisjoi
                 dstTreeletInfo.totalProb += edge.weight;
             }
         }
-        // for (int edgeIdx = 0; edgeIdx < outgoingBounds.size(); edgeIdx++) {
-        //     Edge *edge = outgoingBounds[edgeIdx];
-        //     uint32_t dstTreelet = treeletAllocations[dirIdx][edge->dst];
-        //     if (curTreelet != dstTreelet) {
-        //         TreeletInfo &dstTreeletInfo = treelets[dstTreelet];
-        //         dstTreeletInfo.totalProb += edge->weight;
-        //     }
-        // }
     }
     TreeletInfo &rootTreelet = treelets.at(treeletAllocations[dirIdx][0]);
     rootTreelet.totalProb += 1.0;
@@ -447,7 +438,6 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateUnspecializedTreelet
     AdjacencyGraph graph;
     graph.vertexToEdges.resize(nodeCount);
     graph.incomingProb.resize(nodeCount);
-
     if (partitionAlgo == PartitionAlgorithm::MergedGraph) {
         vector<unordered_map<uint64_t, float>> mergedEdges;
         mergedEdges.resize(nodeCount);
@@ -473,24 +463,16 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateUnspecializedTreelet
                 // }
             }
         }
-
         for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
-            auto &outgoing = mergedEdges[nodeIdx];
-            for (auto &kv: outgoing){
+            auto &edgeList = mergedEdges[nodeIdx];
+            for (auto &kv: edgeList){
                 graph.vertexToEdges[nodeIdx].emplace_back(nodeIdx,kv.first,kv.second);
             }
         }
-        // for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
-        //     auto &outgoing = mergedEdges[nodeIdx];
-        //     size_t start = graph.edges.size();
-        //     for (auto &kv : outgoing) {
-        //         graph.edges.emplace_back(nodeIdx, kv.first, kv.second);
-        //     }
-        //     graph.outgoing[nodeIdx] = make_pair(graph.edges.data() + start, outgoing.size());
-        // }
+        
     }
-
     treeletAllocations[0] = ComputeTreelets(graph, maxTreeletBytes);
+
     auto intermediateTreelets = MergeDisjointTreelets(0, maxTreeletBytes, graph);
 
     vector<TreeletInfo> finalTreelets;
@@ -821,33 +803,22 @@ TreeletDumpBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction)
     AdjacencyGraph graph;
     graph.vertexToEdges.resize(nodeCount);
     auto edgeIter = intermediate.edges.begin();
+    long num_edges = 0;
     while(edgeIter != intermediate.edges.end()){
         Edge curr_edge = *edgeIter;
         graph.vertexToEdges[curr_edge.src].push_back(curr_edge);
         graph.vertexToEdges[curr_edge.dst].push_back(curr_edge);
         edgeIter++;
+        num_edges++; 
     
     }
-    // while (edgeIter != intermediate.edges.end()) {
-    //     graph.edges.push_back(*edgeIter);
-    //     edgeIter++;
-    //     intermediate.edges.pop_front();
-    // }
 
     graph.depthFirst = move(intermediate.depthFirst);
     graph.incomingProb = move(intermediate.incomingProb);
 
-    // auto adjacencyIter = intermediate.outgoing.begin();
-    // // while (adjacencyIter != intermediate.outgoing.end()) {
-    // //     uint64_t idx = adjacencyIter->first;
-    // //     uint64_t weight = adjacencyIter->second;
-    // //     graph.outgoing.emplace_back(&graph.edges[idx], weight);
-    // //     adjacencyIter++;
-    // //     intermediate.outgoing.pop_front();
-    // // }
 
     printf("Graph gen complete: %lu verts %lu edges\n",
-           graph.depthFirst.size(), graph.vertexToEdges.size());
+           graph.depthFirst.size(), num_edges);
 
     return graph;
 }
@@ -1078,9 +1049,8 @@ TreeletDumpBVH::ComputeTreeletsTopological(const AdjacencyGraph &graph,
         includedInstances |= nodeInstanceMasks[curNode];
 
         while (remainingBytes >= sizeof(CloudBVH::TreeletNode)) {
-            auto outgoingBounds = graph.vertexToEdges[curNode];
-            // for (int i = 0; i < outgoingBounds.second; i++) {
-            for (auto &kv: outgoingBounds){
+            auto edgeList = graph.vertexToEdges[curNode];
+            for (auto &kv: edgeList){
                 const Edge *edge = &kv;
 
                 uint64_t nodeSize = getAdditionalSize(edge->dst);
@@ -1319,7 +1289,7 @@ TreeletDumpBVH::ComputeTreelets(const AdjacencyGraph &graph,
     vector<uint32_t> assignment;
     switch (partitionAlgo) {
         case PartitionAlgorithm::OneByOne:
-            // assignment = ComputeTreeletsTopological(graph, maxTreeletBytes);
+            assignment = ComputeTreeletsTopological(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::TopologicalHierarchical:
             // assignment = ComputeTreeletsTopologicalHierarchical(graph, maxTreeletBytes);

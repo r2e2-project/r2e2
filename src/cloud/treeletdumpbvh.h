@@ -117,7 +117,6 @@ class TreeletDumpBVH : public BVHAccel {
         std::vector<uint64_t> depthFirst;
         std::vector<float> incomingProb;
 
-        // std::vector<std::pair<Edge *, uint64_t>> outgoing;
     };
 
 
