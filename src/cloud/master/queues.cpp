@@ -27,7 +27,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
         tiles.cameraRaysRemaining() && (worker.treelets.count(0) > 0);
 
     /* Q2: do we have any work for this worker? */
-    const bool workToDo = (queueIt != queuedRayBags.end());
+    bool workToDo = (queueIt != queuedRayBags.end());
 
     if (!raysToGenerate && !workToDo) {
         return true;
@@ -35,7 +35,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
 
     protobuf::RayBags proto;
 
-    while ((raysToGenerate || (workToDo && !queueIt->second.empty())) &&
+    while ((raysToGenerate || workToDo) &&
            worker.activeRays() < WORKER_MAX_ACTIVE_RAYS) {
         if (raysToGenerate && workToDo) {
             /* we flip and coin and decide which one to do */
@@ -51,14 +51,15 @@ bool LambdaMaster::assignWork(Worker& worker) {
             continue;
         }
 
-        /* if only workToDo or the coin flip returned false */
+        /* only if workToDo or the coin flip returned false */
         *proto.add_items() = to_protobuf(queueIt->second.front());
         recordAssign(worker.id, queueIt->second.front());
         queueIt->second.pop();
-    }
 
-    if (workToDo && queueIt->second.empty()) {
-        queuedRayBags.erase(queueIt);
+        if (queueIt->second.empty()) {
+            queuedRayBags.erase(queueIt);
+            workToDo = false;
+        }
     }
 
     if (proto.items_size()) {
