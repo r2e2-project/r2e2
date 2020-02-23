@@ -1301,7 +1301,7 @@ TreeletDumpBVH::ComputeTreelets(const AdjacencyGraph &graph,
             // assignment = ComputeTreeletsAgglomerative(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::Nvidia:
-            // assignment = OrigAssignTreelets(maxTreeletBytes);
+            assignment = OrigAssignTreelets(maxTreeletBytes);
             break;
         case PartitionAlgorithm::MergedGraph:
             assignment = ComputeTreeletsTopological(graph, maxTreeletBytes);
