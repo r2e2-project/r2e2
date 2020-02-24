@@ -244,7 +244,6 @@ uint64_t TreeletDumpBVH::GetInstancesBytes(const InstanceMask &mask) const {
 
     return totalInstanceSize;
 }
-// ** modifying this 
 unordered_map<uint32_t, TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::MergeDisjointTreelets(int dirIdx, int maxTreeletBytes, const AdjacencyGraph &graph) {
     unordered_map<uint32_t, TreeletInfo> treelets;
     for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
@@ -273,9 +272,7 @@ unordered_map<uint32_t, TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::MergeDisjoi
             }
         }
 
-        auto edgeList = graph.vertexToEdges[nodeIdx];
-        for (auto &kv: edgeList){
-                Edge edge = kv; 
+        for (auto &edge: graph.vertexToEdges[nodeIdx]){
                 uint32_t dstTreelet = treeletAllocations[dirIdx][edge.dst];
             if (curTreelet != dstTreelet) {
                 TreeletInfo &dstTreeletInfo = treelets[dstTreelet];
@@ -432,9 +429,7 @@ void TreeletDumpBVH::OrderTreeletNodesDepthFirst(int numDirs, vector<TreeletInfo
     }
 }
 
-//** probably need to modify this 
 vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateUnspecializedTreelets(int maxTreeletBytes) {
-    //adjacency graph here 
     AdjacencyGraph graph;
     graph.vertexToEdges.resize(nodeCount);
     graph.incomingProb.resize(nodeCount);
@@ -443,7 +438,6 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateUnspecializedTreelet
         mergedEdges.resize(nodeCount);
         for (int dirIdx = 0; dirIdx < 8; dirIdx++) {
             Vector3f dir = ComputeRayDir(dirIdx);
-            //adjacency graph here 
             AdjacencyGraph g = CreateTraversalGraph(dir, 0);
             if (dirIdx == 0) {
                 graph.depthFirst = move(g.depthFirst);
@@ -451,16 +445,10 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateUnspecializedTreelet
             for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
                 graph.incomingProb[nodeIdx] += g.incomingProb[nodeIdx];
 
-                const auto edgeList = g.vertexToEdges[nodeIdx];
-                // auto iter = edgeList.begin();
-                for (auto &edge : edgeList){
+                for (auto &edge : g.vertexToEdges[nodeIdx]){
                     mergedEdges[edge.src][edge.dst] += edge.weight;
                     mergedEdges[edge.dst][edge.src] += edge.weight;
                 }
-                // for (Edge *edge = bounds.first; edge < bounds.first + bounds.second; edge++) {
-                //     mergedEdges[edge->src][edge->dst] += edge->weight;
-                //     mergedEdges[edge->dst][edge->src] += edge->weight;
-                // }
             }
         }
         for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
@@ -515,18 +503,6 @@ vector<TreeletDumpBVH::TreeletInfo> TreeletDumpBVH::AllocateDirectionalTreelets(
         Vector3f dir = ComputeRayDir(dirIdx);
         AdjacencyGraph graph = CreateTraversalGraph(dir, 0);
 
-        //rayCounts[i].resize(nodeCount);
-        //// Init rayCounts so unordered_map isn't modified during intersection
-        //for (uint64_t srcIdx = 0; srcIdx < nodeCount; srcIdx++) {
-        //    auto outgoing = graph.outgoing[srcIdx];
-        //    for (const Edge *outgoingEdge = outgoing.first;
-        //         outgoingEdge < outgoing.first + outgoing.second;
-        //         outgoingEdge++) {
-        //        uint64_t dstIdx = outgoingEdge->dst;
-        //        auto res = rayCounts[i][srcIdx].emplace(dstIdx, 0);
-        //        CHECK_EQ(res.second, true);
-        //    }
-        //}
 
         treeletAllocations[dirIdx] = ComputeTreelets(graph, maxTreeletBytes);
         intermediateTreelets[dirIdx] = MergeDisjointTreelets(dirIdx, maxTreeletBytes, graph);
@@ -805,12 +781,10 @@ TreeletDumpBVH::CreateTraversalGraph(const Vector3f &rayDir, int depthReduction)
     auto edgeIter = intermediate.edges.begin();
     long num_edges = 0;
     while(edgeIter != intermediate.edges.end()){
-        Edge curr_edge = *edgeIter;
-        graph.vertexToEdges[curr_edge.src].push_back(curr_edge);
-        graph.vertexToEdges[curr_edge.dst].push_back(curr_edge);
+        graph.vertexToEdges[edgeIter->src].emplace_back(edgeIter->src,edgeIter->dst,edgeIter->weight);
+        graph.vertexToEdges[edgeIter->dst].emplace_back(edgeIter->dst,edgeIter->src,edgeIter->weight);
         edgeIter++;
         num_edges++; 
-    
     }
 
     graph.depthFirst = move(intermediate.depthFirst);
@@ -973,7 +947,6 @@ A                if (srcSize + dstSize > maxTreeletBytes) {
 #endif
 }
 
-//** Brennan's computeTreelets, need to modify
 vector<uint32_t>
 TreeletDumpBVH::ComputeTreeletsTopological(const AdjacencyGraph &graph,
                                            uint64_t maxTreeletBytes) const {
@@ -1282,7 +1255,6 @@ TreeletDumpBVH::ComputeTreeletsGreedySize(
 #endif
 }
          
-//** definitely need to modify                                               
 vector<uint32_t>
 TreeletDumpBVH::ComputeTreelets(const AdjacencyGraph &graph,
                                 uint64_t maxTreeletBytes) const {
@@ -1292,12 +1264,15 @@ TreeletDumpBVH::ComputeTreelets(const AdjacencyGraph &graph,
             assignment = ComputeTreeletsTopological(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::TopologicalHierarchical:
+            throw runtime_error("Unimplemented");
             // assignment = ComputeTreeletsTopologicalHierarchical(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::GreedySize:
+            throw runtime_error("Unimplemented");
             // assignment = ComputeTreeletsGreedySize(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::PseudoAgglomerative:
+            throw runtime_error("Unimplemented");
             // assignment = ComputeTreeletsAgglomerative(graph, maxTreeletBytes);
             break;
         case PartitionAlgorithm::Nvidia:
