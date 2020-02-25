@@ -122,7 +122,7 @@ void WSServer<TCPSocket>::Connection::write() {
 
         /* set write_all to false because socket might be unable to write all */
         const auto next_it =
-            socket.write(buffer.substr(send_buffer_offset), false);
+            socket.write(buffer.cbegin() + send_buffer_offset, buffer.cend());
 
         if (next_it != buffer.cend()) {
             /* save the offset of the remaining string */
