@@ -64,12 +64,12 @@ ResultType LambdaMaster::handleStatusMessage() {
         return total ? (((uint64_t)(100 * (100.0 * n / total))) / 100.0) : 0.0;
     };
 
-    auto BG = []() -> char const * {
+    auto BG = [](const bool reset = false) -> char const * {
         constexpr char const *BG_A = "\033[48;5;022m";
         constexpr char const *BG_B = "\033[48;5;028m";
 
         static bool alternate = true;
-        alternate = !alternate;
+        alternate = reset ? false : !alternate;
 
         return alternate ? BG_B : BG_A;
     };
@@ -81,8 +81,8 @@ ResultType LambdaMaster::handleStatusMessage() {
     oss << "\033[0m" << fixed << setprecision(2)
 
         // finished paths
-        << BG() << " \u21af " << s.finishedPaths
-                << " (" << percent(s.finishedPaths, scene.totalPaths) << "%) "
+        << BG(true) << " \u21af " << s.finishedPaths
+        << " (" << percent(s.finishedPaths, scene.totalPaths) << "%) "
 
         << BG() << " \u21a6 " << Worker::activeCount[Worker::Role::Generator]
                 << "/" << rayGenerators << " "
@@ -105,6 +105,9 @@ ResultType LambdaMaster::handleStatusMessage() {
         // dequeued bytes
         << BG() << " \u2193 " << percent(s.dequeued.bytes, s.enqueued.bytes)
                 << "% "
+
+        // subscribers
+        << BG() << " \u29bf " << subscribers.size() << " "
 
         // elapsed time
         << BG() << " " << setfill('0')
