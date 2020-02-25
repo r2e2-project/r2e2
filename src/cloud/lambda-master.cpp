@@ -419,15 +419,20 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
         wsServer = make_unique<WebSocketTCPServer>(
             Address{"0.0.0.0", clientPort}, loop.poller());
 
-        wsServer->set_message_callback([](const uint64_t, const WSMessage &) {
-            cerr << "GOT MESSAGE!" << endl;
-        });
+        wsServer->set_message_callback(
+            [&](const uint64_t id, const WSMessage &message) {
+                if (message.type() == WSMessage::Type::Text) {
+                    auto tokens = split(message.payload(), " ");
+                    if (tokens.size() != 2 || tokens[0] != "subscribe") return;
 
-        wsServer->set_open_callback(
-            [](const uint64_t) { cerr << "Opened!" << endl; });
+                    this->subscribers.emplace(id, stoull(tokens[1]));
+                }
+            });
+
+        wsServer->set_open_callback([](const uint64_t) {});
 
         wsServer->set_close_callback(
-            [](const uint64_t) { cerr << "Closed!" << endl; });
+            [&](const uint64_t id) { this->subscribers.erase(id); });
 
         wsServer->init_listener_socket();
     }

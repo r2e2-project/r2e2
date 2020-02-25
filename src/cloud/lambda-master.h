@@ -87,7 +87,12 @@ class LambdaMaster {
     const TempDirectory sceneDir{"/tmp/pbrt-lambda-master"};
     const std::string jobId;
 
+    ////////////////////////////////////////////////////////////////////////////
+    // Job Info Server                                                        //
+    ////////////////////////////////////////////////////////////////////////////
+
     std::unique_ptr<WebSocketTCPServer> wsServer{nullptr};
+    std::map<uint64_t, size_t> subscribers{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Cloud                                                                  //
