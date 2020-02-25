@@ -47,3 +47,15 @@ void put_field(char *message, const uint16_t n, size_t loc) {
     memcpy(message + loc, reinterpret_cast<const char *>(&network_order),
            sizeof(network_order));
 }
+
+uint16_t get_uint16(const char *data) {
+    return be16toh(*reinterpret_cast<const uint16_t *>(data));
+}
+
+uint32_t get_uint32(const char *data) {
+    return be32toh(*reinterpret_cast<const uint32_t *>(data));
+}
+
+uint64_t get_uint64(const char *data) {
+    return be64toh(*reinterpret_cast<const uint64_t *>(data));
+}

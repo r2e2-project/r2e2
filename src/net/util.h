@@ -21,4 +21,8 @@ std::string put_field(T n) = delete;
 template <class T>
 std::string put_field(char* message, T n, size_t) = delete;
 
+uint16_t get_uint16(const char * data);
+uint32_t get_uint32(const char * data);
+uint64_t get_uint64(const char * data);
+
 #endif /* PBRT_NET_UTIL_H */

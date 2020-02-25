@@ -32,7 +32,7 @@ Poller::Result Poller::poll( const int timeout_ms )
     auto it_pollfd = pollfds_.begin();
 
     while ( it_action != actions_.end() and it_pollfd != pollfds_.end() ) {
-      if ( fd_nums.count( it_pollfd->fd ) ) {
+      if ( fds_to_remove_.count( it_pollfd->fd ) ) {
         it_action = actions_.erase( it_action );
         it_pollfd = pollfds_.erase( it_pollfd );
       }
