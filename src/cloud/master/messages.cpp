@@ -58,6 +58,7 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             recordEnqueue(workerId, info);
 
             if (info.sampleBag) {
+                sampleBags.push_back(info);
                 continue;
             }
 

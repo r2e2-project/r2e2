@@ -233,6 +233,9 @@ class LambdaMaster {
     /* ray bags that there are no workers for them */
     std::map<TreeletId, std::queue<RayBagInfo>> pendingRayBags;
 
+    /* sample bags */
+    std::vector<RayBagInfo> sampleBags;
+
     void moveFromPendingToQueued(const TreeletId treeletId);
     void moveFromQueuedToPending(const TreeletId treeletId);
 
