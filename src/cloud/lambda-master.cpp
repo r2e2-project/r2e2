@@ -421,6 +421,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
 
         wsServer->set_message_callback(
             [&](const uint64_t id, const WSMessage &message) {
+                cerr << "[ws] message: " << id << endl;
                 if (message.type() == WSMessage::Type::Text) {
                     auto tokens = split(message.payload(), " ");
                     if (tokens.size() != 2 || tokens[0] != "subscribe") return;
@@ -429,10 +430,18 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
                 }
             });
 
-        wsServer->set_open_callback([](const uint64_t) {});
+        wsServer->set_open_callback(
+            [](const uint64_t id) { cerr << "[ws] open: " << id << endl; });
 
-        wsServer->set_close_callback(
-            [&](const uint64_t id) { this->subscribers.erase(id); });
+        wsServer->set_close_callback([&](const uint64_t id) {
+            cerr << "[ws] closed: " << id << endl;
+            this->subscribers.erase(id);
+        });
+
+        loop.poller().add_action(
+            Poller::Action(serviceSubscribersTimer, Direction::In,
+                           bind(&LambdaMaster::handleSubscribers, this),
+                           [&]() { return !subscribers.empty(); }));
 
         wsServer->init_listener_socket();
     }

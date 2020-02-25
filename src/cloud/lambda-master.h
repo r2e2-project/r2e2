@@ -39,6 +39,7 @@ namespace pbrt {
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WORKER_INVOCATION_INTERVAL{2'000};
+constexpr std::chrono::milliseconds SUBSCRIBERS_INTERVAL{1'000};
 
 struct MasterConfiguration {
     int samplesPerPixel;
@@ -90,6 +91,8 @@ class LambdaMaster {
     ////////////////////////////////////////////////////////////////////////////
     // Job Info Server                                                        //
     ////////////////////////////////////////////////////////////////////////////
+
+    Poller::Action::Result::Type handleSubscribers();
 
     std::unique_ptr<WebSocketTCPServer> wsServer{nullptr};
     std::map<uint64_t, size_t> subscribers{};
@@ -335,6 +338,7 @@ class LambdaMaster {
     TimerFD rescheduleTimer{RESCHEDULE_INTERVAL,
                             std::chrono::milliseconds{500}};
     TimerFD workerStatsWriteTimer;
+    TimerFD serviceSubscribersTimer{SUBSCRIBERS_INTERVAL};
 
     std::unique_ptr<TimerFD> jobExitTimer;
     std::unique_ptr<TimerFD> jobTimeoutTimer;

@@ -1,7 +1,6 @@
-#include "cloud/lambda-master.h"
-
 #include <iomanip>
 
+#include "cloud/lambda-master.h"
 #include "util/status_bar.h"
 
 using namespace std;
@@ -10,6 +9,20 @@ using namespace pbrt;
 using namespace PollerShortNames;
 
 constexpr milliseconds EXIT_GRACE_PERIOD{5'000};
+
+ResultType LambdaMaster::handleSubscribers() {
+    serviceSubscribersTimer.read_event();
+
+    for (auto &kv : subscribers) {
+        const auto connectionId = kv.first;
+        const auto nextSampleIndex = kv.second;
+
+        WSFrame frame{true, WSFrame::OpCode::Text, "kmn"};
+        wsServer->queue_frame(connectionId, frame);
+    }
+
+    return ResultType::Continue;
+}
 
 ResultType LambdaMaster::handleStatusMessage() {
     ScopeTimer<TimeLog::Category::StatusBar> timer_;
@@ -29,14 +42,14 @@ ResultType LambdaMaster::handleStatusMessage() {
 
         jobTimeoutTimer = make_unique<TimerFD>(EXIT_GRACE_PERIOD);
 
-        loop.poller().add_action(
-            Poller::Action(*jobTimeoutTimer, Direction::In,
-                           [this]() {
-                               jobTimeoutTimer = nullptr;
-                               return ResultType::Exit;
-                           },
-                           [this]() { return true; },
-                           []() { throw runtime_error("job finish"); }));
+        loop.poller().add_action(Poller::Action(
+            *jobTimeoutTimer, Direction::In,
+            [this]() {
+                jobTimeoutTimer = nullptr;
+                return ResultType::Exit;
+            },
+            [this]() { return true; },
+            []() { throw runtime_error("job finish"); }));
     }
 
     const auto laggingWorkers =
