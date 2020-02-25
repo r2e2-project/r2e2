@@ -27,6 +27,24 @@ unsigned int Poller::Action::service_count( void ) const
 
 Poller::Result Poller::poll( const int timeout_ms )
 {
+  if ( !fds_to_remove_.empty() ) {
+    auto it_action = actions_.begin();
+    auto it_pollfd = pollfds_.begin();
+
+    while ( it_action != actions_.end() and it_pollfd != pollfds_.end() ) {
+      if ( fd_nums.count( it_pollfd->fd ) ) {
+        it_action = actions_.erase( it_action );
+        it_pollfd = pollfds_.erase( it_pollfd );
+      }
+      else {
+        it_action++;
+        it_pollfd++;
+      }
+    }
+
+    fds_to_remove_.clear();
+  }
+
   /* first, let's add all the actions that are waiting in the queue */
   while ( not action_add_queue_.empty() ) {
     Action & action = action_add_queue_.front();
@@ -109,30 +127,13 @@ Poller::Result Poller::poll( const int timeout_ms )
     }
   }
 
-  remove_actions( fds_to_remove );
-
+  remove_fds( fds_to_remove );
   return Result::Type::Success;
 }
 
-void Poller::remove_actions( const set<int> & fd_nums )
+void Poller::remove_fds( const set<int> & fd_nums )
 {
-  if ( fd_nums.size() == 0 ) {
-    return;
-  }
-
-  auto it_action = actions_.begin();
-  auto it_pollfd = pollfds_.begin();
-
-  while ( it_action != actions_.end() and it_pollfd != pollfds_.end() ) {
-    if ( fd_nums.count( it_pollfd->fd ) ) {
-      it_action = actions_.erase( it_action );
-      it_pollfd = pollfds_.erase( it_pollfd );
-    }
-    else {
-      it_action++;
-      it_pollfd++;
-    }
-  }
+  fds_to_remove_.insert(fd_nums.begin(), fd_nums.end());
 }
 
 void Poller::deactivate_actions( const set<uint64_t> & action_ids ) {
