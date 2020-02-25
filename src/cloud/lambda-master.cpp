@@ -414,6 +414,23 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
 
         return true;
     });
+
+    if (clientPort != 0) {
+        wsServer = make_unique<WebSocketTCPServer>(
+            Address{"0.0.0.0", clientPort}, loop.poller());
+
+        wsServer->set_message_callback([](const uint64_t, const WSMessage &) {
+            cerr << "GOT MESSAGE!" << endl;
+        });
+
+        wsServer->set_open_callback(
+            [](const uint64_t) { cerr << "Opened!" << endl; });
+
+        wsServer->set_close_callback(
+            [](const uint64_t) { cerr << "Closed!" << endl; });
+
+        wsServer->init_listener_socket();
+    }
 }
 
 string LambdaMaster::Worker::toString() const {

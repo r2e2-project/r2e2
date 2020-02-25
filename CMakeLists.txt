@@ -541,6 +541,7 @@ SET(ALL_PBRT_LIBS
   pbrt
   pbrt_messages
   atomic
+  cryptopp
   ${CMAKE_THREAD_LIBS_INIT}
   ${OPENEXR_LIBS}
   glog

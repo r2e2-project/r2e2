@@ -24,6 +24,7 @@
 #include "net/address.h"
 #include "net/aws.h"
 #include "net/http_request.h"
+#include "net/ws_server.h"
 #include "storage/backend.h"
 #include "util/optional.h"
 #include "util/seq_no_set.h"
@@ -85,6 +86,8 @@ class LambdaMaster {
     const MasterConfiguration config;
     const TempDirectory sceneDir{"/tmp/pbrt-lambda-master"};
     const std::string jobId;
+
+    std::unique_ptr<WebSocketTCPServer> wsServer{nullptr};
 
     ////////////////////////////////////////////////////////////////////////////
     // Cloud                                                                  //
