@@ -74,8 +74,6 @@ class WSServer {
 
     std::set<uint64_t> closed_connections_{};
 
-    void init_listener_socket();
-
     /* gracefully close the connection */
     void wait_close_connection(const uint64_t connection_id);
 
@@ -84,6 +82,8 @@ class WSServer {
 
   public:
     WSServer(const Address &listener_addr, Poller &poller);
+
+    void init_listener_socket();
 
     void set_message_callback(MessageCallback func) {
         message_callback_ = func;

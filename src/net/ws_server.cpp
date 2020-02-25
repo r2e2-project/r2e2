@@ -325,7 +325,6 @@ template <class SocketType>
 WSServer<SocketType>::WSServer(const Address &listener_addr, Poller &poller)
     : poller_(poller) {
     listener_addr_ = listener_addr;
-    init_listener_socket();
 }
 
 template <class SocketType>
