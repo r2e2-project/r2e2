@@ -59,8 +59,9 @@ struct MasterConfiguration {
 
 class LambdaMaster {
   public:
-    LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
-                 const uint32_t rayGenerators, const std::string &publicAddress,
+    LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
+                 const uint32_t maxWorkers, const uint32_t rayGenerators,
+                 const std::string &publicAddress,
                  const std::string &storageBackend,
                  const std::string &awsRegion,
                  std::unique_ptr<Scheduler> &&scheduler,

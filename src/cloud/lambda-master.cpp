@@ -66,7 +66,8 @@ LambdaMaster::~LambdaMaster() {
     }
 }
 
-LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint32_t maxWorkers,
+LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
+                           const uint32_t maxWorkers,
                            const uint32_t rayGenerators,
                            const string &publicAddress,
                            const string &storageBackendUri,
@@ -540,6 +541,7 @@ void usage(const char *argv0, int exitCode) {
          << endl
          << "Options:" << endl
          << "  -p --port PORT             port to use" << endl
+         << "  -P --client-port PORT      port for clients to connect" << endl
          << "  -i --ip IPSTRING           public ip of this machine" << endl
          << "  -r --aws-region REGION     region to run lambdas in" << endl
          << "  -b --storage-backend NAME  storage backend URI" << endl
@@ -598,6 +600,7 @@ int main(int argc, char *argv[]) {
     google::InitGoogleLogging(argv[0]);
 
     uint16_t listenPort = 50000;
+    uint16_t clientPort = 0;
     int32_t maxWorkers = -1;
     int32_t rayGenerators = 0;
     string publicIp;
@@ -627,6 +630,7 @@ int main(int argc, char *argv[]) {
 
     struct option long_options[] = {
         {"port", required_argument, nullptr, 'p'},
+        {"client-port", required_argument, nullptr, 'P'},
         {"ip", required_argument, nullptr, 'i'},
         {"aws-region", required_argument, nullptr, 'r'},
         {"storage-backend", required_argument, nullptr, 'b'},
@@ -655,7 +659,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         const int opt = getopt_long(
-            argc, argv, "p:i:r:b:m:G:w:D:a:S:M:L:c:t:j:T:n:J:d:E:B:gh",
+            argc, argv, "p:P:i:r:b:m:G:w:D:a:S:M:L:c:t:j:T:n:J:d:E:B:gh",
             long_options, nullptr);
 
         if (opt == -1) {
@@ -665,6 +669,7 @@ int main(int argc, char *argv[]) {
         switch (opt) {
         // clang-format off
         case 'p': listenPort = stoi(optarg); break;
+        case 'P': clientPort = stoi(optarg); break;
         case 'i': publicIp = optarg; break;
         case 'r': region = optarg; break;
         case 'b': storageBackendUri = optarg; break;
@@ -772,9 +777,10 @@ int main(int argc, char *argv[]) {
                                   move(engines)};
 
     try {
-        master = make_unique<LambdaMaster>(
-            listenPort, maxWorkers, rayGenerators, publicAddress.str(),
-            storageBackendUri, region, move(scheduler), config);
+        master = make_unique<LambdaMaster>(listenPort, clientPort, maxWorkers,
+                                           rayGenerators, publicAddress.str(),
+                                           storageBackendUri, region,
+                                           move(scheduler), config);
 
         master->run();
 
