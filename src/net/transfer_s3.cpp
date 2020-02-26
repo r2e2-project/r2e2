@@ -35,8 +35,9 @@ S3TransferAgent::S3Config::S3Config(const unique_ptr<StorageBackend>& backend) {
 }
 
 S3TransferAgent::S3TransferAgent(const unique_ptr<StorageBackend>& backend,
-                                 const size_t threadCount)
-    : TransferAgent(), clientConfig(backend) {
+                                 const size_t threadCount,
+                                 const bool uploadAsPublic)
+    : TransferAgent(), clientConfig(backend), uploadAsPublic(uploadAsPublic) {
     if (threadCount == 0) {
         throw runtime_error("thread count cannot be zero");
     }
@@ -61,7 +62,7 @@ HTTPRequest S3TransferAgent::getRequest(const Action& action) {
     case Task::Upload:
         return S3PutRequest(clientConfig.credentials, clientConfig.endpoint,
                             clientConfig.region, action.key, action.data,
-                            UNSIGNED_PAYLOAD)
+                            UNSIGNED_PAYLOAD, uploadAsPublic)
             .to_http_request();
 
     case Task::Download:

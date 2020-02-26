@@ -28,6 +28,7 @@ class S3TransferAgent : public TransferAgent {
 
     static constexpr size_t MAX_REQUESTS_ON_CONNECTION{1};
     std::chrono::steady_clock::time_point lastAddrUpdate{};
+    const bool uploadAsPublic;
 
     HTTPRequest getRequest(const Action& action);
 
@@ -36,7 +37,8 @@ class S3TransferAgent : public TransferAgent {
 
   public:
     S3TransferAgent(const std::unique_ptr<StorageBackend>& backend,
-                    const size_t threadCount = MAX_THREADS);
+                    const size_t threadCount = MAX_THREADS,
+                    const bool uploadAsPublic = false);
 
     ~S3TransferAgent();
 };
