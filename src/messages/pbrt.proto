@@ -446,6 +446,7 @@ message HistogramUInt64 {
 }
 
 message JobStatus {
-    uint64 next_sample_index = 1;
-    repeated string sample_bags = 2;
+    string url_prefix = 1;
+    uint64 next_sample_index = 2;
+    repeated string sample_bags = 3;
 }

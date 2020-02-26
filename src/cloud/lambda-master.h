@@ -96,6 +96,7 @@ class LambdaMaster {
 
     std::unique_ptr<WebSocketTCPServer> wsServer{nullptr};
     std::map<uint64_t, size_t> subscribers{};
+    std::string samplesUrlPrefix{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Cloud                                                                  //

@@ -24,9 +24,10 @@ ResultType LambdaMaster::handleSubscribers() {
             status.add_sample_bags(sampleBags[i].str(""));
         }
 
-        status.set_next_sample_index(nextSampleIndex);
-
         if (status.sample_bags_size() == 0) continue;
+
+        status.set_next_sample_index(nextSampleIndex);
+        status.set_url_prefix(samplesUrlPrefix);
 
         WSFrame frame{true, WSFrame::OpCode::Text, protoutil::to_json(status)};
         wsServer->queue_frame(connectionId, frame);

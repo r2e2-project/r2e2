@@ -45,6 +45,7 @@
 #include "util/status_bar.h"
 #include "util/temp_file.h"
 #include "util/tokenize.h"
+#include "util/uri.h"
 #include "util/util.h"
 
 using namespace std;
@@ -444,6 +445,14 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
                            [&]() { return !subscribers.empty(); }));
 
         wsServer->init_listener_socket();
+
+        ParsedURI uri{storageBackendUri};
+        samplesUrlPrefix =
+            "https://" +
+            S3::endpoint(uri.options.count("region") ? uri.options["region"]
+                                                     : "us-east-1",
+                         uri.host) +
+            "/jobs/" + jobId + "/";
     }
 }
 
