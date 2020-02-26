@@ -444,3 +444,8 @@ message HistogramUInt64 {
     uint64 sum = 8;
     uint64 squares_sum = 9;
 }
+
+message JobStatus {
+    uint64 next_sample_index = 1;
+    repeated string sample_bags = 2;
+}

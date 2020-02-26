@@ -1,6 +1,7 @@
 #include <iomanip>
 
 #include "cloud/lambda-master.h"
+#include "messages/utils.h"
 #include "util/status_bar.h"
 
 using namespace std;
@@ -15,9 +16,19 @@ ResultType LambdaMaster::handleSubscribers() {
 
     for (auto &kv : subscribers) {
         const auto connectionId = kv.first;
-        const auto nextSampleIndex = kv.second;
+        auto &nextSampleIndex = kv.second;
 
-        WSFrame frame{true, WSFrame::OpCode::Text, "kmn"};
+        protobuf::JobStatus status;
+        for (size_t i = nextSampleIndex; i < sampleBags.size();
+             i++, nextSampleIndex++) {
+            status.add_sample_bags(sampleBags[i].str(""));
+        }
+
+        status.set_next_sample_index(nextSampleIndex);
+
+        if (status.sample_bags_size() == 0) continue;
+
+        WSFrame frame{true, WSFrame::OpCode::Text, protoutil::to_json(status)};
         wsServer->queue_frame(connectionId, frame);
     }
 
