@@ -28,7 +28,8 @@ public:
   S3PutRequest( const AWSCredentials & credentials,
                 const std::string & endpoint, const std::string & region,
                 const std::string & object, const std::string & contents,
-                const std::string & content_hash = {} );
+                const std::string & content_hash = {},
+                const bool public_read = false );
 };
 
 class S3GetRequest : public AWSRequest

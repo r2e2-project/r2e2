@@ -34,10 +34,11 @@ std::string S3::endpoint( const string & region, const string & bucket )
 S3PutRequest::S3PutRequest( const AWSCredentials & credentials,
                             const string & endpoint, const string & region,
                             const string & object, const string & contents,
-                            const string & content_hash )
+                            const string & content_hash,
+                            const bool public_read )
   : AWSRequest( credentials, region, "PUT /" + object + " HTTP/1.1", contents )
 {
-  headers_[ "x-amz-acl" ] = "private";
+  headers_[ "x-amz-acl" ] = public_read ? "public-read" : "private";
   headers_[ "host" ] = endpoint;
   headers_[ "content-length" ] = to_string( contents.length() );
 
