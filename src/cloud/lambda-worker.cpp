@@ -38,7 +38,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         transferAgent = make_unique<S3TransferAgent>(storageBackend);
     }
 
-    samplesTransferAgent = make_unique<S3TransferAgent>(storageBackend, 2);
+    samplesTransferAgent =
+        make_unique<S3TransferAgent>(storageBackend, 2, true);
 
     cerr << "* starting worker in " << workingDirectory.name() << endl;
     roost::chdir(workingDirectory.name());
