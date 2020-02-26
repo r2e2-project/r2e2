@@ -1,9 +1,11 @@
 #include "raystate.h"
-#include "cloud/bvh.h"
 
 #include <lz4.h>
+
 #include <cstring>
 #include <limits>
+
+#include "cloud/bvh.h"
 
 using namespace std;
 using namespace pbrt;
@@ -58,7 +60,7 @@ void RayState::SetHit(const TreeletNode &node) {
 struct __attribute__((packed, aligned(1))) Packed3f {
     Float values[3];
     Packed3f(const Spectrum &spectrum) {
-        memcpy(values, spectrum.data(), 3*sizeof(Float));
+        memcpy(values, spectrum.data(), 3 * sizeof(Float));
     }
 
     Packed3f(const Point3f &p) {
@@ -75,7 +77,7 @@ struct __attribute__((packed, aligned(1))) Packed3f {
 
     Spectrum ToSpectrum() const {
         Spectrum s;
-        memcpy(s.data(), values, 3*sizeof(Float));
+        memcpy(s.data(), values, 3 * sizeof(Float));
         return s;
     };
 
@@ -96,22 +98,18 @@ struct __attribute__((packed, aligned(1))) PackedRay {
     Float time;
 
     PackedRay(const Ray &ray)
-        : o(ray.o),
-          d(ray.d),
-          tMax(ray.tMax),
-          time(ray.time)
-    {}
+        : o(ray.o), d(ray.d), tMax(ray.tMax), time(ray.time) {}
 };
 
 struct __attribute__((packed, aligned(1))) PackedTransform {
     Float m[4][4];
     PackedTransform(const Transform &txfm) {
-        memcpy(m, txfm.GetMatrix().m, 16*sizeof(Float));
+        memcpy(m, txfm.GetMatrix().m, 16 * sizeof(Float));
     }
 
     Transform ToTransform() const {
         Float tmp[4][4];
-        memcpy(tmp, m, sizeof(Float)*16);
+        memcpy(tmp, m, sizeof(Float) * 16);
         return Transform(tmp);
     }
 };
@@ -126,12 +124,11 @@ struct __attribute__((packed, aligned(1))) PackedTreeletNode {
         : treelet(node.treelet),
           transformed(node.transformed),
           primitive(node.primitive),
-          node(node.node)
-    {}
+          node(node.node) {}
 
     RayState::TreeletNode ToTreeletNode() const {
-        return RayState::TreeletNode { treelet, node,
-                                       (uint8_t)primitive, (bool)transformed };
+        return RayState::TreeletNode{treelet, node, (uint8_t)primitive,
+                                     (bool)transformed};
     }
 };
 
@@ -147,8 +144,7 @@ struct __attribute__((packed, aligned(1))) PackedSampleID {
           pFilmX(sample.pFilm.x),
           pFilmY(sample.pFilm.y),
           weight(sample.weight),
-          dim(sample.dim)
-    {}
+          dim(sample.dim) {}
 };
 
 struct __attribute__((packed, aligned(1))) PackedRayFixedHdr {
@@ -179,8 +175,7 @@ struct __attribute__((packed, aligned(1))) PackedRayFixedHdr {
           Ld(r.Ld),
           toVisitHead(r.toVisitHead),
           hasDifferentials(r.ray.hasDifferentials),
-          ray(r.ray)
-    {}
+          ray(r.ray) {}
 };
 
 struct __attribute__((packed, aligned(1))) PackedDifferentials {
@@ -191,8 +186,7 @@ struct __attribute__((packed, aligned(1))) PackedDifferentials {
         : rxOrigin(r.ray.rxOrigin),
           ryOrigin(r.ray.ryOrigin),
           rxDirection(r.ray.rxDirection),
-          ryDirection(r.ray.ryDirection)
-    {}
+          ryDirection(r.ray.ryDirection) {}
 };
 
 size_t PackRay(char *bufferStart, const RayState &state) {
@@ -269,8 +263,7 @@ void UnPackRay(char *buffer, RayState &state) {
 
         state.hitNode = hitNode->ToTreeletNode();
         if (state.hitNode.transformed) {
-            PackedTransform *txfm =
-                reinterpret_cast<PackedTransform *>(buffer);
+            PackedTransform *txfm = reinterpret_cast<PackedTransform *>(buffer);
             buffer += sizeof(PackedTransform);
 
             state.hitTransform = txfm->ToTransform();
@@ -286,16 +279,16 @@ void UnPackRay(char *buffer, RayState &state) {
     }
 
     if (!state.toVisitEmpty() && state.toVisitTop().transformed) {
-        PackedTransform *txfm =
-            reinterpret_cast<PackedTransform *>(buffer);
+        PackedTransform *txfm = reinterpret_cast<PackedTransform *>(buffer);
 
         state.rayTransform = txfm->ToTransform();
     }
 }
 
-const size_t RayState::MaxPackedSize = sizeof(PackedRayFixedHdr) +
-    64 * sizeof(PackedTreeletNode) + sizeof(PackedTreeletNode) +
-    sizeof(PackedDifferentials) + 2 * sizeof(PackedTransform) + 4;
+const size_t RayState::MaxPackedSize =
+    sizeof(PackedRayFixedHdr) + 64 * sizeof(PackedTreeletNode) +
+    sizeof(PackedTreeletNode) + sizeof(PackedDifferentials) +
+    2 * sizeof(PackedTransform) + 4;
 
 size_t RayState::Serialize(char *data) {
     static thread_local char packedBuffer[RayState::MaxPackedSize];
@@ -306,8 +299,8 @@ size_t RayState::Serialize(char *data) {
     uint32_t len = packedBytes;
 
     if (PbrtOptions.compressRays) {
-        len = LZ4_compress_default(packedBuffer, data + 4,
-                                   packedBytes, upperBound);
+        len = LZ4_compress_default(packedBuffer, data + 4, packedBytes,
+                                   upperBound);
 
         if (len == 0) {
             throw runtime_error("ray compression failed");
@@ -331,16 +324,15 @@ void RayState::Deserialize(const char *data, const size_t len) {
             throw runtime_error("ray decompression failed");
         }
     } else {
-        memcpy(packedBuffer, data,
-               min(RayState::MaxPackedSize, len));
+        memcpy(packedBuffer, data, min(RayState::MaxPackedSize, len));
     }
 
     UnPackRay(packedBuffer, *this);
 }
 
 size_t RayState::MaxSize() const {
-    size_t size = 4 + sizeof(PackedRayFixedHdr) +
-        toVisitHead * sizeof(PackedTreeletNode);
+    size_t size =
+        4 + sizeof(PackedRayFixedHdr) + toVisitHead * sizeof(PackedTreeletNode);
 
     if (hit) {
         size += sizeof(PackedTreeletNode) + sizeof(PackedTransform);
@@ -377,24 +369,57 @@ Sample::Sample(const RayState &rayState)
     }
 }
 
-size_t Sample::Size() const {
-    return offset_of(*this, &Sample::L) + sizeof(Sample::L);
+struct __attribute__((packed, aligned(1))) PackedSample {
+    uint64_t sampleId;
+    Float x, y;
+    Float weight;
+    Float c[3];
+};
+
+size_t Sample::Size() const { return sizeof(PackedSample); }
+
+size_t PackSample(char *buffer, Sample &sample) {
+    PackedSample *packed = new (buffer) PackedSample;
+
+    packed->sampleId = sample.sampleId;
+    packed->x = sample.pFilm.x;
+    packed->y = sample.pFilm.y;
+    packed->weight = sample.weight;
+
+    for (size_t i = 0; i < 3; i++) {
+        packed->c[i] = sample.L.data()[i];
+    }
+
+    return sizeof(PackedSample);
 }
 
-size_t Sample::Serialize(char *data, const bool compress) {
-    constexpr size_t upperBound = LZ4_COMPRESSBOUND(sizeof(Sample));
-    const size_t size = this->Size();
+void UnPackSample(char *buffer, Sample &sample) {
+    PackedSample *packed = reinterpret_cast<PackedSample *>(buffer);
+    sample.sampleId = packed->sampleId;
+    sample.pFilm.x = packed->x;
+    sample.pFilm.y = packed->y;
+    sample.weight = packed->weight;
+
+    for (size_t i = 0; i < 3; i++) {
+        sample.L.data()[i] = packed->c[i];
+    }
+}
+
+size_t Sample::Serialize(char *data) {
+    static thread_local char packedBuffer[sizeof(PackedSample)];
+
+    const size_t size = PackSample(packedBuffer, *this);
+    const size_t upperBound = LZ4_COMPRESSBOUND(size);
     uint32_t len = size;
 
-    if (compress) {
-        len = LZ4_compress_default(reinterpret_cast<char *>(this), data + 4,
-                                   size, upperBound);
+    if (PbrtOptions.compressRays) {
+        len = LZ4_compress_default(packedBuffer, data + 4, size, upperBound);
 
         if (len == 0) {
             throw runtime_error("finished ray compression failed");
         }
     } else {
-        memcpy(data + 4, reinterpret_cast<char *>(this), size);
+        memcpy(data + 4, packedBuffer, size);
     }
 
     memcpy(data, &len, 4);
@@ -403,15 +428,16 @@ size_t Sample::Serialize(char *data, const bool compress) {
     return len;
 }
 
-void Sample::Deserialize(const char *data, const size_t len,
-                              const bool decompress) {
-    if (decompress) {
-        if (LZ4_decompress_safe(data, reinterpret_cast<char *>(this), len,
-                                sizeof(Sample)) < 0) {
+void Sample::Deserialize(const char *data, const size_t len) {
+    static thread_local char packedBuffer[sizeof(PackedSample)];
+
+    if (PbrtOptions.compressRays) {
+        if (LZ4_decompress_safe(data, packedBuffer, len, sizeof(Sample)) < 0) {
             throw runtime_error("ray decompression failed");
         }
     } else {
-        memcpy(reinterpret_cast<char *>(this), data,
-               min(sizeof(Sample), len));
+        memcpy(packedBuffer, data, min(sizeof(Sample), len));
     }
+
+    UnPackSample(packedBuffer, *this);
 }

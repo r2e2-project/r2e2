@@ -105,11 +105,10 @@ class Sample {
     Sample &operator=(const Sample &) = delete;
 
     size_t Size() const;
-    size_t Serialize(char *data, const bool compress = true);
-    void Deserialize(const char *data, const size_t len,
-                     const bool decompress = true);
+    size_t Serialize(char *data);
+    void Deserialize(const char *data, const size_t len);
 
-    size_t MaxCompressedSize() const { return 4 + LZ4_COMPRESSBOUND(Size()); }
+    size_t MaxCompressedSize() const { return Size(); }
 };
 
 }  // namespace pbrt
