@@ -41,6 +41,8 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 }
 
 ResultType LambdaWorker::handleTraceQueue() {
+    ScopeTimer<TimeLog::Category::TraceQueue> timer_;
+
     queue<RayStatePtr> processedRays;
 
     constexpr size_t MAX_RAYS = WORKER_MAX_ACTIVE_RAYS / 2;

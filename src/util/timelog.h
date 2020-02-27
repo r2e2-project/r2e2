@@ -28,6 +28,15 @@ public:
     CloseWorker,
     TCPReceive,
     StatusBar,
+    OutQueue,
+    OpenBags,
+    Samples,
+    SealedBags,
+    SampleBags,
+    ReceiveQueue,
+    TransferResults,
+    TraceQueue,
+    MessageParser,
     COUNT
   };
 
@@ -36,7 +45,9 @@ public:
   constexpr static std::array<const char*, num_categories> _category_names {
     { "QueuedRayBags", "HandleMessages", "Schedule", "WorkerStats",
       "Invocation",  "AcceptWorker", "CloseWorker", "TCPReceive",
-      "StatusBar" }
+      "StatusBar", "OutQueue", "OpenBags", "Samples", "SealedBags",
+      "SampleBags", "ReceiveQueue", "TransferResults", "TraceQueue",
+      "MessageParser" }
   };
 
 private:

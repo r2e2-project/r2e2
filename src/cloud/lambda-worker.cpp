@@ -66,6 +66,8 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
     coordinatorConnection = loop.make_connection<TCPConnection>(
         coordinatorAddr,
         [this](shared_ptr<TCPConnection>, string&& data) {
+            ScopeTimer<TimeLog::Category::MessageParser> timer_;
+
             this->messageParser.parse(data);
             return true;
         },

@@ -13,6 +13,8 @@ using PollerResult = Poller::Result::Type;
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 ResultType LambdaWorker::handleMessages() {
+    ScopeTimer<TimeLog::Category::HandleMessages> timer_;
+
     while (!messageParser.empty()) {
         processMessage(messageParser.front());
         messageParser.pop();

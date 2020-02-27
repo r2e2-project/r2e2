@@ -24,6 +24,8 @@ void LambdaWorker::sendWorkerStats() {
 }
 
 ResultType LambdaWorker::handleWorkerStats() {
+    ScopeTimer<TimeLog::Category::WorkerStats> timer_;
+
     workerStatsTimer.read_event();
 
     if (!workerId.initialized()) return ResultType::Continue;

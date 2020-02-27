@@ -1,6 +1,7 @@
+#include <lz4.h>
+
 #include "cloud/lambda-worker.h"
 #include "messages/utils.h"
-#include <lz4.h>
 
 using namespace std;
 using namespace chrono;
@@ -11,6 +12,8 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 
 ResultType LambdaWorker::handleOutQueue() {
+    ScopeTimer<TimeLog::Category::OutQueue> timer_;
+
     bernoulli_distribution bd{config.bagLogRate};
 
     auto createNewBag = [&](const TreeletId treeletId) -> RayBag {
@@ -66,6 +69,8 @@ ResultType LambdaWorker::handleOutQueue() {
 }
 
 ResultType LambdaWorker::handleOpenBags() {
+    ScopeTimer<TimeLog::Category::OpenBags> timer_;
+
     sealBagsTimer.read_event();
 
     nanoseconds nextExpiry = nanoseconds::max();
@@ -96,6 +101,8 @@ ResultType LambdaWorker::handleOpenBags() {
 }
 
 ResultType LambdaWorker::handleSamples() {
+    ScopeTimer<TimeLog::Category::Samples> timer_;
+
     auto& out = sampleBags;
 
     if (out.empty()) {
@@ -122,16 +129,16 @@ ResultType LambdaWorker::handleSamples() {
 }
 
 ResultType LambdaWorker::handleSealedBags() {
+    ScopeTimer<TimeLog::Category::SealedBags> timer_;
+
     while (!sealedBags.empty()) {
         auto& bag = sealedBags.front();
 
         if (PbrtOptions.compressRayBags) {
             size_t upperBound = LZ4_COMPRESSBOUND(bag.info.bagSize);
             std::string compressed(upperBound, '\0');
-            size_t compressedSize = LZ4_compress_default(bag.data.data(),
-                                                         &compressed[0],
-                                                         bag.info.bagSize,
-                                                         upperBound);
+            size_t compressedSize = LZ4_compress_default(
+                bag.data.data(), &compressed[0], bag.info.bagSize, upperBound);
 
             if (compressedSize == 0) {
                 throw runtime_error("bag compression failed");
@@ -157,6 +164,8 @@ ResultType LambdaWorker::handleSealedBags() {
 }
 
 ResultType LambdaWorker::handleSampleBags() {
+    ScopeTimer<TimeLog::Category::SampleBags> timer_;
+
     sampleBagsTimer.read_event();
 
     while (!sampleBags.empty()) {
@@ -174,6 +183,8 @@ ResultType LambdaWorker::handleSampleBags() {
 }
 
 ResultType LambdaWorker::handleReceiveQueue() {
+    ScopeTimer<TimeLog::Category::ReceiveQueue> timer_;
+
     while (!receiveQueue.empty()) {
         RayBag bag = move(receiveQueue.front());
         receiveQueue.pop();
@@ -185,12 +196,12 @@ ResultType LambdaWorker::handleReceiveQueue() {
         size_t totalSize = bag.data.size();
 
         if (PbrtOptions.compressRayBags) {
-            string decompressed(bag.info.rayCount * RayState::MaxPackedSize, '\0');
+            string decompressed(bag.info.rayCount * RayState::MaxPackedSize,
+                                '\0');
 
-            int decompressedSize = LZ4_decompress_safe(bag.data.data(),
-                                                       &decompressed[0],
-                                                       totalSize,
-                                                       decompressed.size());
+            int decompressedSize =
+                LZ4_decompress_safe(bag.data.data(), &decompressed[0],
+                                    totalSize, decompressed.size());
 
             if (decompressedSize < 0) {
                 throw runtime_error("bag decompression failed");
@@ -225,6 +236,8 @@ ResultType LambdaWorker::handleReceiveQueue() {
 }
 
 ResultType LambdaWorker::handleTransferResults(const bool sampleBags) {
+    ScopeTimer<TimeLog::Category::TransferResults> timer_;
+
     protobuf::RayBags enqueuedProto;
     protobuf::RayBags dequeuedProto;
 
