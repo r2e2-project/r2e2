@@ -159,10 +159,14 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
 }
 
 void LambdaWorker::run() {
+    timer();
+
     while (!terminated) {
         auto res = loop.loop_once(-1).result;
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
+
+    TLOG(TIMING) << timer().summary() << endl;
 }
 
 void usage(const char* argv0, int exitCode) {
