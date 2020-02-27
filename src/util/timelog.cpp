@@ -50,6 +50,8 @@ string TimeLog::summary() const
   uint64_t accounted = 0;
 
   for ( unsigned int i = 0; i < num_categories; i++ ) {
+    if ( _logs.at( i ).count == 0 ) continue;
+
     out << "    " << setw( WIDTH - 4 ) << left << _category_names.at( i );
     out << fixed << setprecision( 1 ) << Value<double>(100 * _logs.at( i ).total_ns / double( elapsed )) << "%";
     accounted += _logs.at( i ).total_ns;
