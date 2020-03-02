@@ -121,7 +121,7 @@ class FilmTile {
         pixels = std::vector<FilmTilePixel>(std::max(0, pixelBounds.Area()));
     }
     void AddSample(const Point2f &pFilm, Spectrum L,
-                   Float sampleWeight = 1.) {
+                   Float sampleWeight = 1., bool incrementSum = true) {
         ProfilePhase _(Prof::AddFilmSample);
         if (L.y() > maxSampleLuminance)
             L *= maxSampleLuminance / L.y();
@@ -157,7 +157,9 @@ class FilmTile {
                 // Update pixel values with filtered sample contribution
                 FilmTilePixel &pixel = GetPixel(Point2i(x, y));
                 pixel.contribSum += L * sampleWeight * filterWeight;
-                pixel.filterWeightSum += filterWeight;
+                if (incrementSum) {
+                    pixel.filterWeightSum += filterWeight;
+                }
             }
         }
     }

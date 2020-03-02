@@ -64,8 +64,8 @@ class RayState {
     bool IsShadowRay() const { return isShadowRay; }
     bool HasHit() const { return hit; }
 
-    int64_t SampleNum(const uint32_t spp);
-    Point2i SamplePixel(const Vector2i &extent, const uint32_t spp);
+    int64_t SampleNum(const uint32_t spp) const;
+    Point2i SamplePixel(const Vector2i &extent, const uint32_t spp) const;
 
     bool toVisitEmpty() const { return toVisitHead == 0; }
     const TreeletNode &toVisitTop() const { return toVisit[toVisitHead - 1]; }
@@ -103,6 +103,9 @@ class Sample {
     /* disallow copying */
     Sample(const Sample &) = delete;
     Sample &operator=(const Sample &) = delete;
+
+    int64_t SampleNum(const uint32_t spp) const;
+    Point2i SamplePixel(const Vector2i &extent, const uint32_t spp) const;
 
     size_t Size() const;
     size_t Serialize(char *data);

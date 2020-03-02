@@ -28,7 +28,7 @@ parser.add_argument('-n', '--run-name', required=True, type=str)
 parser.add_argument('-D', '--directional', action='store_true')
 parser.add_argument('-F', '--install-function', action='store_true')
 parser.add_argument('-G', '--ray-generators', required=True)
-parser.add_argument('-M', '--max-depth', default=4, type=int)
+parser.add_argument('-M', '--max-depth', default=5, type=int)
 parser.add_argument('-r', '--aws-region', required=True, type=str)
 parser.add_argument('-a', '--num-attempts', default=1, type=int)
 

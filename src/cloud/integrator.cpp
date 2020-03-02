@@ -51,30 +51,6 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
 
     const auto bsdfFlags = BxDFType(BSDF_ALL & ~BSDF_SPECULAR);
 
-    if (rayState.remainingBounces) {
-        Vector3f wo = -rayState.ray.d, wi;
-        Float pdf;
-        BxDFType flags;
-        Spectrum f = it.bsdf->Sample_f(wo, &wi, sampler->Get2D(), &pdf,
-                                       BSDF_ALL, &flags);
-
-        if (!f.IsBlack() && pdf > 0.f) {
-            bouncePtr = RayState::Create();
-            auto &newRay = *bouncePtr;
-
-            newRay.trackRay = rayState.trackRay;
-            newRay.hop = 0;
-            newRay.pathHop = rayState.pathHop;
-            newRay.beta = rayState.beta * f * AbsDot(wi, it.shading.n) / pdf;
-            newRay.ray = it.SpawnRay(wi);
-            newRay.remainingBounces = rayState.remainingBounces - 1;
-            newRay.sample = rayState.sample;
-            newRay.StartTrace();
-
-            ++nIntersectionTests;
-        }
-    }
-
     if (it.bsdf->NumComponents(bsdfFlags) > 0 && lights.size() > 0) {
         /* Let's pick a light at random */
         int nLights = (int)lights.size();
@@ -86,6 +62,8 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
         const shared_ptr<Light> &light = lights[lightNum];
 
         Point2f uLight = sampler->Get2D();
+        Point2f uScattering = sampler->Get2D(); // For consistency with PBRT
+        (void)uScattering; // Only used for delta lights
         Vector3f wi;
         Float lightPdf;
         VisibilityTester visibility;
@@ -97,15 +75,17 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
 
             if (!f.IsBlack()) {
                 /* now we have to shoot the ray to the light source */
-                shadowRayPtr = move(rayStatePtr);
+                shadowRayPtr = RayState::Create();
                 auto &shadowRay = *shadowRayPtr;
 
-                /* if bounce isn't produced, this is the last ray in the path */
-                if (bouncePtr == nullptr) shadowRay.remainingBounces = 0;
-
+                shadowRay.trackRay = rayState.trackRay;
                 shadowRay.hop = 0;
+                shadowRay.pathHop = rayState.pathHop;
+                shadowRay.sample = rayState.sample;
                 shadowRay.ray = visibility.P0().SpawnRayTo(visibility.P1());
+                shadowRay.beta = rayState.beta;
                 shadowRay.Ld = (f * Li / lightPdf) / lightSelectPdf;
+                shadowRay.remainingBounces = rayState.remainingBounces;
                 shadowRay.isShadowRay = true;
                 shadowRay.StartTrace();
 
@@ -114,8 +94,35 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
         }
     }
 
+    if (rayState.remainingBounces) {
+        Vector3f wo = -rayState.ray.d, wi;
+        Float pdf;
+        BxDFType flags;
+        Spectrum f = it.bsdf->Sample_f(wo, &wi, sampler->Get2D(), &pdf,
+                                       BSDF_ALL, &flags);
+
+        if (!f.IsBlack() && pdf > 0.f) {
+            bouncePtr = move(rayStatePtr);
+            rayStatePtr = nullptr;
+            auto &newRay = *bouncePtr;
+
+            newRay.hop = 0;
+            newRay.ray = it.SpawnRay(wi);
+            newRay.beta *= f * AbsDot(wi, it.shading.n) / pdf;
+            newRay.Ld  = 0;
+            newRay.remainingBounces -= 1;
+            newRay.StartTrace();
+
+            ++nIntersectionTests;
+        }
+    }
+
+
     if (bouncePtr) {
         bouncePtr->sample.dim = sampler->GetCurrentDimension();
+    } else if (shadowRayPtr) {
+        /* if bounce isn't produced, this is the last ray in the path */
+        shadowRayPtr->remainingBounces = 0;
     }
 
     return {move(bouncePtr), move(shadowRayPtr)};

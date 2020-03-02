@@ -20,11 +20,18 @@ constexpr int offset_of(T const &t, U T::*a) {
 
 RayStatePtr RayState::Create() { return make_unique<RayState>(); }
 
-int64_t RayState::SampleNum(const uint32_t spp) { return sample.id % spp; }
+int64_t SampleNum(const uint64_t sampleId, const uint32_t spp) { return sampleId % spp; }
 
-Point2i RayState::SamplePixel(const Vector2i &extent, const uint32_t spp) {
-    const int point = static_cast<int>(sample.id / spp);
+Point2i SamplePixel(const uint64_t sampleId, const Vector2i &extent,
+                              const uint32_t spp) {
+    const int point = static_cast<int>(sampleId / spp);
     return Point2i{point % extent.x, point / extent.x};
+}
+
+int64_t RayState::SampleNum(const uint32_t spp) const { return ::SampleNum(sample.id, spp); }
+
+Point2i RayState::SamplePixel(const Vector2i &extent, const uint32_t spp) const {
+    return ::SamplePixel(sample.id, extent, spp);
 }
 
 void RayState::StartTrace() {
@@ -369,6 +376,12 @@ Sample::Sample(const RayState &rayState)
     }
 }
 
+int64_t Sample::SampleNum(const uint32_t spp) const { return ::SampleNum(sampleId, spp); }
+
+Point2i Sample::SamplePixel(const Vector2i &extent, const uint32_t spp) const {
+    return ::SamplePixel(sampleId, extent, spp);
+}
+
 struct __attribute__((packed, aligned(1))) PackedSample {
     uint64_t sampleId;
     Float x, y;
@@ -403,6 +416,10 @@ void UnPackSample(char *buffer, Sample &sample) {
     for (size_t i = 0; i < 3; i++) {
         sample.L.data()[i] = packed->c[i];
     }
+}
+
+size_t Sample::Size() const {
+    return offset_of(*this, &Sample::L) + sizeof(Sample::L);
 }
 
 size_t Sample::Serialize(char *data) {
