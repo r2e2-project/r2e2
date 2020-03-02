@@ -114,7 +114,7 @@ ResultType LambdaMaster::handleWorkerStats() {
                  << (stats.dequeued.count / T) << ','
                  << (stats.samples.rays / T) << ',' << (stats.samples.bytes / T)
                  << ',' << (stats.samples.count / T) << ',' << fixed
-                 << setprecision(2) << (100.0 * stats.cpuTime.count() / T)
+                 << setprecision(2) << (stats.cpuTime.count() / 10'000.0 / T)
                  << '\n';
 
         if (worker.state == Worker::State::Terminated) {
