@@ -166,7 +166,7 @@ void LambdaWorker::run() {
         if (res != PollerResult::Success && res != PollerResult::Timeout) break;
     }
 
-    TLOG(TIMING) << timer().summary() << endl;
+    TLOG(TIMING) << timer().json() << endl;
 }
 
 void usage(const char* argv0, int exitCode) {
