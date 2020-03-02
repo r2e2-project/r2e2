@@ -1,6 +1,9 @@
-#include "cloud/lambda-worker.h"
+#include <sys/resource.h>
+#include <sys/time.h>
 
+#include "cloud/lambda-worker.h"
 #include "messages/utils.h"
+#include "util/exception.h"
 
 using namespace std;
 using namespace meow;
@@ -13,8 +16,14 @@ using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
 void LambdaWorker::sendWorkerStats() {
+    struct rusage usage;
+    CheckSystemCall("getrusage", ::getrusage(RUSAGE_SELF, &usage));
+
     WorkerStats stats;
     stats.finishedPaths = finishedPathIds.size();
+    stats.cpuTime = microseconds{
+        1'000'000ull * (usage.ru_stime.tv_sec + usage.ru_utime.tv_sec) +
+        (usage.ru_stime.tv_usec + usage.ru_utime.tv_usec)};
 
     protobuf::WorkerStats proto = to_protobuf(stats);
     coordinatorConnection->enqueue_write(Message::str(

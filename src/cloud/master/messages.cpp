@@ -106,8 +106,13 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         protobuf::WorkerStats proto;
         protoutil::from_string(message.payload(), proto);
 
-        worker.stats.finishedPaths += proto.finished_paths();
-        aggregatedStats.finishedPaths += proto.finished_paths();
+        WorkerStats stats = from_protobuf(proto);
+
+        worker.stats.finishedPaths += stats.finishedPaths;
+        worker.stats.cpuTime += stats.cpuTime;
+
+        aggregatedStats.finishedPaths += stats.finishedPaths;
+        aggregatedStats.cpuTime += stats.cpuTime;
 
         break;
     }

@@ -35,6 +35,7 @@ TreeletStats TreeletStats::operator-(const TreeletStats& other) const {
 
 void WorkerStats::merge(const WorkerStats& other) {
     finishedPaths += other.finishedPaths;
+    cpuTime += other.cpuTime;
     enqueued.rays += other.enqueued.rays;
     assigned.rays += other.assigned.rays;
     dequeued.rays += other.dequeued.rays;
@@ -55,6 +56,7 @@ WorkerStats WorkerStats::operator-(const WorkerStats& other) const {
     WorkerStats res;
 
     res.finishedPaths = finishedPaths - other.finishedPaths;
+    res.cpuTime = cpuTime - other.cpuTime;
     res.enqueued.rays = enqueued.rays - other.enqueued.rays;
     res.assigned.rays = assigned.rays - other.assigned.rays;
     res.dequeued.rays = dequeued.rays - other.dequeued.rays;
