@@ -12,7 +12,7 @@ Film "image"
 
 Sampler "halton" "integer pixelsamples" [1]
 
-Integrator "path" "integer maxdepth" [5]
+Integrator "path" "integer maxdepth" [10]
 
 Accelerator "treeletdumpbvh" "integer maxtreeletbytes" [10000000] "string partition" ["nvidia"] "string traversal" ["sendcheck"] "integer copyablethreshold" [0]
 

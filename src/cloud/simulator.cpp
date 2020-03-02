@@ -287,7 +287,7 @@ void Simulator::generateRays(Worker &worker) {
             if (!InsideExclusive(pixel, sampleBounds)) continue;
 
             RayStatePtr ray = graphics::GenerateCameraRay(
-                camera, pixel, sample, pathDepth - 1, sampleExtent, sampler);
+                camera, pixel, sample, pathDepth, sampleExtent, sampler);
 
             enqueueRay(worker, move(ray), -1);
 
@@ -473,7 +473,7 @@ void Simulator::processRays(Worker &worker) {
                 RayStatePtr bounceRay, shadowRay;
                 tie(bounceRay, shadowRay) =
                     graphics::ShadeRay(move(rayPtr), *treelets[rayTreeletId],
-                                       lights, sampleExtent, sampler, arena);
+                                       lights, sampleExtent, sampler, pathDepth, arena);
 
                 if (bounceRay != nullptr) {
                     rays.push_back(move(bounceRay));

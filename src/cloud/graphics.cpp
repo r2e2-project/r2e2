@@ -32,7 +32,7 @@ RayStatePtr GenerateCameraRay(const shared_ptr<Camera> &camera,
     state.sample.weight =
         camera->GenerateRayDifferential(cameraSample, &state.ray);
     state.ray.ScaleDifferentials(rayScale);
-    state.remainingBounces = maxDepth;
+    state.remainingBounces = maxDepth - 1;
     state.StartTrace();
 
     return statePtr;

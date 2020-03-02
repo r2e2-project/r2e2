@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
             RayStatePtr bounceRay, shadowRay;
             tie(bounceRay, shadowRay) =
                 graphics::ShadeRay(move(theRayPtr), *treelets[rayTreeletId],
-                                   lights, sampleExtent, sampler, arena);
+                                   lights, sampleExtent, sampler, maxDepth, arena);
 
             if (bounceRay != nullptr) {
                 rayList.push_back(move(bounceRay));

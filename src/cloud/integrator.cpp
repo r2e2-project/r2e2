@@ -28,7 +28,7 @@ RayStatePtr CloudIntegrator::Trace(RayStatePtr &&rayState,
 pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
     RayStatePtr &&rayStatePtr, const CloudBVH &treelet,
     const vector<shared_ptr<Light>> &lights, const Vector2i &sampleExtent,
-    shared_ptr<GlobalSampler> &sampler, MemoryArena &arena) {
+    shared_ptr<GlobalSampler> &sampler, int maxPathDepth, MemoryArena &arena) {
     RayStatePtr bouncePtr = nullptr;
     RayStatePtr shadowRayPtr = nullptr;
 
@@ -114,6 +114,19 @@ pair<RayStatePtr, RayStatePtr> CloudIntegrator::Shade(
             newRay.StartTrace();
 
             ++nIntersectionTests;
+
+            // Russian roulette will need etaScale when transmission is supported
+            Float rrThreshold = 1.0;
+            Spectrum rrBeta = newRay.beta;
+            int bounces = maxPathDepth - newRay.remainingBounces - 2;
+            if (rrBeta.MaxComponentValue() < rrThreshold && bounces > 3) {
+                Float q = std::max((Float).05, 1 - rrBeta.MaxComponentValue());
+                if (sampler->Get1D() < q) {
+                    bouncePtr = nullptr;
+                } else {
+                    newRay.beta /= 1 - q;
+                }
+            }
         }
     }
 
@@ -167,7 +180,7 @@ void CloudIntegrator::Render(const Scene &scene) {
                 camera->GenerateRayDifferential(cameraSample, &state.ray);
             state.ray.ScaleDifferentials(1 /
                                          sqrt((Float)sampler->samplesPerPixel));
-            state.remainingBounces = maxDepth;
+            state.remainingBounces = maxDepth - 1;
             state.StartTrace();
 
             rayQueue.push_back(move(statePtr));
@@ -206,7 +219,7 @@ void CloudIntegrator::Render(const Scene &scene) {
             }
         } else if (state.hit) {
             auto newRays = Shade(move(statePtr), *bvh, scene.lights,
-                                 sampleExtent, sampler, arena);
+                                 sampleExtent, sampler, maxDepth, arena);
 
             if (newRays.first != nullptr) {
                 rayQueue.push_back(move(newRays.first));

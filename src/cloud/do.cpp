@@ -117,6 +117,7 @@ int main(int argc, char const *argv[]) {
         }
 
         const auto sampleExtent = camera->film->GetSampleBounds().Diagonal();
+        const int maxDepth = 5;
 
         while (!rayList.empty()) {
             RayStatePtr theRayPtr = move(rayList.front());
@@ -150,7 +151,7 @@ int main(int argc, char const *argv[]) {
                 RayStatePtr bounceRay, shadowRay;
                 tie(bounceRay, shadowRay) =
                     graphics::ShadeRay(move(theRayPtr), *treelets[rayTreeletId],
-                                       lights, sampleExtent, sampler, arena);
+                                       lights, sampleExtent, sampler, maxDepth, arena);
 
                 if (bounceRay != nullptr) {
                     rayList.push(move(bounceRay));

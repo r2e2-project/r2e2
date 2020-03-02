@@ -37,6 +37,7 @@ class CloudIntegrator : public Integrator {
         RayStatePtr &&rayState, const CloudBVH &treelet,
         const std::vector<std::shared_ptr<Light>> &lights,
         const Vector2i &sampleExtent, std::shared_ptr<GlobalSampler> &sampler,
+        int maxPathDepth,
         MemoryArena &arena);
 
   private:

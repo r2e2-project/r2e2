@@ -117,7 +117,7 @@ ResultType LambdaWorker::handleTraceQueue() {
                     RayStatePtr bounceRay, shadowRay;
                     tie(bounceRay, shadowRay) = graphics::ShadeRay(
                         move(rayPtr), treelet, scene.lights, scene.sampleExtent,
-                        scene.sampler, arena);
+                        scene.sampler, scene.maxDepth, arena);
 
                     if (bounceRay == nullptr && shadowRay == nullptr) {
                         /* this was the last ray in the path */
