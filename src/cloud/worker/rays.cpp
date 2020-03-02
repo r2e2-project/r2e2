@@ -45,11 +45,12 @@ ResultType LambdaWorker::handleTraceQueue() {
 
     queue<RayStatePtr> processedRays;
 
-    constexpr size_t MAX_RAYS = WORKER_MAX_ACTIVE_RAYS / 2;
+    //constexpr size_t MAX_RAYS = WORKER_MAX_ACTIVE_RAYS / 2;
+    const auto traceUntil = steady_clock::now() + 100ms;
     size_t tracedCount = 0;
     MemoryArena arena;
 
-    while (!traceQueue.empty() && tracedCount < MAX_RAYS) {
+    while (!traceQueue.empty() && steady_clock::now() <= traceUntil) {
         for (auto& treeletkv : treelets) {
             const TreeletId treeletId = treeletkv.first;
             const CloudBVH& treelet = *treeletkv.second;
@@ -59,7 +60,8 @@ ResultType LambdaWorker::handleTraceQueue() {
 
             auto& rays = raysIt->second;
 
-            while (!rays.empty() && tracedCount++ < MAX_RAYS) {
+            while (!rays.empty() && steady_clock::now() <= traceUntil) {
+                tracedCount++;
                 RayStatePtr rayPtr = move(rays.front());
                 rays.pop();
 
