@@ -68,7 +68,6 @@ protobuf::Bounds2f to_protobuf(const Bounds2f& bounds);
 protobuf::Bounds3f to_protobuf(const Bounds3f& bounds);
 protobuf::Matrix to_protobuf(const Matrix4x4& matrix);
 protobuf::RGBSpectrum to_protobuf(const RGBSpectrum& spectrum);
-protobuf::RayDifferential to_protobuf(const RayDifferential& ray);
 protobuf::AnimatedTransform to_protobuf(const AnimatedTransform& transform);
 protobuf::TriangleMesh to_protobuf(const TriangleMesh& triangleMesh);
 protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample);
@@ -76,7 +75,6 @@ protobuf::ParamSet to_protobuf(const ParamSet& paramset);
 protobuf::Scene to_protobuf(const Scene& scene);
 protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
 protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey);
-protobuf::Sample to_protobuf(const Sample& sample);
 protobuf::RayBagInfo to_protobuf(const RayBagInfo& RayBagInfo);
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats);
 
@@ -91,7 +89,6 @@ Bounds2f from_protobuf(const protobuf::Bounds2f& bounds);
 Bounds3f from_protobuf(const protobuf::Bounds3f& bounds);
 Matrix4x4 from_protobuf(const protobuf::Matrix& matrix);
 RGBSpectrum from_protobuf(const protobuf::RGBSpectrum& spectrum);
-RayDifferential from_protobuf(const protobuf::RayDifferential& ray);
 TriangleMesh from_protobuf(const protobuf::TriangleMesh& mesh);
 CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& sample);
 ParamSet from_protobuf(const protobuf::ParamSet& paramset);
@@ -102,7 +99,6 @@ TextureParams from_protobuf(
     std::map<std::string, std::shared_ptr<Texture<Float>>>& fTex,
     std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex);
 ObjectKey from_protobuf(const protobuf::ObjectKey& objectKey);
-Sample from_protobuf(const protobuf::Sample& sample);
 RayBagInfo from_protobuf(const protobuf::RayBagInfo& rayBagInfo);
 WorkerStats from_protobuf(const protobuf::WorkerStats& statsProto);
 

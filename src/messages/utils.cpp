@@ -119,25 +119,6 @@ protobuf::RGBSpectrum to_protobuf(const RGBSpectrum& spectrum) {
     return proto_spectrum;
 }
 
-protobuf::RayDifferential to_protobuf(const RayDifferential& ray) {
-    protobuf::RayDifferential proto_ray;
-
-    *proto_ray.mutable_o() = to_protobuf(ray.o);
-    *proto_ray.mutable_d() = to_protobuf(ray.d);
-    proto_ray.set_t_max(ray.tMax);
-    proto_ray.set_time(ray.time);
-
-    proto_ray.set_has_differentials(ray.hasDifferentials);
-    if (ray.hasDifferentials) {
-        *proto_ray.mutable_rx_origin() = to_protobuf(ray.rxOrigin);
-        *proto_ray.mutable_ry_origin() = to_protobuf(ray.ryOrigin);
-        *proto_ray.mutable_rx_direction() = to_protobuf(ray.rxDirection);
-        *proto_ray.mutable_ry_direction() = to_protobuf(ray.ryDirection);
-    }
-
-    return proto_ray;
-}
-
 protobuf::AnimatedTransform to_protobuf(const AnimatedTransform& transform) {
     protobuf::AnimatedTransform proto_transform;
     *proto_transform.mutable_start_transform() =
@@ -256,15 +237,6 @@ protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey) {
     return proto;
 }
 
-protobuf::Sample to_protobuf(const Sample& sample) {
-    protobuf::Sample proto;
-    proto.set_sample_id(sample.sampleId);
-    *proto.mutable_p_film() = to_protobuf(sample.pFilm);
-    proto.set_weight(sample.weight);
-    *proto.mutable_l() = to_protobuf(sample.L);
-    return proto;
-}
-
 protobuf::RayBagInfo to_protobuf(const RayBagInfo& info) {
     protobuf::RayBagInfo proto;
     proto.set_tracked(info.tracked);
@@ -352,25 +324,6 @@ Matrix4x4 from_protobuf(const protobuf::Matrix& proto_matrix) {
 
 RGBSpectrum from_protobuf(const protobuf::RGBSpectrum& proto_spectrum) {
     return RGBSpectrum::FromRGB(proto_spectrum.c().data());
-}
-
-RayDifferential from_protobuf(const protobuf::RayDifferential& proto_ray) {
-    RayDifferential ray;
-
-    ray.o = from_protobuf(proto_ray.o());
-    ray.d = from_protobuf(proto_ray.d());
-    ray.tMax = proto_ray.t_max();
-    ray.time = proto_ray.time();
-    ray.hasDifferentials = proto_ray.has_differentials();
-
-    if (ray.hasDifferentials) {
-        ray.rxOrigin = from_protobuf(proto_ray.rx_origin());
-        ray.ryOrigin = from_protobuf(proto_ray.ry_origin());
-        ray.rxDirection = from_protobuf(proto_ray.rx_direction());
-        ray.ryDirection = from_protobuf(proto_ray.ry_direction());
-    }
-
-    return ray;
 }
 
 TriangleMesh from_protobuf(const protobuf::TriangleMesh& proto_tm) {
@@ -517,15 +470,6 @@ TextureParams from_protobuf(
 
 ObjectKey from_protobuf(const protobuf::ObjectKey& objectKey) {
     return ObjectKey{static_cast<ObjectType>(objectKey.type()), objectKey.id()};
-}
-
-Sample from_protobuf(const protobuf::Sample& proto) {
-    Sample result;
-    result.sampleId = proto.sample_id();
-    result.pFilm = from_protobuf(proto.p_film());
-    result.weight = proto.weight();
-    result.L = from_protobuf(proto.l());
-    return result;
 }
 
 protobuf::Light light::to_protobuf(const string& name, const ParamSet& params,
