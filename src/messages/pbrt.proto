@@ -328,3 +328,17 @@ message JobStatus {
     uint64 next_sample_index = 2;
     repeated string sample_bags = 3;
 }
+
+message CategoryInfo {
+    string title = 1;
+    uint64 total_us = 2;
+    double percentage = 3;
+    uint64 max_us = 4;
+    uint64 count = 5;
+}
+
+message TimeLog {
+    uint64 total = 1;
+    repeated CategoryInfo categories = 2;
+    CategoryInfo unaccounted = 3;
+}

@@ -72,6 +72,7 @@ public:
     entry.max_ns = std::max( entry.max_ns, time_ns );
   }
 
+  std::string json() const;
   std::string summary() const;
 };
 
@@ -105,6 +106,7 @@ public:
     _current_category.clear();
   }
 
+  std::string json() const { return _log.json(); }
   std::string summary() const { return _log.summary(); }
 };
 

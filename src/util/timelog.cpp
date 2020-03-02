@@ -1,11 +1,13 @@
 #include "util/timelog.h"
 
-#include "util/exception.h"
-
 #include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+
+#include "pbrt.pb.h"
+#include "messages/utils.h"
+#include "util/exception.h"
 
 using namespace std;
 
@@ -30,6 +32,38 @@ template <class T>
 ostream &operator<<(ostream &o, const Value<T> &v) {
     o << "\e[1m" << v.get() << "\e[0m";
     return o;
+}
+
+string TimeLog::json() const
+{
+    pbrt::protobuf::TimeLog proto;
+
+    const uint64_t now = timestamp_ns();
+    const uint64_t elapsed = now - _beginning_timestamp;
+
+    proto.set_total(elapsed / THOUSAND);
+
+    uint64_t accounted = 0;
+
+    for ( unsigned int i = 0; i < num_categories; i++ ) {
+      if ( _logs.at( i ).count == 0 ) continue;
+
+      auto &item = *proto.add_categories();
+
+      item.set_title( _category_names.at( i ) );
+      item.set_total_us( _logs.at( i ).total_ns / THOUSAND );
+      item.set_percentage( 100 * _logs.at( i ).total_ns / double( elapsed ) );
+      item.set_max_us( _logs.at( i ).max_ns / THOUSAND );
+      item.set_count( _logs.at( i ).count );
+
+      accounted += _logs.at( i ).total_ns;
+    }
+
+    proto.mutable_unaccounted()->set_title( "Unaccounted" );
+    proto.mutable_unaccounted()->set_total_us( ( elapsed - accounted ) / THOUSAND );
+    proto.mutable_unaccounted()->set_percentage( 100 * ( elapsed - accounted ) / double( elapsed ) );
+
+    return protoutil::to_json(proto);
 }
 
 string TimeLog::summary() const
