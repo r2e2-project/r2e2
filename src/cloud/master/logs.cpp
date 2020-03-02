@@ -13,7 +13,6 @@ void LambdaMaster::recordEnqueue(const WorkerId workerId,
     auto &worker = workers.at(workerId);
     worker.rays.enqueued += info.rayCount;
 
-    worker.lastStats.first = true;
     treelets[info.treeletId].lastStats.first = true;
 
     if (info.sampleBag) {
@@ -49,7 +48,6 @@ void LambdaMaster::recordAssign(const WorkerId workerId,
     worker.outstandingRayBags.insert(info);
     worker.outstandingBytes += info.bagSize;
 
-    worker.lastStats.first = true;
     worker.stats.assigned.rays += info.rayCount;
     worker.stats.assigned.bytes += info.bagSize;
     worker.stats.assigned.count++;
@@ -62,8 +60,6 @@ void LambdaMaster::recordAssign(const WorkerId workerId,
 void LambdaMaster::recordDequeue(const WorkerId workerId,
                                  const RayBagInfo &info) {
     auto &worker = workers.at(workerId);
-
-    worker.lastStats.first = true;
 
     worker.outstandingRayBags.erase(info);
     worker.outstandingBytes -= info.bagSize;
@@ -96,32 +92,28 @@ ResultType LambdaMaster::handleWorkerStats() {
     for (auto it = workers.begin(); it != workers.end();) {
         auto &worker = it->second;
 
-        if (worker.lastStats.first) {
-            const auto stats = worker.stats - worker.lastStats.second;
-            worker.lastStats.second = worker.stats;
-            worker.lastStats.first = false;
+        const auto stats = worker.stats - worker.lastStats;
+        worker.lastStats = worker.stats;
 
-            /* timestamp,workerId,pathsFinished,
-            raysEnqueued,raysAssigned,raysDequeued,
-            bytesEnqueued,bytesAssigned,bytesDequeued,
-            bagsEnqueued,bagsAssigned,bagsDequeued,
-            numSamples,bytesSamples,bagsSamples */
+        /* timestamp,workerId,pathsFinished,
+        raysEnqueued,raysAssigned,raysDequeued,
+        bytesEnqueued,bytesAssigned,bytesDequeued,
+        bagsEnqueued,bagsAssigned,bagsDequeued,
+        numSamples,bytesSamples,bagsSamples,cpuUsage */
 
-            wsStream << t << ',' << worker.id << ',' << fixed
-                     << (stats.finishedPaths / T) << ','
-                     << (stats.enqueued.rays / T) << ','
-                     << (stats.assigned.rays / T) << ','
-                     << (stats.dequeued.rays / T) << ','
-                     << (stats.enqueued.bytes / T) << ','
-                     << (stats.assigned.bytes / T) << ','
-                     << (stats.dequeued.bytes / T) << ','
-                     << (stats.enqueued.count / T) << ','
-                     << (stats.assigned.count / T) << ','
-                     << (stats.dequeued.count / T) << ','
-                     << (stats.samples.rays / T) << ','
-                     << (stats.samples.bytes / T) << ','
-                     << (stats.samples.count / T) << '\n';
-        }
+        wsStream << t << ',' << worker.id << ',' << fixed
+                 << (stats.finishedPaths / T) << ','
+                 << (stats.enqueued.rays / T) << ','
+                 << (stats.assigned.rays / T) << ','
+                 << (stats.dequeued.rays / T) << ','
+                 << (stats.enqueued.bytes / T) << ','
+                 << (stats.assigned.bytes / T) << ','
+                 << (stats.dequeued.bytes / T) << ','
+                 << (stats.enqueued.count / T) << ','
+                 << (stats.assigned.count / T) << ','
+                 << (stats.dequeued.count / T) << ','
+                 << (stats.samples.rays / T) << ',' << (stats.samples.bytes / T)
+                 << ',' << (stats.samples.count / T) << '\n';
 
         if (worker.state == Worker::State::Terminated) {
             it = workers.erase(it);

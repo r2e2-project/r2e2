@@ -148,7 +148,7 @@ class LambdaMaster {
 
         // Statistics
         WorkerStats stats{};
-        std::pair<bool, WorkerStats> lastStats{true, {}};
+        WorkerStats lastStats;
 
         Worker(const WorkerId id, const Role role,
                std::shared_ptr<TCPConnection> &&connection)
