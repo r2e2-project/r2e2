@@ -418,10 +418,6 @@ void UnPackSample(char *buffer, Sample &sample) {
     }
 }
 
-size_t Sample::Size() const {
-    return offset_of(*this, &Sample::L) + sizeof(Sample::L);
-}
-
 size_t Sample::Serialize(char *data) {
     static thread_local char packedBuffer[sizeof(PackedSample)];
 

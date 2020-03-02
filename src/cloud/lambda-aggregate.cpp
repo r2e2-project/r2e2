@@ -47,6 +47,8 @@ int main(int argc, char const *argv[]) {
 
         Sample sample;
 
+        unordered_set<uint64_t> sampleIds;
+
         for (string line; getline(cin, line);) {
             cerr << "Processing " << line << "... ";
             ifstream fin{line};
@@ -61,7 +63,8 @@ int main(int argc, char const *argv[]) {
                 offset += 4;
 
                 sample.Deserialize(data + offset, len);
-                filmTile->AddSample(sample.pFilm, sample.L, sample.weight);
+                auto p = sampleIds.insert(sample.sampleId);
+                filmTile->AddSample(sample.pFilm, sample.L, sample.weight, p.second);
                 offset += len;
             }
 
