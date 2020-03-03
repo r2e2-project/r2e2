@@ -135,9 +135,9 @@ ResultType LambdaWorker::handleSealedBags() {
         auto& bag = sealedBags.front();
 
         if (PbrtOptions.compressRayBags) {
-            size_t upperBound = LZ4_COMPRESSBOUND(bag.info.bagSize);
-            std::string compressed(upperBound, '\0');
-            size_t compressedSize = LZ4_compress_default(
+            const size_t upperBound = LZ4_COMPRESSBOUND(bag.info.bagSize);
+            string compressed(upperBound, '\0');
+            const size_t compressedSize = LZ4_compress_default(
                 bag.data.data(), &compressed[0], bag.info.bagSize, upperBound);
 
             if (compressedSize == 0) {
