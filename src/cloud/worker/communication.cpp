@@ -89,6 +89,9 @@ ResultType LambdaWorker::handleOpenBags() {
         }
 
         logBag(BagAction::Sealed, it->second.info);
+        it->second.data.erase(it->second.info.bagSize);
+        it->second.data.shrink_to_fit();
+
         sealedBags.push(move(it->second));
         it = openBags.erase(it);
     }
