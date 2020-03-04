@@ -109,10 +109,9 @@ void LambdaMaster::processMessage(const uint64_t workerId,
         WorkerStats stats = from_protobuf(proto);
 
         worker.stats.finishedPaths += stats.finishedPaths;
-        worker.stats.cpuTime += stats.cpuTime;
+        worker.stats.cpuUsage = stats.cpuUsage;
 
         aggregatedStats.finishedPaths += stats.finishedPaths;
-        aggregatedStats.cpuTime += stats.cpuTime;
 
         break;
     }

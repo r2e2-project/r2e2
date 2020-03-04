@@ -27,6 +27,7 @@
 #include "net/s3.h"
 #include "net/transfer.h"
 #include "storage/backend.h"
+#include "util/cpu.h"
 #include "util/histogram.h"
 #include "util/seq_no_set.h"
 #include "util/temp_dir.h"
@@ -273,6 +274,8 @@ class LambdaWorker {
     ////////////////////////////////////////////////////////////////////////////
     // Local Stats                                                            //
     ////////////////////////////////////////////////////////////////////////////
+
+    CPUStats cpuStats{};
 
     struct LocalStats {
         constexpr static uint16_t BIN_WIDTH = 5;

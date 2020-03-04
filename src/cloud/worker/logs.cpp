@@ -16,14 +16,18 @@ using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
 void LambdaWorker::sendWorkerStats() {
-    struct rusage usage;
-    CheckSystemCall("getrusage", ::getrusage(RUSAGE_SELF, &usage));
+    CPUStats newCpuStats{};
+    const auto diff = newCpuStats - cpuStats;
+    cpuStats = newCpuStats;
+
+    auto workJiffies = diff.user + diff.nice + diff.system;
+    auto totalJiffies = workJiffies + diff.idle + diff.iowait + diff.irq +
+                        diff.soft_irq + diff.steal + diff.guest +
+                        diff.guest_nice;
 
     WorkerStats stats;
     stats.finishedPaths = finishedPathIds.size();
-    stats.cpuTime = microseconds{
-        1'000'000ull * (usage.ru_stime.tv_sec + usage.ru_utime.tv_sec) +
-        (usage.ru_stime.tv_usec + usage.ru_utime.tv_usec)};
+    stats.cpuUsage = 1.0 * workJiffies / totalJiffies;
 
     protobuf::WorkerStats proto = to_protobuf(stats);
     coordinatorConnection->enqueue_write(Message::str(

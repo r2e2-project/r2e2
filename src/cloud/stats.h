@@ -34,7 +34,7 @@ struct TreeletStats {
 
 struct WorkerStats {
     uint64_t finishedPaths{0};
-    std::chrono::microseconds cpuTime{0};
+    double cpuUsage{0.0};
 
     struct {
         uint64_t rays{0};

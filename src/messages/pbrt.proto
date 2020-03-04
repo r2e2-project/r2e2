@@ -287,7 +287,7 @@ message RayBags {
 
 message WorkerStats {
     uint64 finished_paths = 1;
-    uint64 cpu_time = 2;
+    double cpu_usage = 2;
 }
 
 // Benchmarking

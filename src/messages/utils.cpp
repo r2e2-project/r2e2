@@ -252,7 +252,7 @@ protobuf::RayBagInfo to_protobuf(const RayBagInfo& info) {
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats) {
     protobuf::WorkerStats proto;
     proto.set_finished_paths(stats.finishedPaths);
-    proto.set_cpu_time(stats.cpuTime.count());
+    proto.set_cpu_usage(stats.cpuUsage);
     return proto;
 }
 
@@ -737,7 +737,7 @@ RayBagInfo from_protobuf(const protobuf::RayBagInfo& proto) {
 }
 
 WorkerStats from_protobuf(const protobuf::WorkerStats& proto) {
-    return {proto.finished_paths(), microseconds{proto.cpu_time()}};
+    return {proto.finished_paths(), proto.cpu_usage()};
 }
 
 }  // namespace pbrt
