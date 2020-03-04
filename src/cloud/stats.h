@@ -26,9 +26,6 @@ struct TreeletStats {
     Stats enqueued{}, dequeued{};
     std::vector<Stats> enqueuedTo, dequeuedFrom;
 
-    void merge(const TreeletStats& other);
-    void reset();
-
     TreeletStats operator-(const TreeletStats& other) const;
 };
 
@@ -41,9 +38,6 @@ struct WorkerStats {
         uint64_t bytes{0};
         uint64_t count{0};
     } enqueued{}, assigned{}, dequeued{}, samples{};
-
-    void merge(const WorkerStats& other);
-    void reset();
 
     WorkerStats operator-(const WorkerStats& other) const;
 };
