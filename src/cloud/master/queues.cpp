@@ -19,15 +19,15 @@ bool LambdaMaster::assignWork(Worker& worker) {
     /* return, if the worker doesn't have any treelets */
     if (worker.treelets.empty()) return false;
 
-    const TreeletId treeletId = *worker.treelets.begin();
-    auto queueIt = queuedRayBags.find(treeletId);
+    const TreeletId treeletId = worker.treelets[0];
+    auto &bagQueue = queuedRayBags[treeletId];
 
     /* Q1: do we have any rays to generate? */
     bool raysToGenerate =
-        tiles.cameraRaysRemaining() && (worker.treelets.count(0) > 0);
+        tiles.cameraRaysRemaining() && (treeletId == 0);
 
     /* Q2: do we have any work for this worker? */
-    bool workToDo = (queueIt != queuedRayBags.end());
+    bool workToDo = (bagQueue.size() > 0);
 
     if (!raysToGenerate && !workToDo) {
         return true;
@@ -37,27 +37,18 @@ bool LambdaMaster::assignWork(Worker& worker) {
 
     while ((raysToGenerate || workToDo) &&
            worker.activeRays() < WORKER_MAX_ACTIVE_RAYS) {
-        if (raysToGenerate && workToDo) {
-            /* we flip and coin and decide which one to do */
-            bernoulli_distribution coin{0.0};
-            if (coin(randEngine)) {
-                tiles.sendWorkerTile(worker);
-                raysToGenerate = tiles.cameraRaysRemaining();
-                continue;
-            }
-        } else if (raysToGenerate) {
+        if (raysToGenerate && !workToDo) {
             tiles.sendWorkerTile(worker);
             raysToGenerate = tiles.cameraRaysRemaining();
             continue;
         }
 
         /* only if workToDo or the coin flip returned false */
-        *proto.add_items() = to_protobuf(queueIt->second.front());
-        recordAssign(worker.id, queueIt->second.front());
-        queueIt->second.pop();
+        *proto.add_items() = to_protobuf(bagQueue.front());
+        recordAssign(worker.id, bagQueue.front());
+        bagQueue.pop_front();
 
-        if (queueIt->second.empty()) {
-            queuedRayBags.erase(queueIt);
+        if (bagQueue.empty()) {
             workToDo = false;
         }
     }
@@ -73,42 +64,25 @@ bool LambdaMaster::assignWork(Worker& worker) {
 ResultType LambdaMaster::handleQueuedRayBags() {
     ScopeTimer<TimeLog::Category::QueuedRayBags> _timer;
 
-    shuffle(freeWorkers.begin(), freeWorkers.end(), randEngine);
+    //shuffle(freeWorkers.begin(), freeWorkers.end(), randEngine);
 
-    auto it = freeWorkers.begin();
 
-    while (it != freeWorkers.end() &&
-           (!queuedRayBags.empty() || tiles.cameraRaysRemaining())) {
-        auto workerIt = workers.find(*it);
-
-        if (workerIt == workers.end() || !assignWork(workerIt->second)) {
-            it = freeWorkers.erase(it);
-        } else {
-            it++;
-        }
+    for (Worker &worker : workers) {
+        assignWork(worker);
     }
 
     return ResultType::Continue;
 }
 
 template <class T>
-void moveFromTo(queue<T>& from, queue<T>& to) {
-    while (!from.empty()) {
-        to.emplace(move(from.front()));
-        from.pop();
-    }
+void moveFromTo(list<T> &from, list<T> &to) {
+    to.splice(to.end(), std::move(from));
 }
 
 void LambdaMaster::moveFromPendingToQueued(const TreeletId treeletId) {
-    if (pendingRayBags.count(treeletId) > 0) {
-        moveFromTo(pendingRayBags[treeletId], queuedRayBags[treeletId]);
-        pendingRayBags.erase(treeletId);
-    }
+    moveFromTo(pendingRayBags[treeletId], queuedRayBags[treeletId]);
 }
 
 void LambdaMaster::moveFromQueuedToPending(const TreeletId treeletId) {
-    if (queuedRayBags.count(treeletId) > 0) {
-        moveFromTo(queuedRayBags[treeletId], pendingRayBags[treeletId]);
-        queuedRayBags.erase(treeletId);
-    }
+    moveFromTo(queuedRayBags[treeletId], pendingRayBags[treeletId]);
 }

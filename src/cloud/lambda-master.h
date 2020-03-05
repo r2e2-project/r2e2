@@ -126,7 +126,7 @@ class LambdaMaster {
         steady_clock::time_point lastSeen{};
         std::string awsLogStream{};
 
-        std::set<TreeletId> treelets{};
+        std::vector<TreeletId> treelets{};
         std::set<ObjectKey> objects{};
 
         std::set<RayBagInfo> outstandingRayBags{};
@@ -162,7 +162,7 @@ class LambdaMaster {
         static WorkerId nextId;
     };
 
-    std::unordered_map<WorkerId, Worker> workers{};
+    std::vector<Worker> workers{};
     const uint32_t maxWorkers;
     const uint32_t rayGenerators;
     uint32_t finishedRayGenerators{0};
@@ -237,10 +237,10 @@ class LambdaMaster {
     Poller::Action::Result::Type handleQueuedRayBags();
 
     /* ray bags that are going to be assigned to workers */
-    std::map<TreeletId, std::queue<RayBagInfo>> queuedRayBags;
+    std::vector<std::list<RayBagInfo>> queuedRayBags;
 
     /* ray bags that there are no workers for them */
-    std::map<TreeletId, std::queue<RayBagInfo>> pendingRayBags;
+    std::vector<std::list<RayBagInfo>> pendingRayBags;
 
     /* sample bags */
     std::vector<RayBagInfo> sampleBags;

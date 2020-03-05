@@ -58,7 +58,7 @@ using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
 map<LambdaMaster::Worker::Role, size_t> LambdaMaster::Worker::activeCount = {};
-WorkerId LambdaMaster::Worker::nextId = 1;
+WorkerId LambdaMaster::Worker::nextId = 0;
 
 LambdaMaster::~LambdaMaster() {
     try {
@@ -139,6 +139,9 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
         treeletStats.emplace_back();
         unassignedTreelets.insert(i);
     }
+
+    queuedRayBags.resize(treeletCount);
+    pendingRayBags.resize(treeletCount);
 
     /* and initialize the necessary scene objects */
     scene.initialize(config.samplesPerPixel, config.cropWindow);
@@ -251,7 +254,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
                                                     TCPSocket &&socket) {
         ScopeTimer<TimeLog::Category::AcceptWorker> timer_;
         /* do we want this worker? */
-        if (Worker::nextId > this->rayGenerators && treeletsToSpawn.empty()) {
+        if (Worker::nextId >= this->rayGenerators && treeletsToSpawn.empty()) {
             socket.close();
             return true;
         }
@@ -261,13 +264,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
         auto connectionCloseHandler = [this, workerId]() {
             ScopeTimer<TimeLog::Category::CloseWorker> timer_;
 
-            auto workerIt = workers.find(workerId);
-
-            if (workerIt == workers.end()) {
-                throw runtime_error("unexpected worker id");
-            }
-
-            auto &worker = workerIt->second;
+            auto &worker = workers[workerId];
 
             if (worker.state == Worker::State::Terminating) {
                 if (worker.role == Worker::Role::Generator) {
@@ -284,11 +281,6 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
                     throw runtime_error(
                         "worker died without finishing its work: " +
                         to_string(workerId));
-                }
-
-                if (this->config.workerStatsWriteInterval == 0) {
-                    workers.erase(workerIt);
-                    /* otherwise, we have to leave it to stats writer */
                 }
 
                 return;
@@ -319,7 +311,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
                 return true;
             },
             [this, workerId]() {
-                auto &worker = workers.at(workerId);
+                auto &worker = workers[workerId];
 
                 throw runtime_error(
                     "worker died unexpected: " + to_string(workerId) +
@@ -329,18 +321,14 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
             },
             connectionCloseHandler);
 
-        if (workerId <= this->rayGenerators) {
+        if (workerId < this->rayGenerators) {
             /* This worker is a ray generator
                Let's (1) say hi, (2) tell the worker to fetch the scene,
                (3) generate rays for its tile */
 
             /* (0) create the entry for the worker */
-            auto &worker =
-                workers
-                    .emplace(piecewise_construct, forward_as_tuple(workerId),
-                             forward_as_tuple(workerId, Worker::Role::Generator,
-                                              move(connection)))
-                    .first->second;
+            workers.emplace_back(workerId, Worker::Role::Generator, move(connection));
+            auto &worker = workers.back();
 
             assignBaseObjects(worker);
 
@@ -380,13 +368,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
                 treelet.pendingWorkers--;
 
                 /* (0) create the entry for the worker */
-                auto &worker =
-                    workers
-                        .emplace(
-                            piecewise_construct, forward_as_tuple(workerId),
-                            forward_as_tuple(workerId, Worker::Role::Tracer,
-                                             move(connection)))
-                        .first->second;
+                workers.emplace_back(workerId, Worker::Role::Tracer, move(connection));
+                auto &worker = workers.back();
 
                 assignBaseObjects(worker);
                 assignTreelet(worker, treelet);
@@ -545,8 +528,7 @@ void LambdaMaster::run() {
     wsStream.close();
     tlStream.close();
 
-    for (auto &workerkv : workers) {
-        const auto &worker = workerkv.second;
+    for (auto &worker : workers) {
         worker.connection->socket().close();
 
         if (config.collectDebugLogs || config.rayLogRate || config.bagLogRate) {
