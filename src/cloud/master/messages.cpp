@@ -63,9 +63,9 @@ void LambdaMaster::processMessage(const uint64_t workerId,
             }
 
             if (unassignedTreelets.count(info.treeletId) == 0) {
-                queuedRayBags[info.treeletId].push(info);
+                queuedRayBags[info.treeletId].push_back(info);
             } else {
-                pendingRayBags[info.treeletId].push(info);
+                pendingRayBags[info.treeletId].push_back(info);
             }
         }
 

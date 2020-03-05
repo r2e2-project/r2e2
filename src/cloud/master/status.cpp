@@ -66,8 +66,8 @@ ResultType LambdaMaster::handleStatusMessage() {
 
     const auto laggingWorkers =
         count_if(workers.begin(), workers.end(), [&now](const auto &worker) {
-            return (worker.second.state != Worker::State::Terminated) &&
-                   (now - worker.second.lastSeen >= seconds{4});
+            return (worker.state != Worker::State::Terminated) &&
+                   (now - worker.lastSeen >= seconds{4});
         });
 
     const auto elapsedSeconds = duration_cast<seconds>(now - startTime).count();

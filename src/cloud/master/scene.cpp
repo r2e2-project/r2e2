@@ -21,7 +21,7 @@ void LambdaMaster::assignTreelet(Worker &worker, Treelet &treelet) {
     unassignedTreelets.erase(treelet.id);
     moveFromPendingToQueued(treelet.id);
 
-    worker.treelets.insert(treelet.id);
+    worker.treelets.push_back(treelet.id);
     treelet.workers.insert(worker.id);
 
     auto &dependencies = global::manager.getTreeletDependencies(treelet.id);

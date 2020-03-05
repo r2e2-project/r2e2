@@ -89,8 +89,7 @@ ResultType LambdaMaster::handleWorkerStats() {
 
     const float T = static_cast<float>(config.workerStatsWriteInterval);
 
-    for (auto it = workers.begin(); it != workers.end();) {
-        auto &worker = it->second;
+    for (Worker &worker : workers) {
 
         const auto stats = worker.stats - worker.lastStats;
         worker.lastStats = worker.stats;
@@ -115,12 +114,6 @@ ResultType LambdaMaster::handleWorkerStats() {
                  << (stats.samples.rays / T) << ',' << (stats.samples.bytes / T)
                  << ',' << (stats.samples.count / T) << ',' << fixed
                  << setprecision(2) << (100 * stats.cpuUsage) << '\n';
-
-        if (worker.state == Worker::State::Terminated) {
-            it = workers.erase(it);
-        } else {
-            it++;
-        }
     }
 
     for (size_t treeletId = 0; treeletId < treelets.size(); treeletId++) {
