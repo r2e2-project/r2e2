@@ -237,10 +237,10 @@ class LambdaMaster {
     Poller::Action::Result::Type handleQueuedRayBags();
 
     /* ray bags that are going to be assigned to workers */
-    std::vector<std::list<RayBagInfo>> queuedRayBags;
+    std::vector<std::queue<RayBagInfo>> queuedRayBags;
 
     /* ray bags that there are no workers for them */
-    std::vector<std::list<RayBagInfo>> pendingRayBags;
+    std::vector<std::queue<RayBagInfo>> pendingRayBags;
 
     /* sample bags */
     std::vector<RayBagInfo> sampleBags;
