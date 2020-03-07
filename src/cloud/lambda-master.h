@@ -147,6 +147,7 @@ class LambdaMaster {
         }
 
         // Statistics
+        bool isLogged{true};
         WorkerStats stats{};
         WorkerStats lastStats;
 

@@ -327,7 +327,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
                (3) generate rays for its tile */
 
             /* (0) create the entry for the worker */
-            workers.emplace_back(workerId, Worker::Role::Generator, move(connection));
+            workers.emplace_back(workerId, Worker::Role::Generator,
+                                 move(connection));
             auto &worker = workers.back();
 
             assignBaseObjects(worker);
@@ -368,7 +369,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
                 treelet.pendingWorkers--;
 
                 /* (0) create the entry for the worker */
-                workers.emplace_back(workerId, Worker::Role::Tracer, move(connection));
+                workers.emplace_back(workerId, Worker::Role::Tracer,
+                                     move(connection));
                 auto &worker = workers.back();
 
                 assignBaseObjects(worker);
@@ -529,7 +531,9 @@ void LambdaMaster::run() {
     tlStream.close();
 
     for (auto &worker : workers) {
-        worker.connection->socket().close();
+        if (worker.state != Worker::State::Terminated) {
+            worker.connection->socket().close();
+        }
 
         if (config.collectDebugLogs || config.rayLogRate || config.bagLogRate) {
             getRequests.emplace_back(

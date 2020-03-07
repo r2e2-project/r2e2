@@ -90,6 +90,8 @@ ResultType LambdaMaster::handleWorkerStats() {
     const float T = static_cast<float>(config.workerStatsWriteInterval);
 
     for (Worker &worker : workers) {
+        if (!worker.isLogged) continue;
+        if (worker.state == Worker::State::Terminated) worker.isLogged = false;
 
         const auto stats = worker.stats - worker.lastStats;
         worker.lastStats = worker.stats;
