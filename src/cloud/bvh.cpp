@@ -102,7 +102,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
             node.child_treelet[RIGHT] = treeletID;
             node.child_node[RIGHT] = (uint32_t)right_ref;
 
-            info.children.insert(node.child_node[RIGHT]);
+            info.children.insert(node.child_treelet[RIGHT]);
         } else if (!is_leaf) {
             q.emplace(index, RIGHT);
         }
@@ -113,7 +113,7 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
             node.child_treelet[LEFT] = treeletID;
             node.child_node[LEFT] = (uint32_t)left_ref;
 
-            info.children.insert(node.child_node[LEFT]);
+            info.children.insert(node.child_treelet[LEFT]);
         } else if (!is_leaf) {
             q.emplace(index, LEFT);
         }
@@ -152,6 +152,8 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
                 } else {
                     bvh_instances_[instance_ref] =
                         make_shared<CloudBVH>(instance_group);
+
+                    info.instances.insert(instance_group);
                 }
             }
 
@@ -159,8 +161,6 @@ void CloudBVH::loadTreelet(const uint32_t root_id) const {
                 move(make_unique<TransformedPrimitive>(
                     bvh_instances_.at(instance_ref),
                     primitive_to_world)));
-
-            info.instances.insert(proto_tp.root_ref());
         }
 
         for (int i = 0; i < proto_node.triangles_size(); i++) {
