@@ -9,7 +9,8 @@
 #include <list>
 #include <set>
 #include <queue>
-#include <poll.h>
+#include <unordered_map>
+#include <sys/epoll.h>
 
 #include "file_descriptor.h"
 
@@ -34,7 +35,7 @@ public:
 
     uint64_t id { current_id++ };
     FileDescriptor & fd;
-    enum PollDirection : short { In = POLLIN, Out = POLLOUT } direction;
+    enum PollDirection : short { In = EPOLLIN, Out = EPOLLOUT } direction;
     CallbackType callback;
     std::function<bool(void)> when_interested;
     std::function<void(void)> fderror_callback;
@@ -62,7 +63,10 @@ private:
   std::set<int> fds_to_remove_ {};
   std::queue<Action> action_add_queue_ {};
   std::list<Action> actions_ {};
-  std::vector<pollfd> pollfds_ {};
+  std::list<epoll_event> in_events_ {};
+  std::vector<epoll_event> out_events_ {};
+  std::unordered_map<int, decltype(actions_)::iterator> to_action_;
+  int epfd_;
 
 public:
   struct Result
@@ -73,7 +77,9 @@ public:
       : result( s_result ), exit_status( s_status ) {}
   };
 
-  Poller() {}
+  Poller() 
+    : epfd_(epoll_create1(0))
+  {}
 
   uint64_t add_action( Action action );
   Result poll( const int timeout_ms );
