@@ -55,15 +55,6 @@ void Allocator::resort() {
              double ySurplus = surplus(y, netAllocations);
              return xSurplus != ySurplus ? xSurplus < ySurplus : x.id < y.id;
          });
-    ostringstream logline;
-    for (const auto& a : sortedTreelets) {
-        int allocP = int(double(a.allocations) / netAllocations * 100 + 0.5);
-        int targetP = int(a.targetWeight * 100 + 0.5);
-        logline << "[T" << a.id << " "
-                << " #" << a.allocations << " " << setw(2) << allocP << "/"
-                << setw(2) << targetP << "] ";
-    }
-    LOG(INFO) << logline.str();
 }
 
 void Allocator::addTreelet(TreeletId id) { unassignedTreelets.push_back(id); }
