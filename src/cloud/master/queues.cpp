@@ -46,7 +46,9 @@ bool LambdaMaster::assignWork(Worker& worker) {
         /* only if workToDo or the coin flip returned false */
         *proto.add_items() = to_protobuf(bagQueue.front());
         recordAssign(worker.id, bagQueue.front());
+
         bagQueue.pop();
+        queuedRayBagsCount--;
 
         if (bagQueue.empty()) {
             workToDo = false;
@@ -83,9 +85,11 @@ void moveFromTo(queue<T, C> &from, queue<T, C> &to) {
 }
 
 void LambdaMaster::moveFromPendingToQueued(const TreeletId treeletId) {
+    queuedRayBagsCount += pendingRayBags[treeletId].size();
     moveFromTo(pendingRayBags[treeletId], queuedRayBags[treeletId]);
 }
 
 void LambdaMaster::moveFromQueuedToPending(const TreeletId treeletId) {
+    queuedRayBagsCount -= pendingRayBags[treeletId].size();
     moveFromTo(queuedRayBags[treeletId], pendingRayBags[treeletId]);
 }

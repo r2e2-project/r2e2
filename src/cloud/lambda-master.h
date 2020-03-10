@@ -239,6 +239,7 @@ class LambdaMaster {
 
     /* ray bags that are going to be assigned to workers */
     std::vector<std::queue<RayBagInfo>> queuedRayBags;
+    size_t queuedRayBagsCount{0};
 
     /* ray bags that there are no workers for them */
     std::vector<std::queue<RayBagInfo>> pendingRayBags;

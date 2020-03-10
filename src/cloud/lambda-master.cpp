@@ -222,7 +222,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
         [this]() {
             return initializedWorkers >= this->maxWorkers &&
                    !freeWorkers.empty() &&
-                   (tiles.cameraRaysRemaining() || !queuedRayBags.empty());
+                   (tiles.cameraRaysRemaining() || queuedRayBagsCount > 0);
         },
         []() { throw runtime_error("queued ray bags failed"); }));
 
