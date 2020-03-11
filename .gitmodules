@@ -1,0 +1,3 @@
+[submodule "lib/pbrt"]
+	path = lib/pbrt
+	url = https://github.com/r2t2-project/pbrt-v3
