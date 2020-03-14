@@ -1,6 +1,11 @@
 #ifndef PBRT_CLOUD_LAMBDA_WORKER_H
 #define PBRT_CLOUD_LAMBDA_WORKER_H
 
+#include <pbrt/accelerators/cloudbvh.h>
+#include <pbrt/core/geometry.h>
+#include <pbrt/main.h>
+#include <pbrt/raystate.h>
+
 #include <cstring>
 #include <fstream>
 #include <future>
@@ -11,18 +16,11 @@
 #include <thread>
 #include <tuple>
 
-#include "cloud/bvh.h"
-#include "cloud/lambda-master.h"
-#include "cloud/lambda.h"
-#include "cloud/raystate.h"
-#include "cloud/stats.h"
-#include "core/camera.h"
-#include "core/geometry.h"
-#include "core/light.h"
-#include "core/sampler.h"
-#include "core/transform.h"
+#include "common/lambda.h"
+#include "common/stats.h"
 #include "execution/loop.h"
 #include "execution/meow/message.h"
+#include "master/lambda-master.h"
 #include "net/address.h"
 #include "net/s3.h"
 #include "net/transfer.h"
@@ -36,7 +34,7 @@
 
 #define TLOG(tag) LOG(INFO) << "[" #tag "] "
 
-namespace pbrt {
+namespace r2t2 {
 
 constexpr std::chrono::milliseconds SEAL_BAGS_INTERVAL{100};
 constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL{1'000};
@@ -102,37 +100,24 @@ class LambdaWorker {
 
     struct SceneData {
       public:
-        bool initialized{false};
+        pbrt::scene::Base base{};
 
-        uint8_t maxDepth{5};
         int samplesPerPixel{1};
-        Vector2i sampleExtent{};
-        std::shared_ptr<Camera> camera{};
-        std::unique_ptr<FilmTile> filmTile{};
-        std::shared_ptr<GlobalSampler> sampler{};
-        std::vector<std::unique_ptr<Transform>> transformCache{};
-        std::unique_ptr<Scene> fakeScene{};
-        std::vector<std::shared_ptr<Light>> lights{};
+        uint8_t maxDepth{5};
 
-        void initialize();
-
-      private:
-        void loadCamera();
-        void loadSampler();
-        void loadLights();
-        void loadFakeScene();
+        SceneData() {}
     } scene;
 
     /*** Ray Tracing **********************************************************/
 
     Poller::Action::Result::Type handleTraceQueue();
 
-    void generateRays(const Bounds2i& cropWindow);
+    void generateRays(const pbrt::Bounds2i& cropWindow);
 
-    std::map<TreeletId, std::unique_ptr<CloudBVH>> treelets{};
-    std::map<TreeletId, std::queue<RayStatePtr>> traceQueue{};
-    std::map<TreeletId, std::queue<RayStatePtr>> outQueue{};
-    std::queue<Sample> samples{};
+    std::map<TreeletId, std::unique_ptr<pbrt::CloudBVH>> treelets{};
+    std::map<TreeletId, std::queue<pbrt::RayStatePtr>> traceQueue{};
+    std::map<TreeletId, std::queue<pbrt::RayStatePtr>> outQueue{};
+    std::queue<pbrt::Sample> samples{};
     size_t outQueueSize{0};
 
     ////////////////////////////////////////////////////////////////////////////
@@ -242,7 +227,7 @@ class LambdaWorker {
         Opened
     };
 
-    void logRay(const RayAction action, const RayState& state,
+    void logRay(const RayAction action, const pbrt::RayState& state,
                 const RayBagInfo& info = RayBagInfo::EmptyBag());
 
     void logBag(const BagAction action, const RayBagInfo& info);
@@ -286,6 +271,6 @@ class LambdaWorker {
     } localStats{};
 };
 
-}  // namespace pbrt
+}  // namespace r2t2
 
 #endif /* PBRT_CLOUD_LAMBDA_WORKER_H */

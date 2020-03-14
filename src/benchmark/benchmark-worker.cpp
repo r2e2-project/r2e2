@@ -18,7 +18,7 @@
 
 using namespace std;
 using namespace chrono;
-using namespace pbrt;
+using namespace r2t2;
 using namespace PollerShortNames;
 
 string randomString(const size_t length) {

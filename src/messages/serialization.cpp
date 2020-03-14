@@ -9,7 +9,7 @@
 using namespace std;
 using namespace google::protobuf::io;
 
-namespace pbrt {
+namespace r2t2 {
 namespace protobuf {
 
 RecordWriter::RecordWriter(const string& filename)
@@ -145,4 +145,4 @@ void RecordReader::initialize() {
 }
 
 }  // namespace protobuf
-}  // namespace pbrt
+}  // namespace r2t2

@@ -5,10 +5,10 @@
 #include <fcntl.h>
 #include <glog/logging.h>
 #include <sys/types.h>
+
 #include <chrono>
 #include <stdexcept>
 
-#include "cloud/stats.h"
 #include "net/http_response_parser.h"
 #include "net/util.h"
 #include "util/chunk.h"

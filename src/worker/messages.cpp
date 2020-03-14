@@ -1,10 +1,12 @@
-#include "cloud/lambda-worker.h"
+#include "lambda-worker.h"
 #include "messages/utils.h"
 
 using namespace std;
-using namespace meow;
-using namespace std::chrono;
+using namespace chrono;
+using namespace r2t2;
 using namespace pbrt;
+using namespace meow;
+
 using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
@@ -53,7 +55,8 @@ void LambdaWorker::processMessage(const Message& message) {
         protobuf::GetObjects proto;
         protoutil::from_string(message.payload(), proto);
         getObjects(proto);
-        scene.initialize();
+
+        scene.base = {workingDirectory.name(), scene.samplesPerPixel};
 
         coordinatorConnection->enqueue_write(
             Message::str(*workerId, OpCode::GetObjects, ""));
@@ -64,7 +67,8 @@ void LambdaWorker::processMessage(const Message& message) {
     case OpCode::GenerateRays: {
         protobuf::GenerateRays proto;
         protoutil::from_string(message.payload(), proto);
-        generateRays(from_protobuf(proto.crop_window()));
+        generateRays(
+            Bounds2i{{proto.x0(), proto.y0()}, {proto.x1(), proto.y1()}});
         break;
     }
 

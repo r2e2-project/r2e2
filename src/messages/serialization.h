@@ -10,9 +10,9 @@
 
 #include "util/file_descriptor.h"
 #include "util/optional.h"
-#include "pbrt.pb.h"
+#include "r2t2.pb.h"
 
-namespace pbrt {
+namespace r2t2 {
 namespace protobuf {
 
 class RecordWriter {

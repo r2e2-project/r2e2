@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "cloud/lambda.h"
+#include "common/lambda.h"
 
 struct AllocationInfo {
     double targetWeight;

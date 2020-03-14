@@ -2,7 +2,7 @@
 
 using namespace std;
 
-namespace pbrt {
+namespace r2t2 {
 
 bool SeqNoSet::contains(const uint64_t value) const {
     if (value < smallest_not_in_set_) {
@@ -52,4 +52,4 @@ uint64_t SeqNoSet::size() const { return smallest_not_in_set_ + set_.size(); }
 
 uint64_t SeqNoSet::numberOfItemsInMemory() const { return set_.size(); }
 
-}  // namespace pbrt
+}  // namespace r2t2

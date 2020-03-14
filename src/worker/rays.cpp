@@ -1,29 +1,29 @@
-#include "cloud/lambda-worker.h"
-#include "cloud/r2t2.h"
+#include <pbrt/core/sampler.h>
+
+#include "lambda-worker.h"
 #include "messages/utils.h"
 #include "net/util.h"
 
 using namespace std;
-using namespace meow;
-using namespace std::chrono;
+using namespace chrono;
+using namespace r2t2;
 using namespace pbrt;
-using namespace pbrt::global;
+using namespace meow;
+
 using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
 void LambdaWorker::generateRays(const Bounds2i& bounds) {
-    const Bounds2i sampleBounds = scene.camera->film->GetSampleBounds();
-
     /* for ray tracking */
     bernoulli_distribution bd{config.rayLogRate};
 
-    for (size_t sample = 0; sample < scene.sampler->samplesPerPixel; sample++) {
+    for (size_t sample = 0; sample < scene.base.samplesPerPixel; sample++) {
         for (const Point2i pixel : bounds) {
             RayStatePtr statePtr = graphics::GenerateCameraRay(
-                scene.camera, pixel, sample, scene.maxDepth, scene.sampleExtent,
-                scene.sampler);
+                scene.base.camera, pixel, sample, scene.maxDepth,
+                scene.base.sampleExtent, scene.base.sampler);
 
             statePtr->trackRay = trackRays ? bd(randEngine) : false;
             logRay(RayAction::Generated, *statePtr);
@@ -45,7 +45,7 @@ ResultType LambdaWorker::handleTraceQueue() {
 
     queue<RayStatePtr> processedRays;
 
-    //constexpr size_t MAX_RAYS = WORKER_MAX_ACTIVE_RAYS / 2;
+    // constexpr size_t MAX_RAYS = WORKER_MAX_ACTIVE_RAYS / 2;
     const auto traceUntil = steady_clock::now() + 100ms;
     size_t tracedCount = 0;
     MemoryArena arena;
@@ -116,8 +116,9 @@ ResultType LambdaWorker::handleTraceQueue() {
 
                     RayStatePtr bounceRay, shadowRay;
                     tie(bounceRay, shadowRay) = graphics::ShadeRay(
-                        move(rayPtr), treelet, scene.lights, scene.sampleExtent,
-                        scene.sampler, scene.maxDepth, arena);
+                        move(rayPtr), treelet, scene.base.lights,
+                        scene.base.sampleExtent, scene.base.sampler,
+                        scene.maxDepth, arena);
 
                     if (bounceRay == nullptr && shadowRay == nullptr) {
                         /* this was the last ray in the path */

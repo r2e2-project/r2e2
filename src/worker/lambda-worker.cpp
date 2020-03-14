@@ -3,18 +3,16 @@
 #include <getopt.h>
 #include <signal.h>
 
-#include "core/camera.h"
-#include "core/light.h"
-#include "core/sampler.h"
 #include "messages/utils.h"
 #include "net/transfer_mcd.h"
 #include "net/transfer_s3.h"
 
 using namespace std;
 using namespace chrono;
-using namespace meow;
+using namespace r2t2;
 using namespace pbrt;
-using namespace pbrt::global;
+using namespace meow;
+
 using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
@@ -57,11 +55,10 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
         TLOG(BAG) << "timestamp,bag,workerId,count,size,action";
     }
 
-    PbrtOptions.nThreads = 1;
+    pbrt::PbrtOptions.nThreads = 1;
+
     scene.samplesPerPixel = config.samplesPerPixel;
     scene.maxDepth = config.maxPathDepth;
-
-    manager.init(".");
 
     coordinatorConnection = loop.make_connection<TCPConnection>(
         coordinatorAddr,
@@ -151,7 +148,7 @@ void LambdaWorker::getObjects(const protobuf::GetObjects& objects) {
             treelets.emplace(id.id, make_unique<CloudBVH>(id.id));
         }
 
-        const string filePath = id.to_string();
+        const string filePath = scene::GetObjectName(id.type, id.id);
         requests.emplace_back(filePath, filePath);
     }
 

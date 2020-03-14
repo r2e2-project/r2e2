@@ -4,11 +4,11 @@
 #include <chrono>
 #include <string>
 
-#include "cloud/allocator.h"
-#include "cloud/scheduler.h"
-#include "cloud/schedulers/static.h"
+#include "allocator.h"
+#include "scheduler.h"
+#include "static.h"
 
-namespace pbrt {
+namespace r2t2 {
 
 class DynamicScheduler : public Scheduler {
   private:
@@ -22,5 +22,5 @@ class DynamicScheduler : public Scheduler {
         const std::vector<TreeletStats> &stats) override;
 };
 
-}  // namespace pbrt
+}  // namespace r2t2
 #endif /* PBRT_CLOUD_SCHEDULERS_DYNAMIC_H */

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <set>
 
-namespace pbrt {
+namespace r2t2 {
 
 /**
  * A data structure for storing sets of unsigned integers, which is optimized to
@@ -31,6 +31,6 @@ class SeqNoSet {
     uint64_t smallest_not_in_set_{0};
 };
 
-}  // namespace pbrt
+}  // namespace r2t2
 
 #endif /* PBRT_UTIL_SEQ_NO_SET_H */

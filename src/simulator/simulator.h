@@ -23,7 +23,7 @@
 #include "messages/serialization.h"
 #include "schedulers/static_multi.h"
 
-namespace pbrt {
+namespace r2t2 {
 
 struct RayData {
     RayStatePtr ray;

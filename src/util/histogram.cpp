@@ -6,7 +6,7 @@
 #include "messages/utils.h"
 
 using namespace std;
-using namespace pbrt;
+using namespace r2t2;
 
 template <class T>
 Histogram<T>::Histogram(const T width, const T lower_bound, const T upper_bound)

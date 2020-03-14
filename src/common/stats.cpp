@@ -7,7 +7,7 @@
 using namespace std;
 using namespace chrono;
 
-namespace pbrt {
+namespace r2t2 {
 
 TreeletStats TreeletStats::operator-(const TreeletStats& other) const {
     TreeletStats res;
@@ -43,4 +43,4 @@ WorkerStats WorkerStats::operator-(const WorkerStats& other) const {
     return res;
 }
 
-}  // namespace pbrt
+}  // namespace r2t2

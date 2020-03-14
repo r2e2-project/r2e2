@@ -1,4 +1,4 @@
-#include "cloud/simulator.h"
+#include "simulator.h"
 
 using namespace std;
 
@@ -7,7 +7,7 @@ void usage(const char *argv0) {
     exit(EXIT_FAILURE);
 }
 
-namespace pbrt {
+namespace r2t2 {
 
 unordered_map<uint64_t, unordered_set<uint32_t>> loadInitMapping(const string &fname,
                                                                  uint64_t numWorkers,
@@ -272,7 +272,7 @@ void Simulator::enqueueRay(Worker &worker, RayStatePtr &&ray, uint32_t srcTreele
     curPacket.rays.emplace_back(move(ray), srcTreelet, dstTreelet);
     // Store size separately so outstanding can be updated after packet.rays
     // has been spliced away.
-    curPacket.numRays++; 
+    curPacket.numRays++;
 
     worker.outstanding++;
     curStats.raysEnqueued++;
@@ -507,7 +507,7 @@ void Simulator::sendPartialPackets() {
 }
 
 int main(int argc, char const *argv[]) {
-    using namespace pbrt;
+    using namespace r2t2;
 
     PbrtOptions.nThreads = 1;
 

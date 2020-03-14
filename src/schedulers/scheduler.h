@@ -4,11 +4,11 @@
 #include <map>
 #include <vector>
 
-#include "cloud/lambda.h"
-#include "cloud/stats.h"
+#include "common/lambda.h"
+#include "common/stats.h"
 #include "util/optional.h"
 
-namespace pbrt {
+namespace r2t2 {
 
 /* Schedule is a {TreeletId -> Worker Count} mapping */
 using Schedule = std::vector<size_t>;
@@ -21,6 +21,6 @@ class Scheduler {
     virtual ~Scheduler() {}
 };
 
-}  // namespace pbrt
+}  // namespace r2t2
 
 #endif /* PBRT_CLOUD_SCHEDULER_H */

@@ -1,10 +1,10 @@
-#include "cloud/schedulers/dynamic.h"
+#include "dynamic.h"
 
 #include <algorithm>
 
 using namespace std;
 using namespace chrono;
-using namespace pbrt;
+using namespace r2t2;
 
 constexpr seconds SCHEDULING_INTERVAL{20};
 

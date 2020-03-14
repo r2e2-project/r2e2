@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "pbrt.pb.h"
+#include "r2t2.pb.h"
 
 template <class T>
 class Histogram {
@@ -22,7 +22,7 @@ class Histogram {
     T squares_sum_ = 0;
 
   public:
-    Histogram(const pbrt::protobuf::HistogramUInt64& proto);
+    Histogram(const r2t2::protobuf::HistogramUInt64& proto);
     Histogram(const T width, const T lower_bound, const T upper_bound);
 
     void add(const T value);
@@ -38,7 +38,7 @@ class Histogram {
     T squares_sum() const { return squares_sum_; }
 
     std::string str() const;
-    pbrt::protobuf::HistogramUInt64 to_protobuf() const;
+    r2t2::protobuf::HistogramUInt64 to_protobuf() const;
 };
 
 #endif /* PBRT_UTIL_HISTOGRAM_H */

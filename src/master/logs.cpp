@@ -1,11 +1,11 @@
 #include <iomanip>
 
-#include "cloud/lambda-master.h"
+#include "lambda-master.h"
 #include "messages/utils.h"
 
 using namespace std;
 using namespace std::chrono;
-using namespace pbrt;
+using namespace r2t2;
 using namespace PollerShortNames;
 
 void LambdaMaster::recordEnqueue(const WorkerId workerId,

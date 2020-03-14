@@ -1,9 +1,9 @@
 #ifndef PBRT_CLOUD_SCHEDULERS_NULL_H
 #define PBRT_CLOUD_SCHEDULERS_NULL_H
 
-#include "cloud/scheduler.h"
+#include "scheduler.h"
 
-namespace pbrt {
+namespace r2t2 {
 
 class NullScheduler : public Scheduler {
   public:
@@ -13,5 +13,5 @@ class NullScheduler : public Scheduler {
     }
 };
 
-}  // namespace pbrt
+}  // namespace r2t2
 #endif /* PBRT_CLOUD_SCHEDULERS_NULL_H */

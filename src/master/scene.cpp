@@ -1,13 +1,14 @@
-#include "cloud/lambda-master.h"
-#include "cloud/manager.h"
+#include <pbrt/core/geometry.h>
+
 #include "execution/meow/message.h"
+#include "lambda-master.h"
 #include "messages/utils.h"
 
 using namespace std;
+using namespace r2t2;
 using namespace pbrt;
 using namespace meow;
 using namespace protoutil;
-using namespace pbrt::global;
 
 using OpCode = Message::OpCode;
 
@@ -24,7 +25,7 @@ void LambdaMaster::assignTreelet(Worker &worker, Treelet &treelet) {
     worker.treelets.push_back(treelet.id);
     treelet.workers.insert(worker.id);
 
-    auto &dependencies = global::manager.getTreeletDependencies(treelet.id);
+    auto &dependencies = scene.base.GetTreeletDependencies(treelet.id);
 
     for (const auto &obj : dependencies) {
         assignObject(worker, obj);
@@ -36,40 +37,16 @@ void LambdaMaster::assignBaseObjects(Worker &worker) {
     assignObject(worker, ObjectKey{ObjectType::Camera, 0});
     assignObject(worker, ObjectKey{ObjectType::Sampler, 0});
     assignObject(worker, ObjectKey{ObjectType::Lights, 0});
+    assignObject(worker, ObjectKey{ObjectType::Manifest, 0});
 }
 
-void LambdaMaster::SceneData::loadCamera(const Optional<Bounds2i> &cropWindow) {
-    auto reader = manager.GetReader(ObjectType::Camera);
-    protobuf::Camera proto_camera;
-    reader->read(&proto_camera);
-    camera = camera::from_protobuf(proto_camera, transformCache);
-
-    if (cropWindow.initialized()) {
-        sampleBounds = *cropWindow;
-    } else {
-        sampleBounds = camera->film->GetSampleBounds();
-    }
-
-    sampleExtent = sampleBounds.Diagonal();
-}
-
-void LambdaMaster::SceneData::loadSampler(const int samplesPerPixel) {
-    auto reader = manager.GetReader(ObjectType::Sampler);
-    protobuf::Sampler proto_sampler;
-    reader->read(&proto_sampler);
-    sampler = sampler::from_protobuf(proto_sampler, samplesPerPixel);
-}
-
-void LambdaMaster::SceneData::initialize(const int samplesPerPixel,
-                                         const Optional<Bounds2i> &cropWindow) {
-    if (initialized) return;
-
-    loadCamera(cropWindow);
-    loadSampler(samplesPerPixel);
-    totalPaths = sampleBounds.Area() * sampler->samplesPerPixel;
-
-    initialized = true;
-}
+LambdaMaster::SceneData::SceneData(const std::string &scenePath,
+                                   const int samplesPerPixel,
+                                   const Optional<Bounds2i> &cropWindow)
+    : base(scenePath, samplesPerPixel),
+      sampleBounds(cropWindow.initialized() ? *cropWindow : base.sampleBounds),
+      sampleExtent(sampleBounds.Diagonal()),
+      totalPaths(base.totalPaths) {}
 
 int defaultTileSize(int spp) {
     int bytesPerSec = 30e+6;
@@ -125,8 +102,12 @@ Bounds2i LambdaMaster::Tiles::nextCameraTile() {
 
 void LambdaMaster::Tiles::sendWorkerTile(Worker &worker) {
     protobuf::GenerateRays proto;
-    Bounds2i nextTile = nextCameraTile();
-    *proto.mutable_crop_window() = to_protobuf(nextTile);
+
+    const Bounds2i nextTile = nextCameraTile();
+    proto.set_x0(nextTile.pMin.x);
+    proto.set_y0(nextTile.pMin.y);
+    proto.set_x1(nextTile.pMax.x);
+    proto.set_y1(nextTile.pMax.y);
 
     worker.rays.camera += nextTile.Area() * tileSpp;
 

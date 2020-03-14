@@ -4,13 +4,11 @@
 #include <cmath>
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
-#include "cloud/estimators.h"
-#include "cloud/lambda.h"
-#include "cloud/manager.h"
-#include "cloud/raystate.h"
+#include "lambda.h"
 
-namespace pbrt {
+namespace r2t2 {
 
 /* timing utility functions */
 using timepoint_t = std::chrono::time_point<std::chrono::system_clock>;
@@ -42,6 +40,6 @@ struct WorkerStats {
     WorkerStats operator-(const WorkerStats& other) const;
 };
 
-}  // namespace pbrt
+}  // namespace r2t2
 
 #endif /* PBRT_CLOUD_STATS_H */

@@ -2,19 +2,10 @@
 #define PBRT_MESSAGES_UTILS_H
 
 #include <google/protobuf/util/json_util.h>
+#include <pbrt/common.h>
 
-#include "cloud/integrator.h"
-#include "cloud/manager.h"
-#include "cloud/stats.h"
-#include "core/geometry.h"
-#include "core/light.h"
-#include "core/paramset.h"
-#include "core/sampler.h"
-#include "core/spectrum.h"
-#include "core/transform.h"
-
-#include "pbrt.pb.h"
-#include "shapes/triangle.h"
+#include "common/stats.h"
+#include "r2t2.pb.h"
 
 namespace protoutil {
 
@@ -55,116 +46,16 @@ void from_json(const std::string& data, ProtobufType& dest) {
 
 }  // namespace protoutil
 
-namespace pbrt {
+namespace r2t2 {
 
-protobuf::Point2i to_protobuf(const Point2i& point);
-protobuf::Point2f to_protobuf(const Point2f& point);
-protobuf::Point3f to_protobuf(const Point3f& point);
-protobuf::Vector2f to_protobuf(const Vector2f& point);
-protobuf::Vector3f to_protobuf(const Vector3f& point);
-protobuf::Normal3f to_protobuf(const Normal3f& point);
-protobuf::Bounds2i to_protobuf(const Bounds2i& bounds);
-protobuf::Bounds2f to_protobuf(const Bounds2f& bounds);
-protobuf::Bounds3f to_protobuf(const Bounds3f& bounds);
-protobuf::Matrix to_protobuf(const Matrix4x4& matrix);
-protobuf::RGBSpectrum to_protobuf(const RGBSpectrum& spectrum);
-protobuf::AnimatedTransform to_protobuf(const AnimatedTransform& transform);
-protobuf::TriangleMesh to_protobuf(const TriangleMesh& triangleMesh);
-protobuf::SampleData to_protobuf(const CloudIntegrator::SampleData& sample);
-protobuf::ParamSet to_protobuf(const ParamSet& paramset);
-protobuf::Scene to_protobuf(const Scene& scene);
-protobuf::TextureParams to_protobuf(const TextureParams& texture_params);
-protobuf::ObjectKey to_protobuf(const ObjectKey& ObjectKey);
+protobuf::ObjectKey to_protobuf(const pbrt::ObjectKey& ObjectKey);
 protobuf::RayBagInfo to_protobuf(const RayBagInfo& RayBagInfo);
 protobuf::WorkerStats to_protobuf(const WorkerStats& stats);
 
-Point2i from_protobuf(const protobuf::Point2i& point);
-Point2f from_protobuf(const protobuf::Point2f& point);
-Point3f from_protobuf(const protobuf::Point3f& point);
-Vector2f from_protobuf(const protobuf::Vector2f& point);
-Vector3f from_protobuf(const protobuf::Vector3f& point);
-Normal3f from_protobuf(const protobuf::Normal3f& point);
-Bounds2i from_protobuf(const protobuf::Bounds2i& bounds);
-Bounds2f from_protobuf(const protobuf::Bounds2f& bounds);
-Bounds3f from_protobuf(const protobuf::Bounds3f& bounds);
-Matrix4x4 from_protobuf(const protobuf::Matrix& matrix);
-RGBSpectrum from_protobuf(const protobuf::RGBSpectrum& spectrum);
-TriangleMesh from_protobuf(const protobuf::TriangleMesh& mesh);
-CloudIntegrator::SampleData from_protobuf(const protobuf::SampleData& sample);
-ParamSet from_protobuf(const protobuf::ParamSet& paramset);
-Scene from_protobuf(const protobuf::Scene& scene);
-TextureParams from_protobuf(
-    const protobuf::TextureParams& texture_params, ParamSet& geom_params,
-    ParamSet& material_params,
-    std::map<std::string, std::shared_ptr<Texture<Float>>>& fTex,
-    std::map<std::string, std::shared_ptr<Texture<Spectrum>>>& sTex);
-ObjectKey from_protobuf(const protobuf::ObjectKey& objectKey);
+pbrt::ObjectKey from_protobuf(const protobuf::ObjectKey& objectKey);
 RayBagInfo from_protobuf(const protobuf::RayBagInfo& rayBagInfo);
 WorkerStats from_protobuf(const protobuf::WorkerStats& statsProto);
 
-namespace light {
-
-std::shared_ptr<Light> from_protobuf(const protobuf::Light& light);
-protobuf::Light to_protobuf(const std::string& name, const ParamSet& params,
-                            const Transform& light2world);
-
-}  // namespace light
-
-namespace sampler {
-
-std::shared_ptr<GlobalSampler> from_protobuf(const protobuf::Sampler& sampler,
-                                             const int samplesPerPixel = 0);
-protobuf::Sampler to_protobuf(const std::string& name, const ParamSet& params,
-                              const Bounds2i& sampleBounds);
-
-}  // namespace sampler
-
-namespace camera {
-
-std::shared_ptr<Camera> from_protobuf(
-    const protobuf::Camera& camera,
-    std::vector<std::unique_ptr<Transform>>& transformCache);
-
-protobuf::Camera to_protobuf(const std::string& name, const ParamSet& params,
-                             const AnimatedTransform& cam2world,
-                             const std::string& filmName,
-                             const ParamSet& filmParams,
-                             const std::string& filterName,
-                             const ParamSet& filterParams);
-
-}  // namespace camera
-
-namespace material {
-
-std::shared_ptr<Material> from_protobuf(const protobuf::Material& material);
-
-protobuf::Material to_protobuf(const std::string& name,
-                               const TextureParams& tp);
-
-}  // namespace material
-
-namespace float_texture {
-
-std::shared_ptr<Texture<Float>> from_protobuf(
-    const protobuf::FloatTexture& texture);
-
-protobuf::FloatTexture to_protobuf(const std::string& name,
-                                   const Transform& tex2world,
-                                   const TextureParams& tp);
-
-}  // namespace float_texture
-
-namespace spectrum_texture {
-
-std::shared_ptr<Texture<Spectrum>> from_protobuf(
-    const protobuf::SpectrumTexture& texture);
-
-protobuf::SpectrumTexture to_protobuf(const std::string& name,
-                                      const Transform& tex2world,
-                                      const TextureParams& tp);
-
-}  // namespace spectrum_texture
-
-}  // namespace pbrt
+}  // namespace r2t2
 
 #endif /* PBRT_MESSAGES_UTILS_H */

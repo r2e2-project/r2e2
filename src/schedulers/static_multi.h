@@ -1,10 +1,10 @@
 #ifndef PBRT_CLOUD_SCHEDULERS_STATIC_MULTI_H
 #define PBRT_CLOUD_SCHEDULERS_STATIC_MULTI_H
 
-#include "cloud/allocator.h"
-#include "cloud/scheduler.h"
+#include "allocator.h"
+#include "scheduler.h"
 
-namespace pbrt {
+namespace r2t2 {
 
 class StaticMultiScheduler : public Scheduler {
   private:
@@ -17,5 +17,5 @@ class StaticMultiScheduler : public Scheduler {
                                 const std::vector<TreeletStats> &) override;
 };
 
-}  // namespace pbrt
+}  // namespace r2t2
 #endif /* PBRT_CLOUD_SCHEDULERS_STATIC_MULTI_H */

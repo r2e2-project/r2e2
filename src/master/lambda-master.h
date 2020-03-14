@@ -1,6 +1,9 @@
 #ifndef PBRT_CLOUD_LAMBDA_MASTER_H
 #define PBRT_CLOUD_LAMBDA_MASTER_H
 
+#include <pbrt/core/geometry.h>
+#include <pbrt/main.h>
+
 #include <fstream>
 #include <map>
 #include <memory>
@@ -10,14 +13,8 @@
 #include <string>
 #include <vector>
 
-#include "cloud/estimators.h"
-#include "cloud/lambda.h"
-#include "cloud/manager.h"
-#include "cloud/scheduler.h"
-#include "cloud/stats.h"
-#include "core/camera.h"
-#include "core/geometry.h"
-#include "core/transform.h"
+#include "common/lambda.h"
+#include "common/stats.h"
 #include "execution/connection.h"
 #include "execution/loop.h"
 #include "execution/meow/message.h"
@@ -25,6 +22,8 @@
 #include "net/aws.h"
 #include "net/http_request.h"
 #include "net/ws_server.h"
+#include "r2t2.pb.h"
+#include "schedulers/scheduler.h"
 #include "storage/backend.h"
 #include "util/optional.h"
 #include "util/seq_no_set.h"
@@ -34,7 +33,7 @@
 #include "util/util.h"
 #include "util/uuid.h"
 
-namespace pbrt {
+namespace r2t2 {
 
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL{1'000};
@@ -49,7 +48,7 @@ struct MasterConfiguration {
     float rayLogRate;
     float bagLogRate;
     std::string logsDirectory;
-    Optional<Bounds2i> cropWindow;
+    Optional<pbrt::Bounds2i> cropWindow;
     int tileSize;
     std::chrono::seconds timeout;
     std::string jobSummaryPath;
@@ -127,7 +126,7 @@ class LambdaMaster {
         std::string awsLogStream{};
 
         std::vector<TreeletId> treelets{};
-        std::set<ObjectKey> objects{};
+        std::set<pbrt::ObjectKey> objects{};
 
         std::set<RayBagInfo> outstandingRayBags{};
         size_t outstandingBytes{0};
@@ -210,7 +209,7 @@ class LambdaMaster {
     // Worker <-> Object Assignments                                          //
     ////////////////////////////////////////////////////////////////////////////
 
-    void assignObject(Worker &worker, const ObjectKey &object);
+    void assignObject(Worker &worker, const pbrt::ObjectKey &object);
     void assignBaseObjects(Worker &worker);
     void assignTreelet(Worker &worker, Treelet &treelet);
 
@@ -289,40 +288,34 @@ class LambdaMaster {
 
     struct SceneData {
       public:
+        pbrt::scene::Base base{};
+
+        pbrt::Bounds2i sampleBounds{};
+        pbrt::Vector2i sampleExtent{};
         size_t totalPaths{0};
-        Bounds2i sampleBounds{};
-        Vector2i sampleExtent{};
-        std::shared_ptr<Camera> camera{};
-        std::shared_ptr<Sampler> sampler{};
-        std::vector<std::unique_ptr<Transform>> transformCache{};
 
-        void initialize(const int samplesPerPixel,
-                        const Optional<Bounds2i> &cropWindow);
-
-      private:
-        bool initialized{false};
-
-        void loadCamera(const Optional<Bounds2i> &cropWindow);
-        void loadSampler(const int samplesPerPixel);
+        SceneData() {}
+        SceneData(const std::string &scenePath, const int samplesPerPixel,
+                  const Optional<pbrt::Bounds2i> &cropWindow);
     } scene{};
 
     /*** Tiles ****************************************************************/
 
     class Tiles {
       public:
-        Bounds2i nextCameraTile();
+        pbrt::Bounds2i nextCameraTile();
         bool cameraRaysRemaining() const;
         void sendWorkerTile(Worker &worker);
 
         Tiles() = default;
-        Tiles(const int tileSize, const Bounds2i &bounds, const long int spp,
-              const uint32_t numWorkers);
+        Tiles(const int tileSize, const pbrt::Bounds2i &bounds,
+              const long int spp, const uint32_t numWorkers);
 
         int tileSize{0};
 
       private:
-        Bounds2i sampleBounds{};
-        Point2i nTiles{};
+        pbrt::Bounds2i sampleBounds{};
+        pbrt::Point2i nTiles{};
         size_t curTile{0};
         size_t tileSpp{};
     } tiles{};
@@ -349,6 +342,6 @@ class LambdaMaster {
     std::mt19937 randEngine{std::random_device{}()};
 };
 
-}  // namespace pbrt
+}  // namespace r2t2
 
 #endif /* PBRT_CLOUD_LAMBDA_MASTER_H */

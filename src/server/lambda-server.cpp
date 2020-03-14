@@ -10,7 +10,7 @@
 #include "util/system_runner.h"
 
 using namespace std;
-using namespace pbrt;
+using namespace r2t2;
 
 void usage(char const *argv0) {
     cerr << "Usage: " << argv0 << " IP PORT" << endl;

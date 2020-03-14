@@ -5,7 +5,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "pbrt.pb.h"
+#include "r2t2.pb.h"
 #include "messages/utils.h"
 #include "util/exception.h"
 
@@ -36,7 +36,7 @@ ostream &operator<<(ostream &o, const Value<T> &v) {
 
 string TimeLog::json() const
 {
-    pbrt::protobuf::TimeLog proto;
+    r2t2::protobuf::TimeLog proto;
 
     const uint64_t now = timestamp_ns();
     const uint64_t elapsed = now - _beginning_timestamp;

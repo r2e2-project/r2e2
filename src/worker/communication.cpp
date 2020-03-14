@@ -1,15 +1,18 @@
 #include <lz4.h>
 
-#include "cloud/lambda-worker.h"
+#include "lambda-worker.h"
 #include "messages/utils.h"
 
 using namespace std;
 using namespace chrono;
+using namespace r2t2;
 using namespace pbrt;
 using namespace meow;
 using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
+
+constexpr bool COMPRESS_RAY_BAGS = false;
 
 ResultType LambdaWorker::handleOutQueue() {
     ScopeTimer<TimeLog::Category::OutQueue> timer_;
@@ -137,7 +140,7 @@ ResultType LambdaWorker::handleSealedBags() {
     while (!sealedBags.empty()) {
         auto& bag = sealedBags.front();
 
-        if (PbrtOptions.compressRayBags) {
+        if (COMPRESS_RAY_BAGS) {
             const size_t upperBound = LZ4_COMPRESSBOUND(bag.info.bagSize);
             string compressed(upperBound, '\0');
             const size_t compressedSize = LZ4_compress_default(
@@ -198,7 +201,7 @@ ResultType LambdaWorker::handleReceiveQueue() {
         auto& rays = traceQueue[bag.info.treeletId];
         size_t totalSize = bag.data.size();
 
-        if (PbrtOptions.compressRayBags) {
+        if (COMPRESS_RAY_BAGS) {
             string decompressed(bag.info.rayCount * RayState::MaxPackedSize,
                                 '\0');
 

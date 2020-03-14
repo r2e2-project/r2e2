@@ -1,0 +1,131 @@
+syntax = 'proto3';
+
+package r2t2.protobuf;
+
+message InvocationPayload {
+    string storage_backend = 1;
+    string coordinator = 2;
+    int32 samples_per_pixel = 3;
+    int32 max_path_depth = 4;
+    float ray_log_rate = 5;
+    float bag_log_rate = 6;
+    bool directional_treelets = 7;
+    repeated string memcached_servers = 8;
+}
+
+message ObjectKey {
+    uint32 type = 1;
+    uint64 id = 2;
+};
+
+message Hey {
+    uint64 worker_id = 1;
+    string job_id = 2;
+}
+
+message GetObjects {
+    repeated ObjectKey object_ids = 1;
+}
+
+message GenerateRays {
+    int32 x0 = 1;
+    int32 y0 = 2;
+    int32 x1 = 3;
+    int32 y1 = 4;
+}
+
+// Job Summary
+
+message JobSummary {
+    double total_time = 1;
+    double generation_time = 2;
+    double tracing_time = 3;
+    uint32 num_lambdas = 4;
+    uint64 total_paths = 5;
+    uint64 finished_paths = 6;
+    uint64 finished_rays = 7;
+    uint64 num_enqueues = 8;
+    double ray_throughput = 9;
+    uint64 total_upload = 10;
+    uint64 total_download = 11;
+    uint64 total_samples = 12;
+    double estimated_cost = 13;
+}
+
+// Ray Bags
+
+message RayBagInfo {
+    bool tracked = 1;
+    uint64 worker_id = 2;
+    uint32 treelet_id = 3;
+    uint64 bag_id = 4;
+    uint64 ray_count = 5;
+    uint64 bag_size = 6;
+    bool sample_bag = 7;
+}
+
+message RayBags {
+    uint64 rays_generated = 1;
+    uint64 rays_terminated = 2;
+
+    repeated RayBagInfo items = 3;
+}
+
+message WorkerStats {
+    uint64 finished_paths = 1;
+    double cpu_usage = 2;
+}
+
+// Benchmarking
+
+message BenchmarkRequest {
+    uint64 worker_id = 1;
+    string storage_uri = 2;
+    uint64 bag_size = 3;
+    uint32 threads = 4;
+    uint32 duration = 5;
+    uint32 send = 6;
+    uint32 recv = 7;
+    repeated string memcached_servers = 8;
+}
+
+message BenchmarkResponse {
+    string output = 1;
+    string error = 2;
+    string command = 3;
+    int32 retcode = 4;
+}
+
+message HistogramUInt64 {
+    uint64 width = 1;
+    uint64 lower_bound = 2;
+    uint64 upper_bound = 3;
+
+    repeated uint64 bins = 4;
+
+    uint64 count = 5;
+    uint64 min = 6;
+    uint64 max = 7;
+    uint64 sum = 8;
+    uint64 squares_sum = 9;
+}
+
+message JobStatus {
+    string url_prefix = 1;
+    uint64 next_sample_index = 2;
+    repeated string sample_bags = 3;
+}
+
+message CategoryInfo {
+    string title = 1;
+    uint64 total_us = 2;
+    double percentage = 3;
+    uint64 max_us = 4;
+    uint64 count = 5;
+}
+
+message TimeLog {
+    uint64 total = 1;
+    repeated CategoryInfo categories = 2;
+    CategoryInfo unaccounted = 3;
+}

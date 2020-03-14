@@ -7,12 +7,13 @@
 #include "net/lambda.h"
 #include "net/socket.h"
 #include "net/util.h"
+#include "r2t2.pb.h"
 #include "storage/backend.h"
 #include "util/status_bar.h"
 
 using namespace std;
 using namespace chrono;
-using namespace pbrt;
+using namespace r2t2;
 using namespace PollerShortNames;
 
 void usage(const char *argv0) {

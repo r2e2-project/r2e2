@@ -1,15 +1,15 @@
-#include "cloud/lambda-master.h"
+#include "lambda-master.h"
 #include "messages/utils.h"
 #include "util/random.h"
 
 using namespace std;
-using namespace pbrt;
+using namespace r2t2;
 using namespace meow;
 using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 
-bool LambdaMaster::assignWork(Worker& worker) {
+bool LambdaMaster::assignWork(Worker &worker) {
     /* return, if worker is not active anymore */
     if (worker.state != Worker::State::Active) return false;
 
@@ -23,8 +23,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
     auto &bagQueue = queuedRayBags[treeletId];
 
     /* Q1: do we have any rays to generate? */
-    bool raysToGenerate =
-        tiles.cameraRaysRemaining() && (treeletId == 0);
+    bool raysToGenerate = tiles.cameraRaysRemaining() && (treeletId == 0);
 
     /* Q2: do we have any work for this worker? */
     bool workToDo = (bagQueue.size() > 0);
@@ -66,8 +65,7 @@ bool LambdaMaster::assignWork(Worker& worker) {
 ResultType LambdaMaster::handleQueuedRayBags() {
     ScopeTimer<TimeLog::Category::QueuedRayBags> _timer;
 
-    //shuffle(freeWorkers.begin(), freeWorkers.end(), randEngine);
-
+    // shuffle(freeWorkers.begin(), freeWorkers.end(), randEngine);
 
     for (Worker &worker : workers) {
         assignWork(worker);

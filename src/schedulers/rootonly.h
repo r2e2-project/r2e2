@@ -1,9 +1,9 @@
 #ifndef PBRT_CLOUD_SCHEDULERS_ROOTONLY_H
 #define PBRT_CLOUD_SCHEDULERS_ROOTONLY_H
 
-#include "cloud/scheduler.h"
+#include "scheduler.h"
 
-namespace pbrt {
+namespace r2t2 {
 
 class RootOnlyScheduler : public Scheduler {
   private:
@@ -22,6 +22,6 @@ class RootOnlyScheduler : public Scheduler {
     }
 };
 
-}  // namespace pbrt
+}  // namespace r2t2
 
 #endif /* PBRT_CLOUD_SCHEDULERS_ROOTONLY_H */

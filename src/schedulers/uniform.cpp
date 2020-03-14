@@ -1,9 +1,9 @@
-#include "cloud/schedulers/uniform.h"
+#include "uniform.h"
 
 #include "util/exception.h"
 
 using namespace std;
-using namespace pbrt;
+using namespace r2t2;
 
 Optional<Schedule> UniformScheduler::schedule(
     const size_t maxWorkers, const vector<TreeletStats> &treelets) {

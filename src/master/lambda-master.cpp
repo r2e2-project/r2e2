@@ -2,6 +2,7 @@
 
 #include <getopt.h>
 #include <glog/logging.h>
+#include <pbrt/core/sampler.h>
 
 #include <algorithm>
 #include <chrono>
@@ -19,18 +20,6 @@
 #include <thread>
 #include <vector>
 
-#include "cloud/estimators.h"
-#include "cloud/manager.h"
-#include "cloud/r2t2.h"
-#include "cloud/raystate.h"
-#include "cloud/schedulers/dynamic.h"
-#include "cloud/schedulers/null.h"
-#include "cloud/schedulers/rootonly.h"
-#include "cloud/schedulers/static.h"
-#include "cloud/schedulers/uniform.h"
-#include "core/camera.h"
-#include "core/geometry.h"
-#include "core/transform.h"
 #include "execution/loop.h"
 #include "execution/meow/message.h"
 #include "messages/utils.h"
@@ -39,6 +28,11 @@
 #include "net/socket.h"
 #include "net/transfer_mcd.h"
 #include "net/util.h"
+#include "schedulers/dynamic.h"
+#include "schedulers/null.h"
+#include "schedulers/rootonly.h"
+#include "schedulers/static.h"
+#include "schedulers/uniform.h"
 #include "util/exception.h"
 #include "util/path.h"
 #include "util/random.h"
@@ -49,9 +43,11 @@
 #include "util/util.h"
 
 using namespace std;
-using namespace std::chrono;
+using namespace chrono;
 using namespace meow;
+using namespace r2t2;
 using namespace pbrt;
+
 using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
@@ -112,25 +108,27 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
     /* download required scene objects from the bucket */
     auto getSceneObjectRequest = [&scenePath](const ObjectType type) {
         return storage::GetRequest{
-            SceneManager::getFileName(type, 0),
-            roost::path(scenePath) / SceneManager::getFileName(type, 0)};
+            scene::GetObjectName(type, 0),
+            roost::path(scenePath) / scene::GetObjectName(type, 0)};
     };
 
     vector<storage::GetRequest> sceneObjReqs{
         getSceneObjectRequest(ObjectType::Manifest),
         getSceneObjectRequest(ObjectType::Camera),
         getSceneObjectRequest(ObjectType::Sampler),
+        getSceneObjectRequest(ObjectType::Lights),
+        getSceneObjectRequest(ObjectType::Scene),
     };
 
     cerr << "Downloading scene data... ";
     storageBackend->get(sceneObjReqs);
     cerr << "done." << endl;
 
-    /* now we can initialize the SceneManager */
-    global::manager.init(scenePath);
+    /* now we can initialize the scene */
+    scene = {scenePath, config.samplesPerPixel, config.cropWindow};
 
     /* initializing the treelets array */
-    const size_t treeletCount = global::manager.treeletCount();
+    const size_t treeletCount = scene.base.GetTreeletCount();
     treelets.reserve(treeletCount);
     treeletStats.reserve(treeletCount);
 
@@ -143,11 +141,8 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
     queuedRayBags.resize(treeletCount);
     pendingRayBags.resize(treeletCount);
 
-    /* and initialize the necessary scene objects */
-    scene.initialize(config.samplesPerPixel, config.cropWindow);
-
     tiles = Tiles{config.tileSize, scene.sampleBounds,
-                  scene.sampler->samplesPerPixel,
+                  scene.base.sampler->samplesPerPixel,
                   rayGenerators ? rayGenerators : maxWorkers};
 
     /* are we logging anything? */
@@ -750,9 +745,8 @@ int main(int argc, char *argv[]) {
         TempFile staticFile{"/tmp/pbrt-lambda-master.STATIC0"};
 
         cerr << "Downloading static assignment file... ";
-        storage->get(
-            {{SceneManager::getFileName(ObjectType::StaticAssignment, 0),
-              staticFile.name()}});
+        storage->get({{scene::GetObjectName(ObjectType::StaticAssignment, 0),
+                       staticFile.name()}});
         cerr << "done." << endl;
 
         scheduler = make_unique<StaticScheduler>(staticFile.name());

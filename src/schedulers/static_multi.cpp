@@ -1,4 +1,4 @@
-#include "cloud/schedulers/static_multi.h"
+#include "static_multi.h"
 
 #include <fstream>
 #include <string>
@@ -6,7 +6,7 @@
 #include "util/exception.h"
 
 using namespace std;
-using namespace pbrt;
+using namespace r2t2;
 
 StaticMultiScheduler::StaticMultiScheduler(const string &path) {
     ifstream fin{path};

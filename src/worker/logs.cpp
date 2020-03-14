@@ -1,15 +1,16 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 
-#include "cloud/lambda-worker.h"
+#include "lambda-worker.h"
 #include "messages/utils.h"
 #include "util/exception.h"
 
 using namespace std;
-using namespace meow;
-using namespace std::chrono;
+using namespace chrono;
+using namespace r2t2;
 using namespace pbrt;
-using namespace pbrt::global;
+using namespace meow;
+
 using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;

@@ -1,9 +1,9 @@
 #ifndef PBRT_CLOUD_SCHEDULERS_UNIFORM_H
 #define PBRT_CLOUD_SCHEDULERS_UNIFORM_H
 
-#include "cloud/scheduler.h"
+#include "scheduler.h"
 
-namespace pbrt {
+namespace r2t2 {
 
 class UniformScheduler : public Scheduler {
   private:
@@ -15,5 +15,5 @@ class UniformScheduler : public Scheduler {
         const std::vector<TreeletStats> &treelets) override;
 };
 
-}  // namespace pbrt
+}  // namespace r2t2
 #endif /* PBRT_CLOUD_SCHEDULERS_UNIFORM_H */

@@ -4,7 +4,7 @@
 #include <iterator>
 #include <random>
 
-namespace pbrt {
+namespace r2t2 {
 namespace random {
 
 template <typename Iter, typename RandomGenerator>
@@ -22,6 +22,6 @@ Iter sample(Iter start, Iter end) {
 }
 
 }  // namespace random
-}  // namespace pbrt
+}  // namespace r2t2
 
 #endif /* PBRT_UTIL_RANDOM_H */

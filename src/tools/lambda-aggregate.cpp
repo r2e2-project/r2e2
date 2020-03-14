@@ -1,3 +1,6 @@
+#include <pbrt/main.h>
+#include <pbrt/raystate.h>
+
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -5,25 +8,13 @@
 #include <string>
 #include <vector>
 
-#include "cloud/manager.h"
-#include "core/camera.h"
-#include "core/geometry.h"
-#include "core/transform.h"
 #include "messages/utils.h"
 #include "util/exception.h"
 
 using namespace std;
-using namespace pbrt;
+using namespace r2t2;
 
 void usage(const char *argv0) { cerr << argv0 << " SCENE-DATA" << endl; }
-
-shared_ptr<Camera> loadCamera(const string &scenePath,
-                              vector<unique_ptr<Transform>> &transformCache) {
-    auto reader = global::manager.GetReader(ObjectType::Camera);
-    protobuf::Camera proto_camera;
-    reader->read(&proto_camera);
-    return camera::from_protobuf(proto_camera, transformCache);
-}
 
 int main(int argc, char const *argv[]) {
     try {
@@ -36,18 +27,7 @@ int main(int argc, char const *argv[]) {
             return EXIT_FAILURE;
         }
 
-        const string scenePath{argv[1]};
-
-        global::manager.init(scenePath);
-
-        vector<unique_ptr<Transform>> transformCache;
-        shared_ptr<Camera> camera = loadCamera(scenePath, transformCache);
-        const Bounds2i sampleBounds = camera->film->GetSampleBounds();
-        unique_ptr<FilmTile> filmTile = camera->film->GetFilmTile(sampleBounds);
-
-        Sample sample;
-
-        unordered_set<uint64_t> sampleIds;
+        pbrt::scene::Base sceneBase{argv[1], 0};
 
         for (string line; getline(cin, line);) {
             cerr << "Processing " << line << "... ";
@@ -57,23 +37,24 @@ int main(int argc, char const *argv[]) {
             const string dataStr = buffer.str();
             const char *data = dataStr.data();
 
+            vector<pbrt::Sample> samples;
+
             for (size_t offset = 0; offset < dataStr.size();) {
                 const auto len =
                     *reinterpret_cast<const uint32_t *>(data + offset);
                 offset += 4;
 
-                sample.Deserialize(data + offset, len);
-                auto p = sampleIds.insert(sample.sampleId);
-                filmTile->AddSample(sample.pFilm, sample.L, sample.weight, p.second);
+                samples.emplace_back();
+                samples.back().Deserialize(data + offset, len);
                 offset += len;
             }
 
+            pbrt::graphics::AccumulateImage(sceneBase.camera, samples);
             cerr << "done." << endl;
         }
 
         /* Create the final output */
-        camera->film->MergeFilmTile(move(filmTile));
-        camera->film->WriteImage();
+        pbrt::graphics::WriteImage(sceneBase.camera);
     } catch (const exception &e) {
         print_exception(argv[0], e);
         return EXIT_FAILURE;
