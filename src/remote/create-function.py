@@ -9,9 +9,9 @@ import hashlib
 import base64
 import boto3
 
-def create_function_package(output, pbrt_lambda_worker):
+def create_function_package(output, r2t2_lambda_worker):
     PACKAGE_FILES = {
-        "pbrt-lambda-worker": pbrt_lambda_worker,
+        "r2t2-lambda-worker": r2t2_lambda_worker,
         "main.py": "lambda-function/main.py",
     }
 
@@ -50,24 +50,24 @@ def main():
     parser = argparse.ArgumentParser(description="Generate and install Lambda functions.")
     parser.add_argument('--delete', dest='delete', action='store_true', default=False)
     parser.add_argument('--role', dest='role', action='store',
-                        default=os.environ.get('PBRT_LAMBDA_ROLE'))
+                        default=os.environ.get('R2T2_LAMBDA_ROLE'))
     parser.add_argument('--region', dest='region', default=os.environ.get('AWS_REGION'), action='store')
-    parser.add_argument('--name', dest='name', default=os.environ.get('PBRT_LAMBDA_FUNCTION', "pbrt-lambda-function"), action='store')
-    parser.add_argument('--pbrt-lambda-worker', dest='pbrt_lambda_worker',
-                        default=shutil.which("pbrt-lambda-worker"))
+    parser.add_argument('--name', dest='name', default=os.environ.get('R2T2_LAMBDA_FUNCTION', "r2t2-lambda-function"), action='store')
+    parser.add_argument('--r2t2-lambda-worker', dest='r2t2_lambda_worker',
+                        default=shutil.which("r2t2-lambda-worker"))
 
     args = parser.parse_args()
 
-    if not args.pbrt_lambda_worker:
-        raise Exception("Cannot find pbrt-lambda-worker")
+    if not args.r2t2_lambda_worker:
+        raise Exception("Cannot find r2t2-lambda-worker")
 
     if not args.role:
-        raise Exception("Please provide function role (or set PBRT_LAMBDA_ROLE).")
+        raise Exception("Please provide function role (or set R2T2_LAMBDA_ROLE).")
 
     function_name = args.name
     function_file = "{}.zip".format(function_name)
     try:
-        create_function_package(function_file, args.pbrt_lambda_worker)
+        create_function_package(function_file, args.r2t2_lambda_worker)
         print("Installing lambda function {}... ".format(function_name), end='')
         install_lambda_package(function_file, function_name, args.role, args.region,
                                delete=args.delete)
