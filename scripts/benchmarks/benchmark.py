@@ -37,22 +37,22 @@ args = parser.parse_args()
 resource.setrlimit(resource.RLIMIT_NOFILE,
         (65536, 65536))
 
-pbrt_path = os.path.abspath(os.path.join(os.path.dirname(
+r2t2_path = os.path.abspath(os.path.join(os.path.dirname(
     os.path.realpath(__file__)),
     os.path.join(os.path.pardir, os.path.pardir)))
 
-pbrt_scripts_path = os.path.join(pbrt_path, 'scripts')
+r2t2_scripts_path = os.path.join(r2t2_path, 'scripts')
 
 build_path = os.path.abspath(args.build_path)
 
-master_path = os.path.join(build_path, 'pbrt-lambda-master')
-worker_path = os.path.join(build_path, 'pbrt-lambda-worker')
+master_path = os.path.join(build_path, 'r2t2-lambda-master')
+worker_path = os.path.join(build_path, 'r2t2-lambda-worker')
 
 if args.install_function:
     subprocess.run("""
-        ./create-function.py --pbrt-lambda-worker {worker_path} --delete
+        ./create-function.py --r2t2-lambda-worker {worker_path} --delete
         """.format(worker_path=worker_path),
-        cwd=os.path.join(pbrt_path, 'src/remote'), check=True, shell=True)
+        cwd=os.path.join(r2t2_path, 'src/remote'), check=True, shell=True)
 
 if args.ip is None:
     ip = subprocess.check_output("curl -s http://checkip.amazonaws.com",
@@ -81,7 +81,7 @@ samples = args.samples if args.samples else [1]
 out_dir = os.path.join(args.out_dir, args.run_name + datetime.now().strftime('-%H-%M-%S-%m-%d-%Y'))
 os.makedirs(out_dir)
 
-infra_dir = os.path.join(pbrt_path, 'infrastructure')
+infra_dir = os.path.join(r2t2_path, 'infrastructure')
 memcached_args = subprocess.check_output(os.path.join(infra_dir, 'get-cmdline-args'), cwd=infra_dir).decode('utf-8').strip()
 
 cmds = []
@@ -174,7 +174,7 @@ for cmd, dir, scene, nlambdas, spp in cmds:
     os.chdir(dir)
 
     if args.generate_static:
-        subprocess.run(os.path.join(pbrt_scripts_path,
+        subprocess.run(os.path.join(r2t2_scripts_path,
             "generate_static_assignment.sh") + " treelets.csv > STATIC0",
             shell=True, check=True)
         subprocess.run("aws s3 cp STATIC0 s3://{s3_path}/{scene}/".format(
@@ -182,7 +182,7 @@ for cmd, dir, scene, nlambdas, spp in cmds:
     else:
         graph_title = "{scene}: {nworkers} - {spp}spp".format(scene=scene, nworkers=nlambdas, spp=spp)
         os.mkdir('graphs')
-        subprocess.run(os.path.join(os.path.join(pbrt_scripts_path, 'benchmarks'),
+        subprocess.run(os.path.join(os.path.join(r2t2_scripts_path, 'benchmarks'),
             "detail-graphs.py") + " -x {num_generators} -i . -o graphs -t \"{title}\"".format(
                 title=graph_title,
                 num_generators=args.ray_generators),
