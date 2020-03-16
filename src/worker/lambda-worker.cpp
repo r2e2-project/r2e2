@@ -24,7 +24,7 @@ LambdaWorker::LambdaWorker(const string& coordinatorIP,
                            const WorkerConfiguration& config)
     : config(config),
       coordinatorAddr(coordinatorIP, coordinatorPort),
-      workingDirectory("/tmp/pbrt-worker"),
+      workingDirectory("/tmp/r2t2-worker"),
       storageBackend(StorageBackend::create_backend(storageUri)) {
     // let the program handle SIGPIPE
     signal(SIGPIPE, SIG_IGN);

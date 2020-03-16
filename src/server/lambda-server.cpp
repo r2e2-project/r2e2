@@ -64,7 +64,7 @@ int main(int argc, char const *argv[]) {
                                     Address::decompose(payload.coordinator());
 
                                 vector<string> command{
-                                    "pbrt-lambda-worker",
+                                    "r2t2-lambda-worker",
                                     "--ip",
                                     masterAddr.first,
                                     "--port",

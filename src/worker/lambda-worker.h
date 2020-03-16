@@ -232,7 +232,7 @@ class LambdaWorker {
 
     void logBag(const BagAction action, const RayBagInfo& info);
 
-    const std::string logBase{"pbrt-worker"};
+    const std::string logBase{"r2t2-worker"};
     const std::string infoLogName{logBase + ".INFO"};
     std::string logPrefix{"logs/"};
     const bool trackRays{config.rayLogRate > 0};

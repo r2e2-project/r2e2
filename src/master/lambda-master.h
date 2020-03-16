@@ -84,7 +84,7 @@ class LambdaMaster {
     ////////////////////////////////////////////////////////////////////////////
 
     const MasterConfiguration config;
-    const TempDirectory sceneDir{"/tmp/pbrt-lambda-master"};
+    const TempDirectory sceneDir{"/tmp/r2t2-lambda-master"};
     const std::string jobId;
 
     ////////////////////////////////////////////////////////////////////////////
@@ -108,7 +108,7 @@ class LambdaMaster {
     const std::string awsRegion;
     const AWSCredentials awsCredentials{};
     const std::string lambdaFunctionName{
-        safe_getenv_or("PBRT_LAMBDA_FUNCTION", "pbrt-lambda-function")};
+        safe_getenv_or("R2T2_LAMBDA_FUNCTION", "r2t2-lambda-function")};
 
     ////////////////////////////////////////////////////////////////////////////
     // Workers                                                                //

@@ -19,7 +19,7 @@ def handler(event, context):
     # remove everything in the temp dir
     print('rm -rf /tmp/*: {}'.format(os.system("rm -rf /tmp/*")))
 
-    command = ["pbrt-lambda-worker",
+    command = ["r2t2-lambda-worker",
                "--ip", coordinator_host,
                "--port", coordinator_port,
                "--storage-backend", storage_backend]

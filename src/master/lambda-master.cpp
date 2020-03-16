@@ -742,7 +742,7 @@ int main(int argc, char *argv[]) {
         scheduler = make_unique<UniformScheduler>();
     } else if (schedulerName == "static") {
         auto storage = StorageBackend::create_backend(storageBackendUri);
-        TempFile staticFile{"/tmp/pbrt-lambda-master.STATIC0"};
+        TempFile staticFile{"/tmp/r2t2-lambda-master.STATIC0"};
 
         cerr << "Downloading static assignment file... ";
         storage->get({{scene::GetObjectName(ObjectType::StaticAssignment, 0),

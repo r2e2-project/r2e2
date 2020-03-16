@@ -50,7 +50,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate and install Lambda functions.")
     parser.add_argument('--delete', dest='delete', action='store_true', default=False)
     parser.add_argument('--role', dest='role', action='store',
-                        default=os.environ.get('PBRT_LAMBDA_ROLE'))
+                        default=os.environ.get('R2T2_LAMBDA_ROLE'))
     parser.add_argument('--region', dest='region', default=os.environ.get('AWS_REGION'), action='store')
     parser.add_argument('--name', dest='name', default="r2t2-s3-benchmark",
                         action='store')
@@ -63,7 +63,7 @@ def main():
         raise Exception("Cannot find benchmark-worker")
 
     if not args.role:
-        raise Exception("Please provide function role (or set PBRT_LAMBDA_ROLE).")
+        raise Exception("Please provide function role (or set R2T2_LAMBDA_ROLE).")
 
     function_name = args.name
     function_file = "{}.zip".format(function_name)
