@@ -1,5 +1,3 @@
-#include <pbrt/core/sampler.h>
-
 #include "lambda-worker.h"
 #include "messages/utils.h"
 #include "net/util.h"
