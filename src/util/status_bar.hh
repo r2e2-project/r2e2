@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_STATUS_BAR_H
-#define PBRT_UTIL_STATUS_BAR_H
+#pragma once
 
 #include <cstdio>
 #include <sys/ioctl.h>
@@ -29,4 +28,3 @@ public:
   static void set_text( const std::string & text );
 };
 
-#endif /* PBRT_UTIL_STATUS_BAR_H */

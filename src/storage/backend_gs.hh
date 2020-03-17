@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef STORAGE_BACKEND_GS_HH
-#define STORAGE_BACKEND_GS_HH
+#pragma once
 
 #include "storage/backend.hh"
 #include "net/aws.hh"
@@ -30,5 +29,3 @@ public:
   const std::string & prefix() const { return prefix_; }
 
 };
-
-#endif /* STORAGE_BACKEND_GS_HH */

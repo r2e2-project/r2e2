@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_NET_LAMBDA_H
-#define PBRT_NET_LAMBDA_H
+#pragma once
 
 #include <string>
 
@@ -23,5 +22,3 @@ public:
                            const LogType & log_type = LogType::NONE,
                            const std::string & context = "e30=" /* base64( "{}" ) */ );
 };
-
-#endif /* PBRT_NET_LAMBDA_H */

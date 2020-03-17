@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_ITERATOR_HH
-#define PBRT_UTIL_ITERATOR_HH
+#pragma once
 
 #include <vector>
 #include <iterator>
@@ -113,6 +112,3 @@ JoinContainer<typename Container::const_iterator> join_containers( const Contain
   JoinContainer<typename Container::const_iterator> x( c1.cbegin(), c1.cend(), c2.cbegin(), c2.cend() );
   return x;
 }
-
-
-#endif /* PBRT_UTIL_ITERATOR_HH */

@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_PATH_HH
-#define PBRT_UTIL_PATH_HH
+#pragma once
 
 #include <string>
 #include <vector>
@@ -76,5 +75,3 @@ namespace roost {
   void atomic_create( const std::string & contents, const path & dst,
                       const bool set_mode = false, const mode_t target_mode = 0 );
 }
-
-#endif /* PBRT_UTIL_PATH_HH */

@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-#ifndef ADDRESS_HH
-#define ADDRESS_HH
+#pragma once
 
 #include <string>
 #include <utility>
@@ -52,5 +51,3 @@ public:
 
     static std::pair<std::string, uint16_t> decompose( const std::string & ip_port );
 };
-
-#endif /* ADDRESS_HH */

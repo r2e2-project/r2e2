@@ -1,5 +1,4 @@
-#ifndef PBRT_NET_MEMCACHED_H
-#define PBRT_NET_MEMCACHED_H
+#pragma once
 
 #include <cstring>
 
@@ -255,5 +254,3 @@ class TransferAgent : public ::TransferAgent {
 };
 
 }  // namespace memcached
-
-#endif /* PBRT_NET_MEMCACHED_H */

@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-#ifndef PBRT_NET_HTTP_RESPONSE_PARSER_H
-#define PBRT_NET_HTTP_RESPONSE_PARSER_H
+#pragma once
 
 #include "http_message_sequence.hh"
 #include "http_response.hh"
@@ -19,5 +18,3 @@ public:
     void new_request_arrived( const HTTPRequest & request );
     unsigned int pending_requests() const { return requests_.size(); }
 };
-
-#endif /* PBRT_NET_HTTP_RESPONSE_PARSER_H */

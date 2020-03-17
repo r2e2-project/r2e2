@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-#ifndef PBRT_NET_HTTP_MESSAGE_SEQUENCE_H
-#define PBRT_NET_HTTP_MESSAGE_SEQUENCE_H
+#pragma once
 
 #include <string>
 #include <queue>
@@ -151,5 +150,3 @@ void HTTPMessageSequence<MessageType>::parse( const std::string & buf )
     /* parse as much as we can */
     while ( parsing_step() ) {}
 }
-
-#endif /* PBRT_NET_HTTP_MESSAGE_SEQUENCE_H */

@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_TOKENIZE_HH
-#define PBRT_UTIL_TOKENIZE_HH
+#pragma once
 
 #include <string>
 #include <vector>
@@ -36,5 +35,3 @@ static std::vector< std::string > split( const std::string & str, const std::str
 
   return ret;
 }
-
-#endif /* PBRT_UTIL_TOKENIZE_HH */

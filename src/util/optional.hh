@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_OPTIONAL_H
-#define PBRT_UTIL_OPTIONAL_H
+#pragma once
 
 #include <cassert>
 #include <stdexcept>
@@ -162,5 +161,3 @@ template <class T>
 Optional<T> make_optional(bool initialized, const T& val) {
     return Optional<T>(initialized, val);
 }
-
-#endif /* PBRT_UTIL_OPTIONAL_H */

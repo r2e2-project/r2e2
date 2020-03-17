@@ -1,5 +1,4 @@
-#ifndef PBRT_MESSAGES_UTILS_H
-#define PBRT_MESSAGES_UTILS_H
+#pragma once
 
 #include <google/protobuf/util/json_util.h>
 #include <pbrt/common.h>
@@ -57,5 +56,3 @@ RayBagInfo from_protobuf(const protobuf::RayBagInfo& rayBagInfo);
 WorkerStats from_protobuf(const protobuf::WorkerStats& statsProto);
 
 }  // namespace r2t2
-
-#endif /* PBRT_MESSAGES_UTILS_H */

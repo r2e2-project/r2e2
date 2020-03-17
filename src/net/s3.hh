@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_NET_S3_H
-#define PBRT_NET_S3_H
+#pragma once
 
 #include <ctime>
 #include <string>
@@ -87,5 +86,3 @@ public:
   const AWSCredentials & credentials() const { return credentials_; }
   const S3ClientConfig & config() const { return config_; }
 };
-
-#endif /* PBRT_NET_S3_H */

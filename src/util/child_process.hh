@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-#ifndef PBRT_UTIL_CHILD_PROCESS_HH
-#define PBRT_UTIL_CHILD_PROCESS_HH
+#pragma once
 
 #include <functional>
 #include <unistd.h>
@@ -54,5 +53,3 @@ public:
     /* ... but not move assignment operator */
     ChildProcess & operator=( ChildProcess && other ) = delete;
 };
-
-#endif /* PBRT_UTIL_CHILD_PROCESS_HH */

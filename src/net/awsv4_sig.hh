@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_NET_AWSV4_SIG_H
-#define PBRT_NET_AWSV4_SIG_H
+#pragma once
 
 #include <map>
 #include <string>
@@ -27,5 +26,3 @@ class AWSv4Sig {
                              std::map<std::string, std::string> &headers,
                              const std::string & payload_hash = {});
 };
-
-#endif /* PBRT_NET_AWSV4_SIG_H */

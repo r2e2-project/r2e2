@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_EXCEPTION_H
-#define PBRT_UTIL_EXCEPTION_H
+#pragma once
 
 #include <system_error>
 #include <iostream>
@@ -68,5 +67,3 @@ inline int CheckSystemCall( const std::string & s_attempt, const int return_valu
 {
   return CheckSystemCall( s_attempt.c_str(), return_value );
 }
-
-#endif /* PBRT_UTIL_EXCEPTION_H */

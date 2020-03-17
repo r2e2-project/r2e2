@@ -1,5 +1,4 @@
-#ifndef PBRT_CLOUD_SCHEDULERS_DYNAMIC_H
-#define PBRT_CLOUD_SCHEDULERS_DYNAMIC_H
+#pragma once
 
 #include <chrono>
 #include <string>
@@ -23,4 +22,3 @@ class DynamicScheduler : public Scheduler {
 };
 
 }  // namespace r2t2
-#endif /* PBRT_CLOUD_SCHEDULERS_DYNAMIC_H */

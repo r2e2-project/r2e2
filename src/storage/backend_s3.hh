@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_STORAGE_BACKEND_S3_HH
-#define PBRT_STORAGE_BACKEND_S3_HH
+#pragma once
 
 #include "storage/backend.hh"
 #include "net/aws.hh"
@@ -31,5 +30,3 @@ public:
   const std::string & prefix() const { return prefix_; }
 
 };
-
-#endif /* PBRT_STORAGE_BACKEND_S3_HH */

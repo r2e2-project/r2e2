@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-#ifndef PBRT_NET_HTTP_MESSAGE_H
-#define PBRT_NET_HTTP_MESSAGE_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -81,5 +80,3 @@ public:
        in ASCII without sensitivity to locale */
     static bool equivalent_strings( const std::string & a, const std::string & b );
 };
-
-#endif /* PBRT_NET_HTTP_MESSAGE_H */

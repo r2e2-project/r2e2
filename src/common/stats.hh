@@ -1,5 +1,4 @@
-#ifndef PBRT_CLOUD_STATS_H
-#define PBRT_CLOUD_STATS_H
+#pragma once
 
 #include <cmath>
 #include <cstdint>
@@ -42,4 +41,3 @@ struct WorkerStats {
 
 }  // namespace r2t2
 
-#endif /* PBRT_CLOUD_STATS_H */

@@ -1,5 +1,4 @@
-#ifndef PBRT_CLOUD_LAMBDA_H
-#define PBRT_CLOUD_LAMBDA_H
+#pragma once
 
 #include <chrono>
 #include <cstdint>
@@ -78,4 +77,3 @@ struct RayBag {
         : info(info), data(std::move(data)) {}
 };
 
-#endif /* PBRT_CLOUD_LAMBDA_H */

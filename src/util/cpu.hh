@@ -1,5 +1,4 @@
-#ifndef PBRT_UTIL_CPU_H
-#define PBRT_UTIL_CPU_H
+#pragma once
 
 #include <cstdint>
 #include <chrono>
@@ -22,5 +21,3 @@ class CPUStats {
     uint64_t guest;
     uint64_t guest_nice;
 };
-
-#endif /* PBRT_UTIL_CPU_H */

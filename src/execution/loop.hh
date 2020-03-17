@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_EXECUTION_LOOP_H
-#define PBRT_EXECUTION_LOOP_H
+#pragma once
 
 #include <list>
 #include <vector>
@@ -118,5 +117,3 @@ public:
 
   Poller::Result loop_once( const int timeout_ms = -1 );
 };
-
-#endif /* PBRT_EXECUTION_LOOP_H */

@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_NET_NB_SECURE_SOCKET_H
-#define PBRT_NET_NB_SECURE_SOCKET_H
+#pragma once
 
 #include <deque>
 #include <string>
@@ -77,5 +76,3 @@ class NBSecureSocket : public SecureSocket {
                (state_ != State::needs_ssl_write_to_accept);
     }
 };
-
-#endif /* PBRT_NET_NB_SECURE_SOCKET_H */

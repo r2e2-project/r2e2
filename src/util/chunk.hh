@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_CHUNK_HH
-#define PBRT_UTIL_CHUNK_HH
+#pragma once
 
 #include <string>
 #include <vector>
@@ -127,5 +126,3 @@ public:
     return ( val >> bit_offset ) & bit_mask( bit_length );
   }
 };
-
-#endif /* PBRT_UTIL_CHUNK_HH */

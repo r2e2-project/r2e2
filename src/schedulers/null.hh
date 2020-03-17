@@ -1,5 +1,4 @@
-#ifndef PBRT_CLOUD_SCHEDULERS_NULL_H
-#define PBRT_CLOUD_SCHEDULERS_NULL_H
+#pragma once
 
 #include "scheduler.hh"
 
@@ -14,4 +13,3 @@ class NullScheduler : public Scheduler {
 };
 
 }  // namespace r2t2
-#endif /* PBRT_CLOUD_SCHEDULERS_NULL_H */

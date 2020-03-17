@@ -1,5 +1,4 @@
-#ifndef PBRT_UTIL_TIMERFD_H
-#define PBRT_UTIL_TIMERFD_H
+#pragma once
 
 #include <sys/timerfd.h>
 #include <unistd.h>
@@ -52,5 +51,3 @@ class TimerFD : public FileDescriptor {
 
     ~TimerFD() { disarm(); }
 };
-
-#endif /* PBRT_UTIL_TIMERFD_H */

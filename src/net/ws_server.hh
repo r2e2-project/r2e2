@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_NET_WS_SERVER_H
-#define PBRT_NET_WS_SERVER_H
+#pragma once
 
 #include <deque>
 #include <functional>
@@ -106,5 +105,3 @@ class WSServer {
 };
 
 using WebSocketTCPServer = WSServer<TCPSocket>;
-
-#endif /* PBRT_NET_WS_SERVER_H */

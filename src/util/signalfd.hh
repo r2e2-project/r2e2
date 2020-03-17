@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_SIGNALFD_HH
-#define PBRT_UTIL_SIGNALFD_HH
+#pragma once
 
 #include <sys/signalfd.h>
 #include <initializer_list>
@@ -35,5 +34,3 @@ public:
   FileDescriptor & fd( void ) { return fd_; }
   signalfd_siginfo read_signal( void ); /* read one signal */
 };
-
-#endif /* PBRT_UTIL_SIGNALFD_HH */

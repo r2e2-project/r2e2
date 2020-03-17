@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_URI_HH
-#define PBRT_UTIL_URI_HH
+#pragma once
 
 #include <string>
 #include <unordered_map>
@@ -21,4 +20,3 @@ struct ParsedURI
   ParsedURI( const std::string & uri );
 };
 
-#endif /* PBRT_UTIL_URI_HH */

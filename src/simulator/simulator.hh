@@ -1,5 +1,4 @@
-#ifndef SIMULATOR_H_INCLUDED
-#define SIMULATOR_H_INCLUDED
+#pragma once
 
 #include <cstdlib>
 #include <iostream>
@@ -188,5 +187,3 @@ private:
 };
 
 }
-
-#endif

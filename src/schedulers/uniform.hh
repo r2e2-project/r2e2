@@ -1,5 +1,4 @@
-#ifndef PBRT_CLOUD_SCHEDULERS_UNIFORM_H
-#define PBRT_CLOUD_SCHEDULERS_UNIFORM_H
+#pragma once
 
 #include "scheduler.hh"
 
@@ -16,4 +15,3 @@ class UniformScheduler : public Scheduler {
 };
 
 }  // namespace r2t2
-#endif /* PBRT_CLOUD_SCHEDULERS_UNIFORM_H */

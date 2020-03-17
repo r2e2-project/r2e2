@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-#ifndef PBRT_NET_MIME_TYPE_H
-#define PBRT_NET_MIME_TYPE_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -18,4 +17,3 @@ public:
   const std::string & type() const { return type_; }
 };
 
-#endif /* PBRT_NET_MIME_TYPE_H */

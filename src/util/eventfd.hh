@@ -1,5 +1,4 @@
-#ifndef PBRT_UTIL_EVENTFD_H
-#define PBRT_UTIL_EVENTFD_H
+#pragma once
 
 #include <sys/eventfd.h>
 #include <unistd.h>
@@ -37,5 +36,3 @@ class EventFD : public FileDescriptor {
         }
     }
 };
-
-#endif /* PBRT_UTIL_EVENTFD_H */

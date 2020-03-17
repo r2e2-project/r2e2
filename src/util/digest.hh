@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_DIGEST_HH
-#define PBRT_UTIL_DIGEST_HH
+#pragma once
 
 #include <string>
 
@@ -9,5 +8,3 @@ namespace digest
 {
   std::string sha256( const std::string & input );
 }
-
-#endif /* PBRT_UTIL_DIGEST_HH */

@@ -1,5 +1,4 @@
-#ifndef PBRT_NET_UTIL_H
-#define PBRT_NET_UTIL_H
+#pragma once
 
 #include <cstring>
 #include <string>
@@ -24,5 +23,3 @@ std::string put_field(char* message, T n, size_t) = delete;
 uint16_t get_uint16(const char * data);
 uint32_t get_uint32(const char * data);
 uint64_t get_uint64(const char * data);
-
-#endif /* PBRT_NET_UTIL_H */

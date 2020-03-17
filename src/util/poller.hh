@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef POLLER_HH
-#define POLLER_HH
+#pragma once
 
 #include <functional>
 #include <vector>
@@ -89,5 +88,3 @@ namespace PollerShortNames {
   typedef Poller::Action::Result::Type ResultType;
   typedef Poller::Action::PollDirection Direction;
 }
-
-#endif

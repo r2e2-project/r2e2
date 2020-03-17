@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_NET_WS_FRAME_H
-#define PBRT_NET_WS_FRAME_H
+#pragma once
 
 #include <string>
 
@@ -62,5 +61,3 @@ class WSFrame {
 
     static uint64_t expected_length(const Chunk& chunk);
 };
-
-#endif /* PBRT_NET_WS_FRAME_H */

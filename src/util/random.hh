@@ -1,11 +1,9 @@
-#ifndef PBRT_UTIL_RANDOM_H
-#define PBRT_UTIL_RANDOM_H
+#pragma once
 
 #include <iterator>
 #include <random>
 
-namespace r2t2 {
-namespace random {
+namespace r2t2::random {
 
 template <typename Iter, typename RandomGenerator>
 Iter sample(Iter start, Iter end, RandomGenerator& g) {
@@ -21,7 +19,5 @@ Iter sample(Iter start, Iter end) {
     return sample(start, end, gen);
 }
 
-}  // namespace random
-}  // namespace r2t2
+}  // namespace r2t2::random
 
-#endif /* PBRT_UTIL_RANDOM_H */

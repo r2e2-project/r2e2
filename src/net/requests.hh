@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_NET_STORAGE_REQUESTS_H
-#define PBRT_NET_STORAGE_REQUESTS_H
+#pragma once
 
 #include <string>
 
@@ -45,5 +44,3 @@ namespace storage {
   };
 
 }
-
-#endif /* PBRT_NET_STORAGE_REQUESTS_H */

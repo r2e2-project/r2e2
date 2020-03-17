@@ -1,5 +1,4 @@
-#ifndef PBRT_CLOUD_SCHEDULER_H
-#define PBRT_CLOUD_SCHEDULER_H
+#pragma once
 
 #include <map>
 #include <vector>
@@ -23,4 +22,3 @@ class Scheduler {
 
 }  // namespace r2t2
 
-#endif /* PBRT_CLOUD_SCHEDULER_H */

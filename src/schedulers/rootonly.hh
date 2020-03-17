@@ -1,5 +1,4 @@
-#ifndef PBRT_CLOUD_SCHEDULERS_ROOTONLY_H
-#define PBRT_CLOUD_SCHEDULERS_ROOTONLY_H
+#pragma once
 
 #include "scheduler.hh"
 
@@ -23,5 +22,3 @@ class RootOnlyScheduler : public Scheduler {
 };
 
 }  // namespace r2t2
-
-#endif /* PBRT_CLOUD_SCHEDULERS_ROOTONLY_H */

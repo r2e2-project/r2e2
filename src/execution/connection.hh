@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_EXECUTION_CONNECTION_H
-#define PBRT_EXECUTION_CONNECTION_H
+#pragma once
 
 #include <chrono>
 #include <deque>
@@ -96,5 +95,3 @@ class UDPConnection : public Pacer, public UDPSocket {
 
 using TCPConnection = Connection<TCPSocket>;
 using SSLConnection = Connection<NBSecureSocket>;
-
-#endif /* PBRT_EXECUTION_CONNECTION_H */

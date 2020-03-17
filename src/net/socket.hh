@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-#ifndef PBRT_NET_SOCKET_H
-#define PBRT_NET_SOCKET_H
+#pragma once
 
 #include <functional>
 #include <sys/uio.h>
@@ -107,5 +106,3 @@ public:
         setsockopt( SOL_SOCKET, SO_RCVTIMEO, tv );
     }
 };
-
-#endif /* PBRT_NET_SOCKET_H */

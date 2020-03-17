@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_EXECUTION_MEOW_MESSAGE_H
-#define PBRT_EXECUTION_MEOW_MESSAGE_H
+#pragma once
 
 #include <list>
 #include <string>
@@ -92,5 +91,3 @@ class MessageParser {
 };
 
 }  // namespace meow
-
-#endif /* PBRT_EXECUTION_MEOW_REQUEST_H */

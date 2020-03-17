@@ -3,6 +3,7 @@
 /* run: sudo apt-get install libssl-dev */
 
 #pragma once
+
 #include <memory>
 #include <openssl/ssl.h>
 #include <openssl/err.h>

@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_SYSTEM_RUNNER_HH
-#define PBRT_UTIL_SYSTEM_RUNNER_HH
+#pragma once
 
 #include <vector>
 #include <string>
@@ -24,5 +23,3 @@ std::string command_str( const std::vector<std::string> & command,
                          const std::vector<std::string> & environment );
 
 std::string command_str( const int argc, char * argv[] );
-
-#endif /* PBRT_UTIL_SYSTEM_RUNNER_HH */

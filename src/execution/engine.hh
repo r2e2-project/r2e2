@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_EXECUTION_ENGINE_H
-#define PBRT_EXECUTION_ENGINE_H
+#pragma once
 
 #include <string>
 #include <stdexcept>
@@ -48,5 +47,3 @@ public:
 
   virtual ~ExecutionEngine() {}
 };
-
-#endif /* PBRT_EXECUTION_ENGINE_H */

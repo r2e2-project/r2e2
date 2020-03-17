@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_TEMP_DIR_HH
-#define PBRT_UTIL_TEMP_DIR_HH
+#pragma once
 
 #include <vector>
 #include <string>
@@ -42,5 +41,3 @@ public:
 
   ~TempDirectory();
 };
-
-#endif /* PBRT_UTIL_TEMP_DIR_HH */

@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-#ifndef PBRT_NET_HTTP_REQUEST_H
-#define PBRT_NET_HTTP_REQUEST_H
+#pragma once
 
 #include "http_message.hh"
 
@@ -22,5 +21,3 @@ public:
 
     using HTTPMessage::HTTPMessage;
 };
-
-#endif /* PBRT_NET_HTTP_REQUEST_H */

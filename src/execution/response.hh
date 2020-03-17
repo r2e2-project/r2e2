@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_EXECUTION_EXECUTION_RESPONSE_H
-#define PBRT_EXECUTION_EXECUTION_RESPONSE_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -23,5 +22,3 @@ private:
 public:
   static ExecutionResponse parse_message( const std::string & message );
 };
-
-#endif /* PBRT_EXECUTION_EXECUTION_RESPONSE_H */

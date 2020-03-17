@@ -1,5 +1,4 @@
-#ifndef PBRT_UTIL_HISTOGRAM_H
-#define PBRT_UTIL_HISTOGRAM_H
+#pragma once
 
 #include <limits>
 #include <string>
@@ -40,5 +39,3 @@ class Histogram {
     std::string str() const;
     r2t2::protobuf::HistogramUInt64 to_protobuf() const;
 };
-
-#endif /* PBRT_UTIL_HISTOGRAM_H */

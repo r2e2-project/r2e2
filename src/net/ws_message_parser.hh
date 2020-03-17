@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_NET_WS_MESSAGE_PARSER_H
-#define PBRT_NET_WS_MESSAGE_PARSER_H
+#pragma once
 
 #include <list>
 #include <queue>
@@ -26,5 +25,3 @@ class WSMessageParser {
 
     void pop() { complete_messages_.pop(); }
 };
-
-#endif /* PBRT_NET_WS_MESSAGE_PARSER_H */

@@ -1,5 +1,4 @@
-#ifndef PBRT_CNET_TRANSFER_H
-#define PBRT_CNET_TRANSFER_H
+#pragma once
 
 #include <atomic>
 #include <condition_variable>
@@ -84,5 +83,3 @@ size_t TransferAgent::tryPopBulk(std::back_insert_iterator<Container> insertIt,
 
     return count;
 }
-
-#endif /* PBRT_NET_TRANSFER_H */

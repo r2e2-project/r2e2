@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_NET_AWS_H
-#define PBRT_NET_AWS_H
+#pragma once
 
 #include <ctime>
 #include <string>
@@ -54,5 +53,3 @@ protected:
 public:
   HTTPRequest to_http_request() const;
 };
-
-#endif /* PBRT_NET_AWS_H */

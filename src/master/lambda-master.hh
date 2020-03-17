@@ -1,5 +1,4 @@
-#ifndef PBRT_CLOUD_LAMBDA_MASTER_H
-#define PBRT_CLOUD_LAMBDA_MASTER_H
+#pragma once
 
 #include <pbrt/core/geometry.h>
 #include <pbrt/main.h>
@@ -344,4 +343,3 @@ class LambdaMaster {
 
 }  // namespace r2t2
 
-#endif /* PBRT_CLOUD_LAMBDA_MASTER_H */

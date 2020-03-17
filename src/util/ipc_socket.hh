@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_IPC_SOCKET_HH
-#define PBRT_UTIL_IPC_SOCKET_HH
+#pragma once
 
 #include <string>
 
@@ -19,5 +18,3 @@ public:
   void listen( const int backlog = 200 );
   FileDescriptor accept( void );
 };
-
-#endif /* PBRT_UTIL_IPC_SOCKET_HH */

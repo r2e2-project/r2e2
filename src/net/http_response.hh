@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-#ifndef PBRT_NET_HTTP_RESPONSE_H
-#define PBRT_NET_HTTP_RESPONSE_H
+#pragma once
 
 #include <memory>
 
@@ -29,5 +28,3 @@ public:
 
     using HTTPMessage::HTTPMessage;
 };
-
-#endif /* PBRT_NET_HTTP_RESPONSE_H */

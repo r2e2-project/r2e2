@@ -1,5 +1,4 @@
-#ifndef PBRT_CLOUD_LAMBDA_WORKER_H
-#define PBRT_CLOUD_LAMBDA_WORKER_H
+#pragma once
 
 #include <pbrt/accelerators/cloudbvh.h>
 #include <pbrt/core/geometry.h>
@@ -272,5 +271,3 @@ class LambdaWorker {
 };
 
 }  // namespace r2t2
-
-#endif /* PBRT_CLOUD_LAMBDA_WORKER_H */

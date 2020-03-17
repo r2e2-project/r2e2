@@ -1,5 +1,4 @@
-#ifndef PBRT_NET_TRANSFER_S3_H
-#define PBRT_NET_TRANSFER_S3_H
+#pragma once
 
 #include <atomic>
 
@@ -42,5 +41,3 @@ class S3TransferAgent : public TransferAgent {
 
     ~S3TransferAgent();
 };
-
-#endif /* PBRT_NET_TRANSFER_S3_H */

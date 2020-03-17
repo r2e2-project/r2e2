@@ -1,5 +1,4 @@
-#ifndef PBRT_MESSAGES_SERIALIZATION_H
-#define PBRT_MESSAGES_SERIALIZATION_H
+#pragma once
 
 #include <string>
 #include <iostream>
@@ -111,6 +110,3 @@ bool RecordReader::read(ProtobufType * record) {
 
 }
 }
-
-
-#endif /* PBRT_MESSAGES_SERIALIZATION_H */

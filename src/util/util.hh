@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_UTIL_UTIL_HH
-#define PBRT_UTIL_UTIL_HH
+#pragma once
 
 #include <sys/time.h>
 
@@ -39,5 +38,3 @@ inline void to_timeval(const Duration &d, timeval &tv) {
     tv.tv_usec =
         std::chrono::duration_cast<std::chrono::microseconds>(d - sec).count();
 }
-
-#endif /* PBRT_UTIL_UTIL_HH */

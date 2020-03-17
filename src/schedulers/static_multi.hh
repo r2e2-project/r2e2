@@ -1,5 +1,4 @@
-#ifndef PBRT_CLOUD_SCHEDULERS_STATIC_MULTI_H
-#define PBRT_CLOUD_SCHEDULERS_STATIC_MULTI_H
+#pragma once
 
 #include "allocator.hh"
 #include "scheduler.hh"
@@ -18,4 +17,3 @@ class StaticMultiScheduler : public Scheduler {
 };
 
 }  // namespace r2t2
-#endif /* PBRT_CLOUD_SCHEDULERS_STATIC_MULTI_H */

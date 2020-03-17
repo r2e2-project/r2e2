@@ -1,7 +1,6 @@
 /* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 
-#ifndef PBRT_STORAGE_BACKEND_LOCAL_HH
-#define PBRT_STORAGE_BACKEND_LOCAL_HH
+#pragma once
 
 #include "backend.hh"
 #include "net/aws.hh"
@@ -18,5 +17,3 @@ public:
   void get( const std::vector<storage::GetRequest> &,
             const GetCallback & = []( const storage::GetRequest & ){} ) {}
 };
-
-#endif /* PBRT_STORAGE_BACKEND_LOCAL_HH */
