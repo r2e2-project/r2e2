@@ -72,13 +72,13 @@ set ( ALL_R2T2_LIBS
     cryptopp
 )
 
-add_executable ( r2t2-lambda-master src/master/lambda-master.cpp )
+add_executable ( r2t2-lambda-master src/master/lambda-master.cc )
 target_link_libraries( r2t2-lambda-master ${ALL_R2T2_LIBS} )
 
-add_executable ( r2t2-lambda-worker src/worker/lambda-worker.cpp )
+add_executable ( r2t2-lambda-worker src/worker/lambda-worker.cc )
 target_link_libraries( r2t2-lambda-worker ${ALL_R2T2_LIBS} dl z unwind lzma
     -static -Wl,-allow-multiple-definition ${STRIP_SYMBOLS} -Wl,--whole-archive
     -lpthread -Wl,--no-whole-archive)
 
-add_executable ( r2t2-lambda-aggregate src/tools/lambda-aggregate.cpp )
+add_executable ( r2t2-lambda-aggregate src/tools/lambda-aggregate.cc )
 target_link_libraries( r2t2-lambda-aggregate ${ALL_R2T2_LIBS} )
