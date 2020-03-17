@@ -27,9 +27,7 @@ class SessionBase<T, std::enable_if_t<std::is_same<T, SSLSocket>::value>>
   TCPSocketBIO socket_;
 
 public:
-  SessionBase( SSL_handle&& ssl,
-               TCPSocket&& socket,
-               const std::string& hostname );
+  SessionBase( SSL_handle&& ssl, TCPSocket&& socket );
 };
 
 template<class T>

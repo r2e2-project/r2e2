@@ -43,11 +43,7 @@ void TCPSession::do_write()
   }
 }
 
-void TCPSession::do_write() {}
-
-SSLSession::SSLSession( SSL_handle&& ssl,
-                        TCPSocket&& sock,
-                        const string& hostname )
+SSLSession::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
   : ssl_( move( ssl ) )
   , socket_( move( sock ) )
 {
@@ -58,10 +54,6 @@ SSLSession::SSLSession( SSL_handle&& ssl,
 
   SSL_set0_rbio( ssl_.get(), socket_ );
   SSL_set0_wbio( ssl_.get(), socket_ );
-
-  if ( not SSL_set1_host( ssl_.get(), hostname.c_str() ) ) {
-    OpenSSL::throw_error( "SSL_set1_host" );
-  }
 
   SSL_set_connect_state( ssl_.get() );
 
