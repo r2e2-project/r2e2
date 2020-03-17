@@ -1,153 +1,145 @@
-/* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-
 #include "file_descriptor.hh"
-
-#include <unistd.h>
-#include <fcntl.h>
-#include <cassert>
-#include <sys/file.h>
 
 #include "exception.hh"
 
+#include <algorithm>
+#include <fcntl.h>
+#include <iostream>
+#include <stdexcept>
+#include <sys/uio.h>
+#include <unistd.h>
+
 using namespace std;
 
-/* construct from fd number */
-FileDescriptor::FileDescriptor( const int fd )
-  : fd_( fd ),
-   eof_( false ),
-   read_count_( 0 ),
-   write_count_( 0 )
+//! \param[in] fd is the file descriptor number returned by [open(2)](\ref man2::open) or similar
+FileDescriptor::FDWrapper::FDWrapper( const int fd )
+  : _fd( fd )
 {
-  /* set close-on-exec flag so our file descriptors
-    aren't passed on to unrelated children (like a shell) */
-  CheckSystemCall( "fcntl FD_CLOEXEC", fcntl( fd_, F_SETFD, FD_CLOEXEC ) );
-}
-
-/* move constructor */
-FileDescriptor::FileDescriptor( FileDescriptor && other )
-  : fd_( other.fd_ ),
-    eof_( other.eof_ ),
-    read_count_( other.read_count_ ),
-    write_count_( other.write_count_ )
-{
-  /* mark other file descriptor as inactive */
-  other.fd_ = -1;
-}
-
-FileDescriptor & FileDescriptor::operator=( FileDescriptor && other )
-{
-  fd_ = other.fd_;
-  eof_ = other.eof_;
-  read_count_ = other.read_count_;
-  write_count_ = other.write_count_;
-
-  other.fd_ = -1;
-
-  return *this;
-}
-
-/* close method throws exception on failure */
-void FileDescriptor::close()
-{
-  if ( fd_ < 0 ) { /* has already been moved away or closed */
-    return;
+  if ( fd < 0 ) {
+    throw runtime_error( "invalid fd number:" + to_string( fd ) );
   }
 
-  CheckSystemCall( "close", ::close( fd_ ) );
-
-  fd_ = -1;
+  const int flags = CheckSystemCall( "fcntl", fcntl( fd, F_GETFL ) );
+  _non_blocking = flags & O_NONBLOCK;
 }
 
-/* destructor tries to close, but catches exception */
-FileDescriptor::~FileDescriptor()
+void FileDescriptor::FDWrapper::close()
+{
+  CheckSystemCall( "close", ::close( _fd ) );
+  _eof = _closed = true;
+}
+
+FileDescriptor::FDWrapper::~FDWrapper()
 {
   try {
+    if ( _closed ) {
+      return;
+    }
     close();
-  } catch ( const exception & e ) { /* don't throw from destructor */
-    print_exception( "FileDescriptor", e );
+  } catch ( const exception& e ) {
+    // don't throw an exception from the destructor
+    cerr << "Exception destructing FDWrapper: " << e.what() << endl;
   }
 }
 
-/* attempt to write a portion of a string */
-string::const_iterator FileDescriptor::write( const string::const_iterator & begin,
-                       const string::const_iterator & end )
+//! \param[in] fd is the file descriptor number returned by [open(2)](\ref man2::open) or similar
+FileDescriptor::FileDescriptor( const int fd )
+  : _internal_fd( make_shared<FDWrapper>( fd ) )
+{}
+
+//! Private constructor used by duplicate()
+FileDescriptor::FileDescriptor( shared_ptr<FDWrapper> other_shared_ptr )
+  : _internal_fd( move( other_shared_ptr ) )
+{}
+
+//! \returns a copy of this FileDescriptor
+FileDescriptor FileDescriptor::duplicate() const
 {
-  if ( begin >= end ) {
-    throw runtime_error( "nothing to write" );
-  }
-
-  ssize_t bytes_written = CheckSystemCall( "write", ::write( fd_, &*begin, end - begin ) );
-  if ( bytes_written == 0 ) {
-    throw runtime_error( "write returned 0" );
-  }
-
-  register_write();
-
-  return begin + bytes_written;
+  return FileDescriptor( _internal_fd );
 }
 
-/* read method */
-string FileDescriptor::read( const size_t limit )
+//! \param[out] str is the string to be read
+size_t FileDescriptor::read( simple_string_span buffer )
 {
-  char buffer[ BUFFER_SIZE ];
+  if ( buffer.empty() ) {
+    throw runtime_error( "FileDescriptor::read: no space to read" );
+  }
 
-  ssize_t bytes_read = CheckSystemCall( "read", ::read( fd_, buffer, min( BUFFER_SIZE, limit ) ) );
-  if ( bytes_read == 0 ) {
-    set_eof();
+  const ssize_t bytes_read = ::read( fd_num(), buffer.mutable_data(), buffer.size() );
+  if ( bytes_read < 0 ) {
+    if ( _internal_fd->_non_blocking and ( errno == EAGAIN or errno == EINPROGRESS ) ) {
+      return 0;
+    } else {
+      throw unix_error( "read" );
+    }
   }
 
   register_read();
 
-  return string( buffer, bytes_read );
-}
-
-/* write method */
-string::const_iterator FileDescriptor::write( const std::string & buffer, const bool write_all )
-{
-  auto it = buffer.begin();
-
-  do {
-    it = write( it, buffer.end() );
-  } while ( write_all and (it != buffer.end()) );
-
-  return it;
-}
-
-string FileDescriptor::read_exactly( const size_t length,
-                                     const bool fail_silently )
-  {
-    std::string ret;
-
-    while ( ret.size() < length ) {
-      ret.append( read( length - ret.size() ) );
-      if ( eof() ) {
-        if ( fail_silently ) {
-          return ret;
-        }
-        else {
-          throw std::runtime_error( "read_exactly: reached EOF before reaching target" );
-        }
-      }
-    }
-
-    assert( ret.size() == length );
-    return ret;
+  if ( bytes_read == 0 ) {
+    _internal_fd->_eof = true;
   }
 
-void FileDescriptor::block_for_exclusive_lock()
-{
-  CheckSystemCall( "flock", flock( fd_num(), LOCK_EX ) );
+  if ( bytes_read > static_cast<ssize_t>( buffer.size() ) ) {
+    throw runtime_error( "read() read more than requested" );
+  }
+
+  return bytes_read;
 }
 
-void FileDescriptor::set_blocking( const bool block )
+size_t FileDescriptor::write( const string_view buffer )
 {
-  int flags = CheckSystemCall( "fcntl F_GETFL", fcntl( fd_, F_GETFL ) );
+  const ssize_t bytes_written = CheckSystemCall( "write", ::write( fd_num(), buffer.data(), buffer.size() ) );
+  register_write();
 
-  if ( block ) {
-    flags = flags & ~O_NONBLOCK;
+  if ( bytes_written == 0 and buffer.size() != 0 ) {
+    throw runtime_error( "write returned 0 given non-empty input buffer" );
+  }
+
+  if ( bytes_written > ssize_t( buffer.size() ) ) {
+    throw runtime_error( "write wrote more than length of input buffer" );
+  }
+
+  return bytes_written;
+}
+
+size_t FileDescriptor::write( const vector<string_view>& buffers )
+{
+  vector<iovec> iovecs;
+  iovecs.reserve( buffers.size() );
+  for ( const auto x : buffers ) {
+    iovecs.push_back( { const_cast<char*>( x.data() ), x.size() } );
+  }
+
+  const ssize_t bytes_written = CheckSystemCall( "writev", ::writev( fd_num(), iovecs.data(), iovecs.size() ) );
+  register_write();
+
+  return bytes_written;
+}
+
+void FileDescriptor::set_blocking( const bool blocking )
+{
+  int flags = CheckSystemCall( "fcntl", fcntl( fd_num(), F_GETFL ) );
+  if ( blocking ) {
+    flags ^= ( flags & O_NONBLOCK );
   } else {
-    flags = flags | O_NONBLOCK;
+    flags |= O_NONBLOCK;
   }
 
-  CheckSystemCall( "fcntl F_SETFL", fcntl( fd_, F_SETFL, flags ) );
+  CheckSystemCall( "fcntl", fcntl( fd_num(), F_SETFL, flags ) );
+
+  _internal_fd->_non_blocking = not blocking;
+}
+
+int FileDescriptor::FDWrapper::CheckSystemCall( const string_view s_attempt, const int return_value ) const
+{
+  if ( return_value >= 0 ) {
+    return return_value;
+  }
+
+  if ( _non_blocking and ( errno == EAGAIN or errno == EINPROGRESS ) ) {
+    return 0;
+  }
+
+  throw unix_error( s_attempt );
 }
