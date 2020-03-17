@@ -13,73 +13,105 @@ using namespace std;
 using namespace meow;
 
 constexpr char const*
-    Message::OPCODE_NAMES[to_underlying(Message::OpCode::COUNT)];
+  Message::OPCODE_NAMES[to_underlying( Message::OpCode::COUNT )];
 
-Message::Message(const Chunk& chunk) {
-    if (chunk.size() < HEADER_LENGTH) {
-        throw out_of_range("incomplete header");
+Message::Message( const string_view& header, string&& payload )
+  : payload_( move( payload ) )
+{
+  if ( header.length() == HEADER_LENGTH ) {
+    throw out_of_range( "incomplete header" );
+  }
+
+  sender_id_ = get_field<uint64_t>( header );
+  payload_length_ = get_field<uint32_t>( header.substr( 8 ) );
+  opcode_ = static_cast<OpCode>( header[12] );
+}
+
+Message::Message( const uint64_t sender_id,
+                  const OpCode opcode,
+                  string&& payload )
+  : sender_id_( sender_id )
+  , payload_length_( payload.length() )
+  , opcode_( opcode )
+  , payload_( move( payload ) )
+{}
+
+string Message::str() const
+{
+  return Message::str( sender_id_, opcode_, payload_ );
+}
+
+void Message::str( char* message_str,
+                   const uint64_t sender_id,
+                   const OpCode opcode,
+                   const size_t payload_length )
+{
+  put_field( message_str, sender_id, 0 );
+  put_field( message_str, static_cast<uint32_t>( payload_length ), 8 );
+  message_str[12] = to_underlying( opcode );
+}
+
+std::string Message::str( const uint64_t sender_id,
+                          const OpCode opcode,
+                          const string& payload )
+{
+  string output;
+  output.reserve( sizeof( sender_id ) + sizeof( opcode )
+                  + sizeof( payload.length() ) + payload.length() );
+
+  output += put_field( sender_id );
+  output += put_field( static_cast<uint32_t>( payload.length() ) );
+  output += to_underlying( opcode );
+  output += payload;
+  return output;
+}
+
+uint32_t Message::expected_payload_length( const string_view header )
+{
+  return ( header.length() < HEADER_LENGTH )
+           ? 0
+           : get_field<uint32_t>( header.substr( 8, 4 ) );
+}
+
+void MessageParser::complete_message()
+{
+  expected_payload_length_.reset();
+
+  completed_messages_.emplace( incomplete_header_,
+                               move( incomplete_payload_ ) );
+
+  incomplete_header_.clear();
+  incomplete_payload_.clear();
+}
+
+void MessageParser::parse( string_view buf )
+{
+  while ( not buf.empty() ) {
+    if ( not expected_payload_length_.has_value() ) {
+      const auto remaining_length = min(
+        buf.length(), Message::HEADER_LENGTH - incomplete_header_.length() );
+
+      incomplete_header_.append( buf.substr( 0, remaining_length ) );
+      buf.remove_prefix( remaining_length );
+
+      if ( incomplete_header_.length() == Message::HEADER_LENGTH ) {
+        expected_payload_length_
+          = Message::expected_length( incomplete_header_ )
+            - Message::HEADER_LENGTH;
+      }
     }
 
-    Chunk c = chunk;
+    if ( expected_payload_length_.has_value() and not buf.empty() ) {
+      const auto remaining_length
+        = min( buf.length(),
+               *expected_payload_length_ - incomplete_payload_.length() );
 
-    sender_id_ = c.be64();
-    payload_length_ = (c = c(8)).be32();
-    opcode_ = static_cast<OpCode>((c = c(4)).octet());
-    payload_ = (c = c(1)).to_string();
-}
+      incomplete_payload_.append( buf.substr( 0, remaining_length ) );
+      buf.remove_prefix( remaining_length );
 
-Message::Message(const uint64_t sender_id, const OpCode opcode,
-                 string&& payload)
-    : sender_id_(sender_id),
-      payload_length_(payload.length()),
-      opcode_(opcode),
-      payload_(move(payload)) {}
-
-string Message::str() const {
-    return Message::str(sender_id_, opcode_, payload_);
-}
-
-void Message::str(char* message_str, const uint64_t sender_id,
-                  const OpCode opcode, const size_t payload_length) {
-    put_field(message_str, sender_id, 0);
-    put_field(message_str, static_cast<uint32_t>(payload_length), 8);
-    message_str[12] = to_underlying(opcode);
-}
-
-std::string Message::str(const uint64_t sender_id, const OpCode opcode,
-                         const string& payload) {
-    string output;
-    output.reserve(sizeof(sender_id) + sizeof(opcode) +
-                   sizeof(payload.length()) + payload.length());
-
-    output += put_field(sender_id);
-    output += put_field(static_cast<uint32_t>(payload.length()));
-    output += to_underlying(opcode);
-    output += payload;
-    return output;
-}
-
-uint32_t Message::expected_length(const Chunk& chunk) {
-    return HEADER_LENGTH +
-           ((chunk.size() < HEADER_LENGTH) ? 0 : chunk(8, 4).be32());
-}
-
-void MessageParser::parse(const string& buf) {
-    raw_buffer_.append(buf);
-
-    while (true) {
-        uint32_t expected_length = Message::expected_length(raw_buffer_);
-
-        if (raw_buffer_.length() < expected_length) {
-            /* still need more bytes to have a complete message */
-            break;
-        }
-
-        Message message{
-            Chunk{reinterpret_cast<const uint8_t*>(raw_buffer_.data()),
-                  expected_length}};
-
-        raw_buffer_.erase(0, expected_length);
-        completed_messages_.push_back(move(message));
+      if ( incomplete_payload_.length() == *expected_payload_length_ ) {
+        complete_message();
+      }
     }
+  }
 }
