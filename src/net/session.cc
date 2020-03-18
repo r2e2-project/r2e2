@@ -15,7 +15,9 @@ Session<T, Endpoint>::~Session()
 }
 
 template<class T, class Endpoint>
-void Session<T, Endpoint>::install_rules( EventLoop& loop )
+void Session<T, Endpoint>::install_rules(
+  EventLoop& loop,
+  const function<void( void )>& cancel_callback )
 {
   static Categories categories = [] -> Categories {
     return {}
@@ -30,14 +32,16 @@ void Session<T, Endpoint>::install_rules( EventLoop& loop )
     socket(),
     Direction::In,
     [&] { do_read(); },
-    [&] { return want_read(); } ) );
+    [&] { return want_read(); },
+    cancel_callback ) );
 
   installed_rules_.push_back( loop.add_rule(
     "socket write",
     socket(),
     Direction::In,
     [&] { do_write(); },
-    [&] { return want_write(); } ) );
+    [&] { return want_write(); },
+    cancel_callback ) );
 
   installed_rules_.push_back( loop.add_rule(
     "endpoint write",
