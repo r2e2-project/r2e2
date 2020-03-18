@@ -30,7 +30,7 @@ public:
   SessionBase( SSL_handle&& ssl, TCPSocket&& socket );
 };
 
-template<class T, class Endpoint>
+template<class T>
 class Session : public SessionBase<T>
 {
 private:
@@ -41,13 +41,8 @@ private:
   RingBuffer outbound_plaintext_ { STORAGE_SIZE };
   RingBuffer inbound_plaintext_ { STORAGE_SIZE };
 
-  Endpoint endpoint_;
-
-  std::vector<EventLoop::RuleHandle> installed_rules_;
-
 public:
   using SessionBase<T>::SessionBase();
-  ~Session();
 
   TCPSocket& socket() { return socket_; }
 
@@ -56,16 +51,8 @@ public:
 
   bool want_read();
   bool want_write();
-
-  Endpoint& endpoint() { return endpoint_; }
-
-  void install_rules(
-    EventLoop& loop,
-    const std::function<void( void )>& cancel_callback = [] {} );
 };
 
-template<class Endpoint>
-using TCPSession = Session<TCPSocket, Endpoint>;
+using TCPSession = Session<TCPSocket>;
 
-template<class Endpoint>
-using SSLSession = Session<SSLSocket, Endpoint>;
+using SSLSession = Session<SSLSocket>;
