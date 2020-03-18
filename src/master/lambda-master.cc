@@ -2,7 +2,6 @@
 
 #include <getopt.h>
 #include <glog/logging.h>
-#include <pbrt/core/sampler.h>
 
 #include <algorithm>
 #include <chrono>
@@ -20,7 +19,6 @@
 #include <thread>
 #include <vector>
 
-#include "execution/loop.hh"
 #include "execution/meow/message.hh"
 #include "messages/utils.hh"
 #include "net/lambda.hh"
@@ -53,727 +51,764 @@ using namespace PollerShortNames;
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
-map<LambdaMaster::Worker::Role, size_t> LambdaMaster::Worker::activeCount = {};
-WorkerId LambdaMaster::Worker::nextId = 0;
+map<LambdaMaster::Worker::Role, size_t> LambdaMaster::Worker::active_count = {};
+WorkerId LambdaMaster::Worker::next_id = 0;
 
-LambdaMaster::~LambdaMaster() {
-    try {
-        roost::empty_directory(sceneDir.name());
-    } catch (exception &ex) {
-    }
+LambdaMaster::~LambdaMaster()
+{
+  try {
+    roost::empty_directory( sceneDir.name() );
+  } catch ( exception& ex ) {
+  }
 }
 
-LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
-                           const uint32_t maxWorkers,
-                           const uint32_t rayGenerators,
-                           const string &publicAddress,
-                           const string &storageBackendUri,
-                           const string &awsRegion,
-                           unique_ptr<Scheduler> &&scheduler,
-                           const MasterConfiguration &config)
-    : config(config),
-      jobId([] {
-          ostringstream oss;
-          oss << hex << setfill('0') << setw(8) << time(nullptr);
-          return oss.str();
-      }()),
-      maxWorkers(maxWorkers),
-      rayGenerators(rayGenerators),
-      scheduler(move(scheduler)),
-      publicAddress(publicAddress),
-      storageBackendUri(storageBackendUri),
-      storageBackend(StorageBackend::create_backend(storageBackendUri)),
-      awsRegion(awsRegion),
-      awsAddress(LambdaInvocationRequest::endpoint(awsRegion), "https"),
-      workerStatsWriteTimer(seconds{config.workerStatsWriteInterval},
-                            milliseconds{1}) {
-    const string scenePath = sceneDir.name();
-    roost::create_directories(scenePath);
-
-    protobuf::InvocationPayload invocationProto;
-    invocationProto.set_storage_backend(storageBackendUri);
-    invocationProto.set_coordinator(publicAddress);
-    invocationProto.set_samples_per_pixel(config.samplesPerPixel);
-    invocationProto.set_max_path_depth(config.maxPathDepth);
-    invocationProto.set_ray_log_rate(config.rayLogRate);
-    invocationProto.set_bag_log_rate(config.bagLogRate);
-    invocationProto.set_directional_treelets(PbrtOptions.directionalTreelets);
-
-    for (const auto &memcachedServer : config.memcachedServers) {
-        *invocationProto.add_memcached_servers() = memcachedServer;
-    }
-
-    invocationPayload = protoutil::to_json(invocationProto);
-
-    /* download required scene objects from the bucket */
-    auto getSceneObjectRequest = [&scenePath](const ObjectType type) {
-        return storage::GetRequest{
-            scene::GetObjectName(type, 0),
-            roost::path(scenePath) / scene::GetObjectName(type, 0)};
-    };
-
-    vector<storage::GetRequest> sceneObjReqs{
-        getSceneObjectRequest(ObjectType::Manifest),
-        getSceneObjectRequest(ObjectType::Camera),
-        getSceneObjectRequest(ObjectType::Sampler),
-        getSceneObjectRequest(ObjectType::Lights),
-        getSceneObjectRequest(ObjectType::Scene),
-    };
-
-    cerr << "Downloading scene data... ";
-    storageBackend->get(sceneObjReqs);
-    cerr << "done." << endl;
-
-    /* now we can initialize the scene */
-    scene = {scenePath, config.samplesPerPixel, config.cropWindow};
-
-    /* initializing the treelets array */
-    const size_t treeletCount = scene.base.GetTreeletCount();
-    treelets.reserve(treeletCount);
-    treeletStats.reserve(treeletCount);
-
-    for (size_t i = 0; i < treeletCount; i++) {
-        treelets.emplace_back(i);
-        treeletStats.emplace_back();
-        unassignedTreelets.insert(i);
-    }
-
-    queuedRayBags.resize(treeletCount);
-    pendingRayBags.resize(treeletCount);
-
-    tiles = Tiles{config.tileSize, scene.sampleBounds,
-                  scene.base.sampler->samplesPerPixel,
-                  rayGenerators ? rayGenerators : maxWorkers};
-
-    /* are we logging anything? */
-    if (config.collectDebugLogs || config.workerStatsWriteInterval > 0 ||
-        config.rayLogRate > 0 || config.bagLogRate > 0) {
-        roost::create_directories(config.logsDirectory);
-    }
-
-    if (config.workerStatsWriteInterval > 0) {
-        wsStream.open(config.logsDirectory + "/" + "workers.csv", ios::trunc);
-        tlStream.open(config.logsDirectory + "/" + "treelets.csv", ios::trunc);
-
-        wsStream << "timestamp,workerId,pathsFinished,"
-                    "raysEnqueued,raysAssigned,raysDequeued,"
-                    "bytesEnqueued,bytesAssigned,bytesDequeued,"
-                    "bagsEnqueued,bagsAssigned,bagsDequeued,"
-                    "numSamples,bytesSamples,bagsSamples,cpuUsage\n";
-
-        tlStream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
-                    "bytesEnqueued,bytesDequeued,bagsEnqueued,bagsDequeued\n";
-    }
-
-    auto printInfo = [](char const *key, auto value) {
-        cerr << "  " << key << "    \e[1m" << value << "\e[0m" << endl;
-    };
-
-    cerr << endl << "Job info:" << endl;
-    printInfo("Job ID           ", jobId);
-    printInfo("Working directory", scenePath);
-    printInfo("Public address   ", publicAddress);
-    printInfo("Maxium workers   ", maxWorkers);
-    printInfo("Ray generators   ", rayGenerators);
-    printInfo("Treelet count    ", treeletCount);
-    printInfo("Tile size        ",
-              to_string(tiles.tileSize) + "\u00d7" + to_string(tiles.tileSize));
-    printInfo("Output dimensions", to_string(scene.sampleExtent.x) + "\u00d7" +
-                                       to_string(scene.sampleExtent.y));
-    printInfo("Samples per pixel", config.samplesPerPixel);
-    printInfo("Total paths      ", scene.sampleExtent.x * scene.sampleExtent.y *
-                                       config.samplesPerPixel);
-    cerr << endl;
-
-    loop.poller().add_action(Poller::Action(
-        rescheduleTimer, Direction::In,
-        bind(&LambdaMaster::handleReschedule, this),
-        [this]() { return finishedRayGenerators == this->rayGenerators; },
-        []() { throw runtime_error("rescheduler failed"); }));
-
-    loop.poller().add_action(Poller::Action(
-        alwaysOnFd, Direction::Out,
-        [&]() {
-            jobExitTimer = make_unique<TimerFD>(14min + 50s);
-
-            loop.poller().add_action(Poller::Action(
-                *jobExitTimer, Direction::In,
-                [&]() { return ResultType::Exit; }, []() { return true; },
-                []() { throw runtime_error("job exit failed"); }));
-
-            return ResultType::Cancel;
-        },
-        [this]() { return finishedRayGenerators == this->rayGenerators; },
-        []() { throw runtime_error("job exit failed"); }));
-
-    loop.poller().add_action(Poller::Action(
-        alwaysOnFd, Direction::Out, bind(&LambdaMaster::handleMessages, this),
-        [this]() { return !incomingMessages.empty(); },
-        []() { throw runtime_error("messages failed"); }));
-
-    loop.poller().add_action(Poller::Action(
-        alwaysOnFd, Direction::Out,
-        bind(&LambdaMaster::handleQueuedRayBags, this),
-        [this]() {
-            return initializedWorkers >= this->maxWorkers &&
-                   !freeWorkers.empty() &&
-                   (tiles.cameraRaysRemaining() || queuedRayBagsCount > 0);
-        },
-        []() { throw runtime_error("queued ray bags failed"); }));
-
-    if (config.workerStatsWriteInterval > 0) {
-        loop.poller().add_action(Poller::Action(
-            workerStatsWriteTimer, Direction::In,
-            bind(&LambdaMaster::handleWorkerStats, this),
-            [this]() { return true; },
-            []() { throw runtime_error("worker stats failed"); }));
-    }
-
-    loop.poller().add_action(Poller::Action(
-        workerInvocationTimer, Direction::In,
-        bind(&LambdaMaster::handleWorkerInvocation, this),
-        [this]() {
-            return !treeletsToSpawn.empty() &&
-                   Worker::activeCount[Worker::Role::Tracer] < this->maxWorkers;
-        },
-        []() { throw runtime_error("worker invocation failed"); }));
-
-    loop.poller().add_action(Poller::Action(
-        statusPrintTimer, Direction::In,
-        bind(&LambdaMaster::handleStatusMessage, this),
-        [this]() { return true; },
-        []() { throw runtime_error("status print failed"); }));
-
-    loop.make_listener({"0.0.0.0", listenPort}, [this, maxWorkers](
-                                                    ExecutionLoop &loop,
-                                                    TCPSocket &&socket) {
-        ScopeTimer<TimeLog::Category::AcceptWorker> timer_;
-        /* do we want this worker? */
-        if (Worker::nextId >= this->rayGenerators && treeletsToSpawn.empty()) {
-            socket.close();
-            return true;
-        }
-
-        const WorkerId workerId = Worker::nextId++;
-
-        auto connectionCloseHandler = [this, workerId]() {
-            ScopeTimer<TimeLog::Category::CloseWorker> timer_;
-
-            auto &worker = workers[workerId];
-
-            if (worker.state == Worker::State::Terminating) {
-                if (worker.role == Worker::Role::Generator) {
-                    lastGeneratorDone = steady_clock::now();
-                    finishedRayGenerators++;
-                }
-
-                /* it's okay for this worker to go away,
-                   let's not panic! */
-                worker.state = Worker::State::Terminated;
-                Worker::activeCount[worker.role]--;
-
-                if (!worker.outstandingRayBags.empty()) {
-                    throw runtime_error(
-                        "worker died without finishing its work: " +
-                        to_string(workerId));
-                }
-
-                return;
-            }
-
-            cerr << "Worker info: " << worker.toString() << endl;
-
-            throw runtime_error(
-                "worker died unexpectedly: " + to_string(workerId) +
-                (worker.awsLogStream.empty()
-                     ? ""s
-                     : (" ("s + worker.awsLogStream + ")"s)));
-        };
-
-        auto parser = make_shared<MessageParser>();
-        auto connection = loop.add_connection<TCPSocket>(
-            move(socket),
-            [this, workerId, parser](auto, string &&data) {
-                ScopeTimer<TimeLog::Category::TCPReceive> timer_;
-                parser->parse(data);
-
-                while (!parser->empty()) {
-                    incomingMessages.emplace_back(workerId,
-                                                  move(parser->front()));
-                    parser->pop();
-                }
-
-                return true;
-            },
-            [this, workerId]() {
-                auto &worker = workers[workerId];
-
-                throw runtime_error(
-                    "worker died unexpected: " + to_string(workerId) +
-                    (worker.awsLogStream.empty()
-                         ? ""s
-                         : (" ("s + worker.awsLogStream + ")"s)));
-            },
-            connectionCloseHandler);
-
-        if (workerId < this->rayGenerators) {
-            /* This worker is a ray generator
-               Let's (1) say hi, (2) tell the worker to fetch the scene,
-               (3) generate rays for its tile */
-
-            /* (0) create the entry for the worker */
-            workers.emplace_back(workerId, Worker::Role::Generator,
-                                 move(connection));
-            auto &worker = workers.back();
-
-            assignBaseObjects(worker);
-
-            /* (1) saying hi, assigning id to the worker */
-            protobuf::Hey heyProto;
-            heyProto.set_worker_id(workerId);
-            heyProto.set_job_id(jobId);
-            worker.connection->enqueue_write(
-                Message::str(0, OpCode::Hey, protoutil::to_string(heyProto)));
-
-            /* (2) tell the worker to get the scene objects necessary */
-            protobuf::GetObjects objsProto;
-            for (const ObjectKey &id : worker.objects) {
-                *objsProto.add_object_ids() = to_protobuf(id);
-            }
-
-            worker.connection->enqueue_write(Message::str(
-                0, OpCode::GetObjects, protoutil::to_string(objsProto)));
-
-            /* (3) Tell the worker to generate rays */
-            if (tiles.cameraRaysRemaining()) {
-                tiles.sendWorkerTile(worker);
-            } else {
-                /* Too many ray launchers for tile size,
-                 * so just finish immediately */
-                worker.connection->enqueue_write(
-                    Message::str(0, OpCode::FinishUp, ""));
-                worker.state = Worker::State::FinishingUp;
-            }
-        } else {
-            /* this is a normal worker */
-            if (!treeletsToSpawn.empty()) {
-                const TreeletId treeletId = treeletsToSpawn.front();
-                treeletsToSpawn.pop_front();
-
-                auto &treelet = treelets[treeletId];
-                treelet.pendingWorkers--;
-
-                /* (0) create the entry for the worker */
-                workers.emplace_back(workerId, Worker::Role::Tracer,
-                                     move(connection));
-                auto &worker = workers.back();
-
-                assignBaseObjects(worker);
-                assignTreelet(worker, treelet);
-
-                /* (1) saying hi, assigning id to the worker */
-                protobuf::Hey heyProto;
-                heyProto.set_worker_id(workerId);
-                heyProto.set_job_id(jobId);
-                worker.connection->enqueue_write(Message::str(
-                    0, OpCode::Hey, protoutil::to_string(heyProto)));
-
-                /* (2) tell the worker to get the scene objects necessary */
-                protobuf::GetObjects objsProto;
-                for (const ObjectKey &id : worker.objects) {
-                    *objsProto.add_object_ids() = to_protobuf(id);
-                }
-
-                worker.connection->enqueue_write(Message::str(
-                    0, OpCode::GetObjects, protoutil::to_string(objsProto)));
-
-                freeWorkers.push_back(worker.id);
-            } else {
-                throw runtime_error("we accepted a useless worker");
-            }
-        }
-
-        return true;
-    });
-
-    if (clientPort != 0) {
-        throw runtime_error("client support is disabled");
-    }
-}
-
-string LambdaMaster::Worker::toString() const {
+LambdaMaster::LambdaMaster( const uint16_t listen_port,
+                            const uint16_t client_port,
+                            const uint32_t max_workers,
+                            const uint32_t ray_generators,
+                            const string& public_address,
+                            const string& storage_backend_uri,
+                            const string& aws_region,
+                            unique_ptr<Scheduler>&& scheduler,
+                            const MasterConfiguration& config )
+  : config( config )
+  , job_id( [] {
     ostringstream oss;
-
-    size_t oustandingSize = 0;
-    for (const auto &bag : outstandingRayBags) oustandingSize += bag.bagSize;
-
-    oss << "id=" << id << ",state=" << static_cast<int>(state)
-        << ",role=" << static_cast<int>(role) << ",awslog=" << awsLogStream
-        << ",treelets=";
-
-    for (auto it = treelets.begin(); it != treelets.end(); it++) {
-        if (it != treelets.begin()) oss << ",";
-        oss << *it;
-    }
-
-    oss << ",outstanding=" << outstandingRayBags.size()
-        << ",outstanding-bytes=" << oustandingSize
-        << ",enqueued=" << stats.enqueued.bytes
-        << ",assigned=" << stats.assigned.bytes
-        << ",dequeued=" << stats.dequeued.bytes
-        << ",samples=" << stats.samples.bytes;
-
+    oss << hex << setfill( '0' ) << setw( 8 ) << time( nullptr );
     return oss.str();
-}
+  }() )
+  , max_workers( max_workers )
+  , ray_generators( ray_generators )
+  , scheduler( move( scheduler ) )
+  , public_address( public_address )
+  , storage_backend_uri( storage_backend_uri )
+  , storage_backend( StorageBackend::create_backend( storage_backend_uri ) )
+  , aws_region( aws_region )
+  , aws_address( LambdaInvocationRequest::endpoint( aws_region ), "https" )
+  , worker_stats_write_timer( seconds { config.worker_stats_write_interval },
+                              milliseconds { 1 } )
+{
+  const string scene_path = scene_dir.name();
+  roost::create_directories( scene_path );
 
-void LambdaMaster::run() {
-    StatusBar::get();
+  protobuf::InvocationPayload invocation_proto;
+  invocation_proto.set_storage_backend( storage_backend_uri );
+  invocation_proto.set_coordinator( public_address );
+  invocation_proto.set_samples_per_pixel( config.samples_per_pixel );
+  invocation_proto.set_max_path_depth( config.max_path_depth );
+  invocation_proto.set_ray_log_rate( config.ray_log_rate );
+  invocation_proto.set_bag_log_rate( config.bag_log_rate );
+  invocation_proto.set_directional_treelets( PbrtOptions.directionalTreelets );
 
-    if (!config.memcachedServers.empty()) {
-        cerr << "Flushing " << config.memcachedServers.size() << " memcached "
-             << pluralize("server", config.memcachedServers.size()) << "... ";
+  for ( const auto& server : config.memcached_servers ) {
+    *invocation_proto.add_memcached_servers() = server;
+  }
 
-        vector<Address> servers;
+  invocation_payload = protoutil::to_json( invocation_proto );
 
-        for (auto &server : config.memcachedServers) {
-            string host;
-            uint16_t port = 11211;
-            tie(host, port) = Address::decompose(server);
-            servers.emplace_back(host, port);
+  /* download required scene objects from the bucket */
+  auto get_scene_object_request = [&scene_path]( const ObjectType type ) {
+    return storage::GetRequest { scene::GetObjectName( type, 0 ),
+                                 roost::path( scene_path )
+                                   / scene::GetObjectName( type, 0 ) };
+  };
+
+  vector<storage::GetRequest> scene_obj_reqs {
+    get_scene_object_request( ObjectType::Manifest ),
+    get_scene_object_request( ObjectType::Camera ),
+    get_scene_object_request( ObjectType::Sampler ),
+    get_scene_object_request( ObjectType::Lights ),
+    get_scene_object_request( ObjectType::Scene ),
+  };
+
+  cerr << "Downloading scene data... ";
+  storage_backend->get( scene_obj_reqs );
+  cerr << "done." << endl;
+
+  /* now we can initialize the scene */
+  scene = { scene_path, config.samples_per_pixel, config.crop_window };
+
+  /* initializing the treelets array */
+  const size_t treelet_count = scene.base.GetTreeletCount();
+  treelets.reserve( treelet_count );
+  treelet_stats.reserve( treelet_count );
+
+  for ( size_t i = 0; i < treelet_count; i++ ) {
+    treelets.emplace_back( i );
+    treelet_stats.emplace_back();
+    unassigned_treelets.insert( i );
+  }
+
+  queued_ray_bags.resize( treelet_count );
+  pending_ray_bags.resize( treelet_count );
+
+  tiles = Tiles { config.tile_size,
+                  scene.sampleBounds,
+                  scene.base.samplesPerPixel,
+                  ray_generators ? ray_generators : max_workers };
+
+  /* are we logging anything? */
+  if ( config.collect_debug_logs || config.worker_stats_write_interval > 0
+       || config.ray_log_rate > 0 || config.bag_log_rate > 0 ) {
+    roost::create_directories( config.logs_directory );
+  }
+
+  if ( config.worker_stats_write_interval > 0 ) {
+    ws_stream.open( config.logs_directory + "/" + "workers.csv", ios::trunc );
+    tl_stream.open( config.logs_directory + "/" + "treelets.csv", ios::trunc );
+
+    ws_stream << "timestamp,workerId,pathsFinished,"
+                 "raysEnqueued,raysAssigned,raysDequeued,"
+                 "bytesEnqueued,bytesAssigned,bytesDequeued,"
+                 "bagsEnqueued,bagsAssigned,bagsDequeued,"
+                 "numSamples,bytesSamples,bagsSamples,cpuUsage\n";
+
+    tl_stream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
+                 "bytesEnqueued,bytesDequeued,bagsEnqueued,bagsDequeued\n";
+  }
+
+  auto print_info = []( char const* key, auto value ) {
+    cerr << "  " << key << "    \e[1m" << value << "\e[0m" << endl;
+  };
+
+  cerr << endl << "Job info:" << endl;
+  print_info( "Job ID           ", job_id );
+  print_info( "Working directory", scene_path );
+  print_info( "Public address   ", public_address );
+  print_info( "Maxium workers   ", max_workers );
+  print_info( "Ray generators   ", ray_generators );
+  print_info( "Treelet count    ", treelet_count );
+  print_info( "Tile size        ",
+              to_string( tiles.tile_size ) + "\u00d7"
+                + to_string( tiles.tile_size ) );
+  print_info( "Output dimensions",
+              to_string( scene.sampleExtent.x ) + "\u00d7"
+                + to_string( scene.sampleExtent.y ) );
+  print_info( "Samples per pixel", scene.samplesPerPixel );
+  print_info( "Total paths      ",
+              scene.sampleExtent.x * scene.sampleExtent.y
+                * scene.samplesPerPixel );
+  cerr << endl;
+
+  loop.poller().add_action( Poller::Action(
+    reschedule_timer,
+    Direction::In,
+    bind( &LambdaMaster::handle_reschedule, this ),
+    [this]() { return finished_ray_generators == this->ray_generators; },
+    []() { throw runtime_error( "rescheduler failed" ); } ) );
+
+  loop.poller().add_action( Poller::Action(
+    always_on_fd,
+    Direction::Out,
+    [&]() {
+      job_exit_timer = make_unique<TimerFD>( 14min + 50s );
+
+      loop.poller().add_action( Poller::Action(
+        *job_exit_timer,
+        Direction::In,
+        [&]() { return ResultType::Exit; },
+        []() { return true; },
+        []() { throw runtime_error( "job exit failed" ); } ) );
+
+      return ResultType::Cancel;
+    },
+    [this]() { return finished_ray_generators == this->ray_generators; },
+    []() { throw runtime_error( "job exit failed" ); } ) );
+
+  loop.poller().add_action( Poller::Action(
+    always_on_fd,
+    Direction::Out,
+    bind( &LambdaMaster::handle_messages, this ),
+    [this]() { return !incoming_messages.empty(); },
+    []() { throw runtime_error( "messages failed" ); } ) );
+
+  loop.poller().add_action( Poller::Action(
+    always_on_fd,
+    Direction::Out,
+    bind( &LambdaMaster::handle_queued_ray_bags, this ),
+    [this]() {
+      return initialized_workers >= this->max_workers && !free_workers.empty()
+             && ( tiles.cameraRaysRemaining() || queued_ray_bags_count > 0 );
+    },
+    []() { throw runtime_error( "queued ray bags failed" ); } ) );
+
+  if ( config.worker_stats_write_interval > 0 ) {
+    loop.poller().add_action( Poller::Action(
+      worker_stats_write_timer,
+      Direction::In,
+      bind( &LambdaMaster::handle_worker_stats, this ),
+      [this]() { return true; },
+      []() { throw runtime_error( "worker stats failed" ); } ) );
+  }
+
+  loop.poller().add_action( Poller::Action(
+    worker_invocation_timer,
+    Direction::In,
+    bind( &LambdaMaster::handle_worker_invocation, this ),
+    [this]() {
+      return !treelets_to_spawn.empty()
+             && Worker::active_count[Worker::Role::Tracer] < this->max_workers;
+    },
+    []() { throw runtime_error( "worker invocation failed" ); } ) );
+
+  loop.poller().add_action( Poller::Action(
+    status_print_timer,
+    Direction::In,
+    bind( &LambdaMaster::handle_status_message, this ),
+    [this]() { return true; },
+    []() { throw runtime_error( "status print failed" ); } ) );
+
+  loop.make_listener(
+    { "0.0.0.0", listen_port },
+    [this, maxWorkers]( ExecutionLoop& loop, TCPSocket&& socket ) {
+      ScopeTimer<TimeLog::Category::AcceptWorker> timer_;
+      /* do we want this worker? */
+      if ( Worker::next_id >= this->ray_generators
+           && treelets_to_spawn.empty() ) {
+        socket.close();
+        return true;
+      }
+
+      const WorkerId worker_id = Worker::next_id++;
+
+      auto connection_close_handler = [this, worker_id]() {
+        ScopeTimer<TimeLog::Category::CloseWorker> timer_;
+
+        auto& worker = workers[worker_id];
+
+        if ( worker.state == Worker::State::Terminating ) {
+          if ( worker.role == Worker::Role::Generator ) {
+            last_generator_done = steady_clock::now();
+            finished_ray_generators++;
+          }
+
+          /* it's okay for this worker to go away,
+             let's not panic! */
+          worker.state = Worker::State::Terminated;
+          Worker::active_count[worker.role]--;
+
+          if ( !worker.outstanding_ray_bags.empty() ) {
+            throw runtime_error( "worker died without finishing its work: "
+                                 + to_string( workerId ) );
+          }
+
+          return;
         }
 
-        Poller poller;
-        unique_ptr<memcached::TransferAgent> agent =
-            make_unique<memcached::TransferAgent>(servers, servers.size());
+        cerr << "Worker info: " << worker.to_string() << endl;
 
-        size_t flushedCount = 0;
+        throw runtime_error(
+          "worker died unexpectedly: " + to_string( workerId )
+          + ( worker.aws_log_stream.empty()
+                ? ""s
+                : ( " ("s + worker.aws_log_stream + ")"s ) ) );
+      };
 
-        poller.add_action(Poller::Action(
-            agent->eventfd(), Direction::In,
-            [&]() {
-                if (!agent->eventfd().read_event()) return ResultType::Continue;
+      auto parser = make_shared<MessageParser>();
+      auto connection = loop.add_connection<TCPSocket>(
+        move( socket ),
+        [this, worker_id, parser]( auto, string&& data ) {
+          ScopeTimer<TimeLog::Category::TCPReceive> timer_;
+          parser->parse( data );
 
-                vector<pair<uint64_t, string>> actions;
-                agent->tryPopBulk(back_inserter(actions));
+          while ( !parser->empty() ) {
+            incoming_messages.emplace_back( worker_id,
+                                            move( parser->front() ) );
+            parser->pop();
+          }
 
-                flushedCount += actions.size();
+          return true;
+        },
+        [this, worker_id]() {
+          auto& worker = workers[worker_id];
 
-                if (flushedCount == config.memcachedServers.size()) {
-                    return ResultType::Exit;
-                } else {
-                    return ResultType::Continue;
-                }
-            },
-            []() { return true; }));
+          throw runtime_error(
+            "worker died unexpected: " + to_string( worker_id )
+            + ( worker.aws_log_stream.empty()
+                  ? ""s
+                  : ( " ("s + worker.aws_log_stream + ")"s ) ) );
+        },
+        connection_close_handler );
 
-        agent->flushAll();
+      if ( worker_id < this->ray_generators ) {
+        /* This worker is a ray generator
+           Let's (1) say hi, (2) tell the worker to fetch the scene,
+           (3) generate rays for its tile */
 
-        while (poller.poll(-1).result == PollerResult::Success)
-            ;
+        /* (0) create the entry for the worker */
+        workers.emplace_back(
+          worker_id, Worker::Role::Generator, move( connection ) );
+        auto& worker = workers.back();
 
-        cerr << "done." << endl;
-    }
+        assignBaseObjects( worker );
 
-    if (rayGenerators > 0) {
-        /* let's invoke the ray generators */
-        cerr << "Launching " << rayGenerators << " ray "
-             << pluralize("generator", rayGenerators) << "... ";
+        /* (1) saying hi, assigning id to the worker */
+        protobuf::Hey hey_proto;
+        hey_proto.set_worker_id( worker_id );
+        hey_proto.set_job_id( job_id );
+        worker.connection->enqueue_write(
+          Message::str( 0, OpCode::Hey, protoutil::to_string( hey_proto ) ) );
 
-        invokeWorkers(rayGenerators + static_cast<size_t>(0.1 * rayGenerators));
-        cerr << "done." << endl;
-    }
-
-    while (true) {
-        auto res = loop.loop_once().result;
-        if (res != PollerResult::Success && res != PollerResult::Timeout) break;
-    }
-
-    vector<storage::GetRequest> getRequests;
-    const string logPrefix = "logs/" + jobId + "/";
-
-    wsStream.close();
-    tlStream.close();
-
-    for (auto &worker : workers) {
-        if (worker.state != Worker::State::Terminated) {
-            worker.connection->socket().close();
+        /* (2) tell the worker to get the scene objects necessary */
+        protobuf::GetObjects objs_proto;
+        for ( const ObjectKey& id : worker.objects ) {
+          *objs_proto.add_object_ids() = to_protobuf( id );
         }
 
-        if (config.collectDebugLogs || config.rayLogRate || config.bagLogRate) {
-            getRequests.emplace_back(
-                logPrefix + to_string(worker.id) + ".INFO",
-                config.logsDirectory + "/" + to_string(worker.id) + ".INFO");
+        worker.connection->enqueue_write( Message::str(
+          0, OpCode::GetObjects, protoutil::to_string( objs_proto ) ) );
+
+        /* (3) Tell the worker to generate rays */
+        if ( tiles.cameraRaysRemaining() ) {
+          tiles.sendWorkerTile( worker );
+        } else {
+          /* Too many ray launchers for tile size,
+           * so just finish immediately */
+          worker.connection->enqueue_write(
+            Message::str( 0, OpCode::FinishUp, "" ) );
+          worker.state = Worker::State::FinishingUp;
         }
-    }
+      } else {
+        /* this is a normal worker */
+        if ( !treelets_to_spawn.empty() ) {
+          const TreeletId treelet_id = treelets_to_spawn.front();
+          treelets_to_spawn.pop_front();
 
-    cerr << endl;
+          auto& treelet = treelets[treelet_id];
+          treelet.pending_workers--;
 
-    printJobSummary();
+          /* (0) create the entry for the worker */
+          workers.emplace_back(
+            workerId, Worker::Role::Tracer, move( connection ) );
+          auto& worker = workers.back();
 
-    if (!config.jobSummaryPath.empty()) {
-        dumpJobSummary();
-    }
+          assign_base_objects( worker );
+          assign_treelet( worker, treelet );
 
-    if (!getRequests.empty()) {
-        cerr << "\nDownloading " << getRequests.size() << " log file(s)... ";
-        this_thread::sleep_for(10s);
-        storageBackend->get(getRequests);
-        cerr << "done." << endl;
-    }
-}
+          /* (1) saying hi, assigning id to the worker */
+          protobuf::Hey hey_proto;
+          hey_proto.set_worker_id( worker_id );
+          hey_proto.set_job_id( job_id );
+          worker.connection->enqueue_write(
+            Message::str( 0, OpCode::Hey, protoutil::to_string( hey_proto ) ) );
 
-void usage(const char *argv0, int exitCode) {
-    cerr << "Usage: " << argv0 << " [OPTION]..." << endl
-         << endl
-         << "Options:" << endl
-         << "  -p --port PORT             port to use" << endl
-         << "  -P --client-port PORT      port for clients to connect" << endl
-         << "  -i --ip IPSTRING           public ip of this machine" << endl
-         << "  -r --aws-region REGION     region to run lambdas in" << endl
-         << "  -b --storage-backend NAME  storage backend URI" << endl
-         << "  -m --max-workers N         maximum number of workers" << endl
-         << "  -G --ray-generators N      number of ray generators" << endl
-         << "  -g --debug-logs            collect worker debug logs" << endl
-         << "  -w --worker-stats N        log worker stats every N seconds"
-         << endl
-         << "  -L --log-rays RATE         log ray actions" << endl
-         << "  -B --log-bags RATE         log bag actions" << endl
-         << "  -D --logs-dir DIR          set logs directory (default: logs/)"
-         << endl
-         << "  -S --samples N             number of samples per pixel" << endl
-         << "  -M --max-depth N           maximum path depth" << endl
-         << "  -a --scheduler TYPE        indicate scheduler type:" << endl
-         << "                               - uniform (default)" << endl
-         << "                               - static" << endl
-         << "                               - all" << endl
-         << "                               - none" << endl
-         << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
-         << endl
-         << "  -T --pix-per-tile N        pixels per tile (default=44)" << endl
-         << "  -n --new-tile-send N       threshold for sending new tiles"
-         << endl
-         << "  -t --timeout T             exit after T seconds of inactivity"
-         << endl
-         << "  -j --job-summary FILE      output the job summary in JSON format"
-         << endl
-         << "  -d --memcached-server      address for memcached" << endl
-         << "                             (can be repeated)" << endl
-         << "  -h --help                  show help information" << endl;
+          /* (2) tell the worker to get the scene objects necessary */
+          protobuf::GetObjects objs_proto;
+          for ( const ObjectKey& id : worker.objects ) {
+            *objs_proto.add_object_ids() = to_protobuf( id );
+          }
 
-    exit(exitCode);
-}
+          worker.connection->enqueue_write( Message::str(
+            0, OpCode::GetObjects, protoutil::to_string( objs_proto ) ) );
 
-Optional<Bounds2i> parseCropWindowOptarg(const string &optarg) {
-    vector<string> args = split(optarg, ",");
-    if (args.size() != 4) return {};
-
-    Point2i pMin, pMax;
-    pMin.x = stoi(args[0]);
-    pMin.y = stoi(args[1]);
-    pMax.x = stoi(args[2]);
-    pMax.y = stoi(args[3]);
-
-    return {true, Bounds2i{pMin, pMax}};
-}
-
-int main(int argc, char *argv[]) {
-    if (argc <= 0) {
-        abort();
-    }
-
-    timer();
-
-    google::InitGoogleLogging(argv[0]);
-
-    uint16_t listenPort = 50000;
-    uint16_t clientPort = 0;
-    int32_t maxWorkers = -1;
-    int32_t rayGenerators = 0;
-    string publicIp;
-    string storageBackendUri;
-    string region{"us-west-2"};
-    uint64_t workerStatsWriteInterval = 0;
-    bool collectDebugLogs = false;
-    float rayLogRate = 0.0;
-    float bagLogRate = 0.0;
-    string logsDirectory = "logs/";
-    Optional<Bounds2i> cropWindow;
-    uint32_t timeout = 0;
-    uint32_t pixelsPerTile = 0;
-    uint64_t newTileThreshold = 10000;
-    string jobSummaryPath;
-
-    unique_ptr<Scheduler> scheduler = nullptr;
-    string schedulerName;
-
-    int samplesPerPixel = 0;
-    int maxPathDepth = 5;
-    int tileSize = 0;
-
-    uint32_t maxJobsOnEngine = 1;
-    vector<string> memcachedServers;
-    vector<pair<string, uint32_t>> engines;
-
-    struct option long_options[] = {
-        {"port", required_argument, nullptr, 'p'},
-        {"client-port", required_argument, nullptr, 'P'},
-        {"ip", required_argument, nullptr, 'i'},
-        {"aws-region", required_argument, nullptr, 'r'},
-        {"storage-backend", required_argument, nullptr, 'b'},
-        {"max-workers", required_argument, nullptr, 'm'},
-        {"ray-generators", required_argument, nullptr, 'G'},
-        {"scheduler", required_argument, nullptr, 'a'},
-        {"debug-logs", no_argument, nullptr, 'g'},
-        {"worker-stats", required_argument, nullptr, 'w'},
-        {"log-rays", required_argument, nullptr, 'L'},
-        {"log-bags", required_argument, nullptr, 'B'},
-        {"logs-dir", required_argument, nullptr, 'D'},
-        {"samples", required_argument, nullptr, 'S'},
-        {"max-depth", required_argument, nullptr, 'M'},
-        {"crop-window", required_argument, nullptr, 'c'},
-        {"timeout", required_argument, nullptr, 't'},
-        {"job-summary", required_argument, nullptr, 'j'},
-        {"pix-per-tile", required_argument, nullptr, 'T'},
-        {"new-tile-send", required_argument, nullptr, 'n'},
-        {"directional", no_argument, nullptr, 'I'},
-        {"jobs", required_argument, nullptr, 'J'},
-        {"memcached-server", required_argument, nullptr, 'd'},
-        {"engine", required_argument, nullptr, 'E'},
-        {"help", no_argument, nullptr, 'h'},
-        {nullptr, 0, nullptr, 0},
-    };
-
-    while (true) {
-        const int opt = getopt_long(
-            argc, argv, "p:P:i:r:b:m:G:w:D:a:S:M:L:c:t:j:T:n:J:d:E:B:gh",
-            long_options, nullptr);
-
-        if (opt == -1) {
-            break;
+          free_workers.push_back( worker.id );
+        } else {
+          throw runtime_error( "we accepted a useless worker" );
         }
+      }
 
-        switch (opt) {
-        // clang-format off
-        case 'p': listenPort = stoi(optarg); break;
-        case 'P': clientPort = stoi(optarg); break;
-        case 'i': publicIp = optarg; break;
+      return true;
+    } );
+
+  if ( client_port != 0 ) {
+    throw runtime_error( "client support is disabled" );
+  }
+}
+
+string LambdaMaster::Worker::to_string() const
+{
+  ostringstream oss;
+
+  size_t oustanding_size = 0;
+  for ( const auto& bag : outstanding_ray_bags )
+    oustanding_size += bag.bag_size;
+
+  oss << "id=" << id << ",state=" << static_cast<int>( state )
+      << ",role=" << static_cast<int>( role ) << ",awslog=" << aws_log_stream
+      << ",treelets=";
+
+  for ( auto it = treelets.begin(); it != treelets.end(); it++ ) {
+    if ( it != treelets.begin() )
+      oss << ",";
+    oss << *it;
+  }
+
+  oss << ",outstanding=" << outstanding_ray_bags.size()
+      << ",outstanding-bytes=" << oustanding_size
+      << ",enqueued=" << stats.enqueued.bytes
+      << ",assigned=" << stats.assigned.bytes
+      << ",dequeued=" << stats.dequeued.bytes
+      << ",samples=" << stats.samples.bytes;
+
+  return oss.str();
+}
+
+void LambdaMaster::run()
+{
+  StatusBar::get();
+
+  if ( !config.memcached_servers.empty() ) {
+    cerr << "Flushing " << config.memcached_servers.size() << " memcached "
+         << pluralize( "server", config.memcached_servers.size() ) << "... ";
+
+    vector<Address> servers;
+
+    for ( auto& server : config.memcached_servers ) {
+      string host;
+      uint16_t port = 11211;
+      tie( host, port ) = Address::decompose( server );
+      servers.emplace_back( host, port );
+    }
+
+    Poller poller;
+    unique_ptr<memcached::TransferAgent> agent
+      = make_unique<memcached::TransferAgent>( servers, servers.size() );
+
+    size_t flushed_count = 0;
+
+    poller.add_action( Poller::Action(
+      agent->eventfd(),
+      Direction::In,
+      [&]() {
+        if ( !agent->eventfd().read_event() )
+          return ResultType::Continue;
+
+        vector<pair<uint64_t, string>> actions;
+        agent->tryPopBulk( back_inserter( actions ) );
+
+        flushed_count += actions.size();
+
+        if ( flushed_count == config.memcached_servers.size() ) {
+          return ResultType::Exit;
+        } else {
+          return ResultType::Continue;
+        }
+      },
+      []() { return true; } ) );
+
+    agent->flushAll();
+
+    while ( poller.poll( -1 ).result == PollerResult::Success )
+      ;
+
+    cerr << "done." << endl;
+  }
+
+  if ( ray_generators > 0 ) {
+    /* let's invoke the ray generators */
+    cerr << "Launching " << ray_generators << " ray "
+         << pluralize( "generator", ray_generators ) << "... ";
+
+    invokeWorkers( ray_generators
+                   + static_cast<size_t>( 0.1 * ray_generators ) );
+    cerr << "done." << endl;
+  }
+
+  while ( true ) {
+    auto res = loop.loop_once().result;
+    if ( res != PollerResult::Success && res != PollerResult::Timeout )
+      break;
+  }
+
+  vector<storage::GetRequest> get_requests;
+  const string log_prefix = "logs/" + jobId + "/";
+
+  ws_stream.close();
+  tl_stream.close();
+
+  for ( auto& worker : workers ) {
+    if ( worker.state != Worker::State::Terminated ) {
+      worker.connection->socket().close();
+    }
+
+    if ( config.collect_debug_logs || config.ray_log_rate
+         || config.bag_log_rate ) {
+      get_requests.emplace_back( logPrefix + to_string( worker.id ) + ".INFO",
+                                 config.logs_directory + "/"
+                                   + to_string( worker.id ) + ".INFO" );
+    }
+  }
+
+  cerr << endl;
+
+  print_job_summary();
+
+  if ( !config.job_summary_path.empty() ) {
+    dump_job_summary();
+  }
+
+  if ( !get_requests.empty() ) {
+    cerr << "\nDownloading " << get_requests.size() << " log file(s)... ";
+    this_thread::sleep_for( 10s );
+    storage_backend->get( get_requests );
+    cerr << "done." << endl;
+  }
+}
+
+void usage( const char* argv0, int exit_code )
+{
+  cerr << "Usage: " << argv0 << " [OPTION]..." << endl
+       << endl
+       << "Options:" << endl
+       << "  -p --port PORT             port to use" << endl
+       << "  -P --client-port PORT      port for clients to connect" << endl
+       << "  -i --ip IPSTRING           public ip of this machine" << endl
+       << "  -r --aws-region REGION     region to run lambdas in" << endl
+       << "  -b --storage-backend NAME  storage backend URI" << endl
+       << "  -m --max-workers N         maximum number of workers" << endl
+       << "  -G --ray-generators N      number of ray generators" << endl
+       << "  -g --debug-logs            collect worker debug logs" << endl
+       << "  -w --worker-stats N        log worker stats every N seconds"
+       << endl
+       << "  -L --log-rays RATE         log ray actions" << endl
+       << "  -B --log-bags RATE         log bag actions" << endl
+       << "  -D --logs-dir DIR          set logs directory (default: logs/)"
+       << endl
+       << "  -S --samples N             number of samples per pixel" << endl
+       << "  -M --max-depth N           maximum path depth" << endl
+       << "  -a --scheduler TYPE        indicate scheduler type:" << endl
+       << "                               - uniform (default)" << endl
+       << "                               - static" << endl
+       << "                               - all" << endl
+       << "                               - none" << endl
+       << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
+       << endl
+       << "  -T --pix-per-tile N        pixels per tile (default=44)" << endl
+       << "  -n --new-tile-send N       threshold for sending new tiles" << endl
+       << "  -t --timeout T             exit after T seconds of inactivity"
+       << endl
+       << "  -j --job-summary FILE      output the job summary in JSON format"
+       << endl
+       << "  -d --memcached-server      address for memcached" << endl
+       << "                             (can be repeated)" << endl
+       << "  -h --help                  show help information" << endl;
+
+  exit( exit_code );
+}
+
+Optional<Bounds2i> parse_crop_window_optarg( const string& optarg )
+{
+  vector<string> args = split( optarg, "," );
+  if ( args.size() != 4 )
+    return {};
+
+  Point2i p_min, p_max;
+  p_min.x = stoi( args[0] );
+  p_min.y = stoi( args[1] );
+  p_max.x = stoi( args[2] );
+  p_max.y = stoi( args[3] );
+
+  return { true, Bounds2i { p_min, p_max } };
+}
+
+int main( int argc, char* argv[] )
+{
+  if ( argc <= 0 ) {
+    abort();
+  }
+
+  timer();
+
+  google::InitGoogleLogging( argv[0] );
+
+  uint16_t listen_port = 50000;
+  uint16_t client_port = 0;
+  int32_t max_workers = -1;
+  int32_t ray_generators = 0;
+  string public_ip;
+  string storage_backend_uri;
+  string region { "us-west-2" };
+  uint64_t worker_stats_write_interval = 0;
+  bool collect_debug_logs = false;
+  float ray_log_rate = 0.0;
+  float bag_log_rate = 0.0;
+  string logs_directory = "logs/";
+  Optional<Bounds2i> crop_window;
+  uint32_t timeout = 0;
+  uint32_t pixels_per_tile = 0;
+  uint64_t new_tile_threshold = 10000;
+  string job_summary_path;
+
+  unique_ptr<Scheduler> scheduler = nullptr;
+  string scheduler_name;
+
+  int samples_per_pixel = 0;
+  int max_path_depth = 5;
+  int tile_size = 0;
+
+  uint32_t max_jobs_on_engine = 1;
+  vector<string> memcached_servers;
+  vector<pair<string, uint32_t>> engines;
+
+  struct option long_options[] = {
+    { "port", required_argument, nullptr, 'p' },
+    { "client-port", required_argument, nullptr, 'P' },
+    { "ip", required_argument, nullptr, 'i' },
+    { "aws-region", required_argument, nullptr, 'r' },
+    { "storage-backend", required_argument, nullptr, 'b' },
+    { "max-workers", required_argument, nullptr, 'm' },
+    { "ray-generators", required_argument, nullptr, 'G' },
+    { "scheduler", required_argument, nullptr, 'a' },
+    { "debug-logs", no_argument, nullptr, 'g' },
+    { "worker-stats", required_argument, nullptr, 'w' },
+    { "log-rays", required_argument, nullptr, 'L' },
+    { "log-bags", required_argument, nullptr, 'B' },
+    { "logs-dir", required_argument, nullptr, 'D' },
+    { "samples", required_argument, nullptr, 'S' },
+    { "max-depth", required_argument, nullptr, 'M' },
+    { "crop-window", required_argument, nullptr, 'c' },
+    { "timeout", required_argument, nullptr, 't' },
+    { "job-summary", required_argument, nullptr, 'j' },
+    { "pix-per-tile", required_argument, nullptr, 'T' },
+    { "new-tile-send", required_argument, nullptr, 'n' },
+    { "directional", no_argument, nullptr, 'I' },
+    { "jobs", required_argument, nullptr, 'J' },
+    { "memcached-server", required_argument, nullptr, 'd' },
+    { "engine", required_argument, nullptr, 'E' },
+    { "help", no_argument, nullptr, 'h' },
+    { nullptr, 0, nullptr, 0 },
+  };
+
+  while ( true ) {
+    const int opt
+      = getopt_long( argc,
+                     argv,
+                     "p:P:i:r:b:m:G:w:D:a:S:M:L:c:t:j:T:n:J:d:E:B:gh",
+                     long_options,
+                     nullptr );
+
+    if ( opt == -1 ) {
+      break;
+    }
+
+    switch ( opt ) {
+      // clang-format off
+        case 'p': listen_port = stoi(optarg); break;
+        case 'P': client_port = stoi(optarg); break;
+        case 'i': public_ip = optarg; break;
         case 'r': region = optarg; break;
-        case 'b': storageBackendUri = optarg; break;
-        case 'm': maxWorkers = stoi(optarg); break;
-        case 'G': rayGenerators = stoi(optarg); break;
-        case 'a': schedulerName = optarg; break;
-        case 'g': collectDebugLogs = true; break;
-        case 'w': workerStatsWriteInterval = stoul(optarg); break;
-        case 'D': logsDirectory = optarg; break;
-        case 'S': samplesPerPixel = stoi(optarg); break;
-        case 'M': maxPathDepth = stoi(optarg); break;
-        case 'L': rayLogRate = stof(optarg); break;
-        case 'B': bagLogRate = stof(optarg); break;
+        case 'b': storage_backend_uri = optarg; break;
+        case 'm': max_workers = stoi(optarg); break;
+        case 'G': ray_generators = stoi(optarg); break;
+        case 'a': scheduler_name = optarg; break;
+        case 'g': collect_debug_logs = true; break;
+        case 'w': worker_stats_write_interval = stoul(optarg); break;
+        case 'D': logs_directory = optarg; break;
+        case 'S': samples_per_pixel = stoi(optarg); break;
+        case 'M': max_path_depth = stoi(optarg); break;
+        case 'L': ray_log_rate = stof(optarg); break;
+        case 'B': bag_log_rate = stof(optarg); break;
         case 't': timeout = stoul(optarg); break;
-        case 'j': jobSummaryPath = optarg; break;
-        case 'n': newTileThreshold = stoull(optarg); break;
+        case 'j': job_summary_path = optarg; break;
+        case 'n': new_tile_threshold = stoull(optarg); break;
         case 'I': PbrtOptions.directionalTreelets = true; break;
-        case 'J': maxJobsOnEngine = stoul(optarg); break;
-        case 'd': memcachedServers.emplace_back(optarg); break;
-        case 'E': engines.emplace_back(optarg, maxJobsOnEngine); break;
+        case 'J': max_jobs_on_engine = stoul(optarg); break;
+        case 'd': memcached_servers.emplace_back(optarg); break;
+        case 'E': engines.emplace_back(optarg, max_jobs_on_engine); break;
         case 'h': usage(argv[0], EXIT_SUCCESS); break;
 
-            // clang-format on
+        // clang-format on
 
-        case 'T': {
-            if (strcmp(optarg, "auto") == 0) {
-                tileSize = numeric_limits<typeof(tileSize)>::max();
-                pixelsPerTile = numeric_limits<typeof(pixelsPerTile)>::max();
-            } else {
-                pixelsPerTile = stoul(optarg);
-                tileSize = ceil(sqrt(pixelsPerTile));
-            }
-            break;
+      case 'T': {
+        if ( strcmp( optarg, "auto" ) == 0 ) {
+          tile_size = numeric_limits<typeof( tile_size )>::max();
+          pixels_per_tile = numeric_limits<typeof( pixels_per_tile )>::max();
+        } else {
+          pixels_per_tile = stoul( optarg );
+          tile_size = ceil( sqrt( pixels_per_tile ) );
+        }
+        break;
+      }
+
+      case 'c':
+        crop_window = parse_crop_window_optarg( optarg );
+
+        if ( !crop_window.initialized() ) {
+          cerr << "Error: bad crop window (" << optarg << ")." << endl;
+          usage( argv[0], EXIT_FAILURE );
         }
 
-        case 'c':
-            cropWindow = parseCropWindowOptarg(optarg);
+        break;
 
-            if (!cropWindow.initialized()) {
-                cerr << "Error: bad crop window (" << optarg << ")." << endl;
-                usage(argv[0], EXIT_FAILURE);
-            }
-
-            break;
-
-        default:
-            usage(argv[0], EXIT_FAILURE);
-            break;
-        }
+      default:
+        usage( argv[0], EXIT_FAILURE );
+        break;
     }
+  }
 
-    if (schedulerName == "uniform") {
-        scheduler = make_unique<UniformScheduler>();
-    } else if (schedulerName == "static") {
-        auto storage = StorageBackend::create_backend(storageBackendUri);
-        TempFile staticFile{"/tmp/r2t2-lambda-master.STATIC0"};
+  if ( scheduler_name == "uniform" ) {
+    scheduler = make_unique<UniformScheduler>();
+  } else if ( scheduler_name == "static" ) {
+    auto storage = StorageBackend::create_backend( storage_backend_uri );
+    TempFile static_file { "/tmp/r2t2-lambda-master.STATIC0" };
 
-        cerr << "Downloading static assignment file... ";
-        storage->get({{scene::GetObjectName(ObjectType::StaticAssignment, 0),
-                       staticFile.name()}});
-        cerr << "done." << endl;
+    cerr << "Downloading static assignment file... ";
+    storage->get( { { scene::GetObjectName( ObjectType::StaticAssignment, 0 ),
+                      static_file.name() } } );
+    cerr << "done." << endl;
 
-        scheduler = make_unique<StaticScheduler>(staticFile.name());
-    } else if (schedulerName == "dynamic") {
-        scheduler = make_unique<DynamicScheduler>();
-    } else if (schedulerName == "rootonly") {
-        scheduler = make_unique<RootOnlyScheduler>();
-    } else if (schedulerName == "null") {
-        scheduler = make_unique<NullScheduler>();
-    } else {
-        usage(argv[0], EXIT_FAILURE);
-    }
+    scheduler = make_unique<StaticScheduler>( static_file.name() );
+  } else if ( scheduler_name == "dynamic" ) {
+    scheduler = make_unique<DynamicScheduler>();
+  } else if ( scheduler_name == "rootonly" ) {
+    scheduler = make_unique<RootOnlyScheduler>();
+  } else if ( scheduler_name == "null" ) {
+    scheduler = make_unique<NullScheduler>();
+  } else {
+    usage( argv[0], EXIT_FAILURE );
+  }
 
-    if (scheduler == nullptr || listenPort == 0 || maxWorkers <= 0 ||
-        rayGenerators < 0 || samplesPerPixel < 0 || maxPathDepth < 0 ||
-        rayLogRate < 0 || rayLogRate > 1.0 || bagLogRate < 0 ||
-        bagLogRate > 1.0 || publicIp.empty() || storageBackendUri.empty() ||
-        region.empty() || newTileThreshold == 0 ||
-        (cropWindow.initialized() && pixelsPerTile != 0 &&
-         pixelsPerTile != numeric_limits<typeof(pixelsPerTile)>::max() &&
-         pixelsPerTile > cropWindow->Area())) {
-        usage(argv[0], 2);
-    }
+  if ( scheduler == nullptr || listen_port == 0 || max_workers <= 0
+       || ray_generators < 0 || samples_per_pixel < 0 || max_path_depth < 0
+       || ray_log_rate < 0 || ray_log_rate > 1.0 || bag_log_rate < 0
+       || bag_log_rate > 1.0 || public_ip.empty() || storage_backend_uri.empty()
+       || region.empty() || new_tile_threshold == 0
+       || ( crop_window.initialized() && pixels_per_tile != 0
+            && pixels_per_tile
+                 != numeric_limits<typeof( pixels_per_tile )>::max()
+            && pixels_per_tile > crop_window->Area() ) ) {
+    usage( argv[0], 2 );
+  }
 
-    ostringstream publicAddress;
-    publicAddress << publicIp << ":" << listenPort;
+  ostringstream public_address;
+  public_address << public_ip << ":" << listen_port;
 
-    unique_ptr<LambdaMaster> master;
+  unique_ptr<LambdaMaster> master;
 
-    // TODO clean this up
-    MasterConfiguration config = {samplesPerPixel,
-                                  maxPathDepth,
-                                  collectDebugLogs,
-                                  workerStatsWriteInterval,
-                                  rayLogRate,
-                                  bagLogRate,
-                                  logsDirectory,
-                                  cropWindow,
-                                  tileSize,
-                                  seconds{timeout},
-                                  jobSummaryPath,
-                                  newTileThreshold,
-                                  move(memcachedServers),
-                                  move(engines)};
+  // TODO clean this up
+  MasterConfiguration config = { samples_per_pixel,
+                                 max_path_depth,
+                                 collect_debug_logs,
+                                 worker_stats_write_interval,
+                                 ray_log_rate,
+                                 bag_log_rate,
+                                 logs_directory,
+                                 crop_window,
+                                 tile_size,
+                                 seconds { timeout },
+                                 job_summary_path,
+                                 new_tile_threshold,
+                                 move( memcached_servers ),
+                                 move( engines ) };
 
-    try {
-        master = make_unique<LambdaMaster>(listenPort, clientPort, maxWorkers,
-                                           rayGenerators, publicAddress.str(),
-                                           storageBackendUri, region,
-                                           move(scheduler), config);
+  try {
+    master = make_unique<LambdaMaster>( listen_port,
+                                        client_port,
+                                        max_workers,
+                                        ray_generators,
+                                        public_address.str(),
+                                        storage_backend_uri,
+                                        region,
+                                        move( scheduler ),
+                                        config );
 
-        master->run();
+    master->run();
 
-        cerr << endl << timer().summary() << endl;
-    } catch (const exception &e) {
-        print_exception(argv[0], e);
-        return EXIT_FAILURE;
-    }
+    cerr << endl << timer().summary() << endl;
+  } catch ( const exception& e ) {
+    print_exception( argv[0], e );
+    return EXIT_FAILURE;
+  }
 
-    return EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }

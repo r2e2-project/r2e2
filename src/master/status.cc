@@ -11,41 +11,41 @@ using namespace PollerShortNames;
 
 constexpr milliseconds EXIT_GRACE_PERIOD{5'000};
 
-ResultType LambdaMaster::handleStatusMessage() {
+ResultType LambdaMaster::handle_status_message() {
     ScopeTimer<TimeLog::Category::StatusBar> timer_;
 
-    statusPrintTimer.read_event();
+    status_print_timer.read_event();
 
     const auto now = steady_clock::now();
 
-    if (config.timeout.count() && now - lastActionTime >= config.timeout) {
+    if (config.timeout.count() && now - last_action_time >= config.timeout) {
         cerr << "Job terminated due to inactivity." << endl;
         return ResultType::Exit;
     } else if (jobTimeoutTimer == nullptr &&
-               scene.totalPaths == aggregatedStats.finishedPaths) {
+               scene.total_paths == aggregated_stats.finishedPaths) {
         cerr << "Done! Terminating the job in "
              << duration_cast<seconds>(EXIT_GRACE_PERIOD).count() << "s..."
              << endl;
 
-        jobTimeoutTimer = make_unique<TimerFD>(EXIT_GRACE_PERIOD);
+        job_timeout_timer = make_unique<TimerFD>(EXIT_GRACE_PERIOD);
 
         loop.poller().add_action(Poller::Action(
-            *jobTimeoutTimer, Direction::In,
+            *job_timeout_timer, Direction::In,
             [this]() {
-                jobTimeoutTimer = nullptr;
+                job_timeout_timer = nullptr;
                 return ResultType::Exit;
             },
             [this]() { return true; },
             []() { throw runtime_error("job finish"); }));
     }
 
-    const auto laggingWorkers =
+    const auto lagging_workers =
         count_if(workers.begin(), workers.end(), [&now](const auto &worker) {
             return (worker.state != Worker::State::Terminated) &&
-                   (now - worker.lastSeen >= seconds{4});
+                   (now - worker.last_seen >= seconds{4});
         });
 
-    const auto elapsedSeconds = duration_cast<seconds>(now - startTime).count();
+    const auto elapsed_seconds = duration_cast<seconds>(now - start_time).count();
 
     auto percent = [](const uint64_t n, const uint64_t total) -> double {
         return total ? (((uint64_t)(100 * (100.0 * n / total))) / 100.0) : 0.0;
@@ -61,7 +61,7 @@ ResultType LambdaMaster::handleStatusMessage() {
         return alternate ? BG_B : BG_A;
     };
 
-    auto &s = aggregatedStats;
+    auto &s = aggregated_stats;
 
     // clang-format off
     ostringstream oss;
@@ -69,18 +69,18 @@ ResultType LambdaMaster::handleStatusMessage() {
 
         // finished paths
         << BG(true) << " \u21af " << s.finishedPaths
-        << " (" << percent(s.finishedPaths, scene.totalPaths) << "%) "
+        << " (" << percent(s.finishedPaths, scene.total_paths) << "%) "
 
-        << BG() << " \u21a6 " << Worker::activeCount[Worker::Role::Generator]
+        << BG() << " \u21a6 " << Worker::active_count[Worker::Role::Generator]
                 << "/" << rayGenerators << " "
 
-        << BG() << " \u03bb " << Worker::activeCount[Worker::Role::Tracer]
+        << BG() << " \u03bb " << Worker::active_count[Worker::Role::Tracer]
                 << "/" << maxWorkers << " "
 
-        << BG() << " \u29d6 " << treeletsToSpawn.size() << " "
+        << BG() << " \u29d6 " << treelets_to_spawn.size() << " "
 
         // lagging workers
-        << BG() << " \u203c " << laggingWorkers << " "
+        << BG() << " \u203c " << lagging_workers << " "
 
         // enqueued bytes
         << BG() << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
@@ -93,13 +93,10 @@ ResultType LambdaMaster::handleStatusMessage() {
         << BG() << " \u2193 " << percent(s.dequeued.bytes, s.enqueued.bytes)
                 << "% "
 
-        // subscribers
-        << BG() << " \u29bf " << subscribers.size() << " "
-
         // elapsed time
         << BG() << " " << setfill('0')
-                << setw(2) << (elapsedSeconds / 60) << ":" << setw(2)
-                << (elapsedSeconds % 60) << " "
+                << setw(2) << (elapsed_seconds / 60) << ":" << setw(2)
+                << (elapsed_seconds % 60) << " "
 
         << BG();
     // clang-format on

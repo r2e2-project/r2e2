@@ -14,8 +14,8 @@
 
 #include "common/lambda.hh"
 #include "common/stats.hh"
-#include "execution/session.hh"
 #include "execution/meow/message.hh"
+#include "execution/session.hh"
 #include "net/address.hh"
 #include "net/aws.hh"
 #include "net/http_request.hh"
@@ -32,298 +32,329 @@
 
 namespace r2t2 {
 
-constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
-constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL{1'000};
-constexpr std::chrono::milliseconds WORKER_INVOCATION_INTERVAL{2'000};
+constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL { 1'000 };
+constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL { 1'000 };
+constexpr std::chrono::milliseconds WORKER_INVOCATION_INTERVAL { 2'000 };
 
-struct MasterConfiguration {
-    int samplesPerPixel;
-    int maxPathDepth;
-    bool collectDebugLogs;
-    uint64_t workerStatsWriteInterval;
-    float rayLogRate;
-    float bagLogRate;
-    std::string logsDirectory;
-    Optional<pbrt::Bounds2i> cropWindow;
-    int tileSize;
-    std::chrono::seconds timeout;
-    std::string jobSummaryPath;
-    uint64_t newTileThreshold;
+struct MasterConfiguration
+{
+  int samples_per_pixel;
+  int max_path_depth;
+  bool collect_debug_logs;
+  uint64_t worker_stats_write_interval;
+  float ray_log_rate;
+  float bag_log_rate;
+  std::string logs_directory;
+  Optional<pbrt::Bounds2i> crop_window;
+  int tile_size;
+  std::chrono::seconds timeout;
+  std::string job_summary_path;
+  uint64_t new_tile_threshold;
 
-    std::vector<std::string> memcachedServers;
-    std::vector<std::pair<std::string, uint32_t>> engines;
+  std::vector<std::string> memcached_servers;
+  std::vector<std::pair<std::string, uint32_t>> engines;
 };
 
-class LambdaMaster {
+class LambdaMaster
+{
+public:
+  LambdaMaster( const uint16_t listen_port,
+                const uint16_t client_port,
+                const uint32_t max_workers,
+                const uint32_t ray_generators,
+                const std::string& public_address,
+                const std::string& storage_backend,
+                const std::string& aws_region,
+                std::unique_ptr<Scheduler>&& scheduler,
+                const MasterConfiguration& config );
+
+  ~LambdaMaster();
+
+  void run();
+
+  protobuf::JobSummary get_job_summary() const;
+  void print_job_summary() const;
+  void dump_job_summary() const;
+
+private:
+  using steady_clock = std::chrono::steady_clock;
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Job Information                                                        //
+  ////////////////////////////////////////////////////////////////////////////
+
+  const MasterConfiguration config;
+  const TempDirectory scene_dir { "/tmp/r2t2-lambda-master" };
+  const std::string job_id;
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Cloud                                                                  //
+  ////////////////////////////////////////////////////////////////////////////
+
+  const std::string public_address;
+  const std::string storage_backend_uri;
+  const std::unique_ptr<StorageBackend> storage_backend;
+  const Address aws_address;
+  const std::string aws_region;
+  const AWSCredentials aws_credentials {};
+  const std::string lambda_function_name {
+    safe_getenv_or( "R2T2_LAMBDA_FUNCTION", "r2t2-lambda-function" )
+  };
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Workers                                                                //
+  ////////////////////////////////////////////////////////////////////////////
+
+  struct Worker
+  {
+    enum class State
+    {
+      Active,
+      FinishingUp,
+      Terminating,
+      Terminated
+    };
+    enum class Role
+    {
+      Generator,
+      Tracer,
+      Aggregator
+    };
+
+    WorkerId id;
+    State state { State::Active };
+    Role role;
+    std::shared_ptr<TCPConnection> connection;
+    steady_clock::time_point last_seen {};
+    std::string aws_log_stream {};
+
+    std::vector<TreeletId> treelets {};
+    std::set<pbrt::ObjectKey> objects {};
+
+    std::set<RayBagInfo> outstanding_ray_bags {};
+    size_t outstanding_bytes { 0 };
+
+    struct
+    {
+      uint64_t camera { 0 };
+      uint64_t generated { 0 };
+      uint64_t dequeued { 0 };
+
+      uint64_t terminated { 0 };
+      uint64_t enqueued { 0 };
+    } rays;
+
+    uint64_t activeRays() const
+    {
+      return rays.camera + rays.generated + rays.dequeued - rays.terminated
+             - rays.enqueued;
+    }
+
+    // Statistics
+    bool is_logged { true };
+    WorkerStats stats {};
+    WorkerStats lastStats;
+
+    Worker( const WorkerId id,
+            const Role role,
+            std::shared_ptr<TCPConnection>&& connection )
+      : id( id )
+      , role( role )
+      , connection( std::move( connection ) )
+    {
+      Worker::active_count[role]++;
+    }
+
+    std::string to_string() const;
+
+    static std::map<Role, size_t> active_count;
+    static WorkerId next_id;
+  };
+
+  std::vector<Worker> workers {};
+  const uint32_t max_workers;
+  const uint32_t ray_generators;
+  uint32_t finished_ray_generators { 0 };
+  uint32_t initialized_workers { 0 };
+
+  std::deque<WorkerId> free_workers {};
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Treelets                                                               //
+  ////////////////////////////////////////////////////////////////////////////
+
+  struct Treelet
+  {
+    TreeletId id;
+    size_t pending_workers { 0 };
+    std::set<WorkerId> workers {};
+    std::pair<bool, TreeletStats> last_stats { true, {} };
+
+    Treelet( const TreeletId id )
+      : id( id )
+    {}
+  };
+
+  std::vector<Treelet> treelets {};
+  std::vector<TreeletStats> treelet_stats {};
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Scheduler                                                              //
+  ////////////////////////////////////////////////////////////////////////////
+
+  /* this function is periodically called; it calls the scheduler,
+     and if a new schedule is available, it executes it */
+  Poller::Action::Result::Type handle_reschedule();
+
+  Poller::Action::Result::Type handle_worker_invocation();
+
+  void execute_schedule( const Schedule& schedule );
+
+  /* requests invoking n workers */
+  void invoke_workers( const size_t n );
+
+  std::unique_ptr<Scheduler> scheduler;
+  std::deque<TreeletId> treelets_to_spawn;
+  std::string invocation_payload;
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Worker <-> Object Assignments                                          //
+  ////////////////////////////////////////////////////////////////////////////
+
+  void assign_object( Worker& worker, const pbrt::ObjectKey& object );
+  void assign_base_objects( Worker& worker );
+  void assign_treelet( Worker& worker, Treelet& treelet );
+
+  std::set<TreeletId> unassigned_treelets {};
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Communication                                                          //
+  ////////////////////////////////////////////////////////////////////////////
+
+  /*** Messages *************************************************************/
+
+  /* processes incoming messages; called by handleMessages */
+  void process_message( const WorkerId worker_id,
+                        const meow::Message& message );
+
+  /* process incoming messages */
+  Poller::Action::Result::Type handle_messages();
+
+  /* a queue for incoming messages */
+  std::deque<std::pair<WorkerId, meow::Message>> incoming_messages {};
+
+  /*** Ray Bags *************************************************************/
+
+  bool assign_work( Worker& worker );
+
+  Poller::Action::Result::Type handle_queued_ray_bags();
+
+  /* ray bags that are going to be assigned to workers */
+  std::vector<std::queue<RayBagInfo>> queued_ray_bags;
+  size_t queued_ray_bags_count { 0 };
+
+  /* ray bags that there are no workers for them */
+  std::vector<std::queue<RayBagInfo>> pending_ray_bags;
+
+  /* sample bags */
+  std::vector<RayBagInfo> sample_bags;
+
+  void move_from_pending_to_queued( const TreeletId treeletId );
+  void move_from_queued_to_pending( const TreeletId treeletId );
+
+  std::map<TreeletId, size_t> queue_size;
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Stats                                                                  //
+  ////////////////////////////////////////////////////////////////////////////
+
+  WorkerStats aggregated_stats {};
+
+  /*** Outputting stats *****************************************************/
+
+  void record_enqueue( const WorkerId worker_id, const RayBagInfo& info );
+  void record_assign( const WorkerId worker_id, const RayBagInfo& info );
+  void record_dequeue( const WorkerId worker_id, const RayBagInfo& info );
+
+  /* object for writing worker & treelet stats */
+  std::ofstream ws_stream {};
+  std::ofstream tl_stream {};
+
+  /* write worker stats periodically */
+  Poller::Action::Result::Type handle_worker_stats();
+
+  /* prints the status message every second */
+  Poller::Action::Result::Type handle_status_message();
+
+  /*** Timepoints ***********************************************************/
+
+  const steady_clock::time_point start_time { steady_clock::now() };
+  steady_clock::time_point last_generator_done { start_time };
+  steady_clock::time_point last_finished_ray {};
+  steady_clock::time_point last_action_time { start_time };
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Scene Objects                                                          //
+  ////////////////////////////////////////////////////////////////////////////
+
+  /*** Scene Information ****************************************************/
+
+  struct SceneData
+  {
   public:
-    LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
-                 const uint32_t maxWorkers, const uint32_t rayGenerators,
-                 const std::string &publicAddress,
-                 const std::string &storageBackend,
-                 const std::string &awsRegion,
-                 std::unique_ptr<Scheduler> &&scheduler,
-                 const MasterConfiguration &config);
+    pbrt::scene::Base base {};
 
-    ~LambdaMaster();
+    pbrt::Bounds2i sample_bounds {};
+    pbrt::Vector2i sample_extent {};
+    size_t total_paths { 0 };
 
-    void run();
+    SceneData() {}
+    SceneData( const std::string& scene_path,
+               const int samples_per_pixel,
+               const Optional<pbrt::Bounds2i>& crop_window );
+  } scene {};
 
-    protobuf::JobSummary getJobSummary() const;
-    void printJobSummary() const;
-    void dumpJobSummary() const;
+  /*** Tiles ****************************************************************/
+
+  class Tiles
+  {
+  public:
+    pbrt::Bounds2i next_camera_tile();
+    bool camera_rays_remaining() const;
+    void send_worker_tile( Worker& worker );
+
+    Tiles() = default;
+    Tiles( const int tile_size,
+           const pbrt::Bounds2i& bounds,
+           const long int spp,
+           const uint32_t num_workers );
+
+    int tile_size { 0 };
 
   private:
-    using steady_clock = std::chrono::steady_clock;
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Job Information                                                        //
-    ////////////////////////////////////////////////////////////////////////////
-
-    const MasterConfiguration config;
-    const TempDirectory sceneDir{"/tmp/r2t2-lambda-master"};
-    const std::string jobId;
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Cloud                                                                  //
-    ////////////////////////////////////////////////////////////////////////////
-
-    const std::string publicAddress;
-    const std::string storageBackendUri;
-    const std::unique_ptr<StorageBackend> storageBackend;
-    const Address awsAddress;
-    const std::string awsRegion;
-    const AWSCredentials awsCredentials{};
-    const std::string lambdaFunctionName{
-        safe_getenv_or("R2T2_LAMBDA_FUNCTION", "r2t2-lambda-function")};
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Workers                                                                //
-    ////////////////////////////////////////////////////////////////////////////
-
-    struct Worker {
-        enum class State { Active, FinishingUp, Terminating, Terminated };
-        enum class Role { Generator, Tracer, Aggregator };
-
-        WorkerId id;
-        State state{State::Active};
-        Role role;
-        std::shared_ptr<TCPConnection> connection;
-        steady_clock::time_point lastSeen{};
-        std::string awsLogStream{};
-
-        std::vector<TreeletId> treelets{};
-        std::set<pbrt::ObjectKey> objects{};
-
-        std::set<RayBagInfo> outstandingRayBags{};
-        size_t outstandingBytes{0};
-
-        struct {
-            uint64_t camera{0};
-            uint64_t generated{0};
-            uint64_t dequeued{0};
-
-            uint64_t terminated{0};
-            uint64_t enqueued{0};
-        } rays;
-
-        uint64_t activeRays() const {
-            return rays.camera + rays.generated + rays.dequeued -
-                   rays.terminated - rays.enqueued;
-        }
-
-        // Statistics
-        bool isLogged{true};
-        WorkerStats stats{};
-        WorkerStats lastStats;
-
-        Worker(const WorkerId id, const Role role,
-               std::shared_ptr<TCPConnection> &&connection)
-            : id(id), role(role), connection(std::move(connection)) {
-            Worker::activeCount[role]++;
-        }
-
-        std::string toString() const;
-
-        static std::map<Role, size_t> activeCount;
-        static WorkerId nextId;
-    };
-
-    std::vector<Worker> workers{};
-    const uint32_t maxWorkers;
-    const uint32_t rayGenerators;
-    uint32_t finishedRayGenerators{0};
-    uint32_t initializedWorkers{0};
-
-    std::deque<WorkerId> freeWorkers{};
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Treelets                                                               //
-    ////////////////////////////////////////////////////////////////////////////
-
-    struct Treelet {
-        TreeletId id;
-        size_t pendingWorkers{0};
-        std::set<WorkerId> workers{};
-        std::pair<bool, TreeletStats> lastStats{true, {}};
-
-        Treelet(const TreeletId id) : id(id) {}
-    };
-
-    std::vector<Treelet> treelets{};
-    std::vector<TreeletStats> treeletStats{};
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Scheduler                                                              //
-    ////////////////////////////////////////////////////////////////////////////
-
-    /* this function is periodically called; it calls the scheduler,
-       and if a new schedule is available, it executes it */
-    Poller::Action::Result::Type handleReschedule();
-
-    Poller::Action::Result::Type handleWorkerInvocation();
-
-    void executeSchedule(const Schedule &schedule);
-
-    /* requests invoking n workers */
-    void invokeWorkers(const size_t n);
-
-    std::unique_ptr<Scheduler> scheduler;
-    std::deque<TreeletId> treeletsToSpawn;
-    std::string invocationPayload;
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Worker <-> Object Assignments                                          //
-    ////////////////////////////////////////////////////////////////////////////
-
-    void assignObject(Worker &worker, const pbrt::ObjectKey &object);
-    void assignBaseObjects(Worker &worker);
-    void assignTreelet(Worker &worker, Treelet &treelet);
-
-    std::set<TreeletId> unassignedTreelets{};
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Communication                                                          //
-    ////////////////////////////////////////////////////////////////////////////
-
-    /*** Messages *************************************************************/
-
-    /* processes incoming messages; called by handleMessages */
-    void processMessage(const WorkerId workerId, const meow::Message &message);
-
-    /* process incoming messages */
-    Poller::Action::Result::Type handleMessages();
-
-    /* a queue for incoming messages */
-    std::deque<std::pair<WorkerId, meow::Message>> incomingMessages{};
-
-    /*** Ray Bags *************************************************************/
-
-    bool assignWork(Worker &worker);
-
-    Poller::Action::Result::Type handleQueuedRayBags();
-
-    /* ray bags that are going to be assigned to workers */
-    std::vector<std::queue<RayBagInfo>> queuedRayBags;
-    size_t queuedRayBagsCount{0};
-
-    /* ray bags that there are no workers for them */
-    std::vector<std::queue<RayBagInfo>> pendingRayBags;
-
-    /* sample bags */
-    std::vector<RayBagInfo> sampleBags;
-
-    void moveFromPendingToQueued(const TreeletId treeletId);
-    void moveFromQueuedToPending(const TreeletId treeletId);
-
-    std::map<TreeletId, size_t> queueSize;
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Stats                                                                  //
-    ////////////////////////////////////////////////////////////////////////////
-
-    WorkerStats aggregatedStats{};
-
-    /*** Outputting stats *****************************************************/
-
-    void recordEnqueue(const WorkerId workerId, const RayBagInfo &info);
-    void recordAssign(const WorkerId workerId, const RayBagInfo &info);
-    void recordDequeue(const WorkerId workerId, const RayBagInfo &info);
-
-    /* object for writing worker & treelet stats */
-    std::ofstream wsStream{};
-    std::ofstream tlStream{};
-
-    /* write worker stats periodically */
-    Poller::Action::Result::Type handleWorkerStats();
-
-    /* prints the status message every second */
-    Poller::Action::Result::Type handleStatusMessage();
-
-    /*** Timepoints ***********************************************************/
-
-    const steady_clock::time_point startTime{steady_clock::now()};
-    steady_clock::time_point lastGeneratorDone{startTime};
-    steady_clock::time_point lastFinishedRay{};
-    steady_clock::time_point lastActionTime{startTime};
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Scene Objects                                                          //
-    ////////////////////////////////////////////////////////////////////////////
-
-    /*** Scene Information ****************************************************/
-
-    struct SceneData {
-      public:
-        pbrt::scene::Base base{};
-
-        pbrt::Bounds2i sampleBounds{};
-        pbrt::Vector2i sampleExtent{};
-        size_t totalPaths{0};
-
-        SceneData() {}
-        SceneData(const std::string &scenePath, const int samplesPerPixel,
-                  const Optional<pbrt::Bounds2i> &cropWindow);
-    } scene{};
-
-    /*** Tiles ****************************************************************/
-
-    class Tiles {
-      public:
-        pbrt::Bounds2i nextCameraTile();
-        bool cameraRaysRemaining() const;
-        void sendWorkerTile(Worker &worker);
-
-        Tiles() = default;
-        Tiles(const int tileSize, const pbrt::Bounds2i &bounds,
-              const long int spp, const uint32_t numWorkers);
-
-        int tileSize{0};
-
-      private:
-        pbrt::Bounds2i sampleBounds{};
-        pbrt::Point2i nTiles{};
-        size_t curTile{0};
-        size_t tileSpp{};
-    } tiles{};
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Other Stuff                                                            //
-    ////////////////////////////////////////////////////////////////////////////
-
-    EventLoop loop{};
-
-    /* Timers */
-    TimerFD statusPrintTimer{STATUS_PRINT_INTERVAL};
-    TimerFD workerInvocationTimer{WORKER_INVOCATION_INTERVAL};
-    TimerFD rescheduleTimer{RESCHEDULE_INTERVAL,
-                            std::chrono::milliseconds{500}};
-    TimerFD workerStatsWriteTimer;
-
-    std::unique_ptr<TimerFD> jobExitTimer;
-    std::unique_ptr<TimerFD> jobTimeoutTimer;
-
-    std::mt19937 randEngine{std::random_device{}()};
+    pbrt::Bounds2i sample_bounds {};
+    pbrt::Point2i n_tiles {};
+    size_t cur_tile { 0 };
+    size_t tile_spp {};
+  } tiles {};
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Other Stuff                                                            //
+  ////////////////////////////////////////////////////////////////////////////
+
+  EventLoop loop {};
+
+  /* Timers */
+  TimerFD status_print_timer { STATUS_PRINT_INTERVAL };
+  TimerFD worker_invocation_timer { WORKER_INVOCATION_INTERVAL };
+  TimerFD reschedule_timer { RESCHEDULE_INTERVAL,
+                             std::chrono::milliseconds { 500 } };
+  TimerFD worker_stats_write_timer;
+
+  std::unique_ptr<TimerFD> job_exit_timer;
+  std::unique_ptr<TimerFD> job_timeout_timer;
+
+  std::mt19937 rand_engine { std::random_device {}() };
 };
 
-}  // namespace r2t2
-
+} // namespace r2t2

@@ -9,85 +9,93 @@ using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 
-bool LambdaMaster::assignWork(Worker &worker) {
-    /* return, if worker is not active anymore */
-    if (worker.state != Worker::State::Active) return false;
+bool LambdaMaster::assign_work( Worker& worker )
+{
+  /* return, if worker is not active anymore */
+  if ( worker.state != Worker::State::Active )
+    return false;
 
-    /* return if the worker already has enough work */
-    if (worker.activeRays() >= WORKER_MAX_ACTIVE_RAYS) return false;
+  /* return if the worker already has enough work */
+  if ( worker.active_rays() >= WORKER_MAX_ACTIVE_RAYS )
+    return false;
 
-    /* return, if the worker doesn't have any treelets */
-    if (worker.treelets.empty()) return false;
+  /* return, if the worker doesn't have any treelets */
+  if ( worker.treelets.empty() )
+    return false;
 
-    const TreeletId treeletId = worker.treelets[0];
-    auto &bagQueue = queuedRayBags[treeletId];
+  const TreeletId treelet_id = worker.treelets[0];
+  auto& bag_queue = queuedRayBags[treelet_id];
 
-    /* Q1: do we have any rays to generate? */
-    bool raysToGenerate = tiles.cameraRaysRemaining() && (treeletId == 0);
+  /* Q1: do we have any rays to generate? */
+  bool rays_to_generate = tiles.cameraRaysRemaining() && ( treelet_id == 0 );
 
-    /* Q2: do we have any work for this worker? */
-    bool workToDo = (bagQueue.size() > 0);
+  /* Q2: do we have any work for this worker? */
+  bool work_to_do = ( bagQueue.size() > 0 );
 
-    if (!raysToGenerate && !workToDo) {
-        return true;
+  if ( !rays_to_generate && !work_to_do ) {
+    return true;
+  }
+
+  protobuf::RayBags proto;
+
+  while ( ( rays_to_generate || work_to_do )
+          && worker.active_rays() < WORKER_MAX_ACTIVE_RAYS ) {
+    if ( rays_to_generate && !work_to_do ) {
+      tiles.send_worker_tile( worker );
+      rays_to_generate = tiles.camera_rays_remaining();
+      continue;
     }
 
-    protobuf::RayBags proto;
+    /* only if work_to_do or the coin flip returned false */
+    *proto.add_items() = to_protobuf( bagQueue.front() );
+    record_assign( worker.id, bagQueue.front() );
 
-    while ((raysToGenerate || workToDo) &&
-           worker.activeRays() < WORKER_MAX_ACTIVE_RAYS) {
-        if (raysToGenerate && !workToDo) {
-            tiles.sendWorkerTile(worker);
-            raysToGenerate = tiles.cameraRaysRemaining();
-            continue;
-        }
+    bagQueue.pop();
+    queued_ray_bags_count--;
 
-        /* only if workToDo or the coin flip returned false */
-        *proto.add_items() = to_protobuf(bagQueue.front());
-        recordAssign(worker.id, bagQueue.front());
-
-        bagQueue.pop();
-        queuedRayBagsCount--;
-
-        if (bagQueue.empty()) {
-            workToDo = false;
-        }
+    if ( bagQueue.empty() ) {
+      work_to_do = false;
     }
+  }
 
-    if (proto.items_size()) {
-        worker.connection->enqueue_write(Message::str(
-            0, OpCode::ProcessRayBag, protoutil::to_string(proto)));
-    }
+  if ( proto.items_size() ) {
+    worker.connection->enqueue_write(
+      Message::str( 0, OpCode::ProcessRayBag, protoutil::to_string( proto ) ) );
+  }
 
-    return worker.activeRays() < WORKER_MAX_ACTIVE_RAYS;
+  return worker.active_rays() < WORKER_MAX_ACTIVE_RAYS;
 }
 
-ResultType LambdaMaster::handleQueuedRayBags() {
-    ScopeTimer<TimeLog::Category::QueuedRayBags> _timer;
+ResultType LambdaMaster::handle_queued_ray_bags()
+{
+  ScopeTimer<TimeLog::Category::QueuedRayBags> _timer;
 
-    // shuffle(freeWorkers.begin(), freeWorkers.end(), randEngine);
+  // shuffle(freeWorkers.begin(), freeWorkers.end(), randEngine);
 
-    for (Worker &worker : workers) {
-        assignWork(worker);
-    }
+  for ( Worker& worker : workers ) {
+    assignWork( worker );
+  }
 
-    return ResultType::Continue;
+  return ResultType::Continue;
 }
 
-template <class T, class C>
-void moveFromTo(queue<T, C> &from, queue<T, C> &to) {
-    while (!from.empty()) {
-        to.emplace(move(from.front()));
-        from.pop();
-    }
+template<class T, class C>
+void move_from_to( queue<T, C>& from, queue<T, C>& to )
+{
+  while ( !from.empty() ) {
+    to.emplace( move( from.front() ) );
+    from.pop();
+  }
 }
 
-void LambdaMaster::moveFromPendingToQueued(const TreeletId treeletId) {
-    queuedRayBagsCount += pendingRayBags[treeletId].size();
-    moveFromTo(pendingRayBags[treeletId], queuedRayBags[treeletId]);
+void LambdaMaster::move_from_pending_to_queued( const TreeletId treelet_id )
+{
+  queued_ray_bags_count += pending_ray_bags[treeletId].size();
+  move_from_to( pending_ray_bags[treelet_id], queued_ray_bags[treelet_id] );
 }
 
-void LambdaMaster::moveFromQueuedToPending(const TreeletId treeletId) {
-    queuedRayBagsCount -= pendingRayBags[treeletId].size();
-    moveFromTo(queuedRayBags[treeletId], pendingRayBags[treeletId]);
+void LambdaMaster::move_from_queued_to_pending( const TreeletId treelet_id )
+{
+  queued_ray_bags_count -= pending_ray_bags[treeletId].size();
+  move_from_to( queued_ray_bags[treelet_id], pending_ray_bags[treelet_id] );
 }
