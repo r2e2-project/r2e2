@@ -51,18 +51,14 @@ void Message::str( char* message_str,
   message_str[12] = to_underlying( opcode );
 }
 
-std::string Message::str( const uint64_t sender_id,
-                          const OpCode opcode,
-                          const string& payload )
+void Message::serialize_header( string& output )
 {
-  string output;
-  output.reserve( sizeof( sender_id ) + sizeof( opcode )
-                  + sizeof( payload.length() ) + payload.length() );
+  output.reserve( HEADER_LENGTH );
 
   output += put_field( sender_id );
   output += put_field( static_cast<uint32_t>( payload.length() ) );
   output += to_underlying( opcode );
-  output += payload;
+
   return output;
 }
 
@@ -84,8 +80,10 @@ void MessageParser::complete_message()
   incomplete_payload_.clear();
 }
 
-void MessageParser::parse( string_view buf )
+size_t MessageParser::parse( string_view buf )
 {
+  size_t consumed_bytes = buf.length();
+
   while ( not buf.empty() ) {
     if ( not expected_payload_length_.has_value() ) {
       const auto remaining_length = min(
@@ -114,4 +112,34 @@ void MessageParser::parse( string_view buf )
       }
     }
   }
+
+  return consumed_bytes;
+}
+
+void Client::load()
+{
+  if ( ( not current_request_unsent_header_.empty() )
+       or ( not current_request_unsent_payload_.empty() )
+       or ( requests_.empty() ) ) {
+    throw std::runtime_error( "meow::Client cannot load new request" );
+  }
+
+  requests_.front().serialize_headers( current_request_header_ );
+  current_request_unsent_header_ = current_request_header_;
+  current_request_unsent_payload_ = requests_.front().payload();
+}
+
+void Client::push_request( Message&& message )
+{
+  requests_.push( move( message ) );
+
+  if ( current_request_unsent_header_.empty()
+       and current_request_unsent_payload_.empty() ) {
+    load();
+  }
+}
+
+void Client::read( RingBuffer& in )
+{
+  in.pop( parser_.parse( in.readable_region() ) );
 }
