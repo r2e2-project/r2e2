@@ -11,31 +11,6 @@ using namespace PollerShortNames;
 
 constexpr milliseconds EXIT_GRACE_PERIOD{5'000};
 
-ResultType LambdaMaster::handleSubscribers() {
-    serviceSubscribersTimer.read_event();
-
-    for (auto &kv : subscribers) {
-        const auto connectionId = kv.first;
-        auto &nextSampleIndex = kv.second;
-
-        protobuf::JobStatus status;
-        for (size_t i = nextSampleIndex; i < sampleBags.size();
-             i++, nextSampleIndex++) {
-            status.add_sample_bags(sampleBags[i].str(""));
-        }
-
-        if (status.sample_bags_size() == 0) continue;
-
-        status.set_next_sample_index(nextSampleIndex);
-        status.set_url_prefix(samplesUrlPrefix);
-
-        WSFrame frame{true, WSFrame::OpCode::Text, protoutil::to_json(status)};
-        wsServer->queue_frame(connectionId, frame);
-    }
-
-    return ResultType::Continue;
-}
-
 ResultType LambdaMaster::handleStatusMessage() {
     ScopeTimer<TimeLog::Category::StatusBar> timer_;
 

@@ -14,13 +14,11 @@
 
 #include "common/lambda.hh"
 #include "common/stats.hh"
-#include "execution/connection.hh"
-#include "execution/loop.hh"
+#include "execution/session.hh"
 #include "execution/meow/message.hh"
 #include "net/address.hh"
 #include "net/aws.hh"
 #include "net/http_request.hh"
-#include "net/ws_server.hh"
 #include "r2t2.pb.h"
 #include "schedulers/scheduler.hh"
 #include "storage/backend.hh"
@@ -37,7 +35,6 @@ namespace r2t2 {
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL{1'000};
 constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL{1'000};
 constexpr std::chrono::milliseconds WORKER_INVOCATION_INTERVAL{2'000};
-constexpr std::chrono::milliseconds SUBSCRIBERS_INTERVAL{1'000};
 
 struct MasterConfiguration {
     int samplesPerPixel;
@@ -85,16 +82,6 @@ class LambdaMaster {
     const MasterConfiguration config;
     const TempDirectory sceneDir{"/tmp/r2t2-lambda-master"};
     const std::string jobId;
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Job Info Server                                                        //
-    ////////////////////////////////////////////////////////////////////////////
-
-    Poller::Action::Result::Type handleSubscribers();
-
-    std::unique_ptr<WebSocketTCPServer> wsServer{nullptr};
-    std::map<uint64_t, size_t> subscribers{};
-    std::string samplesUrlPrefix{};
 
     ////////////////////////////////////////////////////////////////////////////
     // Cloud                                                                  //
@@ -323,9 +310,7 @@ class LambdaMaster {
     // Other Stuff                                                            //
     ////////////////////////////////////////////////////////////////////////////
 
-    ExecutionLoop loop{};
-
-    FileDescriptor alwaysOnFd{STDOUT_FILENO};
+    EventLoop loop{};
 
     /* Timers */
     TimerFD statusPrintTimer{STATUS_PRINT_INTERVAL};
@@ -333,7 +318,6 @@ class LambdaMaster {
     TimerFD rescheduleTimer{RESCHEDULE_INTERVAL,
                             std::chrono::milliseconds{500}};
     TimerFD workerStatsWriteTimer;
-    TimerFD serviceSubscribersTimer{SUBSCRIBERS_INTERVAL};
 
     std::unique_ptr<TimerFD> jobExitTimer;
     std::unique_ptr<TimerFD> jobTimeoutTimer;
