@@ -19,6 +19,7 @@
 #include "net/address.hh"
 #include "net/aws.hh"
 #include "net/http_request.hh"
+#include "net/session.hh"
 #include "r2t2.pb.h"
 #include "schedulers/scheduler.hh"
 #include "storage/backend.hh"
@@ -114,6 +115,7 @@ private:
       Terminating,
       Terminated
     };
+
     enum class Role
     {
       Generator,
@@ -124,7 +126,9 @@ private:
     WorkerId id;
     State state { State::Active };
     Role role;
-    std::shared_ptr<TCPConnection> connection;
+
+    Session<TCPSocket, meow::Message> session;
+
     steady_clock::time_point last_seen {};
     std::string aws_log_stream {};
 
@@ -155,12 +159,10 @@ private:
     WorkerStats stats {};
     WorkerStats lastStats;
 
-    Worker( const WorkerId id,
-            const Role role,
-            std::shared_ptr<TCPConnection>&& connection )
+    Worker( const WorkerId id, const Role role, TCPSocket&& sock )
       : id( id )
       , role( role )
-      , connection( std::move( connection ) )
+      , session( move( sock ) )
     {
       Worker::active_count[role]++;
     }
