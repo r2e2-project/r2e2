@@ -5,78 +5,22 @@
 
 using namespace std;
 
-template<class T, class Endpoint>
-Session<T, Endpoint>::~Session()
-{
-  // uninstalling rules
-  for ( auto& rule_handle : installed_rules_ ) {
-    rule_handle.cancel();
-  }
-}
-
-template<class T, class Endpoint>
-void Session<T, Endpoint>::install_rules(
-  EventLoop& loop,
-  const function<void( void )>& cancel_callback )
-{
-  static Categories categories = [] -> Categories {
-    return {}
-  };
-
-  if ( not installed_rules_.empty() ) {
-    throw runtime_error( "install_rules: already installed" );
-  }
-
-  installed_rules_.push_back( loop.add_rule(
-    "socket read",
-    socket(),
-    Direction::In,
-    [&] { do_read(); },
-    [&] { return want_read(); },
-    cancel_callback ) );
-
-  installed_rules_.push_back( loop.add_rule(
-    "socket write",
-    socket(),
-    Direction::In,
-    [&] { do_write(); },
-    [&] { return want_write(); },
-    cancel_callback ) );
-
-  installed_rules_.push_back( loop.add_rule(
-    "endpoint write",
-    [&] { endpoint_.write( outbound_plaintext_ ); },
-    [&] {
-      return ( not outbound_plaintext_.writable_region().empty() )
-             and ( not endpoint_.requests_empty() );
-    } ) );
-
-  installed_rules_.push_back( loop.add_rule(
-    Direction::In,
-    [&] { endpoint_.read( inbound_plaintext_ ); },
-    [&] { return not inbound_plaintext_.writable_region().empty(); } ) );
-}
-
-template<class Endpoint>
-TCPSession<Endpoint>::TCPSession( TCPSocket&& socket )
+TCPSession::TCPSession( TCPSocket&& socket )
   : socket_( move( socket ) )
 {}
 
-template<class Endpoint>
-bool TCPSession<Endpoint>::want_read() const
+bool TCPSession::want_read() const
 {
   return ( not inbound_plaintext_.writable_region().empty() )
          and ( not incoming_stream_terminated_ );
 }
 
-template<class Endpoint>
-bool TCPSession<Endpoint>::want_write() const
+bool TCPSession::want_write() const
 {
   return not outbound_plaintext_.readable_region().empty();
 }
 
-template<class Endpoint>
-void TCPSession<Endpoint>::do_read()
+void TCPSession::do_read()
 {
   simple_string_span target = inbound_plaintext_.writable_region();
   const auto byte_count = socket_.read( target );
@@ -92,8 +36,7 @@ void TCPSession<Endpoint>::do_read()
   }
 }
 
-template<class Endpoint>
-void TCPSession<Endpoint>::do_write()
+void TCPSession::do_write()
 {
   const string_view source = outbound_plaintext_.readable_region();
   const auto bytes_written = socket_.write( source );
@@ -103,8 +46,7 @@ void TCPSession<Endpoint>::do_write()
   }
 }
 
-template<class Endpoint>
-SSLSession<Endpoint>::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
+SSLSession::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
   : ssl_( move( ssl ) )
   , socket_( move( sock ) )
 {
@@ -121,29 +63,25 @@ SSLSession<Endpoint>::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
   OpenSSL::check( "SSLSession constructor" );
 }
 
-template<class Endpoint>
-int SSLSession<Endpoint>::get_error( const int return_value ) const
+int SSLSession::get_error( const int return_value ) const
 {
   return SSL_get_error( ssl_.get(), return_value );
 }
 
-template<class Endpoint>
-bool SSLSession<Endpoint>::want_read() const
+bool SSLSession::want_read() const
 {
   return ( not read_waiting_on_write_ )
          and ( not inbound_plaintext_.writable_region().empty() )
          and ( not incoming_stream_terminated_ );
 }
 
-template<class Endpoint>
-bool SSLSession<Endpoint>::want_write() const
+bool SSLSession::want_write() const
 {
   return ( not write_waiting_on_read_ )
          and ( not outbound_plaintext_.readable_region().empty() );
 }
 
-template<class Endpoint>
-void SSLSession<Endpoint>::do_read()
+void SSLSession::do_read()
 {
   OpenSSL::check( "SSLSession::do_read()" );
 
@@ -183,8 +121,7 @@ void SSLSession<Endpoint>::do_read()
   throw ssl_error( "SSL_read", error_return );
 }
 
-template<class Endpoint>
-void SSLSession<Endpoint>::do_write()
+void SSLSession::do_write()
 {
   OpenSSL::check( "SSLSession::do_write()" );
 
@@ -218,6 +155,3 @@ void SSLSession<Endpoint>::do_write()
   OpenSSL::check( "SSL_write check" );
   throw ssl_error( "SSL_write", error_return );
 }
-
-template class SSLSession<HTTPClient>;
-template class TCPSession<meow::Client>;
