@@ -5,6 +5,54 @@
 
 using namespace std;
 
+template<class T, class Endpoint>
+Session<T, Endpoint>::~Session()
+{
+  // uninstalling rules
+  for ( auto& rule_handle : installed_rules_ ) {
+    rule_handle.cancel();
+  }
+}
+
+template<class T, class Endpoint>
+void Session<T, Endpoint>::install_rules( EventLoop& loop )
+{
+  static Categories categories = [] -> Categories {
+    return {}
+  };
+
+  if ( not installed_rules_.empty() ) {
+    throw runtime_error( "install_rules: already installed" );
+  }
+
+  installed_rules_.push_back( loop.add_rule(
+    "socket read",
+    socket(),
+    Direction::In,
+    [&] { do_read(); },
+    [&] { return want_read(); } ) );
+
+  installed_rules_.push_back( loop.add_rule(
+    "socket write",
+    socket(),
+    Direction::In,
+    [&] { do_write(); },
+    [&] { return want_write(); } ) );
+
+  installed_rules_.push_back( loop.add_rule(
+    "endpoint write",
+    [&] { endpoint_.write( outbound_plaintext_ ); },
+    [&] {
+      return ( not outbound_plaintext_.writable_region().empty() )
+             and ( not endpoint_.requests_empty() );
+    } ) );
+
+  installed_rules_.push_back( loop.add_rule(
+    Direction::In,
+    [&] { endpoint_.read( inbound_plaintext_ ); },
+    [&] { return not inbound_plaintext_.writable_region().empty(); } ) );
+}
+
 template<class Endpoint>
 TCPSession<Endpoint>::TCPSession( TCPSocket&& socket )
   : socket_( move( socket ) )
