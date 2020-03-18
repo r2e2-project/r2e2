@@ -65,19 +65,9 @@ public:
   OpCode opcode() const { return opcode_; }
   const std::string& payload() const { return payload_; }
 
+  void serialize_header( std::string& output );
+
   size_t total_length() const { return HEADER_LENGTH + payload_length(); }
-
-  std::string str() const;
-
-  static void str( char* message_str,
-                   const uint64_t sender_id,
-                   const OpCode opcode,
-                   const size_t payload_length );
-
-  static std::string str( const uint64_t sender_id,
-                          const OpCode opcode,
-                          const std::string& payload );
-
   static uint32_t expected_payload_length( const string_view header );
 };
 
@@ -94,13 +84,61 @@ private:
   void complete_message();
 
 public:
-  void parse( const std::string_view buf );
+  size_t parse( const std::string_view buf );
 
   bool empty() const { return completed_messages_.empty(); }
   Message& front() { return completed_messages_.front(); }
-  void pop() { completed_messages_.pop_front(); }
+  void pop() { completed_messages_.pop(); }
 
   size_t size() const { return completed_messages_.size(); }
 };
+
+class Client : public ::Client<Message, Message>
+{
+private:
+  std::queue<Message> requests_;
+  MessageParser responses_;
+
+  std::string current_request_header_ {};
+  std::string_view current_request_unsent_header_ {};
+  std::string_view current_request_unsent_payload_ {};
+
+  void load();
+
+public:
+  void push_message( Message&& msg ) { requests_.push( std::move( msg ) ); }
+  bool requests_empty() const { return requests_.empty(); }
+
+  bool responses_empty() const { return responses_.empty(); }
+  const Message& responses_front() const { return responses_.front(); }
+  void pop_response() { responses_.pop(); }
+
+  template<class Writable>
+  void write( Writable& out );
+
+  void read( RingBuffer& in );
+};
+
+template<class Writable>
+void Client::write( Writable& out )
+{
+  if ( requests_empty() ) {
+    throw runtime_error( "meow::Client::write(): Client has no more requests" );
+  }
+
+  if ( not current_request_unsent_header_.empty() ) {
+    current_request_unsent_header_.remove_prefix(
+      out.write( current_request_unsent_header_ ) );
+  } else if ( not current_request_unsent_payload_.empty() ) {
+    current_request_unsent_payload_.remove_prefix(
+      out.write( current_request_unsent_payload_ ) );
+  } else {
+    requests_.pop();
+
+    if ( not requests_.empty() ) {
+      load();
+    }
+  }
+}
 
 } // namespace meow
