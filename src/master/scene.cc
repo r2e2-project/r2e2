@@ -12,105 +12,121 @@ using namespace protoutil;
 
 using OpCode = Message::OpCode;
 
-void LambdaMaster::assignObject(Worker &worker, const ObjectKey &object) {
-    worker.objects.insert(object);
+void LambdaMaster::assign_object( Worker& worker, const ObjectKey& object )
+{
+  worker.objects.insert( object );
 }
 
-void LambdaMaster::assignTreelet(Worker &worker, Treelet &treelet) {
-    assignObject(worker, {ObjectType::Treelet, treelet.id});
+void LambdaMaster::assign_treelet( Worker& worker, Treelet& treelet )
+{
+  assign_object( worker, { ObjectType::Treelet, treelet.id } );
 
-    unassignedTreelets.erase(treelet.id);
-    moveFromPendingToQueued(treelet.id);
+  unassigned_treelets.erase( treelet.id );
+  move_from_pending_to_queued( treelet.id );
 
-    worker.treelets.push_back(treelet.id);
-    treelet.workers.insert(worker.id);
+  worker.treelets.push_back( treelet.id );
+  treelet.workers.insert( worker.id );
 
-    auto &dependencies = scene.base.GetTreeletDependencies(treelet.id);
+  auto& dependencies = scene.base.GetTreeletDependencies( treelet.id );
 
-    for (const auto &obj : dependencies) {
-        assignObject(worker, obj);
-    }
+  for ( const auto& obj : dependencies ) {
+    assign_object( worker, obj );
+  }
 }
 
-void LambdaMaster::assignBaseObjects(Worker &worker) {
-    assignObject(worker, ObjectKey{ObjectType::Scene, 0});
-    assignObject(worker, ObjectKey{ObjectType::Camera, 0});
-    assignObject(worker, ObjectKey{ObjectType::Sampler, 0});
-    assignObject(worker, ObjectKey{ObjectType::Lights, 0});
-    assignObject(worker, ObjectKey{ObjectType::Manifest, 0});
+void LambdaMaster::assign_base_objects( Worker& worker )
+{
+  assign_object( worker, ObjectKey { ObjectType::Scene, 0 } );
+  assign_object( worker, ObjectKey { ObjectType::Camera, 0 } );
+  assign_object( worker, ObjectKey { ObjectType::Sampler, 0 } );
+  assign_object( worker, ObjectKey { ObjectType::Lights, 0 } );
+  assign_object( worker, ObjectKey { ObjectType::Manifest, 0 } );
 }
 
-LambdaMaster::SceneData::SceneData(const std::string &scenePath,
-                                   const int samplesPerPixel,
-                                   const Optional<Bounds2i> &cropWindow)
-    : base(scenePath, samplesPerPixel),
-      sampleBounds(cropWindow.initialized() ? *cropWindow : base.sampleBounds),
-      sampleExtent(sampleBounds.Diagonal()),
-      totalPaths(base.totalPaths) {}
+LambdaMaster::SceneData::SceneData( const std::string& scene_path,
+                                    const int samples_per_pixel,
+                                    const Optional<Bounds2i>& crop_window )
+  : base( scene_path, samples_per_pixel )
+  , sample_bounds( crop_window.initialized() ? *crop_window
+                                             : base.sampleBounds )
+  , sample_extent( sample_bounds.Diagonal() )
+  , total_paths( base.totalPaths )
+{}
 
-int defaultTileSize(int spp) {
-    int bytesPerSec = 30e+6;
-    int avgRayBytes = 500;
-    int raysPerSec = bytesPerSec / avgRayBytes;
+int default_tile_size( int spp )
+{
+  int bytes_per_sec = 30e+6;
+  int avg_ray_bytes = 500;
+  int rays_per_sec = bytes_per_sec / avg_ray_bytes;
 
-    return ceil(sqrt(raysPerSec / spp));
+  return ceil( sqrt( rays_per_sec / spp ) );
 }
 
-int autoTileSize(const Bounds2i &bounds, const long int spp, const size_t N) {
-    int tileSize = ceil(sqrt(bounds.Area() / N));
-    const Vector2i extent = bounds.Diagonal();
-    const int safeTileLimit = ceil(sqrt(WORKER_MAX_ACTIVE_RAYS / 2 / spp));
+int auto_tile_size( const Bounds2i& bounds, const long int spp, const size_t N )
+{
+  int tile_size = ceil( sqrt( bounds.Area() / N ) );
+  const Vector2i extent = bounds.Diagonal();
+  const int safe_tile_limit = ceil( sqrt( WORKER_MAX_ACTIVE_RAYS / 2 / spp ) );
 
-    while (ceil(1.0 * extent.x / tileSize) * ceil(1.0 * extent.y / tileSize) >
-           N) {
-        tileSize++;
-    }
+  while ( ceil( 1.0 * extent.x / tile_size )
+            * ceil( 1.0 * extent.y / tile_size )
+          > N ) {
+    tile_size++;
+  }
 
-    tileSize = min(tileSize, safeTileLimit);
+  tile_size = min( tile_size, safe_tile_limit );
 
-    return tileSize;
+  return tile_size;
 }
 
-LambdaMaster::Tiles::Tiles(const int size, const Bounds2i &bounds,
-                           const long int spp, const uint32_t numWorkers)
-    : tileSize(size), sampleBounds(bounds), tileSpp(spp) {
-    if (tileSize == 0) {
-        tileSize = defaultTileSize(spp);
-    } else if (tileSize == numeric_limits<typeof(tileSize)>::max()) {
-        tileSize = autoTileSize(bounds, spp, numWorkers);
-    }
+LambdaMaster::Tiles::Tiles( const int size,
+                            const Bounds2i& bounds,
+                            const long int spp,
+                            const uint32_t numWorkers )
+  : tile_size( size )
+  , sample_bounds( bounds )
+  , tile_spp( spp )
+{
+  if ( tile_size == 0 ) {
+    tile_size = default_tile_size( spp );
+  } else if ( tile_size == numeric_limits<typeof( tile_size )>::max() ) {
+    tile_size = auto_tile_size( bounds, spp, numWorkers );
+  }
 
-    nTiles = Point2i((bounds.Diagonal().x + tileSize - 1) / tileSize,
-                     (bounds.Diagonal().y + tileSize - 1) / tileSize);
+  nTiles = Point2i( ( bounds.Diagonal().x + tile_size - 1 ) / tile_size,
+                    ( bounds.Diagonal().y + tile_size - 1 ) / tile_size );
 }
 
-bool LambdaMaster::Tiles::cameraRaysRemaining() const {
-    return curTile < nTiles.x * nTiles.y;
+bool LambdaMaster::Tiles::camera_rays_remaining() const
+{
+  return curTile < nTiles.x * nTiles.y;
 }
 
-Bounds2i LambdaMaster::Tiles::nextCameraTile() {
-    const int tileX = curTile % nTiles.x;
-    const int tileY = curTile / nTiles.x;
-    const int x0 = sampleBounds.pMin.x + tileX * tileSize;
-    const int x1 = min(x0 + tileSize, sampleBounds.pMax.x);
-    const int y0 = sampleBounds.pMin.y + tileY * tileSize;
-    const int y1 = min(y0 + tileSize, sampleBounds.pMax.y);
+Bounds2i LambdaMaster::Tiles::next_camera_tile()
+{
+  const int tileX = curTile % nTiles.x;
+  const int tileY = curTile / nTiles.x;
+  const int x0 = sampleBounds.pMin.x + tileX * tile_size;
+  const int x1 = min( x0 + tile_size, sampleBounds.pMax.x );
+  const int y0 = sampleBounds.pMin.y + tileY * tile_size;
+  const int y1 = min( y0 + tile_size, sampleBounds.pMax.y );
 
-    curTile++;
-    return Bounds2i(Point2i{x0, y0}, Point2i{x1, y1});
+  curTile++;
+  return Bounds2i( Point2i { x0, y0 }, Point2i { x1, y1 } );
 }
 
-void LambdaMaster::Tiles::sendWorkerTile(Worker &worker) {
-    protobuf::GenerateRays proto;
+void LambdaMaster::Tiles::send_worker_tile( Worker& worker )
+{
+  protobuf::GenerateRays proto;
 
-    const Bounds2i nextTile = nextCameraTile();
-    proto.set_x0(nextTile.pMin.x);
-    proto.set_y0(nextTile.pMin.y);
-    proto.set_x1(nextTile.pMax.x);
-    proto.set_y1(nextTile.pMax.y);
+  const Bounds2i nextTile = next_camera_tile();
+  proto.set_x0( nextTile.pMin.x );
+  proto.set_y0( nextTile.pMin.y );
+  proto.set_x1( nextTile.pMax.x );
+  proto.set_y1( nextTile.pMax.y );
 
-    worker.rays.camera += nextTile.Area() * tileSpp;
+  worker.rays.camera += nextTile.Area() * tileSpp;
 
-    worker.connection->enqueue_write(
-        Message::str(0, OpCode::GenerateRays, protoutil::to_string(proto)));
+  worker.connection->enqueue_write(
+    Message::str( 0, OpCode::GenerateRays, protoutil::to_string( proto ) ) );
 }
