@@ -59,7 +59,9 @@ public:
 
   Endpoint& endpoint() { return endpoint_; }
 
-  void install_rules( EventLoop& loop );
+  void install_rules(
+    EventLoop& loop,
+    const std::function<void( void )>& cancel_callback = [] {} );
 };
 
 template<class Endpoint>
