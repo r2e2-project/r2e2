@@ -1,236 +1,226 @@
-/* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
-
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <linux/netfilter_ipv4.h>
-
 #include "socket.hh"
+
 #include "util/exception.hh"
+
+#include <cstddef>
+#include <stdexcept>
+#include <unistd.h>
 
 using namespace std;
 
-/* default constructor for socket of (subclassed) domain and type */
+// default constructor for socket of (subclassed) domain and type
+//! \param[in] domain is as described in [socket(7)](\ref man7::socket),
+//! probably `AF_INET` or `AF_UNIX` \param[in] type is as described in
+//! [socket(7)](\ref man7::socket)
 Socket::Socket( const int domain, const int type )
-    : FileDescriptor( CheckSystemCall( "socket", socket( domain, type, 0 ) ) )
+  : FileDescriptor( CheckSystemCall( "socket", socket( domain, type, 0 ) ) )
 {}
 
-/* construct from file descriptor */
-Socket::Socket( FileDescriptor && fd, const int domain, const int type )
-    : FileDescriptor( move( fd ) )
+// construct from file descriptor
+//! \param[in] fd is the FileDescriptor from which to construct
+//! \param[in] domain is `fd`'s domain; throws std::runtime_error if wrong value
+//! is supplied \param[in] type is `fd`'s type; throws std::runtime_error if
+//! wrong value is supplied
+Socket::Socket( FileDescriptor&& fd, const int domain, const int type )
+  : FileDescriptor( move( fd ) )
 {
-    int actual_value;
-    socklen_t len;
+  int actual_value;
+  socklen_t len;
 
-    /* verify domain */
-    len = getsockopt( SOL_SOCKET, SO_DOMAIN, actual_value );
-    if ( (len != sizeof( actual_value )) or (actual_value != domain) ) {
-        throw runtime_error( "socket domain mismatch" );
-    }
+  // verify domain
+  len = getsockopt( SOL_SOCKET, SO_DOMAIN, actual_value );
+  if ( ( len != sizeof( actual_value ) ) or ( actual_value != domain ) ) {
+    throw runtime_error( "socket domain mismatch" );
+  }
 
-    /* verify type */
-    len = getsockopt( SOL_SOCKET, SO_TYPE, actual_value );
-    if ( (len != sizeof( actual_value )) or (actual_value != type) ) {
-        throw runtime_error( "socket type mismatch" );
-    }
+  // verify type
+  len = getsockopt( SOL_SOCKET, SO_TYPE, actual_value );
+  if ( ( len != sizeof( actual_value ) ) or ( actual_value != type ) ) {
+    throw runtime_error( "socket type mismatch" );
+  }
 }
 
-/* get the local or peer address the socket is connected to */
-Address Socket::get_address( const std::string & name_of_function,
-                             const std::function<int(int, sockaddr *, socklen_t *)> & function ) const
+// get the local or peer address the socket is connected to
+//! \param[in] name_of_function is the function to call (string passed to
+//! CheckSystemCall()) \param[in] function is a pointer to the function \returns
+//! the requested Address
+Address Socket::get_address(
+  const string& name_of_function,
+  const function<int( int, sockaddr*, socklen_t* )>& function ) const
 {
-    Address::raw address;
-    socklen_t size = sizeof( address );
+  Address::Raw address;
+  socklen_t size = sizeof( address );
 
-    CheckSystemCall( name_of_function, function( fd_num(),
-                                                 &address.as_sockaddr,
-                                                 &size ) );
+  CheckSystemCall( name_of_function, function( fd_num(), address, &size ) );
 
-    return Address( address, size );
+  return { address, size };
 }
 
-Address Socket::local_address( void ) const
+//! \returns the local Address of the socket
+Address Socket::local_address() const
 {
-    return get_address( "getsockname", getsockname );
+  return get_address( "getsockname", getsockname );
 }
 
-Address Socket::peer_address( void ) const
+//! \returns the socket's peer's Address
+Address Socket::peer_address() const
 {
-    return get_address( "getpeername", getpeername );
+  return get_address( "getpeername", getpeername );
 }
 
-/* bind socket to a specified local address (usually to listen/accept) */
-void Socket::bind( const Address & address )
+// bind socket to a specified local address (usually to listen/accept)
+//! \param[in] address is a local Address to bind
+void Socket::bind( const Address& address )
 {
-    CheckSystemCall( "bind", ::bind( fd_num(),
-                                     &address.to_sockaddr(),
-                                     address.size() ) );
+  CheckSystemCall( "bind", ::bind( fd_num(), address, address.size() ) );
 }
 
-/* connect socket to a specified peer address */
-void Socket::connect( const Address & address )
+// connect socket to a specified peer address
+//! \param[in] address is the peer's Address
+void Socket::connect( const Address& address )
 {
-    CheckSystemCall( "connect", ::connect( fd_num(),
-                                           &address.to_sockaddr(),
-                                           address.size() ) );
-    register_write();
+  CheckSystemCall( "connect", ::connect( fd_num(), address, address.size() ) );
 }
 
-void Socket::connect_nonblock( const Address & address )
+// shut down a socket in the specified way
+//! \param[in] how can be `SHUT_RD`, `SHUT_WR`, or `SHUT_RDWR`; see
+//! [shutdown(2)](\ref man2::shutdown)
+void Socket::shutdown( const int how )
 {
-    try {
-        connect( address );
-        throw runtime_error( "nonblocking connect unexpectedly succeeded immediately" );
-    }
-    catch ( const unix_error & e ) {
-        if ( e.error_code() == EINPROGRESS ) {
-            /* do nothing */
-        }
-        else {
-            throw;
-        }
-    }
-}
-/* send datagram to specified address */
-void UDPSocket::sendto( const Address & destination, const string & payload )
-{
-    const ssize_t bytes_sent =
-        CheckSystemCall( "sendto", ::sendto( fd_num(),
-                                             payload.data(),
-                                             payload.size(),
-                                             0,
-                                             &destination.to_sockaddr(),
-                                             destination.size() ) );
-
-    register_write();
-
-    if ( size_t( bytes_sent ) != payload.size() ) {
-        throw runtime_error( "datagram payload too big for sendto()" );
-    }
+  CheckSystemCall( "shutdown", ::shutdown( fd_num(), how ) );
+  switch ( how ) {
+    case SHUT_RD:
+      register_read();
+      break;
+    case SHUT_WR:
+      register_write();
+      break;
+    case SHUT_RDWR:
+      register_read();
+      register_write();
+      break;
+    default:
+      throw runtime_error( "Socket::shutdown() called with invalid `how`" );
+  }
 }
 
-void UDPSocket::sendmsg( const Address & peer, const iovec * iov,
-                         const size_t iovcnt )
+//! \note If `mtu` is too small to hold the received datagram, this method
+//! throws a std::runtime_error
+void UDPSocket::recv( received_datagram& datagram, const size_t mtu )
 {
-    struct msghdr message_header = {
-        .msg_name = ( void * )&peer.to_sockaddr(),
-        .msg_namelen = peer.size(),
-        .msg_iov = ( struct iovec * )iov,
-        .msg_iovlen = iovcnt,
-        .msg_control = nullptr,
-        .msg_controllen = 0,
-        .msg_flags = 0
-    };
+  // receive source address and payload
+  Address::Raw datagram_source_address;
+  datagram.payload.resize( mtu );
 
-    CheckSystemCall( "sendmsg", ::sendmsg( fd_num(), &message_header, 0 ) );
-    register_write();
+  socklen_t fromlen = sizeof( datagram_source_address );
+
+  const ssize_t recv_len = CheckSystemCall( "recvfrom",
+                                            ::recvfrom( fd_num(),
+                                                        datagram.payload.data(),
+                                                        datagram.payload.size(),
+                                                        MSG_TRUNC,
+                                                        datagram_source_address,
+                                                        &fromlen ) );
+
+  if ( recv_len > ssize_t( mtu ) ) {
+    throw runtime_error( "recvfrom (oversized datagram)" );
+  }
+
+  register_read();
+  datagram.source_address = { datagram_source_address, fromlen };
+  datagram.payload.resize( recv_len );
 }
 
-/* send datagram to connected address */
-void UDPSocket::send( const string & payload )
+UDPSocket::received_datagram UDPSocket::recv( const size_t mtu )
 {
-    const ssize_t bytes_sent =
-        CheckSystemCall( "send", ::send( fd_num(),
-                                         payload.data(),
-                                         payload.size(),
-                                         0 ) );
-
-    register_write();
-
-    if ( size_t( bytes_sent ) != payload.size() ) {
-        throw runtime_error( "datagram payload too big for send()" );
-    }
+  received_datagram ret { { nullptr, 0 }, "" };
+  recv( ret, mtu );
+  return ret;
 }
 
-/* mark the socket as listening for incoming connections */
+void UDPSocket::sendto( const Address& destination, const string_view payload )
+{
+  CheckSystemCall( "sendto",
+                   ::sendto( fd_num(),
+                             payload.data(),
+                             payload.length(),
+                             0,
+                             destination,
+                             destination.size() ) );
+  register_write();
+}
+
+void UDPSocket::send( const string_view payload )
+{
+  CheckSystemCall( "send",
+                   ::send( fd_num(), payload.data(), payload.length(), 0 ) );
+  register_write();
+}
+
+// mark the socket as listening for incoming connections
+//! \param[in] backlog is the number of waiting connections to queue (see
+//! [listen(2)](\ref man2::listen))
 void TCPSocket::listen( const int backlog )
 {
-    CheckSystemCall( "listen", ::listen( fd_num(), backlog ) );
+  CheckSystemCall( "listen", ::listen( fd_num(), backlog ) );
 }
 
-/* accept a new incoming connection */
-TCPSocket TCPSocket::accept( void )
+// accept a new incoming connection
+//! \returns a new TCPSocket connected to the peer.
+//! \note This function blocks until a new connection is available
+TCPSocket TCPSocket::accept()
 {
-    register_read();
-    return TCPSocket( FileDescriptor( CheckSystemCall( "accept", ::accept( fd_num(), nullptr, nullptr ) ) ) );
+  register_read();
+  return TCPSocket( FileDescriptor(
+    CheckSystemCall( "accept", ::accept( fd_num(), nullptr, nullptr ) ) ) );
 }
 
-/* get socket option */
-template <typename option_type>
-socklen_t Socket::getsockopt( const int level, const int option, option_type & option_value ) const
+// get socket option
+template<typename option_type>
+socklen_t Socket::getsockopt( const int level,
+                              const int option,
+                              option_type& option_value ) const
 {
-    socklen_t optlen = sizeof( option_value );
-    CheckSystemCall( "getsockopt", ::getsockopt( fd_num(), level, option,
-                                                 &option_value, &optlen ) );
-    return optlen;
+  socklen_t optlen = sizeof( option_value );
+  CheckSystemCall(
+    "getsockopt",
+    ::getsockopt( fd_num(), level, option, &option_value, &optlen ) );
+  return optlen;
 }
 
-/* set socket option */
-template <typename option_type>
-void Socket::setsockopt( const int level, const int option, const option_type & option_value )
+// set socket option
+//! \param[in] level The protocol level at which the argument resides
+//! \param[in] option A single option to set
+//! \param[in] option_value The value to set
+//! \details See [setsockopt(2)](\ref man2::setsockopt) for details.
+template<typename option_type>
+void Socket::setsockopt( const int level,
+                         const int option,
+                         const option_type& option_value )
 {
-    CheckSystemCall( "setsockopt", ::setsockopt( fd_num(), level, option,
-                                                 &option_value, sizeof( option_value ) ) );
+  CheckSystemCall(
+    "setsockopt",
+    ::setsockopt(
+      fd_num(), level, option, &option_value, sizeof( option_value ) ) );
 }
 
-/* allow local address to be reused sooner, at the cost of some robustness */
-void Socket::set_reuseaddr( void )
+// allow local address to be reused sooner, at the cost of some robustness
+//! \note Using `SO_REUSEADDR` may reduce the robustness of your application
+void Socket::set_reuseaddr()
 {
-    setsockopt( SOL_SOCKET, SO_REUSEADDR, int( true ) );
+  setsockopt( SOL_SOCKET, SO_REUSEADDR, int( true ) );
 }
 
-/* turn on timestamps on receipt */
-void UDPSocket::set_timestamps( void )
+void Socket::throw_if_error() const
 {
-    setsockopt( SOL_SOCKET, SO_TIMESTAMPNS, int( true ) );
+  int socket_error = 0;
+  const socklen_t len = getsockopt( SOL_SOCKET, SO_ERROR, socket_error );
+  if ( len != sizeof( socket_error ) ) {
+    throw runtime_error( "unexpected length from getsockopt: "
+                         + to_string( len ) );
+  }
+
+  if ( socket_error ) {
+    throw unix_error( "socket error", socket_error );
+  }
 }
-
-pair<Address, string> UDPSocket::recvfrom( void )
-{
-    static const ssize_t RECEIVE_MTU = 65536;
-
-    /* receive source address and payload */
-    Address::raw datagram_source_address;
-    char buffer[ RECEIVE_MTU ];
-
-    socklen_t fromlen = sizeof( datagram_source_address );
-
-    ssize_t recv_len = CheckSystemCall( "recvfrom",
-                                        ::recvfrom( fd_num(),
-                                                    buffer,
-                                                    sizeof( buffer ),
-                                                    MSG_TRUNC,
-                                                    &datagram_source_address.as_sockaddr,
-                                                    &fromlen ) );
-
-    if ( recv_len > RECEIVE_MTU ) {
-        throw runtime_error( "recvfrom (oversized datagram)" );
-    }
-
-    register_read();
-
-    return make_pair( Address( datagram_source_address, fromlen ),
-                      string( buffer, recv_len ) );
-}
-
-Address TCPSocket::original_dest( void ) const
-{
-    Address::raw dstaddr;
-    socklen_t len = getsockopt( SOL_IP, SO_ORIGINAL_DST, dstaddr );
-
-    return Address( dstaddr, len );
-}
-
-void TCPSocket::verify_no_errors() const
-{
-    int socket_error = 0;
-    const socklen_t len = getsockopt( SOL_SOCKET, SO_ERROR, socket_error );
-    if ( len != sizeof( socket_error ) ) {
-        throw runtime_error( "unexpected length from getsockopt" );
-    }
-
-    if ( socket_error ) {
-        throw unix_error( "nonblocking socket", socket_error );
-    }
-}
-
-template void Socket::setsockopt( const int level, const int option, const timeval & option_value );
