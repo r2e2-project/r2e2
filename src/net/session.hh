@@ -43,8 +43,11 @@ private:
 
   Endpoint endpoint_;
 
+  std::vector<EventLoop::RuleHandle> installed_rules_;
+
 public:
   using SessionBase<T>::SessionBase();
+  ~Session();
 
   TCPSocket& socket() { return socket_; }
 
@@ -55,6 +58,8 @@ public:
   bool want_write();
 
   Endpoint& endpoint() { return endpoint_; }
+
+  void install_rules( EventLoop& loop );
 };
 
 template<class Endpoint>
