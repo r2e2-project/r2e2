@@ -1,17 +1,18 @@
-/* -*-mode:c++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+#include <stdexcept>
+#include <string_view>
 
 #include "mime_type.hh"
-#include "util/exception.hh"
-#include "util/tokenize.hh"
+#include "split.hh"
 
 using namespace std;
 
-MIMEType::MIMEType( const string & content_type )
-  : type_(), parameters_()
+MIMEType::MIMEType( const string_view content_type )
+  : type_()
+  , parameters_()
 {
-  auto type_and_parameters = split( content_type, ";" );
-  if ( type_and_parameters.size() == 0
-       or type_and_parameters.at( 0 ).empty() ) {
+  vector<string_view> type_and_parameters;
+  split( content_type, ';', type_and_parameters );
+  if ( type_and_parameters.size() == 0 or type_and_parameters.at( 0 ).empty() ) {
     throw runtime_error( "MIMEType: invalid MIME media-type string" );
   }
 
