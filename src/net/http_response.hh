@@ -1,30 +1,27 @@
-/* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
-
 #pragma once
 
 #include <memory>
 
-#include "http_message.hh"
 #include "body_parser.hh"
+#include "http_message.hh"
 #include "http_request.hh"
 
 class HTTPResponse : public HTTPMessage
 {
 private:
-    HTTPRequest request_ {};
+  bool request_is_head_ {};
 
-    /* required methods */
-    void calculate_expected_body_size() override;
-    size_t read_in_complex_body( const std::string & str ) override;
-    bool eof_in_body() const override;
+  /* required methods */
+  void calculate_expected_body_size() override;
+  size_t read_in_complex_body( const std::string_view str ) override;
+  bool eof_in_body() const override;
 
-    std::unique_ptr<BodyParser> body_parser_ { nullptr };
+  std::unique_ptr<BodyParser> body_parser_ { nullptr };
 
 public:
-    void set_request( const HTTPRequest & request );
-    const HTTPRequest & request() const { return request_; }
+  void set_request_is_head( const bool request_is_head );
 
-    std::string status_code() const;
+  std::string_view status_code() const;
 
-    using HTTPMessage::HTTPMessage;
+  using HTTPMessage::HTTPMessage;
 };

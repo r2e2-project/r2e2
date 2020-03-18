@@ -1,20 +1,18 @@
-/* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
-
 #pragma once
 
-#include <string>
+#include <string_view>
 
 class HTTPHeader
 {
 private:
-    std::string key_, value_;
+  std::string key_, value_;
 
 public:
-    HTTPHeader( const std::string & buf );
-    HTTPHeader( const std::string & key, const std::string & value );
+  HTTPHeader( const std::string_view buf );
+  HTTPHeader( const std::string_view key, const std::string_view value );
 
-    const std::string & key() const { return key_; }
-    const std::string & value() const { return value_; }
+  const std::string& key() const { return key_; }
+  const std::string& value() const { return value_; }
 
-    std::string str() const { return key_ + ": " + value_; }
+  std::string str() const { return key_ + ": " + value_; }
 };
