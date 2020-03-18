@@ -1,167 +1,175 @@
-/* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+#include "address.hh"
 
-#include <string>
+#include "util/exception.hh"
+
+#include <arpa/inet.h>
 #include <cstring>
 #include <memory>
-#include <cassert>
-#include <functional>
 #include <netdb.h>
-
-#include "address.hh"
-#include "strict_conversions.hh"
-#include "util/util.hh"
-#include "util/exception.hh"
+#include <stdexcept>
+#include <system_error>
 
 using namespace std;
 
-template <typename T> void zero( T & x ) { memset( &x, 0, sizeof( x ) ); }
-
-/* constructors */
-
-Address::Address()
-    : Address( "0", 0 )
-{}
-
-Address::Address( const raw & addr, const size_t size )
-    : Address( addr.as_sockaddr, size )
-{}
-
-Address::Address( const sockaddr & addr, const size_t size )
-    : size_( size ),
-      addr_()
+//! Converts Raw to `sockaddr *`.
+Address::Raw::operator sockaddr*()
 {
-    /* make sure proposed sockaddr can fit */
-    if ( size > sizeof( addr_ ) ) {
-        throw runtime_error( "invalid sockaddr size" );
-    }
-
-    memcpy( &addr_, &addr, size_ );
+  return reinterpret_cast<sockaddr*>( &storage );
 }
 
-Address::Address( const sockaddr_in & addr )
-    : size_( sizeof( sockaddr_in ) ),
-      addr_()
+//! Converts Raw to `const sockaddr *`.
+Address::Raw::operator const sockaddr*() const
 {
-    assert( size_ <= sizeof( addr_ ) );
-
-    memcpy( &addr_, &addr, size_ );
+  return reinterpret_cast<const sockaddr*>( &storage );
 }
 
-/* error category for getaddrinfo and getnameinfo */
+//! \param[in] addr points to a raw socket address
+//! \param[in] size is `addr`'s length
+Address::Address( const sockaddr* addr, const size_t size )
+  : _size( size )
+{
+  // make sure proposed sockaddr can fit
+  if ( size > sizeof( _address.storage ) ) {
+    throw runtime_error( "invalid sockaddr size" );
+  }
+
+  memcpy( &_address.storage, addr, size );
+}
+
+//! Error category for getaddrinfo and getnameinfo failures.
 class gai_error_category : public error_category
 {
 public:
-    const char * name( void ) const noexcept override { return "gai_error_category"; }
-    string message( const int return_value ) const noexcept override
-    {
-        return gai_strerror( return_value );
-    }
+  //! The name of the wrapped error
+  const char* name() const noexcept override { return "gai_error_category"; }
+  //! \brief An error message
+  //! \param[in] return_value the error return value from [getaddrinfo(3)](\ref
+  //! man3::getaddrinfo)
+  //!                         or [getnameinfo(3)](\ref man3::getnameinfo)
+  string message( const int return_value ) const noexcept override
+  {
+    return gai_strerror( return_value );
+  }
 };
 
-/* private constructor given ip/host, service/port, and optional hints */
-Address::Address( const string & node, const string & service, const addrinfo & hints )
-    : size_(),
-      addr_()
+//! \param[in] node is the hostname or dotted-quad address
+//! \param[in] service is the service name or numeric string
+//! \param[in] hints are criteria for resolving the supplied name
+Address::Address( const string& node,
+                  const string& service,
+                  const addrinfo& hints )
+  : _size()
 {
-    /* prepare for the answer */
-    addrinfo *resolved_address;
+  // prepare for the answer
+  addrinfo* resolved_address = nullptr;
 
-    /* look up the name or names */
-    const int gai_ret = getaddrinfo( node.c_str(), service.c_str(), &hints, &resolved_address );
-    if ( gai_ret ) {
-        string explanation = "getaddrinfo(" + node + ":" + service;
-        if ( hints.ai_flags | (AI_NUMERICHOST | AI_NUMERICSERV) ) {
-            explanation += ", numeric";
-        }
-        explanation += ")";
-        throw tagged_error( gai_error_category(), explanation, gai_ret );
-    }
+  // look up the name or names
+  const int gai_ret
+    = getaddrinfo( node.c_str(), service.c_str(), &hints, &resolved_address );
+  if ( gai_ret != 0 ) {
+    throw tagged_error( gai_error_category(),
+                        "getaddrinfo(" + node + ", " + service + ")",
+                        gai_ret );
+  }
 
-    /* if success, should always have at least one entry */
-    if ( not resolved_address ) {
-        throw runtime_error( "getaddrinfo returned successfully but with no results" );
-    }
+  // if success, should always have at least one entry
+  if ( resolved_address == nullptr ) {
+    throw runtime_error(
+      "getaddrinfo returned successfully but with no results" );
+  }
 
-    /* put resolved_address in a wrapper so it will get freed if we have to throw an exception */
-    unique_ptr<addrinfo, function<void(addrinfo*)>> wrapped_address
-        { resolved_address, []( addrinfo * x ) { freeaddrinfo( x ); } };
+  // put resolved_address in a wrapper so it will get freed if we have to throw
+  // an exception
+  auto addrinfo_deleter = []( addrinfo* const x ) { freeaddrinfo( x ); };
+  unique_ptr<addrinfo, decltype( addrinfo_deleter )> wrapped_address(
+    resolved_address, move( addrinfo_deleter ) );
 
-    /* assign to our private members (making sure size fits) */
-    *this = Address( *wrapped_address->ai_addr, wrapped_address->ai_addrlen );
+  // assign to our private members (making sure size fits)
+  *this = Address( wrapped_address->ai_addr, wrapped_address->ai_addrlen );
 }
 
-/* construct by resolving host name and service name */
-Address::Address( const std::string & hostname, const std::string & service )
-    : size_(),
-      addr_()
+//! \brief Build a `struct addrinfo` containing hints for [getaddrinfo(3)](\ref
+//! man3::getaddrinfo) \param[in] ai_flags is the value of the `ai_flags` field
+//! in the [struct addrinfo](\ref man3::getaddrinfo) \param[in] ai_family is the
+//! value of the `ai_family` field in the [struct addrinfo](\ref
+//! man3::getaddrinfo)
+static inline addrinfo make_hints( const int ai_flags, const int ai_family )
 {
-    addrinfo hints;
-    zero( hints );
-    hints.ai_family = AF_INET;
-
-    *this = Address( hostname, service, hints );
+  addrinfo hints {}; // value initialized to all zeros
+  hints.ai_flags = ai_flags;
+  hints.ai_family = ai_family;
+  return hints;
 }
 
-/* construct with numerical IP address and numeral port number */
-Address::Address( const std::string & ip, const uint16_t port )
-    : size_(),
-      addr_()
-{
-    /* tell getaddrinfo that we don't want to resolve anything */
-    addrinfo hints;
-    zero( hints );
-    hints.ai_family = AF_INET;
-    hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+//! \param[in] hostname to resolve
+//! \param[in] service name (from `/etc/services`, e.g., "http" is port 80)
+Address::Address( const string& hostname, const string& service )
+  : Address( hostname, service, make_hints( AI_ALL, AF_INET ) )
+{}
 
-    *this = Address( ip, ::to_string( port ), hints );
+//! \param[in] ip address as a dotted quad ("1.1.1.1")
+//! \param[in] port number
+Address::Address( const string& ip, const uint16_t port )
+  // tell getaddrinfo that we don't want to resolve anything
+  : Address( ip,
+             ::to_string( port ),
+             make_hints( AI_NUMERICHOST | AI_NUMERICSERV, AF_INET ) )
+{}
+
+// accessors
+pair<string, uint16_t> Address::ip_port() const
+{
+  array<char, NI_MAXHOST> ip {};
+  array<char, NI_MAXSERV> port {};
+
+  const int gni_ret = getnameinfo( _address,
+                                   _size,
+                                   ip.data(),
+                                   ip.size(),
+                                   port.data(),
+                                   port.size(),
+                                   NI_NUMERICHOST | NI_NUMERICSERV );
+  if ( gni_ret != 0 ) {
+    throw tagged_error( gai_error_category(), "getnameinfo", gni_ret );
+  }
+
+  return { ip.data(), stoi( port.data() ) };
 }
 
-pair<string, uint16_t> Address::decompose( const string & ip_port )
+string Address::to_string() const
 {
-    const size_t colonPos = ip_port.find( ":" );
-    if ( colonPos == string::npos ) {
-        throw runtime_error( "invalid ip:port format" );
-    }
-    const uint16_t port = strict_atoi( ip_port.substr( colonPos + 1 ) );
-    return make_pair( ip_port.substr( 0, colonPos ), port );
+  const auto ip_and_port = ip_port();
+  return ip_and_port.first + ":" + ::to_string( ip_and_port.second );
 }
 
-/* accessors */
-
-pair<string, uint16_t> Address::ip_port( void ) const
+uint32_t Address::ipv4_numeric() const
 {
-    char ip[ NI_MAXHOST ], port[ NI_MAXSERV ];
+  if ( _address.storage.ss_family != AF_INET
+       or _size != sizeof( sockaddr_in ) ) {
+    throw runtime_error( "ipv4_numeric called on non-IPV4 address" );
+  }
 
-    const int gni_ret = getnameinfo( &to_sockaddr(),
-                                     size_,
-                                     ip, sizeof( ip ),
-                                     port, sizeof( port ),
-                                     NI_NUMERICHOST | NI_NUMERICSERV );
-    if ( gni_ret ) {
-        throw tagged_error( gai_error_category(), "getnameinfo", gni_ret );
-    }
+  sockaddr_in ipv4_addr {};
+  memcpy( &ipv4_addr, &_address.storage, _size );
 
-    return make_pair( ip, strict_atoi( port ) );
+  return be32toh( ipv4_addr.sin_addr.s_addr );
 }
 
-string Address::str( const string port_separator ) const
+Address Address::from_ipv4_numeric( const uint32_t ip_address )
 {
-    const auto ip_and_port = ip_port();
-    return ip_and_port.first + port_separator + to_string( ip_and_port.second );
+  sockaddr_in ipv4_addr {};
+  ipv4_addr.sin_family = AF_INET;
+  ipv4_addr.sin_addr.s_addr = htobe32( ip_address );
+
+  return { reinterpret_cast<sockaddr*>( &ipv4_addr ), sizeof( ipv4_addr ) };
 }
 
-const sockaddr & Address::to_sockaddr( void ) const
+// equality
+bool Address::operator==( const Address& other ) const
 {
-    return addr_.as_sockaddr;
-}
+  if ( _size != other._size ) {
+    return false;
+  }
 
-/* comparisons */
-bool Address::operator==( const Address & other ) const
-{
-    return 0 == memcmp( &addr_, &other.addr_, size_ );
-}
-
-bool Address::operator<( const Address & other ) const
-{
-    return (memcmp( &addr_, &other.addr_, sizeof( addr_ ) ) < 0 );
+  return 0 == memcmp( &_address, &other._address, _size );
 }

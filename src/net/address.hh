@@ -1,53 +1,79 @@
-/* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
-
 #pragma once
 
-#include <string>
-#include <utility>
-#include <netinet/in.h>
+#include <cstddef>
+#include <cstdint>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <string>
+#include <sys/socket.h>
+#include <utility>
 
-/* Address class for IPv4/v6 addresses */
+//! Wrapper around [IPv4 addresses](@ref man7::ip) and DNS operations.
 class Address
 {
 public:
-    typedef union {
-        sockaddr as_sockaddr;
-        sockaddr_storage as_sockaddr_storage;
-    } raw;
+  //! \brief Wrapper around [sockaddr_storage](@ref man7::socket).
+  //! \details A `sockaddr_storage` is enough space to store any socket address
+  //! (IPv4 or IPv6).
+  class Raw
+  {
+  public:
+    sockaddr_storage storage {}; //!< The wrapped struct itself.
+    operator sockaddr*();
+    operator const sockaddr*() const;
+  };
 
 private:
-    socklen_t size_;
-    raw addr_;
+  socklen_t _size; //!< Size of the wrapped address.
+  Raw _address {}; //!< A wrapped [sockaddr_storage](@ref man7::socket)
+                   //!< containing the address.
 
-    /* private constructor given ip/host, service/port, and optional hints */
-    Address( const std::string & node, const std::string & service, const addrinfo & hints );
+  //! Constructor from ip/host, service/port, and hints to the resolver.
+  Address( const std::string& node,
+           const std::string& service,
+           const addrinfo& hints );
 
 public:
-    /* constructors */
-    Address();
-    Address( const raw & addr, const size_t size );
-    Address( const sockaddr & addr, const size_t size );
-    Address( const sockaddr_in & addr );
+  //! Construct by resolving a hostname and servicename.
+  Address( const std::string& hostname, const std::string& service );
 
-    /* construct by resolving host name and service name */
-    Address( const std::string & hostname, const std::string & service );
+  //! Construct from dotted-quad string ("18.243.0.1") and numeric port.
+  Address( const std::string& ip, const std::uint16_t port = 0 );
 
-    /* construct with numerical IP address and numeral port number */
-    Address( const std::string & ip, const uint16_t port );
+  //! Construct from a [sockaddr *](@ref man7::socket).
+  Address( const sockaddr* addr, const std::size_t size );
 
-    /* accessors */
-    std::pair<std::string, uint16_t> ip_port( void ) const;
-    std::string ip( void ) const { return ip_port().first; }
-    uint16_t port( void ) const { return ip_port().second; }
-    std::string str( const std::string port_separator = ":" ) const;
+  //! Equality comparison.
+  bool operator==( const Address& other ) const;
+  bool operator!=( const Address& other ) const
+  {
+    return not operator==( other );
+  }
 
-    socklen_t size( void ) const { return size_; }
-    const sockaddr & to_sockaddr( void ) const;
+  //! \name Conversions
+  //!@{
 
-    /* comparisons */
-    bool operator==( const Address & other ) const;
-    bool operator<( const Address & other ) const;
+  //! Dotted-quad IP address string ("18.243.0.1") and numeric port.
+  std::pair<std::string, uint16_t> ip_port() const;
+  //! Dotted-quad IP address string ("18.243.0.1").
+  std::string ip() const { return ip_port().first; }
+  //! Numeric port (host byte order).
+  uint16_t port() const { return ip_port().second; }
+  //! Numeric IP address as an integer (i.e., in [host byte order](\ref
+  //! man3::byteorder)).
+  uint32_t ipv4_numeric() const;
+  //! Create an Address from a 32-bit raw numeric IP address
+  static Address from_ipv4_numeric( const uint32_t ip_address );
+  //! Human-readable string, e.g., "8.8.8.8:53".
+  std::string to_string() const;
+  //!@}
 
-    static std::pair<std::string, uint16_t> decompose( const std::string & ip_port );
+  //! \name Low-level operations
+  //!@{
+
+  //! Size of the underlying address storage.
+  socklen_t size() const { return _size; }
+  //! Const pointer to the underlying socket address storage.
+  operator const sockaddr*() const { return _address; }
+  //!@}
 };
