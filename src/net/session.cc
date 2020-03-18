@@ -1,23 +1,30 @@
 #include "session.hh"
 
+#include "execution/meow/message.h"
+#include "http_client.hh"
+
 using namespace std;
 
-TCPSession::TCPSession( TCPSocket&& socket )
+template<class Endpoint>
+TCPSession<Endpoint>::TCPSession( TCPSocket&& socket )
   : socket_( move( socket ) )
 {}
 
-bool TCPSession::want_read() const
+template<class Endpoint>
+bool TCPSession<Endpoint>::want_read() const
 {
   return ( not inbound_plaintext_.writable_region().empty() )
          and ( not incoming_stream_terminated_ );
 }
 
-bool TCPSession::want_write() const
+template<class Endpoint>
+bool TCPSession<Endpoint>::want_write() const
 {
   return not outbound_plaintext_.readable_region().empty();
 }
 
-void TCPSession::do_read()
+template<class Endpoint>
+void TCPSession<Endpoint>::do_read()
 {
   simple_string_span target = inbound_plaintext_.writable_region();
   const auto byte_count = socket_.read( target );
@@ -33,7 +40,8 @@ void TCPSession::do_read()
   }
 }
 
-void TCPSession::do_write()
+template<class Endpoint>
+void TCPSession<Endpoint>::do_write()
 {
   const string_view source = outbound_plaintext_.readable_region();
   const auto bytes_written = socket_.write( source );
@@ -43,7 +51,8 @@ void TCPSession::do_write()
   }
 }
 
-SSLSession::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
+template<class Endpoint>
+SSLSession<Endpoint>::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
   : ssl_( move( ssl ) )
   , socket_( move( sock ) )
 {
@@ -60,25 +69,29 @@ SSLSession::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
   OpenSSL::check( "SSLSession constructor" );
 }
 
-int SSLSession::get_error( const int return_value ) const
+template<class Endpoint>
+int SSLSession<Endpoint>::get_error( const int return_value ) const
 {
   return SSL_get_error( ssl_.get(), return_value );
 }
 
-bool SSLSession::want_read() const
+template<class Endpoint>
+bool SSLSession<Endpoint>::want_read() const
 {
   return ( not read_waiting_on_write_ )
          and ( not inbound_plaintext_.writable_region().empty() )
          and ( not incoming_stream_terminated_ );
 }
 
-bool SSLSession::want_write() const
+template<class Endpoint>
+bool SSLSession<Endpoint>::want_write() const
 {
   return ( not write_waiting_on_read_ )
          and ( not outbound_plaintext_.readable_region().empty() );
 }
 
-void SSLSession::do_read()
+template<class Endpoint>
+void SSLSession<Endpoint>::do_read()
 {
   OpenSSL::check( "SSLSession::do_read()" );
 
@@ -118,7 +131,8 @@ void SSLSession::do_read()
   throw ssl_error( "SSL_read", error_return );
 }
 
-void SSLSession::do_write()
+template<class Endpoint>
+void SSLSession<Endpoint>::do_write()
 {
   OpenSSL::check( "SSLSession::do_write()" );
 
@@ -152,3 +166,6 @@ void SSLSession::do_write()
   OpenSSL::check( "SSL_write check" );
   throw ssl_error( "SSL_write", error_return );
 }
+
+template class SSLSession<HTTPClient>;
+template class TCPSession<meow::Client>;

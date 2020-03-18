@@ -30,7 +30,7 @@ public:
   SessionBase( SSL_handle&& ssl, TCPSocket&& socket );
 };
 
-template<class T>
+template<class T, class Endpoint>
 class Session : public SessionBase<T>
 {
 private:
@@ -40,6 +40,8 @@ private:
 
   RingBuffer outbound_plaintext_ { STORAGE_SIZE };
   RingBuffer inbound_plaintext_ { STORAGE_SIZE };
+
+  Endpoint endpoint_;
 
 public:
   using SessionBase<T>::SessionBase();
@@ -51,7 +53,12 @@ public:
 
   bool want_read();
   bool want_write();
+
+  Endpoint& endpoint() { return endpoint_; }
 };
 
-using TCPSession = Session<TCPSocket>;
-using SSLSession = Session<SSLSocket>;
+template<class Endpoint>
+using TCPSession = Session<TCPSocket, Endpoint>;
+
+template<class Endpoint>
+using SSLSession = Session<SSLSocket, Endpoint>;
