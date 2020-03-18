@@ -46,8 +46,6 @@ using namespace meow;
 using namespace r2t2;
 using namespace pbrt;
 
-using namespace PollerShortNames;
-
 using OpCode = Message::OpCode;
 using PollerResult = Poller::Result::Type;
 
@@ -88,6 +86,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   , worker_stats_write_timer( seconds { config.worker_stats_write_interval },
                               milliseconds { 1 } )
 {
+  signals.set_as_mask();
+
   const string scene_path = scene_dir.name();
   roost::create_directories( scene_path );
 
@@ -190,78 +190,64 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                 * scene.samplesPerPixel );
   cerr << endl;
 
-  loop.poller().add_action( Poller::Action(
+  loop.add_rule(
+    "Reschedule",
     reschedule_timer,
     Direction::In,
     bind( &LambdaMaster::handle_reschedule, this ),
-    [this]() { return finished_ray_generators == this->ray_generators; },
-    []() { throw runtime_error( "rescheduler failed" ); } ) );
+    [this] { return finished_ray_generators == this->ray_generators; } );
 
-  loop.poller().add_action( Poller::Action(
-    always_on_fd,
-    Direction::Out,
-    [&]() {
-      job_exit_timer = make_unique<TimerFD>( 14min + 50s );
+  loop.add_rule(
+    job_exit_timer,
+    Direction::In,
+    [&] { terminated = true; },
+    [] { return true; }, );
 
-      loop.poller().add_action( Poller::Action(
-        *job_exit_timer,
-        Direction::In,
-        [&]() { return ResultType::Exit; },
-        []() { return true; },
-        []() { throw runtime_error( "job exit failed" ); } ) );
+  loop.add_rule( "Messages",
+                 bind( &LambdaMaster::handle_messages, this ),
+                 [this] { return !incoming_messages.empty(); } );
 
-      return ResultType::Cancel;
-    },
-    [this]() { return finished_ray_generators == this->ray_generators; },
-    []() { throw runtime_error( "job exit failed" ); } ) );
-
-  loop.poller().add_action( Poller::Action(
-    always_on_fd,
-    Direction::Out,
-    bind( &LambdaMaster::handle_messages, this ),
-    [this]() { return !incoming_messages.empty(); },
-    []() { throw runtime_error( "messages failed" ); } ) );
-
-  loop.poller().add_action( Poller::Action(
-    always_on_fd,
-    Direction::Out,
-    bind( &LambdaMaster::handle_queued_ray_bags, this ),
-    [this]() {
+  loop.add_rule(
+    "Queued ray bags" bind( &LambdaMaster::handle_queued_ray_bags, this ),
+    [this] {
       return initialized_workers >= this->max_workers && !free_workers.empty()
              && ( tiles.cameraRaysRemaining() || queued_ray_bags_count > 0 );
-    },
-    []() { throw runtime_error( "queued ray bags failed" ); } ) );
+    } );
 
   if ( config.worker_stats_write_interval > 0 ) {
-    loop.poller().add_action( Poller::Action(
-      worker_stats_write_timer,
-      Direction::In,
-      bind( &LambdaMaster::handle_worker_stats, this ),
-      [this]() { return true; },
-      []() { throw runtime_error( "worker stats failed" ); } ) );
+    loop.add_rule( "Worker stats",
+                   worker_stats_write_timer,
+                   Direction::In,
+                   bind( &LambdaMaster::handle_worker_stats, this ),
+                   [this] { return true; } );
   }
 
-  loop.poller().add_action( Poller::Action(
-    worker_invocation_timer,
-    Direction::In,
-    bind( &LambdaMaster::handle_worker_invocation, this ),
-    [this]() {
-      return !treelets_to_spawn.empty()
-             && Worker::active_count[Worker::Role::Tracer] < this->max_workers;
-    },
-    []() { throw runtime_error( "worker invocation failed" ); } ) );
+  loop.add_rule( "Worker invocation",
+                 worker_invocation_timer,
+                 Direction::In,
+                 bind( &LambdaMaster::handle_worker_invocation, this ),
+                 [this] {
+                   return !treelets_to_spawn.empty()
+                          && ( Worker::active_count[Worker::Role::Tracer]
+                               < this->max_workers );
+                 } );
 
-  loop.poller().add_action( Poller::Action(
-    status_print_timer,
-    Direction::In,
-    bind( &LambdaMaster::handle_status_message, this ),
-    [this]() { return true; },
-    []() { throw runtime_error( "status print failed" ); } ) );
+  loop.add_rule( "Status",
+                 status_print_timer,
+                 Direction::In,
+                 bind( &LambdaMaster::handle_status_message, this ),
+                 [this]() { return true; } );
 
-  loop.make_listener(
-    { "0.0.0.0", listen_port },
-    [this, maxWorkers]( ExecutionLoop& loop, TCPSocket&& socket ) {
-      ScopeTimer<TimeLog::Category::AcceptWorker> timer_;
+  listener_socket.set_blocking( false );
+  listener_socket.set_reuseaddr();
+  listener_socket.bind( { "0.0.0.0", listen_port } );
+  listener_socket.listen();
+
+  loop.add_rule(
+    "Listener",
+    [this, max_workers] {
+      TCPSocket socket = listener_socket.accept();
+
       /* do we want this worker? */
       if ( Worker::next_id >= this->ray_generators
            && treelets_to_spawn.empty() ) {
@@ -271,9 +257,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
       const WorkerId worker_id = Worker::next_id++;
 
-      auto connection_close_handler = [this, worker_id]() {
-        ScopeTimer<TimeLog::Category::CloseWorker> timer_;
-
+      auto connection_close_handler = [this, worker_id] {
         auto& worker = workers[worker_id];
 
         if ( worker.state == Worker::State::Terminating ) {
@@ -304,43 +288,16 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                 : ( " ("s + worker.aws_log_stream + ")"s ) ) );
       };
 
-      auto parser = make_shared<MessageParser>();
-      auto connection = loop.add_connection<TCPSocket>(
-        move( socket ),
-        [this, worker_id, parser]( auto, string&& data ) {
-          ScopeTimer<TimeLog::Category::TCPReceive> timer_;
-          parser->parse( data );
-
-          while ( !parser->empty() ) {
-            incoming_messages.emplace_back( worker_id,
-                                            move( parser->front() ) );
-            parser->pop();
-          }
-
-          return true;
-        },
-        [this, worker_id]() {
-          auto& worker = workers[worker_id];
-
-          throw runtime_error(
-            "worker died unexpected: " + to_string( worker_id )
-            + ( worker.aws_log_stream.empty()
-                  ? ""s
-                  : ( " ("s + worker.aws_log_stream + ")"s ) ) );
-        },
-        connection_close_handler );
-
       if ( worker_id < this->ray_generators ) {
         /* This worker is a ray generator
            Let's (1) say hi, (2) tell the worker to fetch the scene,
            (3) generate rays for its tile */
 
         /* (0) create the entry for the worker */
-        workers.emplace_back(
-          worker_id, Worker::Role::Generator, move( connection ) );
-        auto& worker = workers.back();
+        auto& worker = workers.emplace_back(
+          worker_id, Worker::Role::Generator, move( socket ) );
 
-        assignBaseObjects( worker );
+        assign_base_objects( worker );
 
         /* (1) saying hi, assigning id to the worker */
         protobuf::Hey hey_proto;
@@ -349,7 +306,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         worker.connection->enqueue_write(
           Message::str( 0, OpCode::Hey, protoutil::to_string( hey_proto ) ) );
 
-        /* (2) tell the worker to get the scene objects necessary */
+        /* (2) tell the worker to get the necessary scene objects */
         protobuf::GetObjects objs_proto;
         for ( const ObjectKey& id : worker.objects ) {
           *objs_proto.add_object_ids() = to_protobuf( id );
@@ -359,8 +316,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           0, OpCode::GetObjects, protoutil::to_string( objs_proto ) ) );
 
         /* (3) Tell the worker to generate rays */
-        if ( tiles.cameraRaysRemaining() ) {
-          tiles.sendWorkerTile( worker );
+        if ( tiles.camera_rays_remaining() ) {
+          tiles.send_worker_tile( worker );
         } else {
           /* Too many ray launchers for tile size,
            * so just finish immediately */
@@ -378,9 +335,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           treelet.pending_workers--;
 
           /* (0) create the entry for the worker */
-          workers.emplace_back(
-            workerId, Worker::Role::Tracer, move( connection ) );
-          auto& worker = workers.back();
+          auto& workers.emplace_back(
+            workerId, Worker::Role::Tracer, move( socket ) );
 
           assign_base_objects( worker );
           assign_treelet( worker, treelet );
@@ -407,8 +363,11 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         }
       }
 
-      return true;
-    } );
+      workers.back().session.install_rules( loop, connection_close_handler );
+    },
+
+    [] { return true; },
+    [] { throw runtime_error( "listener socket closed" ); } );
 
   if ( client_port != 0 ) {
     throw runtime_error( "client support is disabled" );
@@ -460,16 +419,17 @@ void LambdaMaster::run()
       servers.emplace_back( host, port );
     }
 
-    Poller poller;
+    EventLoop memcached_loop;
     unique_ptr<memcached::TransferAgent> agent
       = make_unique<memcached::TransferAgent>( servers, servers.size() );
 
     size_t flushed_count = 0;
 
-    poller.add_action( Poller::Action(
+    memcached_loop.add_rule(
+      "eventfd",
       agent->eventfd(),
       Direction::In,
-      [&]() {
+      [&] {
         if ( !agent->eventfd().read_event() )
           return ResultType::Continue;
 
@@ -477,19 +437,14 @@ void LambdaMaster::run()
         agent->tryPopBulk( back_inserter( actions ) );
 
         flushed_count += actions.size();
-
-        if ( flushed_count == config.memcached_servers.size() ) {
-          return ResultType::Exit;
-        } else {
-          return ResultType::Continue;
-        }
       },
-      []() { return true; } ) );
+      [&] { return flushed_count < config.memcached_servers.size(); } );
 
     agent->flushAll();
 
-    while ( poller.poll( -1 ).result == PollerResult::Success )
-      ;
+    while ( memcached_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+      continue;
+    }
 
     cerr << "done." << endl;
   }
@@ -504,10 +459,9 @@ void LambdaMaster::run()
     cerr << "done." << endl;
   }
 
-  while ( true ) {
-    auto res = loop.loop_once().result;
-    if ( res != PollerResult::Success && res != PollerResult::Timeout )
-      break;
+  while ( !terminated
+          && loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+    continue;
   }
 
   vector<storage::GetRequest> get_requests;
@@ -682,7 +636,7 @@ int main( int argc, char* argv[] )
     }
 
     switch ( opt ) {
-      // clang-format off
+        // clang-format off
         case 'p': listen_port = stoi(optarg); break;
         case 'P': client_port = stoi(optarg); break;
         case 'i': public_ip = optarg; break;

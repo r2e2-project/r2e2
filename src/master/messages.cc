@@ -6,24 +6,19 @@
 #include "messages/utils.hh"
 
 using namespace std;
-using namespace std::chrono;
+using namespace chrono;
 using namespace r2t2;
 using namespace meow;
-using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 
-ResultType LambdaMaster::handle_messages()
+void LambdaMaster::handle_messages()
 {
-  ScopeTimer<TimeLog::Category::HandleMessages> _timer;
-
   while ( !incoming_messages.empty() ) {
     auto& front = incoming_messages.front();
     processMessage( front.first, front.second );
     incoming_messages.pop_front();
   }
-
-  return ResultType::Continue;
 }
 
 void LambdaMaster::process_message( const uint64_t worker_id,

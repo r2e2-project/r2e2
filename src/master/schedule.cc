@@ -19,7 +19,6 @@ using namespace meow;
 
 using T = TimeLog::Category;
 using OpCode = Message::OpCode;
-using ResultType = Poller::Action::Result::Type;
 
 void LambdaMaster::invoke_workers( const size_t n_workers )
 {

@@ -5,7 +5,6 @@
 using namespace std;
 using namespace r2t2;
 using namespace meow;
-using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 
@@ -66,17 +65,13 @@ bool LambdaMaster::assign_work( Worker& worker )
   return worker.active_rays() < WORKER_MAX_ACTIVE_RAYS;
 }
 
-ResultType LambdaMaster::handle_queued_ray_bags()
+void LambdaMaster::handle_queued_ray_bags()
 {
-  ScopeTimer<TimeLog::Category::QueuedRayBags> _timer;
-
   // shuffle(freeWorkers.begin(), freeWorkers.end(), randEngine);
 
   for ( Worker& worker : workers ) {
     assignWork( worker );
   }
-
-  return ResultType::Continue;
 }
 
 template<class T, class C>
