@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include <sys/signalfd.h>
 #include <initializer_list>
+#include <sys/signalfd.h>
 
 #include "file_descriptor.hh"
 
@@ -16,21 +16,18 @@ private:
 
 public:
   SignalMask( const std::initializer_list<int> signals );
-  const sigset_t & mask( void ) const { return mask_; }
+  const sigset_t& mask( void ) const { return mask_; }
   void set_as_mask( void ) const;
 
   static SignalMask current_mask( void );
-  bool operator==( const SignalMask & other ) const;
+  bool operator==( const SignalMask& other ) const;
 };
 
-class SignalFD
+class SignalFD : public FileDescriptor
 {
-private:
-  FileDescriptor fd_;
-
 public:
-  SignalFD( const SignalMask & signals );
+  SignalFD( const SignalMask& signals );
 
-  FileDescriptor & fd( void ) { return fd_; }
+  FileDescriptor& fd( void ) { return fd_; }
   signalfd_siginfo read_signal( void ); /* read one signal */
 };
