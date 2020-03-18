@@ -4,9 +4,8 @@
 #include "messages/utils.hh"
 
 using namespace std;
-using namespace std::chrono;
+using namespace chrono;
 using namespace r2t2;
-using namespace PollerShortNames;
 
 void LambdaMaster::record_enqueue( const WorkerId worker_id,
                                    const RayBagInfo& info )
@@ -82,10 +81,8 @@ void LambdaMaster::record_dequeue( const WorkerId worker_id,
   aggregated_stats.dequeued.count++;
 }
 
-ResultType LambdaMaster::handle_worker_stats()
+void LambdaMaster::handle_worker_stats()
 {
-  ScopeTimer<TimeLog::Category::WorkerStats> timer_;
-
   worker_stats_write_timer.read_event();
 
   const auto t
@@ -146,8 +143,6 @@ ResultType LambdaMaster::handle_worker_stats()
               << ( stats.enqueued.count / T ) << ','
               << ( stats.dequeued.count / T ) << '\n';
   }
-
-  return ResultType::Continue;
 }
 
 protobuf::JobSummary LambdaMaster::get_job_summary() const

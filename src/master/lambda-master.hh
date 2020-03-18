@@ -25,6 +25,7 @@
 #include "storage/backend.hh"
 #include "util/optional.hh"
 #include "util/seq_no_set.hh"
+#include "util/signal_fd.hh"
 #include "util/temp_dir.hh"
 #include "util/timelog.hh"
 #include "util/timerfd.hh"
@@ -206,9 +207,9 @@ private:
 
   /* this function is periodically called; it calls the scheduler,
      and if a new schedule is available, it executes it */
-  Poller::Action::Result::Type handle_reschedule();
+  void handle_reschedule();
 
-  Poller::Action::Result::Type handle_worker_invocation();
+  void handle_worker_invocation();
 
   void execute_schedule( const Schedule& schedule );
 
@@ -240,7 +241,7 @@ private:
                         const meow::Message& message );
 
   /* process incoming messages */
-  Poller::Action::Result::Type handle_messages();
+  void handle_messages();
 
   /* a queue for incoming messages */
   std::deque<std::pair<WorkerId, meow::Message>> incoming_messages {};
@@ -249,7 +250,7 @@ private:
 
   bool assign_work( Worker& worker );
 
-  Poller::Action::Result::Type handle_queued_ray_bags();
+  void handle_queued_ray_bags();
 
   /* ray bags that are going to be assigned to workers */
   std::vector<std::queue<RayBagInfo>> queued_ray_bags;
@@ -283,10 +284,10 @@ private:
   std::ofstream tl_stream {};
 
   /* write worker stats periodically */
-  Poller::Action::Result::Type handle_worker_stats();
+  void handle_worker_stats();
 
   /* prints the status message every second */
-  Poller::Action::Result::Type handle_status_message();
+  void handle_status_message();
 
   /*** Timepoints ***********************************************************/
 
@@ -344,7 +345,16 @@ private:
   // Other Stuff                                                            //
   ////////////////////////////////////////////////////////////////////////////
 
+  bool terminated { false };
+
   EventLoop loop {};
+
+  TCPSocket listener_socket {};
+  SignalMask signals { SIGHUP, SIGTERM, SIGQUIT, SIGINT };
+  SignalFD signal_fd { signals };
+
+  std::list<std::pair<SSLSession<HTTPClient>, EventLoop::RuleHandle>>
+    http_connections;
 
   /* Timers */
   TimerFD status_print_timer { STATUS_PRINT_INTERVAL };
@@ -353,8 +363,8 @@ private:
                              std::chrono::milliseconds { 500 } };
   TimerFD worker_stats_write_timer;
 
-  std::unique_ptr<TimerFD> job_exit_timer;
-  std::unique_ptr<TimerFD> job_timeout_timer;
+  TimerFD job_exit_timer { std::chrono::minutes { 15 } };
+  TimerFD job_timeout_timer {};
 
   std::mt19937 rand_engine { std::random_device {}() };
 };
