@@ -397,38 +397,7 @@ LambdaMaster::LambdaMaster(const uint16_t listenPort, const uint16_t clientPort,
     });
 
     if (clientPort != 0) {
-        wsServer = make_unique<WebSocketTCPServer>(
-            Address{"0.0.0.0", clientPort}, loop.poller());
-
-        wsServer->set_message_callback(
-            [&](const uint64_t id, const WSMessage &message) {
-                if (message.type() == WSMessage::Type::Text) {
-                    auto tokens = split(message.payload(), " ");
-                    if (tokens.size() != 2 || tokens[0] != "subscribe") return;
-
-                    this->subscribers.emplace(id, stoull(tokens[1]));
-                }
-            });
-
-        wsServer->set_open_callback([](const uint64_t) {});
-
-        wsServer->set_close_callback(
-            [&](const uint64_t id) { this->subscribers.erase(id); });
-
-        loop.poller().add_action(
-            Poller::Action(serviceSubscribersTimer, Direction::In,
-                           bind(&LambdaMaster::handleSubscribers, this),
-                           [&]() { return !subscribers.empty(); }));
-
-        wsServer->init_listener_socket();
-
-        ParsedURI uri{storageBackendUri};
-        samplesUrlPrefix =
-            "https://" +
-            S3::endpoint(uri.options.count("region") ? uri.options["region"]
-                                                     : "us-east-1",
-                         uri.host) +
-            "/jobs/" + jobId + "/";
+        throw runtime_error("client support is disabled");
     }
 }
 
