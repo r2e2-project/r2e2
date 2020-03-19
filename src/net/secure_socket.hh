@@ -4,9 +4,9 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
-#include "ring_buffer.hh"
 #include "socket.hh"
 #include "util/exception.hh"
+#include "util/ring_buffer.hh"
 
 /* global OpenSSL behavior */
 class ssl_error_category : public std::error_category
