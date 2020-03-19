@@ -13,6 +13,7 @@
 template<class SessionType>
 class HTTPClient : public Client<SessionType, HTTPRequest, HTTPResponse>
 {
+private:
   std::queue<HTTPRequest> requests_ {};
   HTTPResponseParser responses_ {};
 
@@ -33,7 +34,7 @@ class HTTPClient : public Client<SessionType, HTTPRequest, HTTPResponse>
   void write( Writable& out ) override;
 
 public:
-  using HTTPClient<SessionType>::HTTPClient;
+  using Client<SessionType, HTTPRequest, HTTPResponse>::Client;
 
   void push_request( HTTPRequest&& req ) override;
 };

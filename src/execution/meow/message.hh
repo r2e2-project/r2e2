@@ -93,7 +93,8 @@ public:
   size_t size() const { return completed_messages_.size(); }
 };
 
-class Client : public ::Client<Message, Message>
+template<class SessionType>
+class Client : public ::Client<SessionType, Message, Message>
 {
 private:
   std::queue<Message> requests_;
@@ -105,18 +106,20 @@ private:
 
   void load();
 
-public:
-  void push_message( Message&& msg ) { requests_.push( std::move( msg ) ); }
-  bool requests_empty() const { return requests_.empty(); }
-
-  bool responses_empty() const { return responses_.empty(); }
-  const Message& responses_front() const { return responses_.front(); }
-  void pop_response() { responses_.pop(); }
+  bool requests_empty() const override;
+  bool responses_empty() const override { return responses_.empty(); }
+  const Message& responses_front() const override { return responses_.front(); }
+  void pop_response() override { responses_.pop(); }
 
   template<class Writable>
-  void write( Writable& out );
+  void write( Writable& out ) override;
 
-  void read( RingBuffer& in );
+  void read( RingBuffer& in ) override;
+
+public:
+  using Client<SessionType, Message, Message>::Client;
+
+  void push_request( Message&& msg ) override;
 };
 
 template<class Writable>
