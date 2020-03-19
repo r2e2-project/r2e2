@@ -1,5 +1,6 @@
 #pragma once
 
+#include "util/eventloop.hh"
 #include "util/ring_buffer.hh"
 
 template<class SessionType, class RequestType, class ResponseType>
@@ -11,13 +12,13 @@ protected:
 
   virtual bool requests_empty() const = 0;
   virtual bool responses_empty() const = 0;
-  virtual ResponseType&& responses_front() = 0;
+  virtual ResponseType& responses_front() = 0;
   virtual void pop_response() = 0;
 
-  virtual void read( RingBuffer& in ) = 0;
+  void read( RingBuffer& in );
 
   template<class Writable>
-  virtual void write( Writable& out ) = 0;
+  void write( Writable& out );
 
 public:
   Client( SessionType&& session );
@@ -27,5 +28,5 @@ public:
 
   void install_rules(
     EventLoop& loop,
-    const std::functions<void( ResponseType&& )>& response_callback );
+    const std::function<void( ResponseType&& )>& response_callback );
 };

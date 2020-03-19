@@ -36,32 +36,6 @@ Message::Message( const uint64_t sender_id,
   , payload_( move( payload ) )
 {}
 
-string Message::str() const
-{
-  return Message::str( sender_id_, opcode_, payload_ );
-}
-
-void Message::str( char* message_str,
-                   const uint64_t sender_id,
-                   const OpCode opcode,
-                   const size_t payload_length )
-{
-  put_field( message_str, sender_id, 0 );
-  put_field( message_str, static_cast<uint32_t>( payload_length ), 8 );
-  message_str[12] = to_underlying( opcode );
-}
-
-void Message::serialize_header( string& output )
-{
-  output.reserve( HEADER_LENGTH );
-
-  output += put_field( sender_id );
-  output += put_field( static_cast<uint32_t>( payload.length() ) );
-  output += to_underlying( opcode );
-
-  return output;
-}
-
 uint32_t Message::expected_payload_length( const string_view header )
 {
   return ( header.length() < HEADER_LENGTH )
@@ -94,8 +68,7 @@ size_t MessageParser::parse( string_view buf )
 
       if ( incomplete_header_.length() == Message::HEADER_LENGTH ) {
         expected_payload_length_
-          = Message::expected_length( incomplete_header_ )
-            - Message::HEADER_LENGTH;
+          = Message::expected_payload_length( incomplete_header_ );
       }
     }
 
@@ -117,7 +90,7 @@ size_t MessageParser::parse( string_view buf )
 }
 
 template<class SessionType>
-void Client<SessionType>::load()
+void meow::Client<SessionType>::load()
 {
   if ( ( not current_request_unsent_header_.empty() )
        or ( not current_request_unsent_payload_.empty() )
@@ -125,13 +98,13 @@ void Client<SessionType>::load()
     throw std::runtime_error( "meow::Client cannot load new request" );
   }
 
-  requests_.front().serialize_headers( current_request_header_ );
+  requests_.front().serialize_headerA ( current_request_header_ );
   current_request_unsent_header_ = current_request_header_;
   current_request_unsent_payload_ = requests_.front().payload();
 }
 
 template<class SessionType>
-void Client<SessionType>::push_request( Message&& message )
+void meow::Client<SessionType>::push_request( Message&& message )
 {
   requests_.push( move( message ) );
 
@@ -142,14 +115,14 @@ void Client<SessionType>::push_request( Message&& message )
 }
 
 template<class SessionType>
-bool Client<SessionType>::requests_empty() const
+bool meow::Client<SessionType>::requests_empty() const
 {
   return current_request_unsent_header_.empty()
          and current_request_unsent_payload_.empty() and requests_.empty();
 }
 
 template<class SessionType>
-void Client<SessionType>::read( RingBuffer& in )
+void meow::Client<SessionType>::read( RingBuffer& in )
 {
   in.pop( responses_.parse( in.readable_region() ) );
 }

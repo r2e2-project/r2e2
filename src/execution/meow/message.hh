@@ -2,11 +2,13 @@
 
 #pragma once
 
-#include <list>
 #include <optional>
+#include <queue>
 #include <string>
 #include <string_view>
 
+#include "net/client.hh"
+#include "util/eventloop.hh"
 #include "util/util.hh"
 
 namespace meow {
@@ -54,7 +56,7 @@ private:
   std::string payload_ {};
 
 public:
-  Message( const string_view& header, string&& payload );
+  Message( const std::string_view& header, std::string&& payload );
 
   Message( const uint64_t sender_id,
            const OpCode opcode,
@@ -68,7 +70,7 @@ public:
   void serialize_header( std::string& output );
 
   size_t total_length() const { return HEADER_LENGTH + payload_length(); }
-  static uint32_t expected_payload_length( const string_view header );
+  static uint32_t expected_payload_length( const std::string_view header );
 };
 
 class MessageParser
@@ -108,25 +110,26 @@ private:
 
   bool requests_empty() const override;
   bool responses_empty() const override { return responses_.empty(); }
-  const Message& responses_front() const override { return responses_.front(); }
+  Message& responses_front() override { return responses_.front(); }
   void pop_response() override { responses_.pop(); }
 
   template<class Writable>
-  void write( Writable& out ) override;
+  void write( Writable& out );
 
-  void read( RingBuffer& in ) override;
+  void read( RingBuffer& in );
 
 public:
-  using Client<SessionType, Message, Message>::Client;
+  using ::Client<SessionType, Message, Message>::Client;
 
   void push_request( Message&& msg ) override;
 };
 
+template<class SessionType>
 template<class Writable>
-void Client::write( Writable& out )
+void Client<SessionType>::write( Writable& out )
 {
   if ( requests_empty() ) {
-    throw runtime_error( "meow::Client::write(): Client has no more requests" );
+    throw std::runtime_error( "meow::Client::write(): Client has no more requests" );
   }
 
   if ( not current_request_unsent_header_.empty() ) {
