@@ -13,6 +13,7 @@ class SessionBase;
 template<class T>
 class SessionBase<T, std::enable_if_t<std::is_same<T, TCPSocket>::value>>
 {
+protected:
   TCPSocket socket_;
 
 public:
@@ -21,8 +22,9 @@ public:
 
 /* base for SSLSession */
 template<class T>
-class SessionBase<T, std::enable_if_t<std::is_same<T, SSLSocket>::value>>
+class SessionBase<T, std::enable_if_t<std::is_same<T, TCPSocketBIO>::value>>
 {
+protected:
   SSL_handle ssl_;
   TCPSocketBIO socket_;
 
@@ -42,9 +44,9 @@ private:
   RingBuffer inbound_plaintext_ { STORAGE_SIZE };
 
 public:
-  using SessionBase<T>::SessionBase();
+  using SessionBase<T>::SessionBase;
 
-  TCPSocket& socket() { return socket_; }
+  TCPSocket& socket() { return this->socket_; }
 
   void do_read();
   void do_write();
@@ -54,10 +56,12 @@ public:
 
   RingBuffer& outbound_plaintext() { return outbound_plaintext_; }
   RingBuffer& inbound_plaintext() { return inbound_plaintext_; }
-  
-  bool incoming_stream_terminated() const { return incoming_stream_terminated_; }
+
+  bool incoming_stream_terminated() const
+  {
+    return incoming_stream_terminated_;
+  }
 };
 
 using TCPSession = Session<TCPSocket>;
-
-using SSLSession = Session<SSLSocket>;
+using SSLSession = Session<TCPSocketBIO>;
