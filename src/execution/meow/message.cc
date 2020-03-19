@@ -116,7 +116,8 @@ size_t MessageParser::parse( string_view buf )
   return consumed_bytes;
 }
 
-void Client::load()
+template<class SessionType>
+void Client<SessionType>::load()
 {
   if ( ( not current_request_unsent_header_.empty() )
        or ( not current_request_unsent_payload_.empty() )
@@ -129,7 +130,8 @@ void Client::load()
   current_request_unsent_payload_ = requests_.front().payload();
 }
 
-void Client::push_request( Message&& message )
+template<class SessionType>
+void Client<SessionType>::push_request( Message&& message )
 {
   requests_.push( move( message ) );
 
@@ -139,7 +141,15 @@ void Client::push_request( Message&& message )
   }
 }
 
-void Client::read( RingBuffer& in )
+template<class SessionType>
+bool Client<SessionType>::requests_empty() const
 {
-  in.pop( parser_.parse( in.readable_region() ) );
+  return current_request_unsent_header_.empty()
+         and current_request_unsent_payload_.empty() and requests_.empty();
+}
+
+template<class SessionType>
+void Client<SessionType>::read( RingBuffer& in )
+{
+  in.pop( responses_.parse( in.readable_region() ) );
 }
