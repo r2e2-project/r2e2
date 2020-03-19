@@ -51,6 +51,11 @@ public:
 
   bool want_read();
   bool want_write();
+
+  RingBuffer& outbound_plaintext() { return outbound_plaintext_; }
+  RingBuffer& inbound_plaintext() { return inbound_plaintext_; }
+  
+  bool incoming_stream_terminated() const { return incoming_stream_terminated_; }
 };
 
 using TCPSession = Session<TCPSocket>;

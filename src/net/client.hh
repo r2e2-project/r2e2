@@ -2,19 +2,30 @@
 
 #include "util/ring_buffer.hh"
 
-template<class RequestType, class ResponseType>
+template<class SessionType, class RequestType, class ResponseType>
 class Client
 {
-public:
-  void push_request( RequestType&& req );
-  bool requests_empty() const;
+protected:
+  SessionType session_;
+  std::vector<EventLoop::RuleHandle> installed_rules_ {};
 
-  bool responses_empty() const;
-  const ResponseType& responses_front() const;
-  void pop_response();
+  virtual bool requests_empty() const = 0;
+  virtual bool responses_empty() const = 0;
+  virtual ResponseType&& responses_front() = 0;
+  virtual void pop_response() = 0;
+
+  virtual void read( RingBuffer& in ) = 0;
 
   template<class Writable>
-  void write( Writable& out );
+  virtual void write( Writable& out ) = 0;
 
-  void read( RingBuffer& in );
+public:
+  Client( SessionType&& session );
+  virtual ~Client();
+
+  virtual void push_request( RequestType&& req ) = 0;
+
+  void install_rules(
+    EventLoop& loop,
+    const std::functions<void( ResponseType&& )>& response_callback );
 };
