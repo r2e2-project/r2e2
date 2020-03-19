@@ -22,6 +22,8 @@ include ( etc/find_lz4.cmake )
 include_directories ( SYSTEM
   "${CMAKE_CURRENT_LIST_DIR}/lib/pbrt/src/include"
   "${CMAKE_CURRENT_LIST_DIR}/lib/pbrt/src/core"
+  "${CMAKE_CURRENT_LIST_DIR}/lib/pbrt/src/ext/glog/src"
+  "${CMAKE_CURRENT_BINARY_DIR}/lib/pbrt/src/ext/glog"
 )
 
 add_subdirectory ( src/messages )
