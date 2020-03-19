@@ -3,13 +3,15 @@
 #include <queue>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "client.hh"
 #include "http_request.hh"
 #include "http_response_parser.hh"
 #include "util/ring_buffer.hh"
 
-class HTTPClient : public Client<HTTPRequest, HTTPResponse>
+template<class SessionType>
+class HTTPClient : public Client<SessionType, HTTPRequest, HTTPResponse>
 {
   std::queue<HTTPRequest> requests_ {};
   HTTPResponseParser responses_ {};
@@ -20,22 +22,24 @@ class HTTPClient : public Client<HTTPRequest, HTTPResponse>
 
   void load();
 
-public:
-  void push_request( HTTPRequest&& req );
-  bool requests_empty() const;
+  bool requests_empty() const override;
+  bool responses_empty() const override;
+  ResponseType&& responses_front() override;
+  void pop_response() override;
 
-  bool responses_empty() const { return responses_.empty(); }
-  const HTTPResponse& responses_front() const { return responses_.front(); }
-  void pop_response() { return responses_.pop(); }
+  void read( RingBuffer& in ) override;
 
   template<class Writable>
-  void write( Writable& out );
+  void write( Writable& out ) override;
 
-  void read( RingBuffer& in );
+public:
+  using HTTPClient<SessionType>::HTTPClient;
+
+  void push_request( HTTPRequest&& req ) override;
 };
 
-template<class Writable>
-void HTTPClient::write( Writable& out )
+template<class SessionType, class Writable>
+void HTTPClient<SessionType>::write( Writable& out )
 {
   if ( requests_empty() ) {
     throw std::runtime_error(
@@ -50,6 +54,7 @@ void HTTPClient::write( Writable& out )
       out.write( current_request_unsent_body_ ) );
   } else {
     requests_.pop();
+
     if ( not requests_.empty() ) {
       load();
     }

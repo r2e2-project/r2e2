@@ -17,7 +17,6 @@ using namespace chrono;
 using namespace r2t2;
 using namespace meow;
 
-using T = TimeLog::Category;
 using OpCode = Message::OpCode;
 
 void LambdaMaster::invoke_workers( const size_t n_workers )
@@ -79,8 +78,6 @@ void LambdaMaster::invoke_workers( const size_t n_workers )
 ResultType LambdaMaster::handle_reschedule()
 {
   reschedule_timer.read_event();
-
-  ScopeTimer<T::Schedule> _timer;
 
   /* (1) call the schedule function */
 
