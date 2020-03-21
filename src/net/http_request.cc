@@ -2,22 +2,25 @@
 #include <stdexcept>
 #include <string>
 
-#include "convert.hh"
 #include "http_request.hh"
+#include "util/convert.hh"
 
 using namespace std;
 
 void HTTPRequest::calculate_expected_body_size()
 {
   assert( state_ == BODY_PENDING );
-  if ( first_line_.substr( 0, 4 ) == "GET " or first_line_.substr( 0, 5 ) == "HEAD " ) {
+  if ( first_line_.substr( 0, 4 ) == "GET "
+       or first_line_.substr( 0, 5 ) == "HEAD " ) {
     set_expected_body_size( true, 0 );
-  } else if ( first_line_.substr( 0, 5 ) == "POST " or first_line_.substr( 0, 4 ) == "PUT " ) {
+  } else if ( first_line_.substr( 0, 5 ) == "POST "
+              or first_line_.substr( 0, 4 ) == "PUT " ) {
     if ( !has_header( "Content-Length" ) ) {
       throw runtime_error( "HTTPRequest: does not support chunked requests" );
     }
 
-    set_expected_body_size( true, to_uint64( get_header_value( "Content-Length" ) ) );
+    set_expected_body_size( true,
+                            to_uint64( get_header_value( "Content-Length" ) ) );
   } else {
     throw runtime_error( "Cannot handle HTTP method: " + first_line_ );
   }
