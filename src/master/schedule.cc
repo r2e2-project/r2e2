@@ -1,13 +1,16 @@
 #include <algorithm>
 #include <chrono>
 #include <iomanip>
+#include <iterator>
 #include <numeric>
 #include <random>
 
 #include "execution/meow/message.hh"
 #include "lambda-master.hh"
 #include "messages/utils.hh"
+#include "net/http_client.hh"
 #include "net/lambda.hh"
+#include "net/session.hh"
 #include "schedulers/scheduler.hh"
 #include "util/exception.hh"
 #include "util/random.hh"
@@ -25,57 +28,37 @@ void LambdaMaster::invoke_workers( const size_t n_workers )
     return;
 
   if ( config.engines.empty() ) {
-    HTTPRequest invocation_request
-      = LambdaInvocationRequest( aws_credentials,
-                                 aws_region,
-                                 lambda_function_name,
-                                 invocation_payload,
-                                 LambdaInvocationRequest::InvocationType::EVENT,
-                                 LambdaInvocationRequest::LogType::NONE )
-          .to_http_request();
-
     for ( size_t i = 0; i < n_workers; i++ ) {
-      loop.make_http_request<SSLConnection>(
-        "start-worker",
-        aws_address,
-        invocation_request,
-        []( const uint64_t, const string&, const HTTPResponse& ) {},
-        []( const uint64_t, const string& ) {} );
+      HTTPRequest invocation_request
+        = LambdaInvocationRequest(
+            aws_credentials,
+            aws_region,
+            lambda_function_name,
+            invocation_payload,
+            LambdaInvocationRequest::InvocationType::EVENT,
+            LambdaInvocationRequest::LogType::NONE )
+            .to_http_request();
+
+      TCPSocket socket;
+      socket.set_blocking( false );
+      socket.connect( aws_address );
+      https_clients.emplace_back(
+        SSLSession { ssl_context.make_SSL_handle(), move( socket ) } );
+
+      auto client_it = prev( https_clients.end() );
+
+      client_it->push_request( move( invocation_request ) );
+      client_it->install_rules( loop,
+                                [client_it, this]( HTTPResponse&& response ) {
+                                  https_clients.erase( client_it );
+                                } );
     }
   } else {
-    HTTPRequest request;
-    request.set_first_line( "POST /new_worker HTTP/1.1" );
-    request.add_header( HTTPHeader {
-      "Content-Length", to_string( invocation_payload.length() ) } );
-    request.done_with_headers();
-    request.read_in_body( invocation_payload );
-
-    size_t launchedWorkers = 0;
-
-    for ( auto& engine : config.engines ) {
-      auto engine_ip_port = Address::decompose( engine.first );
-      Address engine_addr { engine_ip_port.first, engine_ip_port.second };
-
-      for ( size_t i = 0; i < engine.second && launched_workers < max_workers;
-            i++, launched_workers++ ) {
-        loop.make_http_request<TCPConnection>(
-          "start-worker",
-          engine_addr,
-          request,
-          []( const uint64_t, const string&, const HTTPResponse& ) {},
-          []( const uint64_t, const string& ) {
-            throw runtime_error( "request failed" );
-          } );
-      }
-
-      if ( launched_workers >= max_workers ) {
-        break;
-      }
-    }
+    throw runtime_error( "external engines not implemented" );
   }
 }
 
-ResultType LambdaMaster::handle_reschedule()
+void LambdaMaster::handle_reschedule()
 {
   reschedule_timer.read_event();
 
@@ -87,32 +70,27 @@ ResultType LambdaMaster::handle_reschedule()
   if ( schedule.initialized() ) {
     cerr << "Rescheduling... ";
 
-    executeSchedule( *schedule );
+    execute_schedule( *schedule );
     auto end = steady_clock::now();
 
     cerr << "done (" << fixed << setprecision( 2 )
          << duration_cast<milliseconds>( end - start ).count() << " ms)."
          << endl;
   }
-
-  return ResultType::Continue;
 }
 
-ResultType LambdaMaster::handle_worker_invocation()
+void LambdaMaster::handle_worker_invocation()
 {
-  ScopeTimer<TimeLog::Category::Invocation> timer_;
   worker_invocation_timer.read_event();
 
   /* let's start as many workers as we can right now */
-  const auto running_count = Worker::activeCount[Worker::Role::Tracer];
+  const auto running_count = Worker::active_count[Worker::Role::Tracer];
   const size_t available_capacity
     = ( this->max_workers > running_count )
         ? static_cast<size_t>( this->max_workers - running_count )
         : 0ul;
 
   invoke_workers( min( available_capacity, treelets_to_spawn.size() ) );
-
-  return ResultType::Continue;
 }
 
 void LambdaMaster::execute_schedule( const Schedule& schedule )
@@ -131,7 +109,7 @@ void LambdaMaster::execute_schedule( const Schedule& schedule )
 
   /* let's plan */
   vector<WorkerId> workers_to_take_down;
-  treeletsToSpawn.clear();
+  treelets_to_spawn.clear();
 
   for ( TreeletId tid = 0; tid < treelets.size(); tid++ ) {
     const size_t requested = schedule[tid];
@@ -171,7 +149,7 @@ void LambdaMaster::execute_schedule( const Schedule& schedule )
   for ( const WorkerId worker_id : workers_to_take_down ) {
     auto& worker = workers.at( worker_id );
     worker.state = Worker::State::FinishingUp;
-    worker.connection->enqueue_write( Message::str( 0, OpCode::FinishUp, "" ) );
+    worker.client.push_request( { 0, OpCode::FinishUp, "" } );
   }
 
   /* the rest will have to wait until we have available capacity */
