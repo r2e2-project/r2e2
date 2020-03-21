@@ -8,7 +8,7 @@
 #include <poll.h>
 
 #include "file_descriptor.hh"
-#include "timelog.hh"
+#include "timer.hh"
 
 //! Waits for events on file descriptors and executes corresponding callbacks.
 class EventLoop
