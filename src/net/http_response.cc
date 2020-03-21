@@ -1,10 +1,10 @@
 #include <cassert>
 #include <string>
 
-#include "convert.hh"
 #include "http_response.hh"
 #include "mime_type.hh"
-#include "split.hh"
+#include "util/convert.hh"
+#include "util/split.hh"
 
 using namespace std;
 
@@ -26,28 +26,35 @@ void HTTPResponse::calculate_expected_body_size()
 
   /* implement rules of RFC 2616 section 4.4 ("Message Length") */
 
-  if ( status_code().at( 0 ) == '1' or status_code() == "204" or status_code() == "304" or request_is_head_ ) {
+  if ( status_code().at( 0 ) == '1' or status_code() == "204"
+       or status_code() == "304" or request_is_head_ ) {
     /* Rule 1: size known to be zero */
     set_expected_body_size( true, 0 );
     return;
   }
 
   if ( has_header( "Transfer-Encoding" ) ) {
-    throw runtime_error( "HTTPResponse: unsupported Transfer-Encoding header, including chunked encoding" );
+    throw runtime_error( "HTTPResponse: unsupported Transfer-Encoding header, "
+                         "including chunked encoding" );
   }
 
-  if ( ( not has_header( "Transfer-Encoding" ) ) and has_header( "Content-Length" ) ) {
+  if ( ( not has_header( "Transfer-Encoding" ) )
+       and has_header( "Content-Length" ) ) {
     /* Rule 3: content-length header present to specify size */
-    set_expected_body_size( true, to_uint64( get_header_value( "Content-Length" ) ) );
+    set_expected_body_size( true,
+                            to_uint64( get_header_value( "Content-Length" ) ) );
     return;
   }
 
   if ( has_header( "Content-Type" )
-       and equivalent_strings( MIMEType( get_header_value( "Content-Type" ) ).type(), "multipart/byteranges" ) ) {
+       and equivalent_strings(
+         MIMEType( get_header_value( "Content-Type" ) ).type(),
+         "multipart/byteranges" ) ) {
 
     /* Rule 4 */
     set_expected_body_size( false );
-    throw runtime_error( "HTTPResponse: unsupported multipart/byteranges without Content-Length" );
+    throw runtime_error(
+      "HTTPResponse: unsupported multipart/byteranges without Content-Length" );
 
     return;
   }
