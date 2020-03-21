@@ -25,13 +25,13 @@ private:
 
   bool requests_empty() const override;
   bool responses_empty() const override;
-  ResponseType&& responses_front() override;
+  HTTPResponse&& responses_front() override;
   void pop_response() override;
 
-  void read( RingBuffer& in ) override;
+  void read( RingBuffer& in );
 
   template<class Writable>
-  void write( Writable& out ) override;
+  void write( Writable& out );
 
 public:
   using Client<SessionType, HTTPRequest, HTTPResponse>::Client;
@@ -39,7 +39,8 @@ public:
   void push_request( HTTPRequest&& req ) override;
 };
 
-template<class SessionType, class Writable>
+template<class SessionType>
+template<class Writable>
 void HTTPClient<SessionType>::write( Writable& out )
 {
   if ( requests_empty() ) {
