@@ -15,7 +15,6 @@
 #include "common/lambda.hh"
 #include "common/stats.hh"
 #include "execution/meow/message.hh"
-#include "execution/session.hh"
 #include "net/address.hh"
 #include "net/aws.hh"
 #include "net/http_request.hh"
@@ -25,9 +24,8 @@
 #include "storage/backend.hh"
 #include "util/optional.hh"
 #include "util/seq_no_set.hh"
-#include "util/signal_fd.hh"
+#include "util/signalfd.hh"
 #include "util/temp_dir.hh"
-#include "util/timelog.hh"
 #include "util/timerfd.hh"
 #include "util/util.hh"
 #include "util/uuid.hh"
@@ -124,11 +122,19 @@ private:
       Aggregator
     };
 
+    Worker( const WorkerId id, const Role role, TCPSocket&& sock )
+      : id( id )
+      , role( role )
+      , client( TCPSession { std::move( sock ) } )
+    {
+      Worker::active_count[role]++;
+    }
+
     WorkerId id;
     State state { State::Active };
     Role role;
 
-    Session<TCPSocket, meow::Message> session;
+    meow::Client<TCPSession> client;
 
     steady_clock::time_point last_seen {};
     std::string aws_log_stream {};
@@ -158,15 +164,7 @@ private:
     // Statistics
     bool is_logged { true };
     WorkerStats stats {};
-    WorkerStats lastStats;
-
-    Worker( const WorkerId id, const Role role, TCPSocket&& sock )
-      : id( id )
-      , role( role )
-      , session( move( sock ) )
-    {
-      Worker::active_count[role]++;
-    }
+    WorkerStats last_stats;
 
     std::string to_string() const;
 
@@ -352,9 +350,6 @@ private:
   TCPSocket listener_socket {};
   SignalMask signals { SIGHUP, SIGTERM, SIGQUIT, SIGINT };
   SignalFD signal_fd { signals };
-
-  std::list<std::pair<SSLSession<HTTPClient>, EventLoop::RuleHandle>>
-    http_connections;
 
   /* Timers */
   TimerFD status_print_timer { STATUS_PRINT_INTERVAL };
