@@ -8,11 +8,13 @@ Client::Client( SessionType&& session )
 {}
 
 template<class SessionType, class RequestType, class ResponseType>
-Client::~Client()
+Client::uninstall_rules()
 {
   for ( auto& rule : installed_rules_ ) {
     rule.cancel();
   }
+
+  installed_rules_.clear();
 }
 
 template<class SessionType, class RequestType, class ResponseType>
