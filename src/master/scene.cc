@@ -82,7 +82,7 @@ int auto_tile_size( const Bounds2i& bounds, const long int spp, const size_t N )
 LambdaMaster::Tiles::Tiles( const int size,
                             const Bounds2i& bounds,
                             const long int spp,
-                            const uint32_t numWorkers )
+                            const uint32_t num_workers )
   : tile_size( size )
   , sample_bounds( bounds )
   , tile_spp( spp )
@@ -90,28 +90,28 @@ LambdaMaster::Tiles::Tiles( const int size,
   if ( tile_size == 0 ) {
     tile_size = default_tile_size( spp );
   } else if ( tile_size == numeric_limits<typeof( tile_size )>::max() ) {
-    tile_size = auto_tile_size( bounds, spp, numWorkers );
+    tile_size = auto_tile_size( bounds, spp, num_workers );
   }
 
-  nTiles = Point2i( ( bounds.Diagonal().x + tile_size - 1 ) / tile_size,
-                    ( bounds.Diagonal().y + tile_size - 1 ) / tile_size );
+  n_tiles = Point2i( ( bounds.Diagonal().x + tile_size - 1 ) / tile_size,
+                     ( bounds.Diagonal().y + tile_size - 1 ) / tile_size );
 }
 
 bool LambdaMaster::Tiles::camera_rays_remaining() const
 {
-  return curTile < nTiles.x * nTiles.y;
+  return cur_tile < n_tiles.x * n_tiles.y;
 }
 
 Bounds2i LambdaMaster::Tiles::next_camera_tile()
 {
-  const int tileX = curTile % nTiles.x;
-  const int tileY = curTile / nTiles.x;
-  const int x0 = sampleBounds.pMin.x + tileX * tile_size;
-  const int x1 = min( x0 + tile_size, sampleBounds.pMax.x );
-  const int y0 = sampleBounds.pMin.y + tileY * tile_size;
-  const int y1 = min( y0 + tile_size, sampleBounds.pMax.y );
+  const int tile_x = cur_tile % n_tiles.x;
+  const int tile_y = cur_tile / n_tiles.x;
+  const int x0 = sample_bounds.pMin.x + tile_x * tile_size;
+  const int x1 = min( x0 + tile_size, sample_bounds.pMax.x );
+  const int y0 = sample_bounds.pMin.y + tile_y * tile_size;
+  const int y1 = min( y0 + tile_size, sample_bounds.pMax.y );
 
-  curTile++;
+  cur_tile++;
   return Bounds2i( Point2i { x0, y0 }, Point2i { x1, y1 } );
 }
 
@@ -119,14 +119,14 @@ void LambdaMaster::Tiles::send_worker_tile( Worker& worker )
 {
   protobuf::GenerateRays proto;
 
-  const Bounds2i nextTile = next_camera_tile();
-  proto.set_x0( nextTile.pMin.x );
-  proto.set_y0( nextTile.pMin.y );
-  proto.set_x1( nextTile.pMax.x );
-  proto.set_y1( nextTile.pMax.y );
+  const Bounds2i next_tile = next_camera_tile();
+  proto.set_x0( next_tile.pMin.x );
+  proto.set_y0( next_tile.pMin.y );
+  proto.set_x1( next_tile.pMax.x );
+  proto.set_y1( next_tile.pMax.y );
 
-  worker.rays.camera += nextTile.Area() * tileSpp;
+  worker.rays.camera += next_tile.Area() * tile_spp;
 
-  worker.connection->enqueue_write(
-    Message::str( 0, OpCode::GenerateRays, protoutil::to_string( proto ) ) );
+  worker.client.push_request(
+    { 0, OpCode::GenerateRays, protoutil::to_string( proto ) } );
 }
