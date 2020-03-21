@@ -155,7 +155,7 @@ private:
       uint64_t enqueued { 0 };
     } rays;
 
-    uint64_t activeRays() const
+    uint64_t active_rays() const
     {
       return rays.camera + rays.generated + rays.dequeued - rays.terminated
              - rays.enqueued;
