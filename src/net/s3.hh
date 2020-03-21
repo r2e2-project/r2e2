@@ -3,49 +3,52 @@
 #pragma once
 
 #include <ctime>
+#include <functional>
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
-#include <functional>
 
 #include "aws.hh"
 #include "http_request.hh"
 #include "requests.hh"
-#include "util/path.hh"
 #include "util/optional.hh"
+#include "util/path.hh"
 
 class S3
 {
 public:
-  static std::string endpoint( const std::string & region,
-                               const std::string & bucket );
+  static std::string endpoint( const std::string& region,
+                               const std::string& bucket );
 };
 
 class S3PutRequest : public AWSRequest
 {
 public:
-  S3PutRequest( const AWSCredentials & credentials,
-                const std::string & endpoint, const std::string & region,
-                const std::string & object, const std::string & contents,
-                const std::string & content_hash = {},
+  S3PutRequest( const AWSCredentials& credentials,
+                const std::string& endpoint,
+                const std::string& region,
+                const std::string& object,
+                const std::string& contents,
+                const std::string& content_hash = {},
                 const bool public_read = false );
 };
 
 class S3GetRequest : public AWSRequest
 {
 public:
-  S3GetRequest( const AWSCredentials & credentials,
-                const std::string & endpoint, const std::string & region,
-                const std::string & object );
+  S3GetRequest( const AWSCredentials& credentials,
+                const std::string& endpoint,
+                const std::string& region,
+                const std::string& object );
 };
 
 class S3DeleteRequest : public AWSRequest
 {
 public:
-  S3DeleteRequest( const AWSCredentials & credentials,
-                   const std::string & endpoint, const std::string & region,
-                   const std::string & object );
-
+  S3DeleteRequest( const AWSCredentials& credentials,
+                   const std::string& endpoint,
+                   const std::string& region,
+                   const std::string& object );
 };
 
 struct S3ClientConfig
@@ -63,26 +66,28 @@ private:
   S3ClientConfig config_;
 
 public:
-  S3Client( const AWSCredentials & credentials,
-            const S3ClientConfig & config = {} );
+  S3Client( const AWSCredentials& credentials,
+            const S3ClientConfig& config = {} );
 
-  void download_file( const std::string & bucket,
-                      const std::string & object,
-                      const roost::path & filename );
+  void download_file( const std::string& bucket,
+                      const std::string& object,
+                      const roost::path& filename );
 
-  void upload_files( const std::string & bucket,
-                     const std::vector<storage::PutRequest> & upload_requests,
-                     const std::function<void( const storage::PutRequest & )> & success_callback
-                       = []( const storage::PutRequest & ){} );
+  void upload_files(
+    const std::string& bucket,
+    const std::vector<storage::PutRequest>& upload_requests,
+    const std::function<void( const storage::PutRequest& )>& success_callback
+    = []( const storage::PutRequest& ) {} );
 
-  void download_files( const std::string & bucket,
-                       const std::vector<storage::GetRequest> & download_requests,
-                       const std::function<void( const storage::GetRequest & )> & success_callback
-                         = []( const storage::GetRequest & ){} );
+  void download_files(
+    const std::string& bucket,
+    const std::vector<storage::GetRequest>& download_requests,
+    const std::function<void( const storage::GetRequest& )>& success_callback
+    = []( const storage::GetRequest& ) {} );
 
-  HTTPRequest create_download_request( const std::string & bucket,
-                                       const std::string & object ) const;
+  HTTPRequest create_download_request( const std::string& bucket,
+                                       const std::string& object ) const;
 
-  const AWSCredentials & credentials() const { return credentials_; }
-  const S3ClientConfig & config() const { return config_; }
+  const AWSCredentials& credentials() const { return credentials_; }
+  const S3ClientConfig& config() const { return config_; }
 };
