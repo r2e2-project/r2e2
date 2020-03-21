@@ -7,7 +7,7 @@ template<class SessionType, class RequestType, class ResponseType>
 class Client
 {
 protected:
-  SessionType session_;
+  SessionType session_ {};
   std::vector<EventLoop::RuleHandle> installed_rules_ {};
 
   virtual bool requests_empty() const = 0;
@@ -22,11 +22,20 @@ protected:
 
 public:
   Client( SessionType&& session );
-  virtual ~Client();
+  virtual ~Client() { uninstall_rules(); }
+
+  Client( Client&& c )
+    : session_( std::move( c.session_ ) )
+    , installed_rules_( std::move( c.installed_rules_ ) )
+  {}
 
   virtual void push_request( RequestType&& req ) = 0;
+
+  SessionType& session() { return session_; }
 
   void install_rules(
     EventLoop& loop,
     const std::function<void( ResponseType&& )>& response_callback );
+
+  void uninstall_rules();
 };
