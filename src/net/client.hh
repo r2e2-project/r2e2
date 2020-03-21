@@ -13,7 +13,7 @@ protected:
   virtual bool requests_empty() const = 0;
   virtual bool responses_empty() const = 0;
   virtual ResponseType& responses_front() = 0;
-  virtual void pop_response() = 0;
+  virtual void responses_pop() = 0;
 
   void read( RingBuffer& in );
 
