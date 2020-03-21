@@ -16,7 +16,7 @@ void LambdaMaster::handle_messages()
 {
   while ( !incoming_messages.empty() ) {
     auto& front = incoming_messages.front();
-    processMessage( front.first, front.second );
+    process_message( front.first, front.second );
     incoming_messages.pop_front();
   }
 }
@@ -51,7 +51,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
       for ( const auto& item : proto.items() ) {
         const RayBagInfo info = from_protobuf( item );
-        recordEnqueue( worker_id, info );
+        record_enqueue( worker_id, info );
 
         if ( info.sampleBag ) {
           sample_bags.push_back( info );
@@ -72,13 +72,11 @@ void LambdaMaster::process_message( const uint64_t worker_id,
           tiles.send_worker_tile( worker );
         } else if ( worker.active_rays() == 0 ) {
           /* Generator is done, tell worker to finish up */
-          worker.connection->enqueue_write(
-            Message::str( 0, OpCode::FinishUp, "" ) );
-
+          worker.client.push_request( { 0, OpCode::FinishUp, "" } );
           worker.state = Worker::State::FinishingUp;
         }
       } else if ( worker.active_rays() < WORKER_MAX_ACTIVE_RAYS ) {
-        free_workers.push_back( workerId );
+        free_workers.push_back( worker_id );
       }
 
       break;
@@ -93,7 +91,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
       for ( const auto& item : proto.items() ) {
         const RayBagInfo info = from_protobuf( item );
-        record_dequeue( workerId, info );
+        record_dequeue( worker_id, info );
       }
 
       break;
@@ -103,7 +101,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       protobuf::WorkerStats proto;
       protoutil::from_string( message.payload(), proto );
 
-      WorkerStats stats = from_protobuf( proto );
+      const WorkerStats stats = from_protobuf( proto );
 
       worker.stats.finishedPaths += stats.finishedPaths;
       worker.stats.cpuUsage = stats.cpuUsage;
@@ -119,7 +117,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
         worker.state = Worker::State::Terminating;
       }
 
-      worker.connection->enqueue_write( Message::str( 0, OpCode::Bye, "" ) );
+      worker.client.push_request( { 0, OpCode::Bye, "" } );
       break;
     }
 
