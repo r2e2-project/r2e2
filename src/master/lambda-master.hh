@@ -17,6 +17,7 @@
 #include "execution/meow/message.hh"
 #include "net/address.hh"
 #include "net/aws.hh"
+#include "net/http_client.hh"
 #include "net/http_request.hh"
 #include "net/session.hh"
 #include "r2t2.pb.h"
@@ -350,6 +351,9 @@ private:
   TCPSocket listener_socket {};
   SignalMask signals { SIGHUP, SIGTERM, SIGQUIT, SIGINT };
   SignalFD signal_fd { signals };
+
+  SSLContext ssl_context;
+  std::list<HTTPClient<SSLSession>> https_clients {};
 
   /* Timers */
   TimerFD status_print_timer { STATUS_PRINT_INTERVAL };
