@@ -111,7 +111,7 @@ private:
   bool requests_empty() const override;
   bool responses_empty() const override { return responses_.empty(); }
   Message& responses_front() override { return responses_.front(); }
-  void pop_response() override { responses_.pop(); }
+  void responses_pop() override { responses_.pop(); }
 
   template<class Writable>
   void write( Writable& out );

@@ -24,9 +24,9 @@ private:
   void load();
 
   bool requests_empty() const override;
-  bool responses_empty() const override;
-  HTTPResponse&& responses_front() override;
-  void pop_response() override;
+  bool responses_empty() const override { return responses_.empty(); }
+  HTTPResponse& responses_front() override { return responses_.front(); }
+  void responses_pop() override { responses_.pop(); }
 
   void read( RingBuffer& in );
 

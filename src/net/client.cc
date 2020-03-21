@@ -3,12 +3,12 @@
 using namespace std;
 
 template<class SessionType, class RequestType, class ResponseType>
-Client::Client( SessionType&& session )
+Client<SessionType, RequestType, ResponseType>::Client( SessionType&& session )
   : session_( move( session ) )
 {}
 
 template<class SessionType, class RequestType, class ResponseType>
-Client::uninstall_rules()
+void Client<SessionType, RequestType, ResponseType>::uninstall_rules()
 {
   for ( auto& rule : installed_rules_ ) {
     rule.cancel();
@@ -18,7 +18,7 @@ Client::uninstall_rules()
 }
 
 template<class SessionType, class RequestType, class ResponseType>
-void Client::install_rules(
+void Client<SessionType, RequestType, ResponseType>::install_rules(
   EventLoop& loop,
   const function<void( ResponseType&& )>& response_callback )
 {
@@ -49,7 +49,8 @@ void Client::install_rules(
     } ) );
 
   installed_rules_.push_back( loop.add_rule(
-    "endpoint read" Direction::In,
+    "endpoint read",
+    Direction::In,
     [&] { read( session_.inbound_plaintext() ); },
     [&] {
       return not session_.inbound_plaintext().writable_region().empty();
