@@ -27,7 +27,5 @@ class SignalFD : public FileDescriptor
 {
 public:
   SignalFD( const SignalMask& signals );
-
-  FileDescriptor& fd( void ) { return fd_; }
   signalfd_siginfo read_signal( void ); /* read one signal */
 };
