@@ -1,5 +1,6 @@
 #include "address.hh"
 
+#include "strict_conversions.hh"
 #include "util/exception.hh"
 
 #include <arpa/inet.h>
