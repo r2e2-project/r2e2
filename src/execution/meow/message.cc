@@ -98,7 +98,7 @@ void meow::Client<SessionType>::load()
     throw std::runtime_error( "meow::Client cannot load new request" );
   }
 
-  requests_.front().serialize_headerA ( current_request_header_ );
+  requests_.front().serialize_header( current_request_header_ );
   current_request_unsent_header_ = current_request_header_;
   current_request_unsent_payload_ = requests_.front().payload();
 }
