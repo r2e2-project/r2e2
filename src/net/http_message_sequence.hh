@@ -59,7 +59,7 @@ public:
 
   /* getters */
   bool empty() const { return complete_messages_.empty(); }
-  const MessageType& front() const { return complete_messages_.front(); }
+  MessageType& front() { return complete_messages_.front(); }
 
   /* pop one request */
   void pop() { complete_messages_.pop(); }
@@ -102,7 +102,8 @@ bool HTTPMessageSequence<MessageType>::parsing_step( std::string_view& buf )
 
     case BODY_PENDING: {
       size_t bytes_read = message_in_progress_.read_in_body( buf );
-      assert( bytes_read == buf.size() or message_in_progress_.state() == COMPLETE );
+      assert( bytes_read == buf.size()
+              or message_in_progress_.state() == COMPLETE );
       buf.remove_prefix( bytes_read );
     }
       return message_in_progress_.state() == COMPLETE;
