@@ -43,7 +43,7 @@ void LambdaMaster::record_enqueue( const WorkerId worker_id,
 void LambdaMaster::record_assign( const WorkerId worker_id,
                                   const RayBagInfo& info )
 {
-  auto& worker = workers.at( workerId );
+  auto& worker = workers.at( worker_id );
   worker.rays.dequeued += info.rayCount;
 
   worker.outstanding_ray_bags.insert( info );
@@ -86,7 +86,7 @@ void LambdaMaster::handle_worker_stats()
   worker_stats_write_timer.read_event();
 
   const auto t
-    = duration_cast<milliseconds>( steady_clock::now() - startTime ).count();
+    = duration_cast<milliseconds>( steady_clock::now() - start_time ).count();
 
   const float T = static_cast<float>( config.worker_stats_write_interval );
 
@@ -127,7 +127,7 @@ void LambdaMaster::handle_worker_stats()
       continue; /* nothing new to log */
     }
 
-    const treelet_stats stats
+    const TreeletStats stats
       = treelet_stats[treelet_id] - treelets[treelet_id].last_stats.second;
 
     treelets[treelet_id].last_stats.second = treelet_stats[treelet_id];
@@ -225,7 +225,7 @@ void LambdaMaster::print_job_summary() const
                  : 0.0;
   };
 
-  const protobuf::JobSummary proto = getJobSummary();
+  const protobuf::JobSummary proto = get_job_summary();
 
   cerr << "Job summary:" << endl;
   cerr << "  Ray throughput       " << fixed << setprecision( 2 )
