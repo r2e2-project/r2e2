@@ -66,6 +66,9 @@ public:
   static Address from_ipv4_numeric( const uint32_t ip_address );
   //! Human-readable string, e.g., "8.8.8.8:53".
   std::string to_string() const;
+
+  static std::pair<std::string, uint16_t> decompose(
+    const std::string& ip_port );
   //!@}
 
   //! \name Low-level operations
