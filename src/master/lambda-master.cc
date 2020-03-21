@@ -47,7 +47,6 @@ using namespace r2t2;
 using namespace pbrt;
 
 using OpCode = Message::OpCode;
-using PollerResult = Poller::Result::Type;
 
 map<LambdaMaster::Worker::Role, size_t> LambdaMaster::Worker::active_count = {};
 WorkerId LambdaMaster::Worker::next_id = 0;
@@ -55,7 +54,7 @@ WorkerId LambdaMaster::Worker::next_id = 0;
 LambdaMaster::~LambdaMaster()
 {
   try {
-    roost::empty_directory( sceneDir.name() );
+    roost::empty_directory( scene_dir.name() );
   } catch ( exception& ex ) {
   }
 }
@@ -143,7 +142,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   pending_ray_bags.resize( treelet_count );
 
   tiles = Tiles { config.tile_size,
-                  scene.sampleBounds,
+                  scene.sample_bounds,
                   scene.base.samplesPerPixel,
                   ray_generators ? ray_generators : max_workers };
 
@@ -182,12 +181,12 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
               to_string( tiles.tile_size ) + "\u00d7"
                 + to_string( tiles.tile_size ) );
   print_info( "Output dimensions",
-              to_string( scene.sampleExtent.x ) + "\u00d7"
-                + to_string( scene.sampleExtent.y ) );
-  print_info( "Samples per pixel", scene.samplesPerPixel );
+              to_string( scene.sample_extent.x ) + "\u00d7"
+                + to_string( scene.sample_extent.y ) );
+  print_info( "Samples per pixel", scene.base.samplesPerPixel );
   print_info( "Total paths      ",
-              scene.sampleExtent.x * scene.sampleExtent.y
-                * scene.samplesPerPixel );
+              scene.sample_extent.x * scene.sample_extent.y
+                * scene.base.samplesPerPixel );
   cerr << endl;
 
   loop.add_rule(
@@ -198,20 +197,22 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     [this] { return finished_ray_generators == this->ray_generators; } );
 
   loop.add_rule(
+    "Job exit",
     job_exit_timer,
     Direction::In,
     [&] { terminated = true; },
-    [] { return true; }, );
+    [] { return true; } );
 
   loop.add_rule( "Messages",
                  bind( &LambdaMaster::handle_messages, this ),
                  [this] { return !incoming_messages.empty(); } );
 
   loop.add_rule(
-    "Queued ray bags" bind( &LambdaMaster::handle_queued_ray_bags, this ),
+    "Queued ray bags",
+    bind( &LambdaMaster::handle_queued_ray_bags, this ),
     [this] {
       return initialized_workers >= this->max_workers && !free_workers.empty()
-             && ( tiles.cameraRaysRemaining() || queued_ray_bags_count > 0 );
+             && ( tiles.camera_rays_remaining() || queued_ray_bags_count > 0 );
     } );
 
   if ( config.worker_stats_write_interval > 0 ) {
@@ -245,6 +246,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   loop.add_rule(
     "Listener",
+    listener_socket,
+    Direction::In,
     [this, max_workers] {
       TCPSocket socket = listener_socket.accept();
 
@@ -252,7 +255,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
       if ( Worker::next_id >= this->ray_generators
            && treelets_to_spawn.empty() ) {
         socket.close();
-        return true;
+        return;
       }
 
       const WorkerId worker_id = Worker::next_id++;
@@ -273,7 +276,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
           if ( !worker.outstanding_ray_bags.empty() ) {
             throw runtime_error( "worker died without finishing its work: "
-                                 + to_string( workerId ) );
+                                 + to_string( worker_id ) );
           }
 
           return;
@@ -282,7 +285,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         cerr << "Worker info: " << worker.to_string() << endl;
 
         throw runtime_error(
-          "worker died unexpectedly: " + to_string( workerId )
+          "worker died unexpectedly: " + to_string( worker_id )
           + ( worker.aws_log_stream.empty()
                 ? ""s
                 : ( " ("s + worker.aws_log_stream + ")"s ) ) );
@@ -303,8 +306,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         protobuf::Hey hey_proto;
         hey_proto.set_worker_id( worker_id );
         hey_proto.set_job_id( job_id );
-        worker.connection->enqueue_write(
-          Message::str( 0, OpCode::Hey, protoutil::to_string( hey_proto ) ) );
+        worker.client.push_request(
+          { 0, OpCode::Hey, protoutil::to_string( hey_proto ) } );
 
         /* (2) tell the worker to get the necessary scene objects */
         protobuf::GetObjects objs_proto;
@@ -312,8 +315,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           *objs_proto.add_object_ids() = to_protobuf( id );
         }
 
-        worker.connection->enqueue_write( Message::str(
-          0, OpCode::GetObjects, protoutil::to_string( objs_proto ) ) );
+        worker.client.push_request(
+          { 0, OpCode::GetObjects, protoutil::to_string( objs_proto ) } );
 
         /* (3) Tell the worker to generate rays */
         if ( tiles.camera_rays_remaining() ) {
@@ -321,8 +324,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         } else {
           /* Too many ray launchers for tile size,
            * so just finish immediately */
-          worker.connection->enqueue_write(
-            Message::str( 0, OpCode::FinishUp, "" ) );
+          worker.client.push_request( { 0, OpCode::FinishUp, "" } );
           worker.state = Worker::State::FinishingUp;
         }
       } else {
@@ -335,8 +337,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           treelet.pending_workers--;
 
           /* (0) create the entry for the worker */
-          auto& workers.emplace_back(
-            workerId, Worker::Role::Tracer, move( socket ) );
+          auto& worker = workers.emplace_back(
+            worker_id, Worker::Role::Tracer, move( socket ) );
 
           assign_base_objects( worker );
           assign_treelet( worker, treelet );
@@ -345,8 +347,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           protobuf::Hey hey_proto;
           hey_proto.set_worker_id( worker_id );
           hey_proto.set_job_id( job_id );
-          worker.connection->enqueue_write(
-            Message::str( 0, OpCode::Hey, protoutil::to_string( hey_proto ) ) );
+          worker.client.push_request(
+            { 0, OpCode::Hey, protoutil::to_string( hey_proto ) } );
 
           /* (2) tell the worker to get the scene objects necessary */
           protobuf::GetObjects objs_proto;
@@ -354,8 +356,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
             *objs_proto.add_object_ids() = to_protobuf( id );
           }
 
-          worker.connection->enqueue_write( Message::str(
-            0, OpCode::GetObjects, protoutil::to_string( objs_proto ) ) );
+          worker.client.push_request(
+            { 0, OpCode::GetObjects, protoutil::to_string( objs_proto ) } );
 
           free_workers.push_back( worker.id );
         } else {
@@ -363,9 +365,11 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         }
       }
 
-      workers.back().session.install_rules( loop, connection_close_handler );
+      workers.back().client.install_rules(
+        loop, [worker_id, this]( Message&& msg ) {
+          this->incoming_messages.emplace_back( worker_id, move( msg ) );
+        } );
     },
-
     [] { return true; },
     [] { throw runtime_error( "listener socket closed" ); } );
 
@@ -380,7 +384,7 @@ string LambdaMaster::Worker::to_string() const
 
   size_t oustanding_size = 0;
   for ( const auto& bag : outstanding_ray_bags )
-    oustanding_size += bag.bag_size;
+    oustanding_size += bag.bagSize;
 
   oss << "id=" << id << ",state=" << static_cast<int>( state )
       << ",role=" << static_cast<int>( role ) << ",awslog=" << aws_log_stream
@@ -431,7 +435,7 @@ void LambdaMaster::run()
       Direction::In,
       [&] {
         if ( !agent->eventfd().read_event() )
-          return ResultType::Continue;
+          return;
 
         vector<pair<uint64_t, string>> actions;
         agent->tryPopBulk( back_inserter( actions ) );
@@ -454,8 +458,8 @@ void LambdaMaster::run()
     cerr << "Launching " << ray_generators << " ray "
          << pluralize( "generator", ray_generators ) << "... ";
 
-    invokeWorkers( ray_generators
-                   + static_cast<size_t>( 0.1 * ray_generators ) );
+    invoke_workers( ray_generators
+                    + static_cast<size_t>( 0.1 * ray_generators ) );
     cerr << "done." << endl;
   }
 
@@ -465,19 +469,19 @@ void LambdaMaster::run()
   }
 
   vector<storage::GetRequest> get_requests;
-  const string log_prefix = "logs/" + jobId + "/";
+  const string log_prefix = "logs/" + job_id + "/";
 
   ws_stream.close();
   tl_stream.close();
 
   for ( auto& worker : workers ) {
     if ( worker.state != Worker::State::Terminated ) {
-      worker.connection->socket().close();
+      worker.client.session().socket().close();
     }
 
     if ( config.collect_debug_logs || config.ray_log_rate
          || config.bag_log_rate ) {
-      get_requests.emplace_back( logPrefix + to_string( worker.id ) + ".INFO",
+      get_requests.emplace_back( log_prefix + to_string( worker.id ) + ".INFO",
                                  config.logs_directory + "/"
                                    + to_string( worker.id ) + ".INFO" );
     }
@@ -561,8 +565,6 @@ int main( int argc, char* argv[] )
     abort();
   }
 
-  timer();
-
   google::InitGoogleLogging( argv[0] );
 
   uint16_t listen_port = 50000;
@@ -636,7 +638,7 @@ int main( int argc, char* argv[] )
     }
 
     switch ( opt ) {
-        // clang-format off
+      // clang-format off
         case 'p': listen_port = stoi(optarg); break;
         case 'P': client_port = stoi(optarg); break;
         case 'i': public_ip = optarg; break;
@@ -757,8 +759,6 @@ int main( int argc, char* argv[] )
                                         config );
 
     master->run();
-
-    cerr << endl << timer().summary() << endl;
   } catch ( const exception& e ) {
     print_exception( argv[0], e );
     return EXIT_FAILURE;
