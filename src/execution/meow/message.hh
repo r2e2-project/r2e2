@@ -99,8 +99,8 @@ template<class SessionType>
 class Client : public ::Client<SessionType, Message, Message>
 {
 private:
-  std::queue<Message> requests_;
-  MessageParser responses_;
+  std::queue<Message> requests_ {};
+  MessageParser responses_ {};
 
   std::string current_request_header_ {};
   std::string_view current_request_unsent_header_ {};
@@ -129,7 +129,8 @@ template<class Writable>
 void Client<SessionType>::write( Writable& out )
 {
   if ( requests_empty() ) {
-    throw std::runtime_error( "meow::Client::write(): Client has no more requests" );
+    throw std::runtime_error(
+      "meow::Client::write(): Client has no more requests" );
   }
 
   if ( not current_request_unsent_header_.empty() ) {

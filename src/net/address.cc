@@ -116,6 +116,16 @@ Address::Address( const string& ip, const uint16_t port )
              make_hints( AI_NUMERICHOST | AI_NUMERICSERV, AF_INET ) )
 {}
 
+pair<string, uint16_t> Address::decompose( const string& ip_port )
+{
+  const size_t colon_pos = ip_port.find( ":" );
+  if ( colon_pos == string::npos ) {
+    throw runtime_error( "invalid ip:port format" );
+  }
+  const uint16_t port = strict_atoi( ip_port.substr( colon_pos + 1 ) );
+  return make_pair( ip_port.substr( 0, colon_pos ), port );
+}
+
 // accessors
 pair<string, uint16_t> Address::ip_port() const
 {
