@@ -20,6 +20,9 @@ public:
 
   ~MMap_Region();
 
+  MMap_Region( MMap_Region&& region ) = default;
+  MMap_Region& operator=( MMap_Region&& region ) = default;
+
   /* Disallow copying */
   MMap_Region( const MMap_Region& other ) = delete;
   MMap_Region& operator=( const MMap_Region& other ) = delete;
