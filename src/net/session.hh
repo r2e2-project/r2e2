@@ -22,11 +22,16 @@ public:
 
 /* base for SSLSession */
 template<class T>
-class SessionBase<T, std::enable_if_t<std::is_same<T, TCPSocketBIO>::value>>
+class SessionBase<T, std::enable_if_t<!std::is_same<T, TCPSocket>::value>>
 {
 protected:
   SSL_handle ssl_;
   TCPSocketBIO socket_;
+
+  int get_error( const int return_value ) const;
+
+  bool write_waiting_on_read_ {};
+  bool read_waiting_on_write_ {};
 
 public:
   SessionBase( SSL_handle&& ssl, TCPSocket&& socket );
@@ -51,8 +56,8 @@ public:
   void do_read();
   void do_write();
 
-  bool want_read();
-  bool want_write();
+  bool want_read() const;
+  bool want_write() const;
 
   RingBuffer& outbound_plaintext() { return outbound_plaintext_; }
   RingBuffer& inbound_plaintext() { return inbound_plaintext_; }

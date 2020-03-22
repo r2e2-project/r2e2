@@ -1,26 +1,30 @@
 #include "session.hh"
 
-#include "execution/meow/message.h"
+#include "execution/meow/message.hh"
 #include "http_client.hh"
 
 using namespace std;
 
-TCPSession::TCPSession( TCPSocket&& socket )
+template<>
+SessionBase<TCPSocket>::SessionBase( TCPSocket&& socket )
   : socket_( move( socket ) )
 {}
 
-bool TCPSession::want_read() const
+template<>
+bool Session<TCPSocket>::want_read() const
 {
   return ( not inbound_plaintext_.writable_region().empty() )
          and ( not incoming_stream_terminated_ );
 }
 
-bool TCPSession::want_write() const
+template<>
+bool Session<TCPSocket>::want_write() const
 {
   return not outbound_plaintext_.readable_region().empty();
 }
 
-void TCPSession::do_read()
+template<>
+void Session<TCPSocket>::do_read()
 {
   simple_string_span target = inbound_plaintext_.writable_region();
   const auto byte_count = socket_.read( target );
@@ -30,13 +34,14 @@ void TCPSession::do_read()
     return;
   }
 
-  if ( bytes_read > 0 ) {
-    inbound_plaintext_.push( bytes_read );
+  if ( byte_count > 0 ) {
+    inbound_plaintext_.push( byte_count );
     return;
   }
 }
 
-void TCPSession::do_write()
+template<>
+void Session<TCPSocket>::do_write()
 {
   const string_view source = outbound_plaintext_.readable_region();
   const auto bytes_written = socket_.write( source );
@@ -46,7 +51,8 @@ void TCPSession::do_write()
   }
 }
 
-SSLSession::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
+template<>
+SessionBase<TCPSocketBIO>::SessionBase( SSL_handle&& ssl, TCPSocket&& sock )
   : ssl_( move( ssl ) )
   , socket_( move( sock ) )
 {
@@ -63,27 +69,31 @@ SSLSession::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
   OpenSSL::check( "SSLSession constructor" );
 }
 
-int SSLSession::get_error( const int return_value ) const
+template<>
+int SessionBase<TCPSocketBIO>::get_error( const int return_value ) const
 {
   return SSL_get_error( ssl_.get(), return_value );
 }
 
-bool SSLSession::want_read() const
+template<>
+bool Session<TCPSocketBIO>::want_read() const
 {
   return ( not read_waiting_on_write_ )
          and ( not inbound_plaintext_.writable_region().empty() )
          and ( not incoming_stream_terminated_ );
 }
 
-bool SSLSession::want_write() const
+template<>
+bool Session<TCPSocketBIO>::want_write() const
 {
   return ( not write_waiting_on_read_ )
          and ( not outbound_plaintext_.readable_region().empty() );
 }
 
-void SSLSession::do_read()
+template<>
+void Session<TCPSocketBIO>::do_read()
 {
-  OpenSSL::check( "SSLSession::do_read()" );
+  OpenSSL::check( "Session<TCPSocketBIO>::do_read()" );
 
   simple_string_span target = inbound_plaintext_.writable_region();
 
@@ -121,9 +131,10 @@ void SSLSession::do_read()
   throw ssl_error( "SSL_read", error_return );
 }
 
-void SSLSession::do_write()
+template<>
+void Session<TCPSocketBIO>::do_write()
 {
-  OpenSSL::check( "SSLSession::do_write()" );
+  OpenSSL::check( "Session<TCPSocketBIO>::do_write()" );
 
   const string_view source = outbound_plaintext_.readable_region();
 
