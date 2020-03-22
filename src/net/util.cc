@@ -58,3 +58,43 @@ void put_field( char* message, const uint16_t n, size_t loc )
           reinterpret_cast<const char*>( &network_order ),
           sizeof( network_order ) );
 }
+
+template<>
+bool get_field( const std::string_view str )
+{
+  if ( str.length() < sizeof( bool ) ) {
+    throw std::out_of_range( "len(str) < sizeof(bool)" );
+  }
+
+  return *reinterpret_cast<const bool*>( str.data() );
+}
+
+template<>
+uint16_t get_field( const std::string_view str )
+{
+  if ( str.length() < sizeof( uint16_t ) ) {
+    throw std::out_of_range( "len(str) < sizeof(uint16_t)" );
+  }
+
+  return be16toh( *reinterpret_cast<const uint16_t*>( str.data() ) );
+}
+
+template<>
+uint32_t get_field( const std::string_view str )
+{
+  if ( str.length() < sizeof( uint32_t ) ) {
+    throw std::out_of_range( "len(str) < sizeof(uint32_t)" );
+  }
+
+  return be32toh( *reinterpret_cast<const uint32_t*>( str.data() ) );
+}
+
+template<>
+uint64_t get_field( const std::string_view str )
+{
+  if ( str.length() < sizeof( uint64_t ) ) {
+    throw std::out_of_range( "len(str) < sizeof(uint64_t)" );
+  }
+
+  return be64toh( *reinterpret_cast<const uint64_t*>( str.data() ) );
+}
