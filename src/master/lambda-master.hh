@@ -258,7 +258,7 @@ class LambdaMaster {
 
     /*** Outputting stats *****************************************************/
 
-    void recordEnqueue(const WorkerId workerId, const RayBagInfo &info, const uint64_t sender_id);
+    void recordEnqueue(const WorkerId workerId, const RayBagInfo &info);
     void recordAssign(const WorkerId workerId, const RayBagInfo &info);
     void recordDequeue(const WorkerId workerId, const RayBagInfo &info);
 

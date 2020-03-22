@@ -115,7 +115,7 @@ class LambdaWorker {
 
     std::map<TreeletId, std::unique_ptr<pbrt::CloudBVH>> treelets{};
     std::map<TreeletId, std::queue<pbrt::RayStatePtr>> traceQueue{};
-    std::map<TreeletId, std::queue<pbrt::RayStatePtr>> outQueue{};
+    std::map<std::tuple<TreeletId, TreeletId>, std::queue<pbrt::RayStatePtr>> outQueue{};
     std::queue<pbrt::Sample> samples{};
     size_t outQueueSize{0};
 

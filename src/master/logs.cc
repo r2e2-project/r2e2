@@ -9,8 +9,7 @@ using namespace r2t2;
 using namespace PollerShortNames;
 
 void LambdaMaster::recordEnqueue(const WorkerId workerId,
-                                 const RayBagInfo &info,
-                                 const uint64_t sender_id) {
+                                 const RayBagInfo &info) {
     auto &worker = workers.at(workerId);
     worker.rays.enqueued += info.rayCount;
 
@@ -35,17 +34,12 @@ void LambdaMaster::recordEnqueue(const WorkerId workerId,
         treeletStats[info.treeletId].enqueued.bytes += info.bagSize;
         treeletStats[info.treeletId].enqueued.count++;
 
-        //assuming Message sender ID  == which treelet this is coming from
-        //enqueuedTo tells us the number of rays going from sender_id to treeletId
-        treeletStats[TreeletId(sender_id)].enqueuedTo[info.treeletId].rays += info.rayCount;
-        treeletStats[TreeletId(sender_id)].enqueuedTo[info.treeletId].bytes += info.bagSize;
-        treeletStats[TreeletId(sender_id)].enqueuedTo[info.treeletId].count++;
+        //enqueuedTo tells us the number of rays going from sender_reciver_id to treeletId
+        treeletStats[info.sender_receiver_treeletId].enqueuedTo[info.treeletId].rays += info.rayCount;
+        treeletStats[info.sender_receiver_treeletId].enqueuedTo[info.treeletId].bytes += info.bagSize;
+        treeletStats[info.sender_receiver_treeletId].enqueuedTo[info.treeletId].count++;
 
-        // dequeuedFrom tells us the number of rays dequeued from sender_id that ends up
-        // at treeletId
-        treeletStats[info.treeletId].dequeuedFrom[TreeletId(sender_id)].rays += info.rayCount;
-        treeletStats[info.treeletId].dequeuedFrom[TreeletId(sender_id)].bytes += info.bagSize;
-        treeletStats[info.treeletId].dequeuedFrom[TreeletId(sender_id)].count++;
+       
 
 
         aggregatedStats.enqueued.rays += info.rayCount;
@@ -65,6 +59,12 @@ void LambdaMaster::recordAssign(const WorkerId workerId,
     worker.stats.assigned.rays += info.rayCount;
     worker.stats.assigned.bytes += info.bagSize;
     worker.stats.assigned.count++;
+
+    // dequeuedFrom tells us the number of rays dequeued from sender_receiver_id that ends up
+    // at treeletId
+    treeletStats[info.treeletId].dequeuedFrom[info.sender_receiver_treeletId].rays += info.rayCount;
+    treeletStats[info.treeletId].dequeuedFrom[info.sender_receiver_treeletId].bytes += info.bagSize;
+    treeletStats[info.treeletId].dequeuedFrom[info.sender_receiver_treeletId].count++;
 
     aggregatedStats.assigned.rays += info.rayCount;
     aggregatedStats.assigned.bytes += info.bagSize;

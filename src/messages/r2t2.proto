@@ -58,10 +58,11 @@ message RayBagInfo {
     bool tracked = 1;
     uint64 worker_id = 2;
     uint32 treelet_id = 3;
-    uint64 bag_id = 4;
-    uint64 ray_count = 5;
-    uint64 bag_size = 6;
-    bool sample_bag = 7;
+    uint32 sender_receiver_treelet_id = 4;
+    uint64 bag_id = 5;
+    uint64 ray_count = 6;
+    uint64 bag_size = 7;
+    bool sample_bag = 8;
 }
 
 message RayBags {

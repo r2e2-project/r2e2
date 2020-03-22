@@ -31,7 +31,7 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
             if (treelets.count(nextTreelet)) {
                 traceQueue[nextTreelet].push(move(statePtr));
             } else {
-                outQueue[nextTreelet].push(move(statePtr));
+                outQueue[make_tuple(TreeletId(0),nextTreelet)].push(move(statePtr));
                 outQueueSize++;
             }
         }
@@ -40,8 +40,8 @@ void LambdaWorker::generateRays(const Bounds2i& bounds) {
 
 ResultType LambdaWorker::handleTraceQueue() {
     ScopeTimer<TimeLog::Category::TraceQueue> timer_;
-
-    queue<RayStatePtr> processedRays;
+    //want to store the previous treeletId so that we can pass it along to the outQueue eventually
+    queue<tuple<TreeletId,RayStatePtr>> processedRays;
 
     // constexpr size_t MAX_RAYS = WORKER_MAX_ACTIVE_RAYS / 2;
     const auto traceUntil = steady_clock::now() + 100ms;
@@ -69,9 +69,9 @@ ResultType LambdaWorker::handleTraceQueue() {
                 const uint64_t pathId = ray.PathID();
 
                 logRay(RayAction::Traced, ray);
-
+                const uint32_t rayTreelet = ray.toVisitTop().treelet;
                 if (!ray.toVisitEmpty()) {
-                    const uint32_t rayTreelet = ray.toVisitTop().treelet;
+                    
                     auto newRayPtr = graphics::TraceRay(move(rayPtr), treelet);
                     auto& newRay = *newRayPtr;
 
@@ -93,10 +93,10 @@ ResultType LambdaWorker::handleTraceQueue() {
                                 localStats.pathHops.add(newRay.pathHop);
                             }
                         } else {
-                            processedRays.push(move(newRayPtr));
+                            processedRays.push(make_tuple(rayTreelet,move(newRayPtr)));
                         }
                     } else if (!emptyVisit || hit) {
-                        processedRays.push(move(newRayPtr));
+                        processedRays.push(make_tuple(rayTreelet,move(newRayPtr)));
                     } else if (emptyVisit) {
                         newRay.Ld = 0.f;
                         samples.emplace(*newRayPtr);
@@ -126,12 +126,12 @@ ResultType LambdaWorker::handleTraceQueue() {
 
                     if (bounceRay != nullptr) {
                         logRay(RayAction::Generated, *bounceRay);
-                        processedRays.push(move(bounceRay));
+                        processedRays.push(make_tuple(rayTreelet,move(bounceRay)));
                     }
 
                     if (shadowRay != nullptr) {
                         logRay(RayAction::Generated, *shadowRay);
-                        processedRays.push(move(shadowRay));
+                        processedRays.push(make_tuple(rayTreelet,move(shadowRay)));
                     }
                 } else {
                     throw runtime_error("invalid ray in ray queue");
@@ -145,7 +145,8 @@ ResultType LambdaWorker::handleTraceQueue() {
     }
 
     while (!processedRays.empty()) {
-        RayStatePtr ray = move(processedRays.front());
+        RayStatePtr ray = move(get<1>(processedRays.front()));
+        TreeletId prevTreelet = get<0>(processedRays.front());
         processedRays.pop();
 
         const TreeletId nextTreelet = ray->CurrentTreelet();
@@ -153,8 +154,9 @@ ResultType LambdaWorker::handleTraceQueue() {
         if (treelets.count(nextTreelet)) {
             traceQueue[nextTreelet].push(move(ray));
         } else {
+            //only care about processedRays' second value if we hit here
             logRay(RayAction::Queued, *ray);
-            outQueue[nextTreelet].push(move(ray));
+            outQueue[make_tuple(nextTreelet,prevTreelet)].push(move(ray));
             outQueueSize++;
         }
 

@@ -16,6 +16,7 @@ struct RayBagInfo {
 
     WorkerId workerId{};
     TreeletId treeletId{};
+    TreeletId sender_receiver_treeletId{};
     BagId bagId{};
     size_t rayCount{};
     size_t bagSize{};
@@ -35,10 +36,12 @@ struct RayBagInfo {
     }
 
     RayBagInfo(const WorkerId workerId, const TreeletId treeletId,
+               const TreeletId sender_receiver_treeletId,
                const BagId bagId, const size_t rayCount, const size_t bagSize,
                const bool sampleBag)
         : workerId(workerId),
           treeletId(treeletId),
+          sender_receiver_treeletId(sender_receiver_treeletId),
           bagId(bagId),
           rayCount(rayCount),
           bagSize(bagSize),
@@ -68,9 +71,9 @@ struct RayBag {
     RayBagInfo info;
     std::string data;
 
-    RayBag(const WorkerId workerId, const TreeletId treeletId,
+    RayBag(const WorkerId workerId, const TreeletId treeletId, const TreeletId prevTreeletId,
            const BagId bagId, const bool finished, const size_t maxBagLen)
-        : info(workerId, treeletId, bagId, 0, 0, finished),
+        : info(workerId, treeletId,prevTreeletId, bagId, 0, 0, finished),
           data(maxBagLen, '\0') {}
 
     RayBag(const RayBagInfo& info, std::string&& data)

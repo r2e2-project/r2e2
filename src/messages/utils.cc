@@ -22,8 +22,9 @@ protobuf::RayBagInfo to_protobuf(const RayBagInfo& info) {
     proto.set_tracked(info.tracked);
     proto.set_worker_id(info.workerId);
     proto.set_treelet_id(info.treeletId);
+    proto.set_sender_receiver_treelet_id(info.sender_receiver_treeletId);
     proto.set_bag_id(info.bagId);
-    proto.set_ray_count(info.rayCount);
+    proto.set_ray_count(info.rayCount); 
     proto.set_bag_size(info.bagSize);
     proto.set_sample_bag(info.sampleBag);
     return proto;
@@ -41,7 +42,7 @@ pbrt::ObjectKey from_protobuf(const protobuf::ObjectKey& key) {
 }
 
 RayBagInfo from_protobuf(const protobuf::RayBagInfo& proto) {
-    RayBagInfo res{proto.worker_id(), proto.treelet_id(), proto.bag_id(),
+    RayBagInfo res{proto.worker_id(), proto.treelet_id(),proto.sender_receiver_treelet_id(), proto.bag_id(),
                    proto.ray_count(), proto.bag_size(),   proto.sample_bag()};
 
     res.tracked = proto.tracked();

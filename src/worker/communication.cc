@@ -19,8 +19,8 @@ ResultType LambdaWorker::handleOutQueue() {
 
     bernoulli_distribution bd{config.bagLogRate};
 
-    auto createNewBag = [&](const TreeletId treeletId) -> RayBag {
-        RayBag bag{*workerId, treeletId, currentBagId[treeletId]++, false,
+    auto createNewBag = [&](const TreeletId treeletId,const TreeletId prevTreeletId) -> RayBag {
+        RayBag bag{*workerId, treeletId,prevTreeletId,currentBagId[treeletId]++, false,
                    MAX_BAG_SIZE};
 
         bag.info.tracked = bd(randEngine);
@@ -35,13 +35,14 @@ ResultType LambdaWorker::handleOutQueue() {
 
     for (auto it = outQueue.begin(); it != outQueue.end();
          it = outQueue.erase(it)) {
-        const TreeletId treeletId = it->first;
+        const TreeletId treeletId = get<0>(it->first);
+        const TreeletId prevTreeletId =  get<1>(it->first);
         auto& rayList = it->second;
 
         auto bagIt = openBags.find(treeletId);
 
         if (bagIt == openBags.end()) {
-            auto result = openBags.emplace(treeletId, createNewBag(treeletId));
+            auto result = openBags.emplace(treeletId, createNewBag(treeletId,prevTreeletId));
             bagIt = result.first;
         }
 
@@ -54,7 +55,7 @@ ResultType LambdaWorker::handleOutQueue() {
                 sealedBags.push(move(bag));
 
                 /* let's create an empty bag */
-                bag = createNewBag(treeletId);
+                bag = createNewBag(treeletId,prevTreeletId);
             }
 
             const auto len = ray->Serialize(&bag.data[0] + bag.info.bagSize);
@@ -112,7 +113,8 @@ ResultType LambdaWorker::handleSamples() {
     auto& out = sampleBags;
 
     if (out.empty()) {
-        out.emplace(*workerId, 0, currentSampleBagId++, true, MAX_BAG_SIZE);
+        //dont care about tracking sample bags, don't worry about prevTreelet
+        out.emplace(*workerId, 0,0, currentSampleBagId++, true, MAX_BAG_SIZE);
     }
 
     while (!samples.empty()) {
@@ -120,7 +122,8 @@ ResultType LambdaWorker::handleSamples() {
 
         if (out.back().info.bagSize + sample.MaxCompressedSize() >
             MAX_BAG_SIZE) {
-            out.emplace(*workerId, 0, currentSampleBagId++, true, MAX_BAG_SIZE);
+            //dont care about tracking sample bags, don't worry about prevTreelet
+            out.emplace(*workerId, 0,0, currentSampleBagId++, true, MAX_BAG_SIZE);
         }
 
         auto& bag = out.back();
