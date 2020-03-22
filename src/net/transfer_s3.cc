@@ -132,17 +132,23 @@ void S3TransferAgent::workerThread(const size_t threadId) {
             }
 
             for (const auto& action : actions) {
+                string headers;
                 HTTPRequest request = getRequest(action);
                 parser->new_request_arrived(request);
-                TRY_OPERATION(s3.write(request.str()), break);
+                request.serialize_headers(headers);
+                TRY_OPERATION(s3.write_all(headers), break);
+                TRY_OPERATION(s3.write_all(request.body()), break);
                 requestCount++;
             }
 
-            while (connectionOkay && !actions.empty()) {
-                string result;
-                TRY_OPERATION(result = s3.read(), break);
+            char buffer[1024 * 1024];
+            string_view sss{buffer};
 
-                if (result.length() == 0) {
+            while (connectionOkay && !actions.empty()) {
+                size_t read_count;
+                TRY_OPERATION(read_count = s3.read(sss), break);
+
+                if (read_count == 0) {
                     // connection was closed by the other side
                     tryCount++;
                     connectionOkay = false;
@@ -150,10 +156,10 @@ void S3TransferAgent::workerThread(const size_t threadId) {
                     break;
                 }
 
-                parser->parse(result);
+                parser->parse(sss.substr(0, read_count));
 
                 while (!parser->empty()) {
-                    const string status = move(parser->front().status_code());
+                    const string_view status = parser->front().status_code();
                     const string data = move(parser->front().body());
                     parser->pop();
 
@@ -175,7 +181,7 @@ void S3TransferAgent::workerThread(const size_t threadId) {
                         break;
 
                     default:  // unexpected response, like 404 or something
-                        throw runtime_error("transfer failed: " + status);
+                        throw runtime_error("transfer failed");
                     }
                 }
             }
