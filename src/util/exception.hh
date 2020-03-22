@@ -33,7 +33,7 @@ public:
 class unix_error : public tagged_error
 {
 public:
-  unix_error( const std::string& s_attempt, const int s_errno = errno )
+  unix_error( const std::string_view s_attempt, const int s_errno = errno )
     : tagged_error( std::system_category(), s_attempt, s_errno )
   {}
 };
