@@ -117,6 +117,13 @@ size_t FileDescriptor::write( const vector<string_view>& buffers )
   return bytes_written;
 }
 
+void FileDescriptor::write_all( string_view buffer )
+{
+  while ( not buffer.empty() ) {
+    buffer.remove_prefix( file.write( buffer ) );
+  }
+}
+
 void FileDescriptor::set_blocking( const bool blocking )
 {
   int flags = CheckSystemCall( "fcntl", fcntl( fd_num(), F_GETFL ) );
