@@ -120,7 +120,7 @@ size_t FileDescriptor::write( const vector<string_view>& buffers )
 void FileDescriptor::write_all( string_view buffer )
 {
   while ( not buffer.empty() ) {
-    buffer.remove_prefix( file.write( buffer ) );
+    buffer.remove_prefix( write( buffer ) );
   }
 }
 
