@@ -9,7 +9,8 @@ using namespace r2t2;
 using namespace PollerShortNames;
 
 void LambdaMaster::recordEnqueue(const WorkerId workerId,
-                                 const RayBagInfo &info) {
+                                 const RayBagInfo &info,
+                                 const uint64_t sender_id) {
     auto &worker = workers.at(workerId);
     worker.rays.enqueued += info.rayCount;
 
@@ -33,6 +34,19 @@ void LambdaMaster::recordEnqueue(const WorkerId workerId,
         treeletStats[info.treeletId].enqueued.rays += info.rayCount;
         treeletStats[info.treeletId].enqueued.bytes += info.bagSize;
         treeletStats[info.treeletId].enqueued.count++;
+
+        //assuming Message sender ID  == which treelet this is coming from
+        //enqueuedTo tells us the number of rays going from sender_id to treeletId
+        treeletStats[TreeletId(sender_id)].enqueuedTo[info.treeletId].rays += info.rayCount;
+        treeletStats[TreeletId(sender_id)].enqueuedTo[info.treeletId].bytes += info.bagSize;
+        treeletStats[TreeletId(sender_id)].enqueuedTo[info.treeletId].count++;
+
+        // dequeuedFrom tells us the number of rays dequeued from sender_id that ends up
+        // at treeletId
+        treeletStats[info.treeletId].dequeuedFrom[TreeletId(sender_id)].rays += info.rayCount;
+        treeletStats[info.treeletId].dequeuedFrom[TreeletId(sender_id)].bytes += info.bagSize;
+        treeletStats[info.treeletId].dequeuedFrom[TreeletId(sender_id)].count++;
+
 
         aggregatedStats.enqueued.rays += info.rayCount;
         aggregatedStats.enqueued.bytes += info.bagSize;
