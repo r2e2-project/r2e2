@@ -14,10 +14,13 @@
 #include "secure_socket.hh"
 #include "socket.hh"
 #include "util/exception.hh"
+#include "util/simple_string_span.hh"
 #include "util/temp_file.hh"
 
 using namespace std;
 using namespace storage;
+
+constexpr size_t BUFFER_SIZE = 1024 * 1024;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
@@ -139,14 +142,20 @@ void S3Client::download_file( const string& bucket,
 
   SSLContext ssl_context;
   HTTPResponseParser responses;
-  SecureSocket s3
-    = ssl_context.new_secure_socket( tcp_connection( s3_address ) );
+  SSLSocket s3 { ssl_context.make_SSL_handle(), tcp_connection( s3_address ) };
   s3.connect();
 
   S3GetRequest request { credentials_, endpoint, config_.region, object };
   HTTPRequest outgoing_request = request.to_http_request();
   responses.new_request_arrived( outgoing_request );
-  s3.write( outgoing_request.str() );
+
+  string headers;
+  outgoing_request.serialize_headers( headers );
+  s3.write( headers );
+  s3.write( outgoing_request.body() );
+
+  char buffer[BUFFER_SIZE];
+  simple_string_span sss { buffer };
 
   FileDescriptor file { CheckSystemCall(
     "open",
@@ -155,15 +164,14 @@ void S3Client::download_file( const string& bucket,
           S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH ) ) };
 
   while ( responses.empty() ) {
-    responses.parse( s3.read() );
+    s3.read( sss );
+    responses.parse( sss );
   }
 
   if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
-    throw runtime_error( "HTTP failure in S3Client::download_file( " + bucket
-                         + ", " + object
-                         + " ): " + responses.front().first_line() );
+    throw runtime_error( "HTTP failure in S3Client::download_file" );
   } else {
-    file.write( responses.front().body(), true );
+    file.write_all( responses.front().body() );
   }
 }
 
@@ -187,15 +195,21 @@ void S3Client::upload_files(
       waitables.emplace_back( async(
         launch::async,
         [&]( const size_t index ) {
+          string headers;
+          char buffer[BUFFER_SIZE];
+          simple_string_span sss { buffer };
+
           for ( size_t first_file_idx = index;
                 first_file_idx < upload_requests.size();
                 first_file_idx += thread_count * batch_size ) {
             SSLContext ssl_context;
             HTTPResponseParser responses;
-            SecureSocket s3
-              = ssl_context.new_secure_socket( tcp_connection( s3_address ) );
+            SSLSocket s3 { ssl_context.make_SSL_handle(),
+                           tcp_connection( s3_address ) };
 
             s3.connect();
+
+            size_t request_count = 0;
 
             for ( size_t file_id = first_file_idx;
                   file_id < min( upload_requests.size(),
@@ -208,34 +222,30 @@ void S3Client::upload_files(
               string hash = upload_requests.at( file_id ).content_hash.get_or(
                 UNSIGNED_PAYLOAD );
 
-              string contents;
-              FileDescriptor file { CheckSystemCall(
-                "open " + filename, open( filename.c_str(), O_RDONLY ) ) };
-              while ( not file.eof() ) {
-                contents.append( file.read() );
-              }
-              file.close();
+              string contents = roost::read_file( filename );
 
               S3PutRequest request { credentials_, endpoint, config_.region,
                                      object_key,   contents, hash };
 
               HTTPRequest outgoing_request = request.to_http_request();
               responses.new_request_arrived( outgoing_request );
-
-              s3.write( outgoing_request.str() );
+              outgoing_request.serialize_headers( headers );
+              s3.write( headers );
+              s3.write( outgoing_request.body() );
+              request_count++;
             }
 
-            const size_t total = responses.pending_requests();
             size_t response_count = 0;
 
-            while ( response_count < total ) {
+            while ( response_count < request_count ) {
               /* drain responses */
-              responses.parse( s3.read() );
+              s3.read( sss );
+              responses.parse( sss );
+
               if ( not responses.empty() ) {
                 if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
                   throw runtime_error(
-                    "HTTP failure in S3Client::upload_files(): "
-                    + responses.front().first_line() );
+                    "HTTP failure in S3Client::upload_files" );
                 } else {
                   const size_t response_index
                     = first_file_idx + response_count * thread_count;
@@ -276,13 +286,17 @@ void S3Client::download_files(
       waitables.emplace_back( async(
         launch::async,
         [&]( const size_t index ) {
+          string headers;
+          char buffer[BUFFER_SIZE];
+          simple_string_span sss { buffer };
+
           for ( size_t first_file_idx = index;
                 first_file_idx < download_requests.size();
                 first_file_idx += thread_count * batch_size ) {
             SSLContext ssl_context;
             HTTPResponseParser responses;
-            SecureSocket s3
-              = ssl_context.new_secure_socket( tcp_connection( s3_address ) );
+            SSLSocket s3 { ssl_context.make_SSL_handle(),
+                           tcp_connection( s3_address ) };
 
             s3.connect();
 
@@ -301,8 +315,9 @@ void S3Client::download_files(
 
               HTTPRequest outgoing_request = request.to_http_request();
               responses.new_request_arrived( outgoing_request );
-
-              s3.write( outgoing_request.str() );
+              outgoing_request.serialize_headers( headers );
+              s3.write( headers );
+              s3.write( outgoing_request.body() );
               expected_responses++;
             }
 
@@ -310,19 +325,14 @@ void S3Client::download_files(
 
             while ( response_count != expected_responses ) {
               /* drain responses */
-              responses.parse( s3.read() );
+              s3.read( sss );
+              responses.parse( sss );
               if ( not responses.empty() ) {
                 if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
                   const size_t response_index
                     = first_file_idx + response_count * thread_count;
-                  cerr << "HTTP failure in downloading '"
-                            + download_requests.at( response_index ).object_key
-                            + "': " + responses.front().first_line()
-                       << endl;
-                  throw runtime_error(
-                    "HTTP failure in downloading '"
-                    + download_requests.at( response_index ).object_key
-                    + "': " + responses.front().first_line() );
+
+                  throw runtime_error( "HTTP failure in downloading" );
                 } else {
                   const size_t response_index
                     = first_file_idx + response_count * thread_count;
