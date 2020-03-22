@@ -165,6 +165,62 @@ TCPSocketBIO::TCPSocketBIO( TCPSocket&& sock )
   OpenSSL::check( "TCPSocketBIO constructor" );
 }
 
+SSLSocket::SSLSocket( SSL_handle&& ssl, TCPSocket&& socket )
+  : TCPSocketBIO( move( socket ) )
+  , ssl_( move( ssl ) )
+{
+  if ( not ssl_ ) {
+    throw runtime_error(
+      "SecureSocket: constructor must be passed valid SSL structure" );
+  }
+
+  SSL_set0_rbio( ssl_.get(), *this );
+  SSL_set0_wbio( ssl_.get(), *this );
+
+  SSL_set_connect_state( ssl_.get() );
+
+  OpenSSL::check( "SSLSession constructor" );
+}
+
+void SSLSocket::connect()
+{
+  int retval = SSL_connect( ssl_.get() );
+
+  if ( not retval ) {
+    throw ssl_error( "SSL_connect", SSL_get_error( ssl_.get(), retval ) );
+  }
+
+  register_read();
+  register_write();
+}
+
+size_t SSLSocket::read( simple_string_span buffer )
+{
+  ERR_clear_error();
+  ssize_t bytes_read
+    = SSL_read( ssl_.get(), buffer.mutable_data(), buffer.size() );
+
+  if ( bytes_read == 0 ) {
+    set_eof();
+  } else if ( bytes_read < 0 ) {
+    throw ssl_error( "SSL_read", SSL_get_error( ssl_.get(), bytes_read ) );
+  }
+
+  return bytes_read;
+}
+
+size_t SSLSocket::write( const std::string_view buffer )
+{
+  ERR_clear_error();
+  ssize_t bytes_written = SSL_write( ssl_.get(), buffer.data(), buffer.size() );
+
+  if ( bytes_written <= 0 ) {
+    throw ssl_error( "SSL_write", SSL_get_error( ssl_.get(), bytes_written ) );
+  }
+
+  return bytes_written;
+}
+
 MemoryBIO::MemoryBIO( const string_view contents )
   : contents_( move( contents ) )
   , bio_( BIO_new_mem_buf( contents.data(), contents.size() ) )
