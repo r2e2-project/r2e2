@@ -75,6 +75,8 @@ public:
 
   size_t write( const std::vector<std::string_view>& buffers );
 
+  void write_all( std::string_view buffer );
+
   //! Close the underlying file descriptor
   void close() { _internal_fd->close(); }
 
