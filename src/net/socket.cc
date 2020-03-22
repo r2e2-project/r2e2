@@ -224,3 +224,7 @@ void Socket::throw_if_error() const
     throw unix_error( "socket error", socket_error );
   }
 }
+
+template void Socket::setsockopt( const int level,
+                                  const int option,
+                                  const timeval& option_value );
