@@ -8,300 +8,281 @@ using namespace chrono;
 using namespace r2t2;
 using namespace pbrt;
 using namespace meow;
-using namespace PollerShortNames;
 
 using OpCode = Message::OpCode;
 
 constexpr bool COMPRESS_RAY_BAGS = false;
 
-ResultType LambdaWorker::handleOutQueue() {
-    ScopeTimer<TimeLog::Category::OutQueue> timer_;
+void LambdaWorker::handle_out_queue()
+{
+  bernoulli_distribution bd { config.bag_log_rate };
 
-    bernoulli_distribution bd{config.bagLogRate};
-
-    auto createNewBag = [&](const TreeletId treeletId) -> RayBag {
-        RayBag bag{*workerId, treeletId, currentBagId[treeletId]++, false,
-                   MAX_BAG_SIZE};
-
-        bag.info.tracked = bd(randEngine);
-        logBag(BagAction::Created, bag.info);
-
-        if (!sealBagsTimer.armed()) {
-            sealBagsTimer.set(0s, SEAL_BAGS_INTERVAL);
-        }
-
-        return bag;
+  auto create_new_bag = [&]( const TreeletId treelet_id ) -> RayBag {
+    RayBag bag {
+      *worker_id, treelet_id, current_bag_id[treelet_id]++, false, MAX_BAG_SIZE
     };
 
-    for (auto it = outQueue.begin(); it != outQueue.end();
-         it = outQueue.erase(it)) {
-        const TreeletId treeletId = it->first;
-        auto& rayList = it->second;
+    bag.info.tracked = bd( rand_engine );
+    log_bag( BagAction::Created, bag.info );
 
-        auto bagIt = openBags.find(treeletId);
-
-        if (bagIt == openBags.end()) {
-            auto result = openBags.emplace(treeletId, createNewBag(treeletId));
-            bagIt = result.first;
-        }
-
-        while (!rayList.empty()) {
-            auto& ray = rayList.front();
-            auto& bag = bagIt->second;
-
-            if (bag.info.bagSize + ray->MaxCompressedSize() > MAX_BAG_SIZE) {
-                logBag(BagAction::Sealed, bag.info);
-                sealedBags.push(move(bag));
-
-                /* let's create an empty bag */
-                bag = createNewBag(treeletId);
-            }
-
-            const auto len = ray->Serialize(&bag.data[0] + bag.info.bagSize);
-            bag.info.rayCount++;
-            bag.info.bagSize += len;
-
-            logRay(RayAction::Bagged, *ray, bag.info);
-
-            rayList.pop();
-            outQueueSize--;
-        }
+    if ( !seal_bags_timer.armed() ) {
+      seal_bags_timer.set( 0s, SEAL_BAGS_INTERVAL );
     }
 
-    return ResultType::Continue;
+    return bag;
+  };
+
+  for ( auto it = out_queue.begin(); it != out_queue.end();
+        it = out_queue.erase( it ) ) {
+    const TreeletId treelet_id = it->first;
+    auto& ray_list = it->second;
+
+    auto bag_it = open_bags.find( treelet_id );
+
+    if ( bag_it == open_bags.end() ) {
+      auto result
+        = open_bags.emplace( treelet_id, create_new_bag( treelet_id ) );
+      bag_it = result.first;
+    }
+
+    while ( !ray_list.empty() ) {
+      auto& ray = ray_list.front();
+      auto& bag = bag_it->second;
+
+      if ( bag.info.bagSize + ray->MaxCompressedSize() > MAX_BAG_SIZE ) {
+        log_bag( BagAction::Sealed, bag.info );
+        sealed_bags.push( move( bag ) );
+
+        /* let's create an empty bag */
+        bag = create_new_bag( treelet_id );
+      }
+
+      const auto len = ray->Serialize( &bag.data[0] + bag.info.bagSize );
+      bag.info.rayCount++;
+      bag.info.bagSize += len;
+
+      log_ray( RayAction::Bagged, *ray, bag.info );
+
+      ray_list.pop();
+      out_queue_size--;
+    }
+  }
 }
 
-ResultType LambdaWorker::handleOpenBags() {
-    ScopeTimer<TimeLog::Category::OpenBags> timer_;
+void LambdaWorker::handle_open_bags()
+{
+  seal_bags_timer.read_event();
 
-    sealBagsTimer.read_event();
+  nanoseconds next_expiry = nanoseconds::max();
+  const auto now = steady_clock::now();
 
-    nanoseconds nextExpiry = nanoseconds::max();
-    const auto now = steady_clock::now();
+  for ( auto it = open_bags.begin(); it != open_bags.end(); ) {
+    const auto time_since_creation = now - it->second.createdAt;
 
-    for (auto it = openBags.begin(); it != openBags.end();) {
-        const auto timeSinceCreation = now - it->second.createdAt;
+    if ( time_since_creation < SEAL_BAGS_INTERVAL ) {
+      it++;
+      next_expiry = min( next_expiry,
+                         1ns
+                           + duration_cast<nanoseconds>(
+                             SEAL_BAGS_INTERVAL - time_since_creation ) );
 
-        if (timeSinceCreation < SEAL_BAGS_INTERVAL) {
-            it++;
-            nextExpiry = min(nextExpiry,
-                             1ns + duration_cast<nanoseconds>(
-                                       SEAL_BAGS_INTERVAL - timeSinceCreation));
-
-            continue;
-        }
-
-        logBag(BagAction::Sealed, it->second.info);
-        it->second.data.erase(it->second.info.bagSize);
-        it->second.data.shrink_to_fit();
-
-        sealedBags.push(move(it->second));
-        it = openBags.erase(it);
+      continue;
     }
 
-    if (!openBags.empty()) {
-        sealBagsTimer.set(0s, nextExpiry);
-    }
+    log_bag( BagAction::Sealed, it->second.info );
+    it->second.data.erase( it->second.info.bagSize );
+    it->second.data.shrink_to_fit();
 
-    return ResultType::Continue;
+    sealed_bags.push( move( it->second ) );
+    it = open_bags.erase( it );
+  }
+
+  if ( !open_bags.empty() ) {
+    seal_bags_timer.set( 0s, next_expiry );
+  }
 }
 
-ResultType LambdaWorker::handleSamples() {
-    ScopeTimer<TimeLog::Category::Samples> timer_;
+void LambdaWorker::handle_samples()
+{
+  /* XXX fix this */
+  auto& out = sample_bags;
 
-    auto& out = sampleBags;
+  if ( out.empty() ) {
+    out.emplace( *worker_id, 0, current_sample_bag_id++, true, MAX_BAG_SIZE );
+  }
 
-    if (out.empty()) {
-        out.emplace(*workerId, 0, currentSampleBagId++, true, MAX_BAG_SIZE);
+  while ( !samples.empty() ) {
+    auto& sample = samples.front();
+
+    if ( out.back().info.bagSize + sample.MaxCompressedSize() > MAX_BAG_SIZE ) {
+      out.emplace( *worker_id, 0, current_sample_bag_id++, true, MAX_BAG_SIZE );
     }
 
-    while (!samples.empty()) {
-        auto& sample = samples.front();
+    auto& bag = out.back();
+    const auto len = sample.Serialize( &bag.data[0] + bag.info.bagSize );
+    bag.info.rayCount++;
+    bag.info.bagSize += len;
 
-        if (out.back().info.bagSize + sample.MaxCompressedSize() >
-            MAX_BAG_SIZE) {
-            out.emplace(*workerId, 0, currentSampleBagId++, true, MAX_BAG_SIZE);
-        }
-
-        auto& bag = out.back();
-        const auto len = sample.Serialize(&bag.data[0] + bag.info.bagSize);
-        bag.info.rayCount++;
-        bag.info.bagSize += len;
-
-        samples.pop();
-    }
-
-    return ResultType::Continue;
+    samples.pop();
+  }
 }
 
-ResultType LambdaWorker::handleSealedBags() {
-    ScopeTimer<TimeLog::Category::SealedBags> timer_;
+void LambdaWorker::handle_sealed_bags()
+{
+  while ( !sealed_bags.empty() ) {
+    auto& bag = sealed_bags.front();
 
-    while (!sealedBags.empty()) {
-        auto& bag = sealedBags.front();
+    if ( COMPRESS_RAY_BAGS ) {
+      const size_t upper_bound = LZ4_COMPRESSBOUND( bag.info.bagSize );
+      string compressed( upper_bound, '\0' );
+      const size_t compressed_size = LZ4_compress_default(
+        bag.data.data(), &compressed[0], bag.info.bagSize, upper_bound );
 
-        if (COMPRESS_RAY_BAGS) {
-            const size_t upperBound = LZ4_COMPRESSBOUND(bag.info.bagSize);
-            string compressed(upperBound, '\0');
-            const size_t compressedSize = LZ4_compress_default(
-                bag.data.data(), &compressed[0], bag.info.bagSize, upperBound);
+      if ( compressed_size == 0 ) {
+        throw runtime_error( "bag compression failed" );
+      }
 
-            if (compressedSize == 0) {
-                throw runtime_error("bag compression failed");
-            }
-
-            bag.info.bagSize = compressedSize;
-            bag.data = move(compressed);
-        }
-
-        bag.data.erase(bag.info.bagSize);
-        bag.data.shrink_to_fit();
-
-        logBag(BagAction::Submitted, bag.info);
-
-        const auto id = transferAgent->requestUpload(
-            bag.info.str(rayBagsKeyPrefix), move(bag.data));
-
-        pendingRayBags[id] = make_pair(Task::Upload, bag.info);
-        sealedBags.pop();
+      bag.info.bagSize = compressed_size;
+      bag.data = move( compressed );
     }
 
-    return ResultType::Continue;
+    bag.data.erase( bag.info.bagSize );
+    bag.data.shrink_to_fit();
+
+    log_bag( BagAction::Submitted, bag.info );
+
+    const auto id = transfer_agent->requestUpload(
+      bag.info.str( ray_bags_key_prefix ), move( bag.data ) );
+
+    pending_ray_bags[id] = make_pair( Task::Upload, bag.info );
+    sealed_bags.pop();
+  }
 }
 
-ResultType LambdaWorker::handleSampleBags() {
-    ScopeTimer<TimeLog::Category::SampleBags> timer_;
+void LambdaWorker::handle_sample_bags()
+{
+  sample_bags_timer.read_event();
 
-    sampleBagsTimer.read_event();
+  while ( !sample_bags.empty() ) {
+    RayBag& bag = sample_bags.front();
+    bag.data.erase( bag.info.bagSize );
 
-    while (!sampleBags.empty()) {
-        RayBag& bag = sampleBags.front();
-        bag.data.erase(bag.info.bagSize);
+    const auto id = samples_transfer_agent->requestUpload(
+      bag.info.str( ray_bags_key_prefix ), move( bag.data ) );
 
-        const auto id = samplesTransferAgent->requestUpload(
-            bag.info.str(rayBagsKeyPrefix), move(bag.data));
-
-        pendingRayBags[id] = make_pair(Task::Upload, bag.info);
-        sampleBags.pop();
-    }
-
-    return ResultType::Continue;
+    pending_ray_bags[id] = make_pair( Task::Upload, bag.info );
+    sample_bags.pop();
+  }
 }
 
-ResultType LambdaWorker::handleReceiveQueue() {
-    ScopeTimer<TimeLog::Category::ReceiveQueue> timer_;
+void LambdaWorker::handle_receive_queue()
+{
+  while ( !receive_queue.empty() ) {
+    RayBag bag = move( receive_queue.front() );
+    receive_queue.pop();
 
-    while (!receiveQueue.empty()) {
-        RayBag bag = move(receiveQueue.front());
-        receiveQueue.pop();
+    /* (1) XXX do we have this treelet? */
 
-        /* (1) XXX do we have this treelet? */
+    /* (2) let's unpack this treelet and add the rays to the trace queue */
+    auto& rays = trace_queue[bag.info.treeletId];
+    size_t total_size = bag.data.size();
 
-        /* (2) let's unpack this treelet and add the rays to the trace queue */
-        auto& rays = traceQueue[bag.info.treeletId];
-        size_t totalSize = bag.data.size();
+    if ( COMPRESS_RAY_BAGS ) {
+      string decompressed( bag.info.rayCount * RayState::MaxPackedSize, '\0' );
 
-        if (COMPRESS_RAY_BAGS) {
-            string decompressed(bag.info.rayCount * RayState::MaxPackedSize,
-                                '\0');
+      int decompressed_size = LZ4_decompress_safe(
+        bag.data.data(), &decompressed[0], total_size, decompressed.size() );
 
-            int decompressedSize =
-                LZ4_decompress_safe(bag.data.data(), &decompressed[0],
-                                    totalSize, decompressed.size());
+      if ( decompressed_size < 0 ) {
+        throw runtime_error( "bag decompression failed" );
+      }
 
-            if (decompressedSize < 0) {
-                throw runtime_error("bag decompression failed");
-            }
-
-            totalSize = decompressedSize;
-            bag.data = move(decompressed);
-        }
-
-        const char* data = bag.data.data();
-
-        for (size_t offset = 0; offset < totalSize;) {
-            uint32_t len;
-            memcpy(&len, data + offset, sizeof(uint32_t));
-            offset += 4;
-
-            RayStatePtr ray = RayState::Create();
-            ray->Deserialize(data + offset, len);
-            ray->hop++;
-            ray->pathHop++;
-            offset += len;
-
-            logRay(RayAction::Unbagged, *ray, bag.info);
-
-            rays.push(move(ray));
-        }
-
-        logBag(BagAction::Opened, bag.info);
+      total_size = decompressed_size;
+      bag.data = move( decompressed );
     }
 
-    return ResultType::Continue;
+    const char* data = bag.data.data();
+
+    for ( size_t offset = 0; offset < total_size; ) {
+      uint32_t len;
+      memcpy( &len, data + offset, sizeof( uint32_t ) );
+      offset += 4;
+
+      RayStatePtr ray = RayState::Create();
+      ray->Deserialize( data + offset, len );
+      ray->hop++;
+      ray->pathHop++;
+      offset += len;
+
+      log_ray( RayAction::Unbagged, *ray, bag.info );
+
+      rays.push( move( ray ) );
+    }
+
+    log_bag( BagAction::Opened, bag.info );
+  }
 }
 
-ResultType LambdaWorker::handleTransferResults(const bool sampleBags) {
-    ScopeTimer<TimeLog::Category::TransferResults> timer_;
+void LambdaWorker::handle_transfer_results( const bool sample_bags )
+{
+  protobuf::RayBags enqueued_proto;
+  protobuf::RayBags dequeued_proto;
 
-    protobuf::RayBags enqueuedProto;
-    protobuf::RayBags dequeuedProto;
+  auto& agent = sample_bags ? samples_transfer_agent : transfer_agent;
 
-    auto& agent = sampleBags ? samplesTransferAgent : transferAgent;
+  if ( !agent->eventfd().read_event() ) {
+    return;
+  }
 
-    if (!agent->eventfd().read_event()) {
-        return ResultType::Continue;
-    }
+  vector<pair<uint64_t, string>> actions;
+  agent->tryPopBulk( back_inserter( actions ) );
 
-    vector<pair<uint64_t, string>> actions;
-    agent->tryPopBulk(back_inserter(actions));
+  for ( auto& action : actions ) {
+    auto infoIt = pending_ray_bags.find( action.first );
 
-    for (auto& action : actions) {
-        auto infoIt = pendingRayBags.find(action.first);
+    if ( infoIt != pending_ray_bags.end() ) {
+      const auto& info = infoIt->second.second;
 
-        if (infoIt != pendingRayBags.end()) {
-            const auto& info = infoIt->second.second;
+      switch ( infoIt->second.first ) {
+        case Task::Upload: {
+          /* we have to tell the master that we uploaded this */
+          *enqueued_proto.add_items() = to_protobuf( info );
 
-            switch (infoIt->second.first) {
-            case Task::Upload: {
-                /* we have to tell the master that we uploaded this */
-                *enqueuedProto.add_items() = to_protobuf(info);
-
-                logBag(BagAction::Enqueued, info);
-                break;
-            }
-
-            case Task::Download:
-                /* we have to put the received bag on the receive queue,
-                   and tell the master */
-                receiveQueue.emplace(info, move(action.second));
-                *dequeuedProto.add_items() = to_protobuf(info);
-
-                logBag(BagAction::Dequeued, info);
-                break;
-            }
-
-            pendingRayBags.erase(infoIt);
+          log_bag( BagAction::Enqueued, info );
+          break;
         }
+
+        case Task::Download:
+          /* we have to put the received bag on the receive queue,
+             and tell the master */
+          receive_queue.emplace( info, move( action.second ) );
+          *dequeued_proto.add_items() = to_protobuf( info );
+
+          log_bag( BagAction::Dequeued, info );
+          break;
+      }
+
+      pending_ray_bags.erase( infoIt );
     }
+  }
 
-    if (enqueuedProto.items_size() > 0) {
-        enqueuedProto.set_rays_generated(rays.generated);
-        enqueuedProto.set_rays_terminated(rays.terminated);
+  if ( enqueued_proto.items_size() > 0 ) {
+    enqueued_proto.set_rays_generated( rays.generated );
+    enqueued_proto.set_rays_terminated( rays.terminated );
 
-        coordinatorConnection->enqueue_write(
-            Message::str(*workerId, OpCode::RayBagEnqueued,
-                         protoutil::to_string(enqueuedProto)));
-    }
+    master_connection.push_request(
+      { *worker_id,
+        OpCode::RayBagEnqueued,
+        protoutil::to_string( enqueued_proto ) } );
+  }
 
-    if (dequeuedProto.items_size() > 0) {
-        dequeuedProto.set_rays_generated(rays.generated);
-        dequeuedProto.set_rays_terminated(rays.terminated);
+  if ( dequeued_proto.items_size() > 0 ) {
+    dequeued_proto.set_rays_generated( rays.generated );
+    dequeued_proto.set_rays_terminated( rays.terminated );
 
-        coordinatorConnection->enqueue_write(
-            Message::str(*workerId, OpCode::RayBagDequeued,
-                         protoutil::to_string(dequeuedProto)));
-    }
-
-    return ResultType::Continue;
+    master_connection.push_request(
+      { *worker_id,
+        OpCode::RayBagDequeued,
+        protoutil::to_string( dequeued_proto ) } );
+  }
 }

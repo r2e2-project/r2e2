@@ -17,7 +17,6 @@
 
 #include "common/lambda.hh"
 #include "common/stats.hh"
-#include "execution/loop.hh"
 #include "execution/meow/message.hh"
 #include "master/lambda-master.hh"
 #include "net/address.hh"
@@ -25,28 +24,30 @@
 #include "net/transfer.hh"
 #include "storage/backend.hh"
 #include "util/cpu.hh"
+#include "util/eventloop.hh"
 #include "util/histogram.hh"
 #include "util/seq_no_set.hh"
 #include "util/temp_dir.hh"
 #include "util/timerfd.hh"
 #include "util/units.hh"
 
-#define TLOG(tag) LOG(INFO) << "[" #tag "] "
+#define TLOG( tag ) LOG( INFO ) << "[" #tag "] "
 
 namespace r2t2 {
 
-constexpr std::chrono::milliseconds SEAL_BAGS_INTERVAL{100};
-constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL{1'000};
-constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL{1'000};
+constexpr std::chrono::milliseconds SEAL_BAGS_INTERVAL { 100 };
+constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL { 1'000 };
+constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL { 1'000 };
 
-constexpr size_t MAX_BAG_SIZE{4 * 1024 * 1024};  // 4 MiB
+constexpr size_t MAX_BAG_SIZE { 4 * 1024 * 1024 }; // 4 MiB
 
-struct WorkerConfiguration {
-    int samplesPerPixel;
-    int maxPathDepth;
-    float rayLogRate;
-    float bagLogRate;
-    std::vector<Address> memcachedServers;
+struct WorkerConfiguration
+{
+  int samples_per_pixel;
+  int max_path_depth;
+  float ray_log_rate;
+  float bag_log_rate;
+  std::vector<Address> memcached_servers;
 };
 
 /* Relationship between different queues in LambdaWorker:
@@ -66,208 +67,217 @@ struct WorkerConfiguration {
             +---------------------+  network  <--------------------+
 */
 
-class LambdaWorker {
+class LambdaWorker
+{
+public:
+  LambdaWorker( const std::string& coordinator_ip,
+                const uint16_t coordinator_port,
+                const std::string& storage_backend_uri,
+                const WorkerConfiguration& config );
+
+  void run();
+  void terminate() { terminated = true; }
+  void upload_logs();
+
+private:
+  using steady_clock = std::chrono::steady_clock;
+  using rays_clock = std::chrono::system_clock;
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Job Information                                                        //
+  ////////////////////////////////////////////////////////////////////////////
+
+  const WorkerConfiguration config;
+  const UniqueDirectory working_directory;
+  Optional<WorkerId> worker_id;
+  Optional<std::string> job_id;
+  bool terminated { false };
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Graphics                                                               //
+  ////////////////////////////////////////////////////////////////////////////
+
+  /*** Scene Information ****************************************************/
+
+  struct SceneData
+  {
   public:
-    LambdaWorker(const std::string& coordinatorIP,
-                 const uint16_t coordinatorPort,
-                 const std::string& storageBackendUri,
-                 const WorkerConfiguration& config);
+    pbrt::scene::Base base {};
 
-    void run();
-    void terminate() { terminated = true; }
-    void uploadLogs();
+    int samples_per_pixel { 1 };
+    uint8_t max_depth { 5 };
 
-  private:
-    using steady_clock = std::chrono::steady_clock;
-    using rays_clock = std::chrono::system_clock;
+    SceneData() {}
+  } scene;
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Job Information                                                        //
-    ////////////////////////////////////////////////////////////////////////////
+  /*** Ray Tracing **********************************************************/
 
-    const WorkerConfiguration config;
-    const UniqueDirectory workingDirectory;
-    Optional<WorkerId> workerId;
-    Optional<std::string> jobId;
-    bool terminated{false};
+  void handle_trace_queue();
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Graphics                                                               //
-    ////////////////////////////////////////////////////////////////////////////
+  void generate_rays( const pbrt::Bounds2i& crop_window );
 
-    /*** Scene Information ****************************************************/
+  std::map<TreeletId, std::unique_ptr<pbrt::CloudBVH>> treelets {};
+  std::map<TreeletId, std::queue<pbrt::RayStatePtr>> trace_queue {};
+  std::map<TreeletId, std::queue<pbrt::RayStatePtr>> out_queue {};
+  std::queue<pbrt::Sample> samples {};
+  size_t out_queue_size { 0 };
 
-    struct SceneData {
-      public:
-        pbrt::scene::Base base{};
+  ////////////////////////////////////////////////////////////////////////////
+  // Communication                                                          //
+  ////////////////////////////////////////////////////////////////////////////
 
-        int samplesPerPixel{1};
-        uint8_t maxDepth{5};
+  /* the coordinator and storage backend */
 
-        SceneData() {}
-    } scene;
+  const Address coordinator_addr;
+  meow::Client<TCPSession> master_connection;
+  std::unique_ptr<StorageBackend> storage_backend;
 
-    /*** Ray Tracing **********************************************************/
+  /* processes incoming messages; called by handleMessages */
+  void process_message( const meow::Message& message );
 
-    Poller::Action::Result::Type handleTraceQueue();
+  /* downloads the necessary scene objects */
+  void get_objects( const protobuf::GetObjects& objects );
 
-    void generateRays(const pbrt::Bounds2i& cropWindow);
+  /* process incoming messages */
+  void handle_messages();
 
-    std::map<TreeletId, std::unique_ptr<pbrt::CloudBVH>> treelets{};
-    std::map<TreeletId, std::queue<pbrt::RayStatePtr>> traceQueue{};
-    std::map<TreeletId, std::queue<pbrt::RayStatePtr>> outQueue{};
-    std::queue<pbrt::Sample> samples{};
-    size_t outQueueSize{0};
+  /* process rays supposed to be sent out */
+  void handle_out_queue();
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Communication                                                          //
-    ////////////////////////////////////////////////////////////////////////////
+  /* sending the rays out */
+  void handle_open_bags();
 
-    /* the coordinator and storage backend */
+  /* sending the rays out */
+  void handle_sealed_bags();
 
-    const Address coordinatorAddr;
-    std::shared_ptr<TCPConnection> coordinatorConnection;
-    std::unique_ptr<StorageBackend> storageBackend;
-    meow::MessageParser messageParser{};
+  /* opening up received ray bags */
+  void handle_receive_queue();
 
-    /* processes incoming messages; called by handleMessages */
-    void processMessage(const meow::Message& message);
+  /* turning samples into sample bags */
+  void handle_samples();
 
-    /* downloads the necessary scene objects */
-    void getObjects(const protobuf::GetObjects& objects);
+  /* sending sample bags out */
+  void handle_sample_bags();
 
-    /* process incoming messages */
-    Poller::Action::Result::Type handleMessages();
+  void handle_transfer_results( const bool sample_bags );
 
-    /* process rays supposed to be sent out */
-    Poller::Action::Result::Type handleOutQueue();
+  /* queues */
 
-    /* sending the rays out */
-    Poller::Action::Result::Type handleOpenBags();
+  /* current bag for each treelet */
+  std::map<TreeletId, RayBag> open_bags {};
 
-    /* sending the rays out */
-    Poller::Action::Result::Type handleSealedBags();
+  /* bags that are sealed and ready to be sent out */
+  std::queue<RayBag> sealed_bags {};
 
-    /* opening up received ray bags */
-    Poller::Action::Result::Type handleReceiveQueue();
+  /* sample bags ready to be sent out */
+  std::queue<RayBag> sample_bags {};
 
-    /* turning samples into sample bags */
-    Poller::Action::Result::Type handleSamples();
+  /* ray bags that are received, but not yet unpacked */
+  std::queue<RayBag> receive_queue {};
 
-    /* sending sample bags out */
-    Poller::Action::Result::Type handleSampleBags();
+  /* id of the paths that are finished (for bookkeeping) */
+  std::queue<uint64_t> finished_path_ids {};
 
-    Poller::Action::Result::Type handleTransferResults(const bool sampleBags);
+  /*** Ray Bags *************************************************************/
 
-    /* queues */
+  enum class Task
+  {
+    Download,
+    Upload
+  };
 
-    /* current bag for each treelet */
-    std::map<TreeletId, RayBag> openBags{};
+  std::string ray_bags_key_prefix {};
+  std::map<TreeletId, BagId> current_bag_id {};
+  std::map<uint64_t, std::pair<Task, RayBagInfo>> pending_ray_bags {};
+  BagId current_sample_bag_id { 0 };
 
-    /* bags that are sealed and ready to be sent out */
-    std::queue<RayBag> sealedBags{};
+  /*** Transfer Agent *******************************************************/
 
-    /* sample bags ready to be sent out */
-    std::queue<RayBag> sampleBags{};
+  std::unique_ptr<TransferAgent> transfer_agent;
+  std::unique_ptr<TransferAgent> samples_transfer_agent;
 
-    /* ray bags that are received, but not yet unpacked */
-    std::queue<RayBag> receiveQueue{};
+  ////////////////////////////////////////////////////////////////////////////
+  // Stats                                                                  //
+  ////////////////////////////////////////////////////////////////////////////
 
-    /* id of the paths that are finished (for bookkeeping) */
-    std::queue<uint64_t> finishedPathIds{};
+  void handle_worker_stats();
 
-    /*** Ray Bags *************************************************************/
+  void send_worker_stats();
 
-    enum class Task { Download, Upload };
+  struct
+  {
+    uint64_t generated { 0 };
+    uint64_t terminated { 0 };
+  } rays;
 
-    std::string rayBagsKeyPrefix{};
-    std::map<TreeletId, BagId> currentBagId{};
-    std::map<uint64_t, std::pair<Task, RayBagInfo>> pendingRayBags{};
-    BagId currentSampleBagId{0};
+  ////////////////////////////////////////////////////////////////////////////
+  // Logging                                                                //
+  ////////////////////////////////////////////////////////////////////////////
 
-    /*** Transfer Agent *******************************************************/
+  enum class RayAction
+  {
+    Generated,
+    Traced,
+    Queued,
+    Bagged,
+    Unbagged,
+    Finished
+  };
 
-    std::unique_ptr<TransferAgent> transferAgent;
-    std::unique_ptr<TransferAgent> samplesTransferAgent;
+  enum class BagAction
+  {
+    Created,
+    Sealed,
+    Submitted,
+    Enqueued,
+    Requested,
+    Dequeued,
+    Opened
+  };
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Stats                                                                  //
-    ////////////////////////////////////////////////////////////////////////////
+  void log_ray( const RayAction action,
+                const pbrt::RayState& state,
+                const RayBagInfo& info = RayBagInfo::EmptyBag() );
 
-    Poller::Action::Result::Type handleWorkerStats();
+  void log_bag( const BagAction action, const RayBagInfo& info );
 
-    void sendWorkerStats();
+  const std::string log_base { "r2t2-worker" };
+  const std::string info_log_name { log_base + ".INFO" };
+  std::string log_prefix { "logs/" };
+  const bool track_rays { config.ray_log_rate > 0 };
+  const bool track_bags { config.bag_log_rate > 0 };
 
-    struct {
-        uint64_t generated{0};
-        uint64_t terminated{0};
-    } rays;
+  std::bernoulli_distribution coin { 0.5 };
+  std::mt19937 rand_engine { std::random_device {}() };
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Logging                                                                //
-    ////////////////////////////////////////////////////////////////////////////
+  const steady_clock::time_point work_start { steady_clock::now() };
 
-    enum class RayAction {
-        Generated,
-        Traced,
-        Queued,
-        Bagged,
-        Unbagged,
-        Finished
-    };
+  ////////////////////////////////////////////////////////////////////////////
+  // Other ℭ𝔯𝔞𝔭
+  ////////////////////////////////////////////////////////////////////////////
 
-    enum class BagAction {
-        Created,
-        Sealed,
-        Submitted,
-        Enqueued,
-        Requested,
-        Dequeued,
-        Opened
-    };
+  EventLoop loop {};
+  Optional<EventLoop::RuleHandle> finish_up_rule {};
 
-    void logRay(const RayAction action, const pbrt::RayState& state,
-                const RayBagInfo& info = RayBagInfo::EmptyBag());
+  /* Timers */
+  TimerFD seal_bags_timer {};
+  TimerFD sample_bags_timer { SAMPLE_BAGS_INTERVAL };
+  TimerFD worker_stats_timer { WORKER_STATS_INTERVAL };
 
-    void logBag(const BagAction action, const RayBagInfo& info);
+  ////////////////////////////////////////////////////////////////////////////
+  // Local Stats                                                            //
+  ////////////////////////////////////////////////////////////////////////////
 
-    const std::string logBase{"r2t2-worker"};
-    const std::string infoLogName{logBase + ".INFO"};
-    std::string logPrefix{"logs/"};
-    const bool trackRays{config.rayLogRate > 0};
-    const bool trackBags{config.bagLogRate > 0};
+  CPUStats cpu_stats {};
 
-    std::bernoulli_distribution coin{0.5};
-    std::mt19937 randEngine{std::random_device{}()};
+  struct LocalStats
+  {
+    constexpr static uint16_t BIN_WIDTH = 5;
 
-    const steady_clock::time_point workStart{steady_clock::now()};
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Other ℭ𝔯𝔞𝔭
-    ////////////////////////////////////////////////////////////////////////////
-
-    ExecutionLoop loop{};
-
-    FileDescriptor alwaysOnFd{STDOUT_FILENO};
-
-    /* Timers */
-    TimerFD sealBagsTimer{};
-    TimerFD sampleBagsTimer{SAMPLE_BAGS_INTERVAL};
-    TimerFD workerStatsTimer{WORKER_STATS_INTERVAL};
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Local Stats                                                            //
-    ////////////////////////////////////////////////////////////////////////////
-
-    CPUStats cpuStats{};
-
-    struct LocalStats {
-        constexpr static uint16_t BIN_WIDTH = 5;
-
-        Histogram<uint64_t> pathHops{BIN_WIDTH, 0, UINT16_MAX};
-        Histogram<uint64_t> rayHops{BIN_WIDTH, 0, UINT16_MAX};
-        Histogram<uint64_t> shadowRayHops{BIN_WIDTH, 0, UINT16_MAX};
-    } localStats{};
+    Histogram<uint64_t> path_hops { BIN_WIDTH, 0, UINT16_MAX };
+    Histogram<uint64_t> ray_hops { BIN_WIDTH, 0, UINT16_MAX };
+    Histogram<uint64_t> shadow_ray_hops { BIN_WIDTH, 0, UINT16_MAX };
+  } local_stats {};
 };
 
-}  // namespace r2t2
+} // namespace r2t2
