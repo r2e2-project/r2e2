@@ -1,12 +1,13 @@
 #pragma once
 
-#include "address.hh"
-#include "util/file_descriptor.hh"
-
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <sys/socket.h>
+
+#include "address.hh"
+#include "util/file_descriptor.hh"
+#include "util/util.hh"
 
 //! \brief Base class for network sockets (TCP, UDP, etc.)
 //! \details Socket is generally used via a subclass. See TCPSocket and
@@ -123,4 +124,20 @@ public:
 
   //! Accept a new incoming connection
   TCPSocket accept();
+
+  template<class Duration>
+  void set_write_timeout( const Duration& d )
+  {
+    timeval tv;
+    to_timeval( d, tv );
+    setsockopt( SOL_SOCKET, SO_SNDTIMEO, tv );
+  }
+
+  template<class Duration>
+  void set_read_timeout( const Duration& d )
+  {
+    timeval tv;
+    to_timeval( d, tv );
+    setsockopt( SOL_SOCKET, SO_RCVTIMEO, tv );
+  }
 };
