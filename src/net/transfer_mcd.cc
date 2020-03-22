@@ -167,14 +167,17 @@ void TransferAgent::workerThread(const size_t threadId) {
                     secondaryActions.pop_front();
                 }
 
-                TRY_OPERATION(sock.write(requestStr), break);
+                TRY_OPERATION(sock.write_all(requestStr), break);
             }
 
-            while (connectionOkay && !actions.empty()) {
-                string result;
-                TRY_OPERATION(result = sock.read(), break);
+            char buffer[1024 * 1024];
+            string_view sss{buffer};
 
-                if (result.length() == 0) {
+            while (connectionOkay && !actions.empty()) {
+                size_t read_count;
+                TRY_OPERATION(read_count = sock.read(sss), break);
+
+                if (read_count == 0) {
                     // connection was closed by the other side
                     tryCount++;
                     connectionOkay = false;
@@ -182,7 +185,7 @@ void TransferAgent::workerThread(const size_t threadId) {
                     break;
                 }
 
-                parser->parse(result);
+                parser->parse(sss.substr(0, read_count));
 
                 while (!parser->empty()) {
                     const auto type = parser->front().type();

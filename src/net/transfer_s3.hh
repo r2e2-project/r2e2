@@ -20,7 +20,7 @@ class S3TransferAgent : public TransferAgent {
         std::string prefix{};
 
         std::string endpoint{};
-        std::atomic<Address> address{Address{}};
+        std::atomic<Address> address{Address{"0", 0}};
 
         S3Config(const std::unique_ptr<StorageBackend>& backend);
     } clientConfig;
