@@ -6,7 +6,7 @@
 #include <vector>
 #include <sys/stat.h>
 
-#include "util/file_descriptor.hh"
+#include "file_descriptor.hh"
 
 namespace roost {
   class Directory

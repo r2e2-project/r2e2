@@ -11,5 +11,5 @@ pair<FileDescriptor, FileDescriptor> make_pipe()
 {
   int pipe_fds[ 2 ];
   CheckSystemCall( "pipe", pipe( pipe_fds ) );
-  return { pipe_fds[ 0 ], pipe_fds[ 1 ] };
+  return { FileDescriptor { pipe_fds[ 0 ] }, FileDescriptor { pipe_fds[ 1 ] } };
 }

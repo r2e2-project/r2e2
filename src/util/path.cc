@@ -230,7 +230,13 @@ namespace roost {
       throw runtime_error( src.string() + " is not a regular file" );
     }
 
-    const string contents = src_file.read_exactly( src_info.st_size );
+    string contents;
+    contents.resize( src_info.st_size );
+
+    for ( size_t index = 0; not src_file.eof(); ) {
+      index += src_file.read( { contents.data() + index,
+                                contents.length() - index } );
+    }
 
     /* write out to new file */
     atomic_create( contents, dst, true, set_mode ? target_mode : src_info.st_mode );
@@ -485,7 +491,15 @@ namespace roost {
       throw runtime_error( pathn.string() + " is not a regular file" );
     }
 
-    return in_file.read_exactly( pathn_info.st_size );
+    string contents;
+    contents.resize( pathn_info.st_size );
+
+    for ( size_t index = 0; not in_file.eof(); ) {
+      index += in_file.read( { contents.data() + index,
+                                contents.length() - index } );
+    }
+
+    return contents;
   }
 
   void make_executable( const path & pathn )

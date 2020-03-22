@@ -108,9 +108,12 @@ string run( const string & filename, const vector<string> & args,
   );
 
   if ( read_stdout_until_eof ) {
+    char buffer[1024 * 1024];
+    simple_string_span sss { buffer, sizeof( buffer ) };
+
     pipe->second.close();
     while ( not pipe->first.eof() ) {
-      output.append( pipe->first.read() );
+      output.append( sss.substr( 0, pipe->first.read( sss ) ) );
     }
   }
 
