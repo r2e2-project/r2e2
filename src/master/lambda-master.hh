@@ -261,8 +261,8 @@ private:
   /* sample bags */
   std::vector<RayBagInfo> sample_bags;
 
-  void move_from_pending_to_queued( const TreeletId treeletId );
-  void move_from_queued_to_pending( const TreeletId treeletId );
+  void move_from_pending_to_queued( const TreeletId treelet_id );
+  void move_from_queued_to_pending( const TreeletId treelet_id );
 
   std::map<TreeletId, size_t> queue_size;
 

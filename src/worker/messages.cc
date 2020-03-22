@@ -7,113 +7,92 @@ using namespace r2t2;
 using namespace pbrt;
 using namespace meow;
 
-using namespace PollerShortNames;
-
 using OpCode = Message::OpCode;
-using PollerResult = Poller::Result::Type;
 
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
-ResultType LambdaWorker::handleMessages() {
-    ScopeTimer<TimeLog::Category::HandleMessages> timer_;
+void LambdaWorker::process_message( const Message& message )
+{
+  /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
+       << "]" << endl; */
 
-    while (!messageParser.empty()) {
-        processMessage(messageParser.front());
-        messageParser.pop();
-    }
-
-    return ResultType::Continue;
-}
-
-void LambdaWorker::processMessage(const Message& message) {
-    /* cerr << "[msg:" << Message::OPCODE_NAMES[to_underlying(message.opcode())]
-         << "]" << endl; */
-
-    switch (message.opcode()) {
+  switch ( message.opcode() ) {
     case OpCode::Hey: {
-        protobuf::Hey proto;
-        protoutil::from_string(message.payload(), proto);
-        workerId.reset(proto.worker_id());
-        jobId.reset(proto.job_id());
+      protobuf::Hey proto;
+      protoutil::from_string( message.payload(), proto );
+      worker_id.reset( proto.worker_id() );
+      job_id.reset( proto.job_id() );
 
-        logPrefix = "logs/" + (*jobId) + "/";
-        rayBagsKeyPrefix = "jobs/" + (*jobId) + "/";
+      log_prefix = "logs/" + ( *job_id ) + "/";
+      ray_bags_key_prefix = "jobs/" + ( *job_id ) + "/";
 
-        cerr << protoutil::to_json(proto) << endl;
+      cerr << protoutil::to_json( proto ) << endl;
 
-        coordinatorConnection->enqueue_write(
-            Message::str(0, OpCode::Hey, safe_getenv_or(LOG_STREAM_ENVAR, "")));
+      master_connection.push_request(
+        { 0, OpCode::Hey, safe_getenv_or( LOG_STREAM_ENVAR, "" ) } );
 
-        break;
+      break;
     }
 
     case OpCode::Ping: {
-        break;
+      break;
     }
 
     case OpCode::GetObjects: {
-        protobuf::GetObjects proto;
-        protoutil::from_string(message.payload(), proto);
-        getObjects(proto);
-
-        scene.base = {workingDirectory.name(), scene.samplesPerPixel};
-
-        coordinatorConnection->enqueue_write(
-            Message::str(*workerId, OpCode::GetObjects, ""));
-
-        break;
+      protobuf::GetObjects proto;
+      protoutil::from_string( message.payload(), proto );
+      get_objects( proto );
+      scene.base = { working_directory.name(), scene.samples_per_pixel };
+      master_connection.push_request( { *worker_id, OpCode::GetObjects, "" } );
+      break;
     }
 
     case OpCode::GenerateRays: {
-        protobuf::GenerateRays proto;
-        protoutil::from_string(message.payload(), proto);
-        generateRays(
-            Bounds2i{{proto.x0(), proto.y0()}, {proto.x1(), proto.y1()}});
-        break;
+      protobuf::GenerateRays proto;
+      protoutil::from_string( message.payload(), proto );
+      generate_rays(
+        Bounds2i { { proto.x0(), proto.y0() }, { proto.x1(), proto.y1() } } );
+      break;
     }
 
     case OpCode::ProcessRayBag: {
-        protobuf::RayBags proto;
-        protoutil::from_string(message.payload(), proto);
+      protobuf::RayBags proto;
+      protoutil::from_string( message.payload(), proto );
 
-        for (const protobuf::RayBagInfo& item : proto.items()) {
-            RayBagInfo info{from_protobuf(item)};
-            const auto id =
-                transferAgent->requestDownload(info.str(rayBagsKeyPrefix));
-            pendingRayBags[id] = make_pair(Task::Download, info);
+      for ( const protobuf::RayBagInfo& item : proto.items() ) {
+        RayBagInfo info { from_protobuf( item ) };
+        const auto id
+          = transfer_agent->requestDownload( info.str( ray_bags_key_prefix ) );
+        pending_ray_bags[id] = make_pair( Task::Download, info );
 
-            logBag(BagAction::Requested, info);
-        }
+        log_bag( BagAction::Requested, info );
+      }
 
-        break;
+      break;
     }
 
     case OpCode::FinishUp:
-        loop.poller().add_action(Poller::Action(
-            alwaysOnFd, Direction::Out,
-            [this]() {
-                sendWorkerStats();
+      finish_up_rule = loop.add_rule(
+        "Finish up",
+        [this]() {
+          send_worker_stats();
+          master_connection.push_request( { *worker_id, OpCode::Bye, "" } );
+          finish_up_rule->cancel();
+        },
+        [this]() {
+          return trace_queue.empty() && out_queue.empty() && samples.empty()
+                 && open_bags.empty() && sealed_bags.empty()
+                 && receive_queue.empty() && pending_ray_bags.empty()
+                 && sample_bags.empty();
+        } );
 
-                coordinatorConnection->enqueue_write(
-                    Message::str(*workerId, OpCode::Bye, ""));
-
-                return ResultType::Cancel;
-            },
-            [this]() {
-                return traceQueue.empty() && outQueue.empty() &&
-                       samples.empty() && openBags.empty() &&
-                       sealedBags.empty() && receiveQueue.empty() &&
-                       pendingRayBags.empty() && sampleBags.empty();
-            },
-            []() { throw runtime_error("terminating failed"); }));
-
-        break;
+      break;
 
     case OpCode::Bye:
-        terminate();
-        break;
+      terminate();
+      break;
 
     default:
-        throw runtime_error("unhandled message opcode");
-    }
+      throw runtime_error( "unhandled message opcode" );
+  }
 }
