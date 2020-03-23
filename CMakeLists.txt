@@ -32,7 +32,7 @@ include_directories ( "${CMAKE_CURRENT_BINARY_DIR}/src/messages" )
 add_definitions ( -D PBRT_CONSTEXPR=constexpr )
 
 file ( GLOB R2T2_SOURCE
-    src/benchmark/*
+    #src/benchmark/*
     src/common/*
     src/execution/*
     src/execution/meow/*
@@ -41,7 +41,7 @@ file ( GLOB R2T2_SOURCE
     src/net/*
     src/remote/*
     src/schedulers/*
-    src/server/*
+    #src/server/*
     #src/simulator/*
     src/storage/*
     src/tools/*
