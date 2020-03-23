@@ -16,7 +16,7 @@ namespace meow {
 class Message
 {
 public:
-  enum class OpCode : uint8_t
+  enum class OpCode : char
   {
     Hey = 0x1,
     Ping,
@@ -113,10 +113,8 @@ private:
   Message& responses_front() override { return responses_.front(); }
   void responses_pop() override { responses_.pop(); }
 
-  template<class Writable>
-  void write( Writable& out );
-
-  void read( RingBuffer& in );
+  void write( RingBuffer& out ) override;
+  void read( RingBuffer& in ) override;
 
 public:
   using ::Client<SessionType, Message, Message>::Client;
@@ -125,8 +123,7 @@ public:
 };
 
 template<class SessionType>
-template<class Writable>
-void Client<SessionType>::write( Writable& out )
+void Client<SessionType>::write( RingBuffer& out )
 {
   if ( requests_empty() ) {
     throw std::runtime_error(

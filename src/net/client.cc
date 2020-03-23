@@ -1,5 +1,9 @@
 #include "client.hh"
 
+#include "execution/meow/message.hh"
+#include "http_client.hh"
+#include "session.hh"
+
 using namespace std;
 
 template<class SessionType, class RequestType, class ResponseType>
@@ -50,7 +54,6 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
 
   installed_rules_.push_back( loop.add_rule(
     "endpoint read",
-    Direction::In,
     [&] { read( session_.inbound_plaintext() ); },
     [&] {
       return not session_.inbound_plaintext().writable_region().empty();
@@ -58,11 +61,15 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
 
   installed_rules_.push_back( loop.add_rule(
     "response",
-    [response_callback, this] {
+    [this, response_callback] {
       while ( not responses_empty() ) {
         response_callback( move( responses_front() ) );
         responses_pop();
       }
     },
-    [] { return not responses_empty(); } ) );
+    [&] { return not responses_empty(); } ) );
 }
+
+template class Client<TCPSession, meow::Message, meow::Message>;
+template class Client<TCPSession, HTTPRequest, HTTPResponse>;
+template class Client<SSLSession, HTTPRequest, HTTPResponse>;

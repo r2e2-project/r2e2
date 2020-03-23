@@ -197,7 +197,7 @@ void S3Client::upload_files(
         [&]( const size_t index ) {
           string headers;
           char buffer[BUFFER_SIZE];
-          simple_string_span sss { buffer };
+          simple_string_span sss { buffer, BUFFER_SIZE };
 
           for ( size_t first_file_idx = index;
                 first_file_idx < upload_requests.size();
@@ -288,7 +288,7 @@ void S3Client::download_files(
         [&]( const size_t index ) {
           string headers;
           char buffer[BUFFER_SIZE];
-          simple_string_span sss { buffer };
+          simple_string_span sss { buffer, BUFFER_SIZE };
 
           for ( size_t first_file_idx = index;
                 first_file_idx < download_requests.size();

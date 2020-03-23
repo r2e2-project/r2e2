@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdexcept>
 
+#include "net/session.hh"
 #include "net/util.hh"
 #include "util/util.hh"
 
@@ -41,6 +42,12 @@ uint32_t Message::expected_payload_length( const string_view header )
   return ( header.length() < HEADER_LENGTH )
            ? 0
            : get_field<uint32_t>( header.substr( 8, 4 ) );
+}
+
+void Message::serialize_header( std::string& output )
+{
+  output = put_field( sender_id_ ) + put_field( payload_length_ )
+           + static_cast<char>( to_underlying( opcode_ ) );
 }
 
 void MessageParser::complete_message()
@@ -126,3 +133,5 @@ void meow::Client<SessionType>::read( RingBuffer& in )
 {
   in.pop( responses_.parse( in.readable_region() ) );
 }
+
+template class meow::Client<TCPSession>;

@@ -1,5 +1,7 @@
 #include "http_client.hh"
 
+#include "session.hh"
+
 using namespace std;
 
 template<class SessionType>
@@ -40,3 +42,6 @@ void HTTPClient<SessionType>::read( RingBuffer& in )
 {
   in.pop( responses_.parse( in.readable_region() ) );
 }
+
+template class HTTPClient<TCPSession>;
+template class HTTPClient<SSLSession>;
