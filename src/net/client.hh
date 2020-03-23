@@ -15,10 +15,8 @@ protected:
   virtual ResponseType& responses_front() = 0;
   virtual void responses_pop() = 0;
 
-  void read( RingBuffer& in );
-
-  template<class Writable>
-  void write( Writable& out );
+  virtual void write( RingBuffer& out ) = 0;
+  virtual void read( RingBuffer& in ) = 0;
 
 public:
   Client( SessionType&& session );

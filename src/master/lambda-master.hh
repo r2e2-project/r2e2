@@ -1,8 +1,5 @@
 #pragma once
 
-#include <pbrt/core/geometry.h>
-#include <pbrt/main.h>
-
 #include <fstream>
 #include <map>
 #include <memory>
@@ -30,6 +27,9 @@
 #include "util/timerfd.hh"
 #include "util/util.hh"
 #include "util/uuid.hh"
+
+#include <pbrt/core/geometry.h>
+#include <pbrt/main.h>
 
 namespace r2t2 {
 

@@ -28,10 +28,8 @@ private:
   HTTPResponse& responses_front() override { return responses_.front(); }
   void responses_pop() override { responses_.pop(); }
 
-  void read( RingBuffer& in );
-
-  template<class Writable>
-  void write( Writable& out );
+  void write( RingBuffer& out ) override;
+  void read( RingBuffer& in ) override;
 
 public:
   using Client<SessionType, HTTPRequest, HTTPResponse>::Client;
@@ -40,8 +38,7 @@ public:
 };
 
 template<class SessionType>
-template<class Writable>
-void HTTPClient<SessionType>::write( Writable& out )
+void HTTPClient<SessionType>::write( RingBuffer& out )
 {
   if ( requests_empty() ) {
     throw std::runtime_error(
