@@ -36,26 +36,3 @@ public:
 
   void push_request( HTTPRequest&& req ) override;
 };
-
-template<class SessionType>
-void HTTPClient<SessionType>::write( RingBuffer& out )
-{
-  if ( requests_empty() ) {
-    throw std::runtime_error(
-      "HTTPClient::write(): HTTPClient has no more requests" );
-  }
-
-  if ( not current_request_unsent_headers_.empty() ) {
-    current_request_unsent_headers_.remove_prefix(
-      out.write( current_request_unsent_headers_ ) );
-  } else if ( not current_request_unsent_body_.empty() ) {
-    current_request_unsent_body_.remove_prefix(
-      out.write( current_request_unsent_body_ ) );
-  } else {
-    requests_.pop();
-
-    if ( not requests_.empty() ) {
-      load();
-    }
-  }
-}
