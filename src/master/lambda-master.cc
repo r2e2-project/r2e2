@@ -479,6 +479,15 @@ void LambdaMaster::run()
 
   while ( !terminated
           && loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+    // cleaning up finished http clients
+    if ( not finished_https_clients.empty() ) {
+      for ( auto& it : finished_https_clients ) {
+        https_clients.erase( it );
+      }
+
+      finished_https_clients.clear();
+    }
+
     continue;
   }
 
@@ -676,7 +685,7 @@ int main( int argc, char* argv[] )
     }
 
     switch ( opt ) {
-      // clang-format off
+        // clang-format off
         case 'p': listen_port = stoi(optarg); break;
         case 'P': client_port = stoi(optarg); break;
         case 'i': public_ip = optarg; break;
