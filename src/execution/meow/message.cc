@@ -19,7 +19,7 @@ constexpr char const*
 Message::Message( const string_view& header, string&& payload )
   : payload_( move( payload ) )
 {
-  if ( header.length() == HEADER_LENGTH ) {
+  if ( header.length() != HEADER_LENGTH ) {
     throw out_of_range( "incomplete header" );
   }
 
@@ -132,6 +132,29 @@ template<class SessionType>
 void meow::Client<SessionType>::read( RingBuffer& in )
 {
   in.pop( responses_.parse( in.readable_region() ) );
+}
+
+template<class SessionType>
+void meow::Client<SessionType>::write( RingBuffer& out )
+{
+  if ( requests_empty() ) {
+    throw std::runtime_error(
+      "meow::Client::write(): Client has no more requests" );
+  }
+
+  if ( not current_request_unsent_header_.empty() ) {
+    current_request_unsent_header_.remove_prefix(
+      out.write( current_request_unsent_header_ ) );
+  } else if ( not current_request_unsent_payload_.empty() ) {
+    current_request_unsent_payload_.remove_prefix(
+      out.write( current_request_unsent_payload_ ) );
+  } else {
+    requests_.pop();
+
+    if ( not requests_.empty() ) {
+      load();
+    }
+  }
 }
 
 template class meow::Client<TCPSession>;
