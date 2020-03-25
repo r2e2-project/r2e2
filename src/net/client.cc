@@ -56,7 +56,7 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
     "endpoint read",
     [&] { read( session_.inbound_plaintext() ); },
     [&] {
-      return not session_.inbound_plaintext().writable_region().empty();
+      return not session_.inbound_plaintext().readable_region().empty();
     } ) );
 
   installed_rules_.push_back( loop.add_rule(
