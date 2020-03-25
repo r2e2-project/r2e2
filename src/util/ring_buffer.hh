@@ -20,8 +20,24 @@ public:
 
   ~MMap_Region();
 
-  MMap_Region( MMap_Region&& region ) = default;
-  MMap_Region& operator=( MMap_Region&& region ) = default;
+  MMap_Region( MMap_Region&& other )
+    : addr_( other.addr_ )
+    , length_( other.length_ )
+  {
+    other.addr_ = nullptr;
+    other.length_ = 0;
+  }
+
+  MMap_Region& operator=( MMap_Region&& other )
+  {
+    addr_ = other.addr_;
+    length_ = other.length_;
+
+    other.addr_ = nullptr;
+    other.length_ = 0;
+
+    return *this;
+  }
 
   /* Disallow copying */
   MMap_Region( const MMap_Region& other ) = delete;
