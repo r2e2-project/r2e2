@@ -7,7 +7,7 @@ template<class SessionType, class RequestType, class ResponseType>
 class Client
 {
 protected:
-  SessionType session_ {};
+  SessionType session_;
   std::vector<EventLoop::RuleHandle> installed_rules_ {};
 
   virtual bool requests_empty() const = 0;
