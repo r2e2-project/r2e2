@@ -359,6 +359,7 @@ private:
 
   SSLContext ssl_context;
   std::list<HTTPClient<SSLSession>> https_clients {};
+  std::list<decltype( https_clients )::iterator> finished_https_clients {};
 
   /* Timers */
   TimerFD status_print_timer { STATUS_PRINT_INTERVAL };
