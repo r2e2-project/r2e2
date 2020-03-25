@@ -21,12 +21,7 @@ protected:
 public:
   Client( SessionType&& session );
   virtual ~Client() { uninstall_rules(); }
-
-  Client( Client&& c )
-    : session_( std::move( c.session_ ) )
-    , installed_rules_( std::move( c.installed_rules_ ) )
-  {}
-
+  
   virtual void push_request( RequestType&& req ) = 0;
 
   SessionType& session() { return session_; }
