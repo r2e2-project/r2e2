@@ -40,7 +40,7 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
   installed_rules_.push_back( loop.add_rule(
     "socket write",
     session_.socket(),
-    Direction::In,
+    Direction::Out,
     [&] { session_.do_write(); },
     [&] { return session_.want_write(); } ) );
 
