@@ -159,7 +159,7 @@ void usage( const char* argv0, int exitCode )
        << "  -p --port PORT             port of coordinator" << endl
        << "  -s --storage-backend NAME  storage backend URI" << endl
        << "  -S --samples N             number of samples per pixel" << endl
-       << "  -M --max-depth N           maximum path depth"
+       << "  -M --max-depth N           maximum path depth" << endl
        << "  -L --log-rays RATE         log ray actions" << endl
        << "  -B --log-bags RATE         log bag actions" << endl
        << "  -d --memcached-server      address for memcached" << endl
