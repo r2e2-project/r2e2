@@ -190,6 +190,20 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   cerr << endl;
 
   loop.add_rule(
+    "Signals",
+    signal_fd,
+    Direction::In,
+    [&] { handle_signal( signal_fd.read_signal() ); },
+    [] { return true; } );
+
+  loop.add_rule(
+    "Terminate",
+    terminate_eventfd,
+    Direction::In,
+    [&] { terminate_eventfd.read_event(); },
+    [] { return true; } );
+
+  loop.add_rule(
     "Reschedule",
     reschedule_timer,
     Direction::In,
@@ -200,7 +214,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     "Job exit",
     job_exit_timer,
     Direction::In,
-    [&] { terminated = true; },
+    [&] { terminate(); },
     [] { return true; } );
 
   loop.add_rule( "Messages",
@@ -501,6 +515,30 @@ void LambdaMaster::run()
     storage_backend->get( get_requests );
     cerr << "done." << endl;
   }
+}
+
+void LambdaMaster::handle_signal( const signalfd_siginfo& sig )
+{
+  switch ( sig.ssi_signo ) {
+    case SIGHUP:
+    case SIGTERM:
+    case SIGQUIT:
+      throw runtime_error( "interrupted by signal" );
+
+    case SIGINT:
+      cerr << endl;
+      terminate();
+      break;
+
+    default:
+      throw runtime_error( "unhandled signal" );
+  }
+}
+
+void LambdaMaster::terminate()
+{
+  terminated = true;
+  terminate_eventfd.write_event();
 }
 
 void usage( const char* argv0, int exit_code )

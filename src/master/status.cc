@@ -31,8 +31,8 @@ void LambdaMaster::handle_status_message()
       "terminate job",
       job_timeout_timer,
       Direction::In,
-      [this] { terminated = true; },
-      [this] { return true; } );
+      [this] { terminate(); },
+      [] { return true; } );
   }
 
   const auto lagging_workers

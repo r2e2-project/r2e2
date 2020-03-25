@@ -20,6 +20,7 @@
 #include "r2t2.pb.h"
 #include "schedulers/scheduler.hh"
 #include "storage/backend.hh"
+#include "util/eventfd.hh"
 #include "util/optional.hh"
 #include "util/seq_no_set.hh"
 #include "util/signalfd.hh"
@@ -344,13 +345,17 @@ private:
   // Other Stuff                                                            //
   ////////////////////////////////////////////////////////////////////////////
 
+  void terminate();
   bool terminated { false };
+  EventFD terminate_eventfd {};
 
   EventLoop loop {};
 
   TCPSocket listener_socket {};
   SignalMask signals { SIGHUP, SIGTERM, SIGQUIT, SIGINT };
   SignalFD signal_fd { signals };
+
+  void handle_signal( const signalfd_siginfo& sig );
 
   SSLContext ssl_context;
   std::list<HTTPClient<SSLSession>> https_clients {};
