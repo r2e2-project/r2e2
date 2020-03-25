@@ -122,27 +122,4 @@ public:
   void push_request( Message&& msg ) override;
 };
 
-template<class SessionType>
-void Client<SessionType>::write( RingBuffer& out )
-{
-  if ( requests_empty() ) {
-    throw std::runtime_error(
-      "meow::Client::write(): Client has no more requests" );
-  }
-
-  if ( not current_request_unsent_header_.empty() ) {
-    current_request_unsent_header_.remove_prefix(
-      out.write( current_request_unsent_header_ ) );
-  } else if ( not current_request_unsent_payload_.empty() ) {
-    current_request_unsent_payload_.remove_prefix(
-      out.write( current_request_unsent_payload_ ) );
-  } else {
-    requests_.pop();
-
-    if ( not requests_.empty() ) {
-      load();
-    }
-  }
-}
-
 } // namespace meow
