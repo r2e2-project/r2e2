@@ -12,6 +12,7 @@
 #include "http_request.hh"
 #include "http_response_parser.hh"
 #include "secure_socket.hh"
+#include "session.hh"
 #include "socket.hh"
 #include "util/exception.hh"
 #include "util/simple_string_span.hh"
@@ -142,8 +143,8 @@ void S3Client::download_file( const string& bucket,
 
   SSLContext ssl_context;
   HTTPResponseParser responses;
-  SSLSocket s3 { ssl_context.make_SSL_handle(), tcp_connection( s3_address ) };
-  s3.connect();
+  SimpleSSLSession s3 { ssl_context.make_SSL_handle(),
+                        tcp_connection( s3_address ) };
 
   S3GetRequest request { credentials_, endpoint, config_.region, object };
   HTTPRequest outgoing_request = request.to_http_request();
@@ -152,7 +153,7 @@ void S3Client::download_file( const string& bucket,
   string headers;
   outgoing_request.serialize_headers( headers );
   s3.write( headers );
-  s3.write( outgoing_request.body() );
+  // s3.write( outgoing_request.body() );
 
   char buffer[BUFFER_SIZE];
   simple_string_span sss { buffer };
@@ -164,8 +165,7 @@ void S3Client::download_file( const string& bucket,
           S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH ) ) };
 
   while ( responses.empty() ) {
-    s3.read( sss );
-    responses.parse( sss );
+    responses.parse( sss.substr( 0, s3.read( sss ) ) );
   }
 
   if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
@@ -190,6 +190,7 @@ void S3Client::upload_files(
 
   vector<future<void>> waitables;
   vector<thread> threads;
+
   for ( size_t thread_index = 0; thread_index < thread_count; thread_index++ ) {
     if ( thread_index < upload_requests.size() ) {
       waitables.emplace_back( async(
@@ -204,10 +205,8 @@ void S3Client::upload_files(
                 first_file_idx += thread_count * batch_size ) {
             SSLContext ssl_context;
             HTTPResponseParser responses;
-            SSLSocket s3 { ssl_context.make_SSL_handle(),
-                           tcp_connection( s3_address ) };
-
-            s3.connect();
+            SimpleSSLSession s3 { ssl_context.make_SSL_handle(),
+                                  tcp_connection( s3_address ) };
 
             size_t request_count = 0;
 
@@ -239,8 +238,7 @@ void S3Client::upload_files(
 
             while ( response_count < request_count ) {
               /* drain responses */
-              s3.read( sss );
-              responses.parse( sss );
+              responses.parse( sss.substr( 0, s3.read( sss ) ) );
 
               if ( not responses.empty() ) {
                 if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
@@ -272,6 +270,8 @@ void S3Client::download_files(
   const std::vector<storage::GetRequest>& download_requests,
   const std::function<void( const storage::GetRequest& )>& success_callback )
 {
+  SSLContext ssl_context;
+
   const string endpoint = ( config_.endpoint.length() > 0 )
                             ? config_.endpoint
                             : S3::endpoint( config_.region, bucket );
@@ -295,10 +295,8 @@ void S3Client::download_files(
                 first_file_idx += thread_count * batch_size ) {
             SSLContext ssl_context;
             HTTPResponseParser responses;
-            SSLSocket s3 { ssl_context.make_SSL_handle(),
-                           tcp_connection( s3_address ) };
-
-            s3.connect();
+            SimpleSSLSession s3 { ssl_context.make_SSL_handle(),
+                                  tcp_connection( s3_address ) };
 
             size_t expected_responses = 0;
 
@@ -317,7 +315,7 @@ void S3Client::download_files(
               responses.new_request_arrived( outgoing_request );
               outgoing_request.serialize_headers( headers );
               s3.write( headers );
-              s3.write( outgoing_request.body() );
+              // s3.write( outgoing_request.body() );
               expected_responses++;
             }
 
@@ -325,8 +323,8 @@ void S3Client::download_files(
 
             while ( response_count != expected_responses ) {
               /* drain responses */
-              s3.read( sss );
-              responses.parse( sss );
+              responses.parse( sss.substr( 0, s3.read( sss ) ) );
+
               if ( not responses.empty() ) {
                 if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
                   const size_t response_index

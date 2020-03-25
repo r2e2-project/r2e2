@@ -5,6 +5,7 @@
 #include "secure_socket.hh"
 #include "socket.hh"
 #include "util/ring_buffer.hh"
+#include "util/simple_string_span.hh"
 
 template<class T, class Enable = void>
 class SessionBase;
@@ -66,6 +67,15 @@ public:
   {
     return incoming_stream_terminated_;
   }
+};
+
+class SimpleSSLSession : public SessionBase<TCPSocketBIO>
+{
+public:
+  SimpleSSLSession( SSL_handle&& ssl, TCPSocket&& socket );
+
+  size_t read( simple_string_span buffer );
+  size_t write( const std::string_view buffer );
 };
 
 using TCPSession = Session<TCPSocket>;

@@ -130,20 +130,6 @@ public:
   operator BIO*() { return bio_.get(); }
 };
 
-class SSLSocket : public TCPSocketBIO
-{
-private:
-  SSL_handle ssl_;
-
-public:
-  SSLSocket( SSL_handle&& ssl, TCPSocket&& socket );
-
-  void connect();
-
-  size_t read( simple_string_span buffer );
-  size_t write( const std::string_view buffer );
-};
-
 class MemoryBIO
 {
   std::string_view contents_;

@@ -166,3 +166,43 @@ void Session<TCPSocketBIO>::do_write()
   OpenSSL::check( "SSL_write check" );
   throw ssl_error( "SSL_write", error_return );
 }
+
+SimpleSSLSession::SimpleSSLSession( SSL_handle&& ssl, TCPSocket&& socket )
+  : SessionBase( move( ssl ), move( socket ) )
+{
+  SSL_clear_mode( ssl_.get(), SSL_MODE_ENABLE_PARTIAL_WRITE );
+}
+
+size_t SimpleSSLSession::read( simple_string_span buffer )
+{
+  OpenSSL::check( "SimpleSSLSession::rread()" );
+
+  const int bytes_read
+    = SSL_read( ssl_.get(), buffer.mutable_data(), buffer.size() );
+
+  if ( bytes_read > 0 ) {
+    return bytes_read;
+  }
+
+  const int error_return = get_error( bytes_read );
+
+  OpenSSL::check( "SSL_read check" );
+  throw ssl_error( "SSL_read", error_return );
+}
+
+size_t SimpleSSLSession::write( const string_view buffer )
+{
+  OpenSSL::check( "SimpleSSLSession::write()" );
+
+  const int bytes_written
+    = SSL_write( ssl_.get(), buffer.data(), buffer.size() );
+
+  if ( bytes_written > 0 ) {
+    return bytes_written;
+  }
+
+  const int error_return = get_error( bytes_written );
+
+  OpenSSL::check( "SSL_write check" );
+  throw ssl_error( "SSL_write", error_return );
+}
