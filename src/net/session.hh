@@ -23,7 +23,7 @@ public:
 
 /* base for SSLSession */
 template<class T>
-class SessionBase<T, std::enable_if_t<!std::is_same<T, TCPSocket>::value>>
+class SessionBase<T, std::enable_if_t<std::is_same<T, TCPSocketBIO>::value>>
 {
 protected:
   SSL_handle ssl_;
@@ -67,6 +67,14 @@ public:
   {
     return incoming_stream_terminated_;
   }
+
+  // disallow copying
+  Session( const Session& ) = delete;
+  Session& operator=( const Session& ) = delete;
+
+  // allow moving
+  Session( Session&& ) = default;
+  Session& operator=( Session&& ) = default;
 };
 
 class SimpleSSLSession : public SessionBase<TCPSocketBIO>

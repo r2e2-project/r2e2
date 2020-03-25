@@ -126,6 +126,9 @@ class TCPSocketBIO : public TCPSocket
 
 public:
   TCPSocketBIO( TCPSocket&& sock );
+  TCPSocketBIO( TCPSocketBIO&& other );
+
+  TCPSocket& operator=( TCPSocketBIO&& ) = delete;
 
   operator BIO*() { return bio_.get(); }
 };

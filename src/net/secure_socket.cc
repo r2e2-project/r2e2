@@ -163,6 +163,13 @@ TCPSocketBIO::TCPSocketBIO( TCPSocket&& sock )
   OpenSSL::check( "TCPSocketBIO constructor" );
 }
 
+TCPSocketBIO::TCPSocketBIO( TCPSocketBIO&& other )
+  : TCPSocket( move( other ) )
+  , bio_( move( other.bio_ ) )
+{
+  BIO_set_data( bio_.get(), static_cast<TCPSocket*>( this ) );
+}
+
 MemoryBIO::MemoryBIO( const string_view contents )
   : contents_( move( contents ) )
   , bio_( BIO_new_mem_buf( contents.data(), contents.size() ) )
