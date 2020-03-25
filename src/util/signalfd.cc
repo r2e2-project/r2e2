@@ -60,7 +60,8 @@ signalfd_siginfo SignalFD::read_signal( void )
 {
   signalfd_siginfo delivered_signal;
 
-  const size_t length = read( reinterpret_cast<char*>( &delivered_signal ) );
+  const size_t length = read( { reinterpret_cast<char*>( &delivered_signal ),
+                                sizeof( signalfd_siginfo ) } );
 
   if ( length != sizeof( signalfd_siginfo ) ) {
     throw runtime_error( "signalfd read size mismatch" );
