@@ -174,7 +174,7 @@ private:
     static WorkerId next_id;
   };
 
-  std::vector<Worker> workers {};
+  std::deque<Worker> workers {};
   const uint32_t max_workers;
   const uint32_t ray_generators;
   uint32_t finished_ray_generators { 0 };
