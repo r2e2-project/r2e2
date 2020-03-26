@@ -379,8 +379,12 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
       }
 
       workers.back().client.install_rules(
-        loop, [worker_id, this]( Message&& msg ) {
+        loop,
+        [worker_id, this]( Message&& msg ) {
           process_message( worker_id, move( msg ) );
+        },
+        [worker_id] {
+          throw runtime_error( "worker died: " + to_string( worker_id ) );
         } );
     },
     [] { return true; },

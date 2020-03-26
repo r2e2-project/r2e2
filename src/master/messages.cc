@@ -12,15 +12,6 @@ using namespace meow;
 
 using OpCode = Message::OpCode;
 
-void LambdaMaster::handle_messages()
-{
-  while ( !incoming_messages.empty() ) {
-    auto& front = incoming_messages.front();
-    process_message( front.first, front.second );
-    incoming_messages.pop_front();
-  }
-}
-
 void LambdaMaster::process_message( const uint64_t worker_id,
                                     const Message& message )
 {

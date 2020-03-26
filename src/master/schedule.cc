@@ -47,9 +47,12 @@ void LambdaMaster::invoke_workers( const size_t n_workers )
 
       auto client_it = prev( https_clients.end() );
 
-      client_it->install_rules( loop, [client_it, this]( HTTPResponse&& ) {
-        finished_https_clients.push_back( client_it );
-      } );
+      client_it->install_rules(
+        loop,
+        [client_it, this]( HTTPResponse&& ) {
+          finished_https_clients.push_back( client_it );
+        },
+        [] {} );
 
       client_it->push_request( move( invocation_request ) );
     }

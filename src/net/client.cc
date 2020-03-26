@@ -24,7 +24,8 @@ void Client<SessionType, RequestType, ResponseType>::uninstall_rules()
 template<class SessionType, class RequestType, class ResponseType>
 void Client<SessionType, RequestType, ResponseType>::install_rules(
   EventLoop& loop,
-  const function<void( ResponseType&& )>& response_callback )
+  const function<void( ResponseType&& )>& response_callback,
+  const function<void( void )>& close_callback )
 {
   if ( not installed_rules_.empty() ) {
     throw runtime_error( "install_rules: already installed" );
@@ -35,7 +36,8 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
     session_.socket(),
     Direction::In,
     [&] { session_.do_read(); },
-    [&] { return session_.want_read(); } ) );
+    [&] { return session_.want_read(); },
+    close_callback ) );
 
   installed_rules_.push_back( loop.add_rule(
     "socket write",

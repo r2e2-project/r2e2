@@ -117,7 +117,9 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                  [this] { return true; } );
 
   master_connection.install_rules(
-    loop, [this]( meow::Message&& msg ) { this->process_message( msg ); } );
+    loop,
+    [this]( meow::Message&& msg ) { this->process_message( msg ); },
+    [this] { this->terminate(); } );
 }
 
 void LambdaWorker::get_objects( const protobuf::GetObjects& objects )
