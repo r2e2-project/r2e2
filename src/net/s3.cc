@@ -270,11 +270,10 @@ void S3Client::download_files(
   const std::vector<storage::GetRequest>& download_requests,
   const std::function<void( const storage::GetRequest& )>& success_callback )
 {
-  SSLContext ssl_context;
-
   const string endpoint = ( config_.endpoint.length() > 0 )
                             ? config_.endpoint
                             : S3::endpoint( config_.region, bucket );
+
   const Address s3_address { endpoint, "https" };
 
   const size_t thread_count = config_.max_threads;

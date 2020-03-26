@@ -21,14 +21,15 @@ protected:
 public:
   Client( SessionType&& session );
   virtual ~Client() { uninstall_rules(); }
-  
+
   virtual void push_request( RequestType&& req ) = 0;
 
   SessionType& session() { return session_; }
 
   void install_rules(
     EventLoop& loop,
-    const std::function<void( ResponseType&& )>& response_callback );
+    const std::function<void( ResponseType&& )>& response_callback,
+    const std::function<void( void )>& close_callback );
 
   void uninstall_rules();
 };
