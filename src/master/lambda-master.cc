@@ -214,12 +214,11 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     "Job exit",
     job_exit_timer,
     Direction::In,
-    [&] { terminate(); },
+    [&] {
+      job_exit_timer.read_event();
+      terminate();
+    },
     [] { return true; } );
-
-  loop.add_rule( "Messages",
-                 bind( &LambdaMaster::handle_messages, this ),
-                 [this] { return !incoming_messages.empty(); } );
 
   loop.add_rule(
     "Queued ray bags",
@@ -381,7 +380,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
       workers.back().client.install_rules(
         loop, [worker_id, this]( Message&& msg ) {
-          this->incoming_messages.emplace_back( worker_id, move( msg ) );
+          process_message( worker_id, move( msg ) );
         } );
     },
     [] { return true; },
@@ -487,8 +486,6 @@ void LambdaMaster::run()
 
       finished_https_clients.clear();
     }
-
-    continue;
   }
 
   vector<storage::GetRequest> get_requests;

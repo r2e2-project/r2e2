@@ -240,12 +240,6 @@ private:
   void process_message( const WorkerId worker_id,
                         const meow::Message& message );
 
-  /* process incoming messages */
-  void handle_messages();
-
-  /* a queue for incoming messages */
-  std::deque<std::pair<WorkerId, meow::Message>> incoming_messages {};
-
   /*** Ray Bags *************************************************************/
 
   bool assign_work( Worker& worker );
