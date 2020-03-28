@@ -23,9 +23,9 @@ using namespace storage;
 
 constexpr size_t BUFFER_SIZE = 1024 * 1024;
 
-const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
+const static string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
-std::string S3::endpoint( const string& region, const string& bucket )
+string S3::endpoint( const string& region, const string& bucket )
 {
   if ( region == "us-east-1" ) {
     return bucket + ".s3.amazonaws.com";
@@ -266,9 +266,9 @@ void S3Client::upload_files(
 }
 
 void S3Client::download_files(
-  const std::string& bucket,
-  const std::vector<storage::GetRequest>& download_requests,
-  const std::function<void( const storage::GetRequest& )>& success_callback )
+  const string& bucket,
+  const vector<storage::GetRequest>& download_requests,
+  const function<void( const storage::GetRequest& )>& success_callback )
 {
   const string endpoint = ( config_.endpoint.length() > 0 )
                             ? config_.endpoint
