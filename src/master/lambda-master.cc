@@ -522,6 +522,9 @@ void LambdaMaster::run()
 
   cerr << endl;
 
+  cerr << global_timer().summary() << endl;
+  cerr << loop.summary() << endl;
+
   print_job_summary();
 
   if ( !config.job_summary_path.empty() ) {
