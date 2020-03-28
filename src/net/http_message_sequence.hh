@@ -46,12 +46,12 @@ public:
 
   size_t parse( std::string_view buf )
   {
+    const size_t original_size = buf.size();
+
     if ( not leftover_.empty() ) {
       leftover_ += buf;
       buf = { leftover_ };
     }
-
-    size_t original_size = buf.size();
 
     if ( buf.empty() ) { /* EOF */
       message_in_progress_.eof();
@@ -64,8 +64,7 @@ public:
     if ( buf.size() != 0 ) {
       // not all the bytes were consumed
       leftover_ = buf;
-    }
-    else {
+    } else {
       leftover_ = {};
     }
 
