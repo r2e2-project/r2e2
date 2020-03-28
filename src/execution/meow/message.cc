@@ -52,11 +52,10 @@ void Message::serialize_header( std::string& output )
 
 void MessageParser::complete_message()
 {
-  expected_payload_length_.reset();
-
   completed_messages_.emplace( incomplete_header_,
                                move( incomplete_payload_ ) );
 
+  expected_payload_length_.reset();
   incomplete_header_.clear();
   incomplete_payload_.clear();
 }
@@ -76,10 +75,12 @@ size_t MessageParser::parse( string_view buf )
       if ( incomplete_header_.length() == Message::HEADER_LENGTH ) {
         expected_payload_length_
           = Message::expected_payload_length( incomplete_header_ );
-      }
-    }
 
-    if ( expected_payload_length_.has_value() and not buf.empty() ) {
+        if ( *expected_payload_length_ == 0 ) {
+          complete_message();
+        }
+      }
+    } else {
       const auto remaining_length
         = min( buf.length(),
                *expected_payload_length_ - incomplete_payload_.length() );
