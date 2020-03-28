@@ -66,6 +66,8 @@ private:
   std::list<std::shared_ptr<FDRule>> _fd_rules {};
   std::list<std::shared_ptr<BasicRule>> _non_fd_rules {};
 
+  const uint64_t _beginning_timestamp { Timer::timestamp_ns() };
+
 public:
   //! Returned by each call to EventLoop::wait_next_event.
   enum class Result

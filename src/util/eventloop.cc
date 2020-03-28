@@ -257,26 +257,71 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
   return Result::Success;
 }
 
-constexpr double THOUSAND = 1000.0;
+constexpr double THOUSAND = 1e3;
+constexpr double MILLION = 1e6;
+constexpr double BILLION = 1e9;
+
+template<class T>
+class Value
+{
+private:
+  T value;
+
+public:
+  Value( T value )
+    : value( value )
+  {}
+
+  T get() const { return value; }
+};
+
+template<class T>
+ostream& operator<<( ostream& o, const Value<T>& v )
+{
+  o << "\e[1m" << v.get() << "\e[0m";
+  return o;
+}
 
 string EventLoop::summary() const
 {
-  ostringstream out;
+  constexpr size_t WIDTH = 23;
 
-  out << "EventLoop timing summary\n------------------------\n\n";
+  ostringstream out;
+  const uint64_t now = Timer::timestamp_ns();
+  const uint64_t elapsed = now - _beginning_timestamp;
+
+  out << "Event loop timing summary:\n";
+  out << "  " << left << setw( WIDTH - 2 ) << "Total time" << fixed
+      << setprecision( 3 )
+      << Value<double>( ( now - _beginning_timestamp ) / BILLION )
+      << " seconds\n";
+
+  uint64_t accounted = 0;
 
   for ( const auto& rule : _rule_categories ) {
     const auto& name = rule.name;
     const auto& timer = rule.timer;
 
-    out << "   " << name << ": ";
-    out << string( 32 - name.size(), ' ' );
-    out << Timer::pp_ns( timer.total_ns );
+    if ( timer.count == 0 )
+      continue;
 
-    out << "     [max=" << Timer::pp_ns( timer.max_ns ) << "]";
-    out << " [count=" << timer.count << "]";
+    out << "    " << setw( WIDTH - 4 ) << left
+        << string_view { name }.substr( 0, WIDTH - 6 );
+
+    out << fixed << setprecision( 1 )
+        << Value<double>( 100 * timer.total_ns / double( elapsed ) ) << "%";
+
+    accounted += timer.total_ns;
+
+    out << "\e[2m [max=" << Timer::pp_ns( timer.max_ns );
+    out << ", count=" << timer.count << "]\e[0m";
     out << "\n";
   }
+
+  const uint64_t unaccounted = elapsed - accounted;
+  out << "    " << setw( WIDTH - 4 ) << "Unaccounted";
+  out << fixed << setprecision( 1 )
+      << Value<double>( 100 * unaccounted / double( elapsed ) ) << "%\n";
 
   return out.str();
 }
