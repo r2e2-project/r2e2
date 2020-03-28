@@ -38,12 +38,19 @@ protected:
   /* the current message we're working on */
   MessageType message_in_progress_ {};
 
+  std::string leftover_ {};
+
 public:
   HTTPMessageSequence() {}
   virtual ~HTTPMessageSequence() {}
 
   size_t parse( std::string_view buf )
   {
+    if ( not leftover_.empty() ) {
+      leftover_ += buf;
+      buf = { leftover_ };
+    }
+
     size_t original_size = buf.size();
 
     if ( buf.empty() ) { /* EOF */
@@ -54,7 +61,15 @@ public:
     while ( parsing_step( buf ) ) {
     }
 
-    return original_size - buf.size();
+    if ( buf.size() != 0 ) {
+      // not all the bytes were consumed
+      leftover_ = buf;
+    }
+    else {
+      leftover_ = {};
+    }
+
+    return original_size;
   }
 
   /* getters */
