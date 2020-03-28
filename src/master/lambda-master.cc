@@ -383,9 +383,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         [worker_id, this]( Message&& msg ) {
           process_message( worker_id, move( msg ) );
         },
-        [worker_id] {
-          throw runtime_error( "worker died: " + to_string( worker_id ) );
-        } );
+        connection_close_handler );
     },
     [] { return true; },
     [] { throw runtime_error( "listener socket closed" ); } );
