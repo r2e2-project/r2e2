@@ -82,6 +82,16 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   , storage_backend( StorageBackend::create_backend( storage_backend_uri ) )
   , aws_region( aws_region )
   , aws_address( LambdaInvocationRequest::endpoint( aws_region ), "https" )
+  , worker_rule_categories( { loop.add_category( "Worker read" ),
+                              loop.add_category( "Worker write" ),
+                              loop.add_category( "Message read" ),
+                              loop.add_category( "Message write" ),
+                              loop.add_category( "Process message" ) } )
+  , https_rule_categories( { loop.add_category( "HTTPS read" ),
+                             loop.add_category( "HTTPS write" ),
+                             loop.add_category( "HTTPResponse read" ),
+                             loop.add_category( "HTTPRequest write" ),
+                             loop.add_category( "Process HTTPResponse" ) } )
   , worker_stats_write_timer( seconds { config.worker_stats_write_interval },
                               milliseconds { 1 } )
 {
@@ -380,6 +390,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
       workers.back().client.install_rules(
         loop,
+        worker_rule_categories,
         [worker_id, this]( Message&& msg ) {
           process_message( worker_id, move( msg ) );
         },

@@ -344,6 +344,7 @@ private:
   EventFD terminate_eventfd {};
 
   EventLoop loop {};
+  meow::Client<TCPSession>::RuleCategories worker_rule_categories;
 
   TCPSocket listener_socket {};
   SignalMask signals { SIGHUP, SIGTERM, SIGQUIT, SIGINT };
@@ -354,6 +355,7 @@ private:
   SSLContext ssl_context;
   std::list<HTTPClient<SSLSession>> https_clients {};
   std::list<decltype( https_clients )::iterator> finished_https_clients {};
+  HTTPClient<SSLSession>::RuleCategories https_rule_categories;
 
   /* Timers */
   TimerFD status_print_timer { STATUS_PRINT_INTERVAL };
