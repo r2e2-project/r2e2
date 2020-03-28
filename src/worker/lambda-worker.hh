@@ -258,6 +258,7 @@ private:
 
   EventLoop loop {};
   Optional<EventLoop::RuleHandle> finish_up_rule {};
+  meow::Client<TCPSession>::RuleCategories worker_rule_categories;
 
   /* Timers */
   TimerFD seal_bags_timer {};

@@ -29,6 +29,11 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
   }() )
   , working_directory( "/tmp/r2t2-worker" )
   , storage_backend( StorageBackend::create_backend( storage_uri ) )
+  , worker_rule_categories( { loop.add_category( "Worker read" ),
+                              loop.add_category( "Worker write" ),
+                              loop.add_category( "Message read" ),
+                              loop.add_category( "Message write" ),
+                              loop.add_category( "Process message" ) } )
 {
   // let the program handle SIGPIPE
   signal( SIGPIPE, SIG_IGN );
@@ -118,6 +123,7 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
 
   master_connection.install_rules(
     loop,
+    worker_rule_categories,
     [this]( meow::Message&& msg ) { this->process_message( msg ); },
     [this] { this->terminate(); } );
 }
