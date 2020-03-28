@@ -494,7 +494,7 @@ namespace roost {
     string contents;
     contents.resize( pathn_info.st_size );
 
-    for ( size_t index = 0; not in_file.eof(); ) {
+    for ( size_t index = 0; not in_file.eof() and index < contents.length(); ) {
       index += in_file.read( { contents.data() + index,
                                 contents.length() - index } );
     }
