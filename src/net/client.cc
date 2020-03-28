@@ -24,6 +24,7 @@ void Client<SessionType, RequestType, ResponseType>::uninstall_rules()
 template<class SessionType, class RequestType, class ResponseType>
 void Client<SessionType, RequestType, ResponseType>::install_rules(
   EventLoop& loop,
+  const RuleCategories& rule_categories,
   const function<void( ResponseType&& )>& response_callback,
   const function<void( void )>& close_callback )
 {
@@ -32,7 +33,7 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
   }
 
   installed_rules_.push_back( loop.add_rule(
-    "socket read",
+    rule_categories.session_read,
     session_.socket(),
     Direction::In,
     [&] { session_.do_read(); },
@@ -40,14 +41,14 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
     close_callback ) );
 
   installed_rules_.push_back( loop.add_rule(
-    "socket write",
+    rule_categories.session_write,
     session_.socket(),
     Direction::Out,
     [&] { session_.do_write(); },
     [&] { return session_.want_write(); } ) );
 
   installed_rules_.push_back( loop.add_rule(
-    "endpoint write",
+    rule_categories.endpoint_write,
     [&] { write( session_.outbound_plaintext() ); },
     [&] {
       return ( not session_.outbound_plaintext().writable_region().empty() )
@@ -55,14 +56,14 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
     } ) );
 
   installed_rules_.push_back( loop.add_rule(
-    "endpoint read",
+    rule_categories.endpoint_read,
     [&] { read( session_.inbound_plaintext() ); },
     [&] {
       return not session_.inbound_plaintext().readable_region().empty();
     } ) );
 
   installed_rules_.push_back( loop.add_rule(
-    "response",
+    rule_categories.response,
     [this, response_callback] {
       while ( not responses_empty() ) {
         response_callback( move( responses_front() ) );

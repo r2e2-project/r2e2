@@ -6,6 +6,16 @@
 template<class SessionType, class RequestType, class ResponseType>
 class Client
 {
+public:
+  struct RuleCategories
+  {
+    size_t session_read;
+    size_t session_write;
+    size_t endpoint_read;
+    size_t endpoint_write;
+    size_t response;
+  };
+
 protected:
   SessionType session_;
   std::vector<EventLoop::RuleHandle> installed_rules_ {};
@@ -28,6 +38,7 @@ public:
 
   void install_rules(
     EventLoop& loop,
+    const RuleCategories& rule_categories,
     const std::function<void( ResponseType&& )>& response_callback,
     const std::function<void( void )>& close_callback );
 
