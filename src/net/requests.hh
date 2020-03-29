@@ -3,9 +3,8 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
-
-#include "util/optional.hh"
 
 namespace storage {
 
@@ -13,21 +12,20 @@ struct PutRequest
 {
   std::filesystem::path filename;
   std::string object_key;
-  Optional<std::string> content_hash;
+  std::optional<std::string> content_hash { std::nullopt };
 
   PutRequest( const std::filesystem::path& filename,
               const std::string& object_key,
               const std::string& content_hash )
     : filename( filename )
     , object_key( object_key )
-    , content_hash( true, content_hash )
+    , content_hash( content_hash )
   {}
 
   PutRequest( const std::filesystem::path& filename,
               const std::string& object_key )
     : filename( filename )
     , object_key( object_key )
-    , content_hash( false )
   {}
 };
 
@@ -35,7 +33,7 @@ struct GetRequest
 {
   std::string object_key;
   std::filesystem::path filename;
-  Optional<mode_t> mode { false };
+  std::optional<mode_t> mode { std::nullopt };
 
   GetRequest( const std::string& object_key,
               const std::filesystem::path& filename )
@@ -48,7 +46,7 @@ struct GetRequest
               const mode_t mode )
     : object_key( object_key )
     , filename( filename )
-    , mode( true, mode )
+    , mode( mode )
   {}
 };
 

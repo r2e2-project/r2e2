@@ -8,12 +8,12 @@ using namespace r2t2;
 
 constexpr seconds SCHEDULING_INTERVAL { 20 };
 
-Optional<Schedule> DynamicScheduler::schedule(
+std::optional<Schedule> DynamicScheduler::schedule(
   const size_t maxWorkers,
   const vector<TreeletStats>& stats )
 {
   if ( steady_clock::now() - lastSchedule < SCHEDULING_INTERVAL ) {
-    return { false };
+    return nullopt;
   }
 
   lastSchedule = steady_clock::now();
@@ -42,7 +42,7 @@ Optional<Schedule> DynamicScheduler::schedule(
     []( const auto& res, const auto& a ) { return res + a.second; } );
 
   if ( totalWaiting == 0 ) {
-    return { false };
+    return nullopt;
   }
 
   size_t remainingWorkers = maxWorkers;
@@ -61,5 +61,5 @@ Optional<Schedule> DynamicScheduler::schedule(
     remainingWorkers -= result[item.first];
   }
 
-  return { true, move( result ) };
+  return { move( result ) };
 }

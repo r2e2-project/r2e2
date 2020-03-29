@@ -25,7 +25,7 @@ ParsedURI::ParsedURI( const std::string& uri )
     path = uri_match_result[9];
 
     if ( uri_match_result[8].length() ) {
-      port.reset( stoul( uri_match_result[8] ) );
+      port = stoul( uri_match_result[8] );
     }
 
     if ( uri_match_result[10].length() ) {

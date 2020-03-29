@@ -48,7 +48,7 @@ S3PutRequest::S3PutRequest( const AWSCredentials& credentials,
   headers_["host"] = endpoint;
   headers_["content-length"] = to_string( contents.length() );
 
-  if ( credentials.session_token().initialized() ) {
+  if ( credentials.session_token() ) {
     headers_["x-amz-security-token"] = *credentials.session_token();
   }
 
@@ -71,7 +71,7 @@ S3GetRequest::S3GetRequest( const AWSCredentials& credentials,
 {
   headers_["host"] = endpoint;
 
-  if ( credentials.session_token().initialized() ) {
+  if ( credentials.session_token() ) {
     headers_["x-amz-security-token"] = *credentials.session_token();
   }
 
@@ -94,7 +94,7 @@ S3DeleteRequest::S3DeleteRequest( const AWSCredentials& credentials,
 {
   headers_["host"] = endpoint;
 
-  if ( credentials.session_token().initialized() ) {
+  if ( credentials.session_token() ) {
     headers_["x-amz-security-token"] = *credentials.session_token();
   }
 
@@ -219,7 +219,7 @@ void S3Client::upload_files(
                 = upload_requests.at( file_id ).filename.string();
               const string& object_key
                 = upload_requests.at( file_id ).object_key;
-              string hash = upload_requests.at( file_id ).content_hash.get_or(
+              string hash = upload_requests.at( file_id ).content_hash.value_or(
                 UNSIGNED_PAYLOAD );
 
               string contents = roost::read_file( filename );
@@ -340,8 +340,8 @@ void S3Client::download_files(
                   roost::atomic_create(
                     responses.front().body(),
                     filename,
-                    download_requests[response_index].mode.initialized(),
-                    download_requests[response_index].mode.get_or( 0 ) );
+                    download_requests[response_index].mode.has_value(),
+                    download_requests[response_index].mode.value_or( 0 ) );
 
                   success_callback( download_requests[response_index] );
                 }

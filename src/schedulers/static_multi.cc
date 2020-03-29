@@ -39,11 +39,10 @@ StaticMultiScheduler::StaticMultiScheduler( const string& path )
   allocator.setTargetWeights( move( probsMap ) );
 }
 
-Optional<Schedule> StaticMultiScheduler::schedule(
+optional<Schedule> StaticMultiScheduler::schedule(
   const size_t maxWorkers,
   const vector<TreeletStats>& stats )
 {
-
   Schedule result;
   result.resize( stats.size(), 0 );
 
@@ -52,5 +51,5 @@ Optional<Schedule> StaticMultiScheduler::schedule(
     result[tid]++;
   }
 
-  return result;
+  return { result };
 }

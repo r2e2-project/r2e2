@@ -2,10 +2,9 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <unordered_map>
-
-#include "optional.hh"
 
 struct ParsedURI
 {
@@ -13,7 +12,7 @@ struct ParsedURI
   std::string username {};
   std::string password {};
   std::string host {};
-  Optional<uint16_t> port { 0 };
+  std::optional<uint16_t> port { 0 };
   std::string path {};
   std::unordered_map<std::string, std::string> options {};
 

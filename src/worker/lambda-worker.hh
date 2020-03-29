@@ -14,6 +14,7 @@
 #include <string>
 #include <thread>
 #include <tuple>
+#include <optional>
 
 #include "common/lambda.hh"
 #include "common/stats.hh"
@@ -88,8 +89,8 @@ private:
 
   const WorkerConfiguration config;
   const UniqueDirectory working_directory;
-  Optional<WorkerId> worker_id;
-  Optional<std::string> job_id;
+  std::optional<WorkerId> worker_id;
+  std::optional<std::string> job_id;
   bool terminated { false };
 
   ////////////////////////////////////////////////////////////////////////////
@@ -256,7 +257,7 @@ private:
   ////////////////////////////////////////////////////////////////////////////
 
   EventLoop loop {};
-  Optional<EventLoop::RuleHandle> finish_up_rule {};
+  std::optional<EventLoop::RuleHandle> finish_up_rule {};
   meow::Client<TCPSession>::RuleCategories worker_rule_categories;
 
   /* Timers */

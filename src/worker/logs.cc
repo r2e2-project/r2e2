@@ -39,7 +39,7 @@ void LambdaWorker::handle_worker_stats()
 {
   worker_stats_timer.read_event();
 
-  if ( !worker_id.initialized() )
+  if ( !worker_id )
     return;
 
   send_worker_stats();
@@ -47,7 +47,7 @@ void LambdaWorker::handle_worker_stats()
 
 void LambdaWorker::upload_logs()
 {
-  if ( !worker_id.initialized() )
+  if ( !worker_id )
     return;
 
   TLOG( RAYHOPS ) << local_stats.ray_hops.str();

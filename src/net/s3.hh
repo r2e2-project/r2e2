@@ -12,7 +12,6 @@
 #include "aws.hh"
 #include "http_request.hh"
 #include "requests.hh"
-#include "util/optional.hh"
 
 class S3
 {

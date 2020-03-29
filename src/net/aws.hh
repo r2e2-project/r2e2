@@ -4,10 +4,10 @@
 
 #include <ctime>
 #include <map>
+#include <optional>
 #include <string>
 
 #include "http_request.hh"
-#include "util/optional.hh"
 #include "util/util.hh"
 
 class AWS
@@ -21,7 +21,7 @@ class AWSCredentials
 private:
   std::string access_key_;
   std::string secret_key_;
-  Optional<std::string> session_token_ {};
+  std::optional<std::string> session_token_ {};
 
 public:
   AWSCredentials();
@@ -31,7 +31,10 @@ public:
 
   const std::string& access_key() const { return access_key_; }
   const std::string& secret_key() const { return secret_key_; }
-  const Optional<std::string>& session_token() const { return session_token_; }
+  const std::optional<std::string>& session_token() const
+  {
+    return session_token_;
+  }
 };
 
 class AWSRequest

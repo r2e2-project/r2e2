@@ -1,7 +1,6 @@
 #include "transfer.hh"
 
 #include "net/http_response_parser.hh"
-#include "util/optional.hh"
 
 using namespace std;
 using namespace chrono;
