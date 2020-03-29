@@ -4,6 +4,7 @@
 
 #include <endian.h>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 
 #include "net/session.hh"
@@ -48,6 +49,15 @@ void Message::serialize_header( std::string& output )
 {
   output = put_field( sender_id_ ) + put_field( payload_length_ )
            + static_cast<char>( to_underlying( opcode_ ) );
+}
+
+string Message::info() const
+{
+  ostringstream oss;
+  oss << "[msg:" << Message::OPCODE_NAMES[to_underlying( opcode() )]
+      << ",len=" << payload_length() << "]";
+
+  return oss.str();
 }
 
 void MessageParser::complete_message()
@@ -150,9 +160,7 @@ void meow::Client<SessionType>::write( RingBuffer& out )
     current_request_unsent_payload_.remove_prefix(
       out.write( current_request_unsent_payload_ ) );
   } else {
-    /* cerr << "\u2192 [msg:"
-         << Message::OPCODE_NAMES[to_underlying( requests_.front().opcode() )]
-         << "] " << endl; */
+    //cerr << "\u2192 " << requests_.front().info() << endl;
 
     requests_.pop();
 
