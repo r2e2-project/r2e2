@@ -71,6 +71,8 @@ public:
 
   size_t total_length() const { return HEADER_LENGTH + payload_length(); }
   static uint32_t expected_payload_length( const std::string_view header );
+
+  std::string info() const;
 };
 
 class MessageParser

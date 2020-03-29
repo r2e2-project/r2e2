@@ -13,9 +13,7 @@ constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
 void LambdaWorker::process_message( const Message& message )
 {
-  /* cerr << "\u2190 [msg:"
-       << Message::OPCODE_NAMES[to_underlying( message.opcode() )] << "]"
-       << endl; */
+  //cerr << "\u2190 " << message.info() << endl;
 
   switch ( message.opcode() ) {
     case OpCode::Hey: {
