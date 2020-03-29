@@ -62,9 +62,13 @@ private:
     unsigned int service_count() const;
   };
 
-  std::vector<RuleCategory> _rule_categories {};
+  std::vector<RuleCategory> _rule_categories {};  
+
   std::list<std::shared_ptr<FDRule>> _fd_rules {};
   std::list<std::shared_ptr<BasicRule>> _non_fd_rules {};
+
+  std::list<std::shared_ptr<FDRule>> _pending_fd_rules {};
+  std::list<std::shared_ptr<BasicRule>> _pending_non_fd_rules {};
 
   const uint64_t _beginning_timestamp { Timer::timestamp_ns() };
 

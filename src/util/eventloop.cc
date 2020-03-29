@@ -50,13 +50,13 @@ EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
     throw out_of_range( "bad category_id" );
   }
 
-  _fd_rules.emplace_back(
+  _pending_fd_rules.emplace_back(
     make_shared<FDRule>( BasicRule { category_id, interest, callback },
                          fd.duplicate(),
                          direction,
                          cancel ) );
 
-  return _fd_rules.back();
+  return _pending_fd_rules.back();
 }
 
 EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
@@ -67,10 +67,10 @@ EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
     throw out_of_range( "bad category_id" );
   }
 
-  _non_fd_rules.emplace_back(
+  _pending_non_fd_rules.emplace_back(
     make_shared<BasicRule>( category_id, interest, callback ) );
 
-  return _non_fd_rules.back();
+  return _pending_non_fd_rules.back();
 }
 
 void EventLoop::RuleHandle::cancel()
@@ -83,7 +83,23 @@ void EventLoop::RuleHandle::cancel()
 
 EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 {
-  // first, handle the non-file-descriptor-related rules
+  // install all the pending rules
+  for ( auto& rule : _pending_fd_rules ) {
+    if ( !rule->cancel_requested ) {
+      _fd_rules.emplace_back( move( rule ) );
+    }
+  }
+
+  for ( auto& rule : _pending_non_fd_rules ) {
+    if ( !rule->cancel_requested ) {
+      _non_fd_rules.emplace_back( move( rule ) );
+    }
+  }
+
+  _pending_fd_rules = {};
+  _pending_non_fd_rules = {};
+
+  // handle the non-file-descriptor-related rules
   {
     unsigned int iterations = 0;
     while ( true ) {
@@ -129,10 +145,8 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
   bool something_to_poll = false;
 
   // set up the pollfd for each rule
-  for ( auto it = _fd_rules.begin();
-        it
-        != _fd_rules
-             .end(); ) { // NOTE: it gets erased or incremented in loop body
+  for ( auto it = _fd_rules.begin(); it != _fd_rules.end(); ) {
+    // NOTE: `it` gets erased or incremented in loop body
     auto& this_rule = **it;
 
     if ( this_rule.cancel_requested ) {
