@@ -75,15 +75,16 @@ set ( ALL_R2T2_LIBS
 add_executable ( r2t2-lambda-master src/master/lambda-master.cc )
 target_link_libraries( r2t2-lambda-master ${ALL_R2T2_LIBS} )
 
-set ( STRIP_SYMBOLS "-export-dynamic" )
-if ( CMAKE_BUILD_TYPE MATCHES Release )
-  set( STRIP_SYMBOLS "-s" )
+set ( WORKER_LINK_FLAGS dl z unwind lzma -static -Wl,-allow-multiple-definition
+                        -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
+                        -s )
+
+if ( CMAKE_BUILD_TYPE MATCHES Debug )
+  set( WORKER_LINK_FLAGS "" )
 endif()
 
 add_executable ( r2t2-lambda-worker src/worker/lambda-worker.cc )
-target_link_libraries( r2t2-lambda-worker ${ALL_R2T2_LIBS} dl z unwind lzma
-    -static -Wl,-allow-multiple-definition ${STRIP_SYMBOLS} -Wl,--whole-archive
-    -lpthread -Wl,--no-whole-archive)
+target_link_libraries( r2t2-lambda-worker ${ALL_R2T2_LIBS} ${WORKER_LINK_FLAGS} )
 
 add_executable ( r2t2-lambda-aggregate src/tools/lambda-aggregate.cc )
 target_link_libraries( r2t2-lambda-aggregate ${ALL_R2T2_LIBS} )
