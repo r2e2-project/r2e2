@@ -3,6 +3,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <random>
 #include <set>
 #include <stack>
@@ -21,7 +22,6 @@
 #include "schedulers/scheduler.hh"
 #include "storage/backend.hh"
 #include "util/eventfd.hh"
-#include "util/optional.hh"
 #include "util/signalfd.hh"
 #include "util/temp_dir.hh"
 #include "util/timerfd.hh"
@@ -46,7 +46,7 @@ struct MasterConfiguration
   float ray_log_rate;
   float bag_log_rate;
   std::string logs_directory;
-  Optional<pbrt::Bounds2i> crop_window;
+  std::optional<pbrt::Bounds2i> crop_window;
   int tile_size;
   std::chrono::seconds timeout;
   std::string job_summary_path;
@@ -307,7 +307,7 @@ private:
     SceneData() {}
     SceneData( const std::string& scene_path,
                const int samples_per_pixel,
-               const Optional<pbrt::Bounds2i>& crop_window );
+               const std::optional<pbrt::Bounds2i>& crop_window );
   } scene {};
 
   /*** Tiles ****************************************************************/

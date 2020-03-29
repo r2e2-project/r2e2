@@ -14,7 +14,6 @@
 #include "net/address.hh"
 #include "net/socket.hh"
 #include "util/eventfd.hh"
-#include "util/optional.hh"
 
 class TransferAgent
 {

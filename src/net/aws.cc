@@ -62,8 +62,12 @@ AWSCredentials::AWSCredentials( const string& access_key,
                                 const string& session_token )
   : access_key_( access_key )
   , secret_key_( secret_key )
-  , session_token_( session_token.length() > 0, session_token )
+  , session_token_()
 {
+  if ( not session_token.empty() ) {
+    session_token_ = session_token;
+  }
+
   if ( access_key_.length() == 0 or secret_key_.length() == 0 ) {
     throw runtime_error( "Missing AWS access key and/or secret key" );
   }

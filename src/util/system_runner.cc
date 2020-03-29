@@ -2,6 +2,7 @@
 
 #include <array>
 #include <fcntl.h>
+#include <optional>
 #include <sstream>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -10,7 +11,6 @@
 #include "child_process.hh"
 #include "exception.hh"
 #include "file_descriptor.hh"
-#include "optional.hh"
 #include "pipe.hh"
 #include "system_runner.hh"
 
@@ -93,8 +93,11 @@ string run( const string& filename,
 {
   string output;
 
-  Optional<pair<FileDescriptor, FileDescriptor>> pipe { read_stdout_until_eof,
-                                                        make_pipe() };
+  optional<pair<FileDescriptor, FileDescriptor>> pipe { nullopt };
+
+  if ( read_stdout_until_eof ) {
+    pipe = make_pipe();
+  }
 
   ChildProcess command_process( args[0], [&]() {
     if ( read_stdout_until_eof ) {

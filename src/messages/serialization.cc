@@ -21,7 +21,7 @@ RecordWriter::RecordWriter( const string& filename )
 {}
 
 RecordWriter::RecordWriter( FileDescriptor&& fd )
-  : fd_( true, move( fd ) )
+  : fd_( move( fd ) )
   , output_stream_( make_unique<FileOutputStream>( fd_->fd_num() ) )
   , coded_output_( output_stream_.get() )
 {}
@@ -66,7 +66,7 @@ RecordReader::RecordReader( const string& filename )
 {}
 
 RecordReader::RecordReader( FileDescriptor&& fd )
-  : fd_( true, move( fd ) )
+  : fd_( move( fd ) )
   , input_stream_( make_unique<FileInputStream>( fd_->fd_num() ) )
   , coded_input_( input_stream_.get() )
 {
@@ -74,7 +74,7 @@ RecordReader::RecordReader( FileDescriptor&& fd )
 }
 
 RecordReader::RecordReader( istringstream&& is )
-  : istream_( true, move( is ) )
+  : istream_( move( is ) )
   , input_stream_( make_unique<IstreamInputStream>( &*istream_ ) )
   , coded_input_( input_stream_.get() )
 {

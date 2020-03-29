@@ -45,10 +45,9 @@ void LambdaMaster::assign_base_objects( Worker& worker )
 
 LambdaMaster::SceneData::SceneData( const std::string& scene_path,
                                     const int samples_per_pixel,
-                                    const Optional<Bounds2i>& crop_window )
+                                    const optional<Bounds2i>& crop_window )
   : base( scene_path, samples_per_pixel )
-  , sample_bounds( crop_window.initialized() ? *crop_window
-                                             : base.sampleBounds )
+  , sample_bounds( crop_window.has_value() ? *crop_window : base.sampleBounds )
   , sample_extent( sample_bounds.Diagonal() )
   , total_paths( base.totalPaths )
 {}

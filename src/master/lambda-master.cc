@@ -606,7 +606,7 @@ void usage( const char* argv0, int exit_code )
   exit( exit_code );
 }
 
-Optional<Bounds2i> parse_crop_window_optarg( const string& optarg )
+optional<Bounds2i> parse_crop_window_optarg( const string& optarg )
 {
   vector<string> args = split( optarg, "," );
   if ( args.size() != 4 )
@@ -618,7 +618,7 @@ Optional<Bounds2i> parse_crop_window_optarg( const string& optarg )
   p_max.x = stoi( args[2] );
   p_max.y = stoi( args[3] );
 
-  return { true, Bounds2i { p_min, p_max } };
+  return make_optional<Bounds2i>( p_min, p_max );
 }
 
 int main( int argc, char* argv[] )
@@ -641,7 +641,7 @@ int main( int argc, char* argv[] )
   float ray_log_rate = 0.0;
   float bag_log_rate = 0.0;
   string logs_directory = "logs/";
-  Optional<Bounds2i> crop_window;
+  optional<Bounds2i> crop_window;
   uint32_t timeout = 0;
   uint32_t pixels_per_tile = 0;
   uint64_t new_tile_threshold = 10000;
@@ -740,7 +740,7 @@ int main( int argc, char* argv[] )
       case 'c':
         crop_window = parse_crop_window_optarg( optarg );
 
-        if ( !crop_window.initialized() ) {
+        if ( not crop_window.has_value() ) {
           cerr << "Error: bad crop window (" << optarg << ")." << endl;
           usage( argv[0], EXIT_FAILURE );
         }
@@ -780,7 +780,7 @@ int main( int argc, char* argv[] )
        || ray_log_rate < 0 || ray_log_rate > 1.0 || bag_log_rate < 0
        || bag_log_rate > 1.0 || public_ip.empty() || storage_backend_uri.empty()
        || region.empty() || new_tile_threshold == 0
-       || ( crop_window.initialized() && pixels_per_tile != 0
+       || ( crop_window.has_value() && pixels_per_tile != 0
             && pixels_per_tile
                  != numeric_limits<typeof( pixels_per_tile )>::max()
             && pixels_per_tile > crop_window->Area() ) ) {

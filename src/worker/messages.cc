@@ -21,8 +21,8 @@ void LambdaWorker::process_message( const Message& message )
     case OpCode::Hey: {
       protobuf::Hey proto;
       protoutil::from_string( message.payload(), proto );
-      worker_id.reset( proto.worker_id() );
-      job_id.reset( proto.job_id() );
+      worker_id = proto.worker_id();
+      job_id = proto.job_id();
 
       log_prefix = "logs/" + ( *job_id ) + "/";
       ray_bags_key_prefix = "jobs/" + ( *job_id ) + "/";

@@ -5,12 +5,12 @@
 using namespace std;
 using namespace r2t2;
 
-Optional<Schedule> UniformScheduler::schedule(
+optional<Schedule> UniformScheduler::schedule(
   const size_t maxWorkers,
   const vector<TreeletStats>& treelets )
 {
   if ( scheduledOnce )
-    return { false };
+    return nullopt;
 
   if ( maxWorkers < treelets.size() ) {
     throw runtime_error( "Not enough workers for uniform scheduler" );
@@ -26,5 +26,5 @@ Optional<Schedule> UniformScheduler::schedule(
   }
 
   scheduledOnce = true;
-  return { true, move( results ) };
+  return { move( results ) };
 }

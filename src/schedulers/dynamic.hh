@@ -17,7 +17,7 @@ private:
 public:
   DynamicScheduler() {}
 
-  Optional<Schedule> schedule(
+  std::optional<Schedule> schedule(
     const size_t maxWorkers,
     const std::vector<TreeletStats>& stats ) override;
 };

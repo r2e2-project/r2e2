@@ -13,8 +13,8 @@ private:
 public:
   StaticMultiScheduler( const std::string& path );
 
-  Optional<Schedule> schedule( const size_t maxWorkers,
-                               const std::vector<TreeletStats>& ) override;
+  std::optional<Schedule> schedule( const size_t maxWorkers,
+                                    const std::vector<TreeletStats>& ) override;
 };
 
 } // namespace r2t2

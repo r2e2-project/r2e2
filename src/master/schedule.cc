@@ -71,7 +71,7 @@ void LambdaMaster::handle_reschedule()
   auto start = steady_clock::now();
   auto schedule = scheduler->schedule( max_workers, treelet_stats );
 
-  if ( schedule.initialized() ) {
+  if ( schedule ) {
     cerr << "Rescheduling... ";
 
     execute_schedule( *schedule );

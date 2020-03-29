@@ -9,7 +9,6 @@
 
 #include "r2t2.pb.h"
 #include "util/file_descriptor.hh"
-#include "util/optional.hh"
 
 namespace r2t2 {
 namespace protobuf {
@@ -36,7 +35,7 @@ public:
   void write_empty();
 
 private:
-  Optional<FileDescriptor> fd_ {};
+  std::optional<FileDescriptor> fd_ {};
 
   std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> output_stream_;
   google::protobuf::io::CodedOutputStream coded_output_;
@@ -66,8 +65,8 @@ public:
 private:
   void initialize();
 
-  Optional<FileDescriptor> fd_;
-  Optional<std::istringstream> istream_;
+  std::optional<FileDescriptor> fd_;
+  std::optional<std::istringstream> istream_;
 
   std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> input_stream_;
   google::protobuf::io::CodedInputStream coded_input_;

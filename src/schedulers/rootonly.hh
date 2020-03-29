@@ -10,17 +10,19 @@ private:
   bool scheduledOnce { false };
 
 public:
-  Optional<Schedule> schedule(
+  std::optional<Schedule> schedule(
     const size_t maxWorkers,
     const std::vector<TreeletStats>& treelets ) override
   {
-    if ( scheduledOnce )
-      return { false };
+    if ( scheduledOnce ) {
+      return std::nullopt;
+    }
+
     scheduledOnce = true;
 
     Schedule result( treelets.size(), 0 );
     result[0] = maxWorkers;
-    return { true, std::move( result ) };
+    return { std::move( result ) };
   }
 };
 

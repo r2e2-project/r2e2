@@ -7,10 +7,10 @@ namespace r2t2 {
 class NullScheduler : public Scheduler
 {
 public:
-  Optional<Schedule> schedule( const size_t,
-                               const std::vector<TreeletStats>& ) override
+  std::optional<Schedule> schedule( const size_t,
+                                    const std::vector<TreeletStats>& ) override
   {
-    return { false };
+    return std::nullopt;
   }
 };
 

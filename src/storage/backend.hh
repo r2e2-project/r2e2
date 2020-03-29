@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "net/requests.hh"
-#include "util/optional.hh"
 
 typedef std::function<void( const storage::PutRequest& )> PutCallback;
 typedef std::function<void( const storage::GetRequest& )> GetCallback;

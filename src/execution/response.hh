@@ -8,8 +8,6 @@
 #include <sys/types.h>
 #include <vector>
 
-#include "util/optional.hh"
-
 class FetchDependenciesError : public std::exception
 {};
 class ExecutionError : public std::exception

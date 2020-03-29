@@ -10,7 +10,7 @@ private:
   bool scheduledOnce { false };
 
 public:
-  Optional<Schedule> schedule(
+  std::optional<Schedule> schedule(
     const size_t maxWorkers,
     const std::vector<TreeletStats>& treelets ) override;
 };
