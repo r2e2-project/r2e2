@@ -45,16 +45,16 @@ void LambdaMaster::process_message( const uint64_t worker_id,
         const RayBagInfo info = from_protobuf( item );
         record_enqueue( worker_id, info );
 
-        if ( info.sampleBag ) {
+        if ( info.sample_bag ) {
           sample_bags.push_back( info );
           continue;
         }
 
-        if ( unassigned_treelets.count( info.treeletId ) == 0 ) {
-          queued_ray_bags[info.treeletId].push( info );
+        if ( unassigned_treelets.count( info.treelet_id ) == 0 ) {
+          queued_ray_bags[info.treelet_id].push( info );
           queued_ray_bags_count++;
         } else {
-          pending_ray_bags[info.treeletId].push( info );
+          pending_ray_bags[info.treelet_id].push( info );
         }
       }
 

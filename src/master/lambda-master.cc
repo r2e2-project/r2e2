@@ -404,7 +404,7 @@ string LambdaMaster::Worker::to_string() const
 
   size_t oustanding_size = 0;
   for ( const auto& bag : outstanding_ray_bags )
-    oustanding_size += bag.bagSize;
+    oustanding_size += bag.bag_size;
 
   oss << "id=" << id << ",state=" << static_cast<int>( state )
       << ",role=" << static_cast<int>( role ) << ",awslog=" << aws_log_stream

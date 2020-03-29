@@ -15,38 +15,38 @@ struct RayBagInfo
 {
   bool tracked { false };
 
-  WorkerId workerId {};
-  TreeletId treeletId {};
-  BagId bagId {};
-  size_t rayCount {};
-  size_t bagSize {};
-  bool sampleBag { false };
+  WorkerId worker_id {};
+  TreeletId treelet_id {};
+  BagId bag_id {};
+  size_t ray_count {};
+  size_t bag_size {};
+  bool sample_bag { false };
 
   std::string str( const std::string& prefix ) const
   {
     std::ostringstream oss;
 
-    if ( !sampleBag ) {
-      oss << prefix << "T" << treeletId << "/W" << workerId << "/B" << bagId;
+    if ( !sample_bag ) {
+      oss << prefix << "T" << treelet_id << "/W" << worker_id << "/B" << bag_id;
     } else {
-      oss << prefix << "samples/W" << workerId << "/B" << bagId;
+      oss << prefix << "samples/W" << worker_id << "/B" << bag_id;
     }
 
     return oss.str();
   }
 
-  RayBagInfo( const WorkerId workerId,
-              const TreeletId treeletId,
-              const BagId bagId,
-              const size_t rayCount,
-              const size_t bagSize,
-              const bool sampleBag )
-    : workerId( workerId )
-    , treeletId( treeletId )
-    , bagId( bagId )
-    , rayCount( rayCount )
-    , bagSize( bagSize )
-    , sampleBag( sampleBag )
+  RayBagInfo( const WorkerId worker_id,
+              const TreeletId treelet_id,
+              const BagId bag_id,
+              const size_t ray_count,
+              const size_t bag_size,
+              const bool sample_bag )
+    : worker_id( worker_id )
+    , treelet_id( treelet_id )
+    , bag_id( bag_id )
+    , ray_count( ray_count )
+    , bag_size( bag_size )
+    , sample_bag( sample_bag )
   {}
 
   RayBagInfo() = default;
@@ -55,11 +55,11 @@ struct RayBagInfo
 
   bool operator<( const RayBagInfo& other ) const
   {
-    return ( workerId < other.workerId )
-           || ( workerId == other.workerId
-                && ( treeletId < other.treeletId
-                     || ( treeletId == other.treeletId
-                          && bagId < other.bagId ) ) );
+    return ( worker_id < other.worker_id )
+           or ( worker_id == other.worker_id
+                and ( treelet_id < other.treelet_id
+                      or ( treelet_id == other.treelet_id
+                           and bag_id < other.bag_id ) ) );
   }
 
   static RayBagInfo& EmptyBag()
@@ -71,20 +71,20 @@ struct RayBagInfo
 
 struct RayBag
 {
-  std::chrono::steady_clock::time_point createdAt {
+  std::chrono::steady_clock::time_point created_at {
     std::chrono::steady_clock::now()
   };
 
   RayBagInfo info;
   std::string data;
 
-  RayBag( const WorkerId workerId,
-          const TreeletId treeletId,
-          const BagId bagId,
+  RayBag( const WorkerId worker_id,
+          const TreeletId treelet_id,
+          const BagId bag_id,
           const bool finished,
-          const size_t maxBagLen )
-    : info( workerId, treeletId, bagId, 0, 0, finished )
-    , data( maxBagLen, '\0' )
+          const size_t max_bag_len )
+    : info( worker_id, treelet_id, bag_id, 0, 0, finished )
+    , data( max_bag_len, '\0' )
   {}
 
   RayBag( const RayBagInfo& info, std::string&& data )

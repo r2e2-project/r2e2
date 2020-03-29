@@ -103,8 +103,8 @@ void LambdaWorker::log_bag( const BagAction action, const RayBagInfo& info )
   /* timestamp,bag,workerId,count,size,action */
   oss << duration_cast<milliseconds>( system_clock::now().time_since_epoch() )
            .count()
-      << ',' << info.str( "" ) << ',' << *worker_id << ',' << info.rayCount
-      << ',' << info.bagSize << ',';
+      << ',' << info.str( "" ) << ',' << *worker_id << ',' << info.ray_count
+      << ',' << info.bag_size << ',';
 
   // clang-format off
     switch(action) {

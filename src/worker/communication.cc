@@ -49,7 +49,7 @@ void LambdaWorker::handle_out_queue()
       auto& ray = ray_list.front();
       auto& bag = bag_it->second;
 
-      if ( bag.info.bagSize + ray->MaxCompressedSize() > MAX_BAG_SIZE ) {
+      if ( bag.info.bag_size + ray->MaxCompressedSize() > MAX_BAG_SIZE ) {
         log_bag( BagAction::Sealed, bag.info );
         sealed_bags.push( move( bag ) );
 
@@ -57,9 +57,9 @@ void LambdaWorker::handle_out_queue()
         bag = create_new_bag( treelet_id );
       }
 
-      const auto len = ray->Serialize( &bag.data[0] + bag.info.bagSize );
-      bag.info.rayCount++;
-      bag.info.bagSize += len;
+      const auto len = ray->Serialize( &bag.data[0] + bag.info.bag_size );
+      bag.info.ray_count++;
+      bag.info.bag_size += len;
 
       log_ray( RayAction::Bagged, *ray, bag.info );
 
@@ -77,7 +77,7 @@ void LambdaWorker::handle_open_bags()
   const auto now = steady_clock::now();
 
   for ( auto it = open_bags.begin(); it != open_bags.end(); ) {
-    const auto time_since_creation = now - it->second.createdAt;
+    const auto time_since_creation = now - it->second.created_at;
 
     if ( time_since_creation < SEAL_BAGS_INTERVAL ) {
       it++;
@@ -90,7 +90,7 @@ void LambdaWorker::handle_open_bags()
     }
 
     log_bag( BagAction::Sealed, it->second.info );
-    it->second.data.erase( it->second.info.bagSize );
+    it->second.data.erase( it->second.info.bag_size );
     it->second.data.shrink_to_fit();
 
     sealed_bags.push( move( it->second ) );
@@ -114,14 +114,14 @@ void LambdaWorker::handle_samples()
   while ( !samples.empty() ) {
     auto& sample = samples.front();
 
-    if ( out.back().info.bagSize + sample.MaxCompressedSize() > MAX_BAG_SIZE ) {
+    if ( out.back().info.bag_size + sample.MaxCompressedSize() > MAX_BAG_SIZE ) {
       out.emplace( *worker_id, 0, current_sample_bag_id++, true, MAX_BAG_SIZE );
     }
 
     auto& bag = out.back();
-    const auto len = sample.Serialize( &bag.data[0] + bag.info.bagSize );
-    bag.info.rayCount++;
-    bag.info.bagSize += len;
+    const auto len = sample.Serialize( &bag.data[0] + bag.info.bag_size );
+    bag.info.ray_count++;
+    bag.info.bag_size += len;
 
     samples.pop();
   }
@@ -133,20 +133,20 @@ void LambdaWorker::handle_sealed_bags()
     auto& bag = sealed_bags.front();
 
     if ( COMPRESS_RAY_BAGS ) {
-      const size_t upper_bound = LZ4_COMPRESSBOUND( bag.info.bagSize );
+      const size_t upper_bound = LZ4_COMPRESSBOUND( bag.info.bag_size );
       string compressed( upper_bound, '\0' );
       const size_t compressed_size = LZ4_compress_default(
-        bag.data.data(), &compressed[0], bag.info.bagSize, upper_bound );
+        bag.data.data(), &compressed[0], bag.info.bag_size, upper_bound );
 
       if ( compressed_size == 0 ) {
         throw runtime_error( "bag compression failed" );
       }
 
-      bag.info.bagSize = compressed_size;
+      bag.info.bag_size = compressed_size;
       bag.data = move( compressed );
     }
 
-    bag.data.erase( bag.info.bagSize );
+    bag.data.erase( bag.info.bag_size );
     bag.data.shrink_to_fit();
 
     log_bag( BagAction::Submitted, bag.info );
@@ -165,7 +165,7 @@ void LambdaWorker::handle_sample_bags()
 
   while ( !sample_bags.empty() ) {
     RayBag& bag = sample_bags.front();
-    bag.data.erase( bag.info.bagSize );
+    bag.data.erase( bag.info.bag_size );
 
     const auto id = samples_transfer_agent->requestUpload(
       bag.info.str( ray_bags_key_prefix ), move( bag.data ) );
@@ -184,11 +184,11 @@ void LambdaWorker::handle_receive_queue()
     /* (1) XXX do we have this treelet? */
 
     /* (2) let's unpack this treelet and add the rays to the trace queue */
-    auto& rays = trace_queue[bag.info.treeletId];
+    auto& rays = trace_queue[bag.info.treelet_id];
     size_t total_size = bag.data.size();
 
     if ( COMPRESS_RAY_BAGS ) {
-      string decompressed( bag.info.rayCount * RayState::MaxPackedSize, '\0' );
+      string decompressed( bag.info.ray_count * RayState::MaxPackedSize, '\0' );
 
       int decompressed_size = LZ4_decompress_safe(
         bag.data.data(), &decompressed[0], total_size, decompressed.size() );

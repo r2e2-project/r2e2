@@ -11,31 +11,31 @@ void LambdaMaster::record_enqueue( const WorkerId worker_id,
                                    const RayBagInfo& info )
 {
   auto& worker = workers.at( worker_id );
-  worker.rays.enqueued += info.rayCount;
+  worker.rays.enqueued += info.ray_count;
 
-  treelets[info.treeletId].last_stats.first = true;
+  treelets[info.treelet_id].last_stats.first = true;
 
-  if ( info.sampleBag ) {
-    worker.stats.samples.rays += info.rayCount;
-    worker.stats.samples.bytes += info.bagSize;
+  if ( info.sample_bag ) {
+    worker.stats.samples.rays += info.ray_count;
+    worker.stats.samples.bytes += info.bag_size;
     worker.stats.samples.count++;
 
-    aggregated_stats.samples.rays += info.rayCount;
-    aggregated_stats.samples.bytes += info.bagSize;
+    aggregated_stats.samples.rays += info.ray_count;
+    aggregated_stats.samples.bytes += info.bag_size;
     aggregated_stats.samples.count++;
 
     last_finished_ray = steady_clock::now();
   } else {
-    worker.stats.enqueued.rays += info.rayCount;
-    worker.stats.enqueued.bytes += info.bagSize;
+    worker.stats.enqueued.rays += info.ray_count;
+    worker.stats.enqueued.bytes += info.bag_size;
     worker.stats.enqueued.count++;
 
-    treelet_stats[info.treeletId].enqueued.rays += info.rayCount;
-    treelet_stats[info.treeletId].enqueued.bytes += info.bagSize;
-    treelet_stats[info.treeletId].enqueued.count++;
+    treelet_stats[info.treelet_id].enqueued.rays += info.ray_count;
+    treelet_stats[info.treelet_id].enqueued.bytes += info.bag_size;
+    treelet_stats[info.treelet_id].enqueued.count++;
 
-    aggregated_stats.enqueued.rays += info.rayCount;
-    aggregated_stats.enqueued.bytes += info.bagSize;
+    aggregated_stats.enqueued.rays += info.ray_count;
+    aggregated_stats.enqueued.bytes += info.bag_size;
     aggregated_stats.enqueued.count++;
   }
 }
@@ -44,17 +44,17 @@ void LambdaMaster::record_assign( const WorkerId worker_id,
                                   const RayBagInfo& info )
 {
   auto& worker = workers.at( worker_id );
-  worker.rays.dequeued += info.rayCount;
+  worker.rays.dequeued += info.ray_count;
 
   worker.outstanding_ray_bags.insert( info );
-  worker.outstanding_bytes += info.bagSize;
+  worker.outstanding_bytes += info.bag_size;
 
-  worker.stats.assigned.rays += info.rayCount;
-  worker.stats.assigned.bytes += info.bagSize;
+  worker.stats.assigned.rays += info.ray_count;
+  worker.stats.assigned.bytes += info.bag_size;
   worker.stats.assigned.count++;
 
-  aggregated_stats.assigned.rays += info.rayCount;
-  aggregated_stats.assigned.bytes += info.bagSize;
+  aggregated_stats.assigned.rays += info.ray_count;
+  aggregated_stats.assigned.bytes += info.bag_size;
   aggregated_stats.assigned.count++;
 }
 
@@ -64,20 +64,20 @@ void LambdaMaster::record_dequeue( const WorkerId worker_id,
   auto& worker = workers.at( worker_id );
 
   worker.outstanding_ray_bags.erase( info );
-  worker.outstanding_bytes -= info.bagSize;
+  worker.outstanding_bytes -= info.bag_size;
 
-  treelets[info.treeletId].last_stats.first = true;
+  treelets[info.treelet_id].last_stats.first = true;
 
-  worker.stats.dequeued.rays += info.rayCount;
-  worker.stats.dequeued.bytes += info.bagSize;
+  worker.stats.dequeued.rays += info.ray_count;
+  worker.stats.dequeued.bytes += info.bag_size;
   worker.stats.dequeued.count++;
 
-  treelet_stats[info.treeletId].dequeued.rays += info.rayCount;
-  treelet_stats[info.treeletId].dequeued.bytes += info.bagSize;
-  treelet_stats[info.treeletId].dequeued.count++;
+  treelet_stats[info.treelet_id].dequeued.rays += info.ray_count;
+  treelet_stats[info.treelet_id].dequeued.bytes += info.bag_size;
+  treelet_stats[info.treelet_id].dequeued.count++;
 
-  aggregated_stats.dequeued.rays += info.rayCount;
-  aggregated_stats.dequeued.bytes += info.bagSize;
+  aggregated_stats.dequeued.rays += info.ray_count;
+  aggregated_stats.dequeued.bytes += info.bag_size;
   aggregated_stats.dequeued.count++;
 }
 
