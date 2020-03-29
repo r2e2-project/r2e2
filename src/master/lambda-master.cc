@@ -522,8 +522,8 @@ void LambdaMaster::run()
 
   cerr << endl;
 
-  cerr << global_timer().summary() << endl;
   cerr << loop.summary() << endl;
+  cerr << global_timer().summary() << endl;
 
   print_job_summary();
 
