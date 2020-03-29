@@ -156,11 +156,11 @@ void S3TransferAgent::workerThread( const size_t threadId )
       }
 
       char buffer[1024 * 1024];
-      string_view sss { buffer };
+      simple_string_span buffer_span { buffer, sizeof( buffer ) };
 
       while ( connectionOkay && !actions.empty() ) {
         size_t read_count;
-        TRY_OPERATION( read_count = s3.read( sss ), break );
+        TRY_OPERATION( read_count = s3.read( buffer_span ), break );
 
         if ( read_count == 0 ) {
           // connection was closed by the other side
@@ -170,7 +170,7 @@ void S3TransferAgent::workerThread( const size_t threadId )
           break;
         }
 
-        parser->parse( sss.substr( 0, read_count ) );
+        parser->parse( buffer_span.substr( 0, read_count ) );
 
         while ( !parser->empty() ) {
           const string_view status = parser->front().status_code();
