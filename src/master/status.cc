@@ -31,7 +31,10 @@ void LambdaMaster::handle_status_message()
       "terminate job",
       job_timeout_timer,
       Direction::In,
-      [this] { terminate(); },
+      [this] {
+        job_timeout_timer.read_event();
+        terminate();
+      },
       [] { return true; } );
   }
 
