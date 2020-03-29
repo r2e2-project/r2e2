@@ -15,7 +15,9 @@ using OpCode = Message::OpCode;
 void LambdaMaster::process_message( const uint64_t worker_id,
                                     const Message& message )
 {
-  //cerr << "\u2190 " << message.info() << " from worker " << worker_id << endl;
+#ifndef NDEBUG
+  cerr << "\u2190 " << message.info() << " from worker " << worker_id << endl;
+#endif
 
   last_action_time = steady_clock::now();
 

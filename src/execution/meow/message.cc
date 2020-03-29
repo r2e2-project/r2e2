@@ -160,7 +160,9 @@ void meow::Client<SessionType>::write( RingBuffer& out )
     current_request_unsent_payload_.remove_prefix(
       out.write( current_request_unsent_payload_ ) );
   } else {
-    //cerr << "\u2192 " << requests_.front().info() << endl;
+#ifndef NDEBUG
+    cerr << "\u2192 " << requests_.front().info() << endl;
+#endif
 
     requests_.pop();
 
