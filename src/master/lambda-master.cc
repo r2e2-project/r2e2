@@ -8,6 +8,7 @@
 #include <cmath>
 #include <ctime>
 #include <deque>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -32,7 +33,6 @@
 #include "schedulers/static.hh"
 #include "schedulers/uniform.hh"
 #include "util/exception.hh"
-#include "util/path.hh"
 #include "util/random.hh"
 #include "util/status_bar.hh"
 #include "util/temp_file.hh"
@@ -54,7 +54,9 @@ WorkerId LambdaMaster::Worker::next_id = 0;
 LambdaMaster::~LambdaMaster()
 {
   try {
-    roost::empty_directory( scene_dir.name() );
+    if ( not scene_dir.name().empty() ) {
+      filesystem::remove_all( scene_dir.name() );
+    }
   } catch ( exception& ex ) {
   }
 }
@@ -98,7 +100,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   signals.set_as_mask();
 
   const string scene_path = scene_dir.name();
-  roost::create_directories( scene_path );
+  filesystem::create_directories( scene_path );
 
   protobuf::InvocationPayload invocation_proto;
   invocation_proto.set_storage_backend( storage_backend_uri );
@@ -118,7 +120,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   /* download required scene objects from the bucket */
   auto get_scene_object_request = [&scene_path]( const ObjectType type ) {
     return storage::GetRequest { scene::GetObjectName( type, 0 ),
-                                 roost::path( scene_path )
+                                 filesystem::path( scene_path )
                                    / scene::GetObjectName( type, 0 ) };
   };
 
@@ -159,7 +161,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   /* are we logging anything? */
   if ( config.collect_debug_logs || config.worker_stats_write_interval > 0
        || config.ray_log_rate > 0 || config.bag_log_rate > 0 ) {
-    roost::create_directories( config.logs_directory );
+    filesystem::create_directories( config.logs_directory );
   }
 
   if ( config.worker_stats_write_interval > 0 ) {

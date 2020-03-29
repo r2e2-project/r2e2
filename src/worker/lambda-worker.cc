@@ -1,5 +1,6 @@
 #include "lambda-worker.hh"
 
+#include <filesystem>
 #include <getopt.h>
 #include <signal.h>
 
@@ -49,7 +50,7 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
     = make_unique<S3TransferAgent>( storage_backend, 2, true );
 
   cerr << "* starting worker in " << working_directory.name() << endl;
-  roost::chdir( working_directory.name() );
+  filesystem::current_path( working_directory.name() );
 
   FLAGS_log_dir = ".";
   FLAGS_log_prefix = false;

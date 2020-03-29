@@ -9,7 +9,6 @@
 
 #include "net/requests.hh"
 #include "util/optional.hh"
-#include "util/path.hh"
 
 typedef std::function<void( const storage::PutRequest& )> PutCallback;
 typedef std::function<void( const storage::GetRequest& )> GetCallback;
