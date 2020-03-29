@@ -2,4 +2,4 @@
 
 #include <string>
 
-std::string stacktrace(int skip = 1);
+std::string stacktrace( int skip = 1 );

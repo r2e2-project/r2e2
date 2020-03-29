@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include <functional>
 #include <chrono>
+#include <functional>
 
 template<class TimeUnit>
-TimeUnit time_it( const std::function<void()> & f );
+TimeUnit time_it( const std::function<void()>& f );

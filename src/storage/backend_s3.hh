@@ -2,9 +2,9 @@
 
 #pragma once
 
-#include "storage/backend.hh"
 #include "net/aws.hh"
 #include "net/s3.hh"
+#include "storage/backend.hh"
 
 class S3StorageBackend : public StorageBackend
 {
@@ -14,19 +14,22 @@ private:
   std::string prefix_;
 
 public:
-  S3StorageBackend( const AWSCredentials & credentials,
-                    const std::string & s3_bucket,
-                    const std::string & s3_region,
-                    const std::string & prefix = {} );
+  S3StorageBackend( const AWSCredentials& credentials,
+                    const std::string& s3_bucket,
+                    const std::string& s3_region,
+                    const std::string& prefix = {} );
 
-  void put( const std::vector<storage::PutRequest> & requests,
-            const PutCallback & success_callback = []( const storage::PutRequest & ){} ) override;
+  void put(
+    const std::vector<storage::PutRequest>& requests,
+    const PutCallback& success_callback
+    = []( const storage::PutRequest& ) {} ) override;
 
-  void get( const std::vector<storage::GetRequest> & requests,
-            const GetCallback & success_callback = []( const storage::GetRequest & ){} ) override;
+  void get(
+    const std::vector<storage::GetRequest>& requests,
+    const GetCallback& success_callback
+    = []( const storage::GetRequest& ) {} ) override;
 
-  const S3Client & client() const { return client_; }
-  const std::string & bucket() const { return bucket_; }
-  const std::string & prefix() const { return prefix_; }
-
+  const S3Client& client() const { return client_; }
+  const std::string& bucket() const { return bucket_; }
+  const std::string& prefix() const { return prefix_; }
 };

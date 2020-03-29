@@ -10,24 +10,25 @@ namespace r2t2 {
  * for storing sets which tend to have most of their values in a contiguous
  * sequence starting at 0.
  */
-class SeqNoSet {
-  public:
-    /**
-     * Creates an empty set
-     */
-    bool contains(const uint64_t value) const;
-    void insert(const uint64_t value);
-    uint64_t size() const;
-    uint64_t numberOfItemsInMemory() const;
+class SeqNoSet
+{
+public:
+  /**
+   * Creates an empty set
+   */
+  bool contains( const uint64_t value ) const;
+  void insert( const uint64_t value );
+  uint64_t size() const;
+  uint64_t numberOfItemsInMemory() const;
 
-    void insertAllBelow(const uint64_t value);
+  void insertAllBelow( const uint64_t value );
 
-    const std::set<uint64_t>& set() { return set_; }
-    uint64_t smallest_not_in_set() { return smallest_not_in_set_; }
+  const std::set<uint64_t>& set() { return set_; }
+  uint64_t smallest_not_in_set() { return smallest_not_in_set_; }
 
-  private:
-    std::set<uint64_t> set_{};
-    uint64_t smallest_not_in_set_{0};
+private:
+  std::set<uint64_t> set_ {};
+  uint64_t smallest_not_in_set_ { 0 };
 };
 
-}  // namespace r2t2
+} // namespace r2t2

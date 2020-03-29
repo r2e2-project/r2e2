@@ -1,7 +1,11 @@
-BasedOnStyle: Google
-AccessModifierOffset: -2
-IndentCaseLabels: false
-PointerBindsToType: false
-Standard: Cpp11
-IndentWidth: 4
+---
+Language: Cpp
+BasedOnStyle: Mozilla
+ColumnLimit: 80
+SpacesInParentheses: true
+AlwaysBreakAfterReturnType: None
+AlwaysBreakAfterDefinitionReturnType: None
+SpaceBeforeCpp11BracedList: true
+BreakBeforeBinaryOperators: All
+...
 

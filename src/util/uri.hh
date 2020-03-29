@@ -17,6 +17,5 @@ struct ParsedURI
   std::string path {};
   std::unordered_map<std::string, std::string> options {};
 
-  ParsedURI( const std::string & uri );
+  ParsedURI( const std::string& uri );
 };
-

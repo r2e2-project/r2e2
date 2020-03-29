@@ -2,14 +2,14 @@
 
 #include "base64.hh"
 
-#include <crypto++/sha.h>
-#include <crypto++/hex.h>
 #include <crypto++/base64.h>
+#include <crypto++/hex.h>
+#include <crypto++/sha.h>
 
 using namespace CryptoPP;
 using namespace std;
 
-string base64::encode( const string & input )
+string base64::encode( const string& input )
 {
   SHA256 hash_function;
   string ret;
@@ -17,13 +17,12 @@ string base64::encode( const string & input )
   /* Each stage of the Crypto++ pipeline will delete the pointer it owns
      (https://www.cryptopp.com/wiki/Pipelining) */
 
-  StringSource s( input, true,
-                  new Base64Encoder( new StringSink( ret ) ) );
+  StringSource s( input, true, new Base64Encoder( new StringSink( ret ) ) );
 
   return ret;
 }
 
-string base64::decode( const string & input )
+string base64::decode( const string& input )
 {
   SHA256 hash_function;
   string ret;
@@ -31,8 +30,7 @@ string base64::decode( const string & input )
   /* Each stage of the Crypto++ pipeline will delete the pointer it owns
      (https://www.cryptopp.com/wiki/Pipelining) */
 
-  StringSource s( input, true,
-                  new Base64Decoder( new StringSink( ret ) ) );
+  StringSource s( input, true, new Base64Decoder( new StringSink( ret ) ) );
 
   return ret;
 }

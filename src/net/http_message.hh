@@ -54,7 +54,9 @@ public:
   virtual ~HTTPMessage() {}
 
   /* convenience constructor */
-  HTTPMessage( std::string&& first_line, std::vector<HTTPHeader>&& headers, std::string&& body );
+  HTTPMessage( std::string&& first_line,
+               std::vector<HTTPHeader>&& headers,
+               std::string&& body );
 
   /* methods called by an external parser */
   void set_first_line( const std::string_view str );
@@ -76,12 +78,14 @@ public:
 
   /* troll through the headers */
   bool has_header( const std::string_view header_name ) const;
-  const std::string_view get_header_value( const std::string_view header_name ) const;
+  const std::string_view get_header_value(
+    const std::string_view header_name ) const;
 
   /* serialize the first line and headers */
   void serialize_headers( std::string& output ) const;
 
   /* compare two strings for (case-insensitive) equality,
      in ASCII without sensitivity to locale */
-  static bool equivalent_strings( const std::string_view a, const std::string_view b );
+  static bool equivalent_strings( const std::string_view a,
+                                  const std::string_view b );
 };

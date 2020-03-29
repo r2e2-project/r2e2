@@ -62,7 +62,7 @@ private:
     unsigned int service_count() const;
   };
 
-  std::vector<RuleCategory> _rule_categories {};  
+  std::vector<RuleCategory> _rule_categories {};
 
   std::list<std::shared_ptr<FDRule>> _fd_rules {};
   std::list<std::shared_ptr<BasicRule>> _non_fd_rules {};

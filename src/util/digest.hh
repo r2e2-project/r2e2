@@ -4,7 +4,6 @@
 
 #include <string>
 
-namespace digest
-{
-  std::string sha256( const std::string & input );
+namespace digest {
+std::string sha256( const std::string& input );
 }

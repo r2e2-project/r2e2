@@ -21,205 +21,217 @@ using namespace chrono;
 using namespace r2t2;
 using namespace PollerShortNames;
 
-string randomString(const size_t length) {
-    string str(length, 0);
-    generate_n(str.begin(), length,
-               []() -> char { return static_cast<char>(rand()); });
-    return str;
+string randomString( const size_t length )
+{
+  string str( length, 0 );
+  generate_n(
+    str.begin(), length, []() -> char { return static_cast<char>( rand() ); } );
+  return str;
 }
 
-void usage(const char* argv0) {
-    cerr << argv0
-         << " <id> <storage-backend> <bag-size_B> <threads> <duration_s> "
-            "<send> <receive> [<memcached-server>]..."
-         << endl;
+void usage( const char* argv0 )
+{
+  cerr << argv0
+       << " <id> <storage-backend> <bag-size_B> <threads> <duration_s> "
+          "<send> <receive> [<memcached-server>]..."
+       << endl;
 }
 
-enum class Action { Upload, Download };
+enum class Action
+{
+  Upload,
+  Download
+};
 
-int main(const int argc, const char* argv[]) {
-    if (argc < 8) {
-        usage(argv[0]);
-        return EXIT_FAILURE;
+int main( const int argc, const char* argv[] )
+{
+  if ( argc < 8 ) {
+    usage( argv[0] );
+    return EXIT_FAILURE;
+  }
+
+  srand( time( nullptr ) );
+
+  const size_t workerId = stoull( argv[1] );
+  const string backendUri = argv[2];
+  const size_t bagSize = stoull( argv[3] );
+  const size_t threads = stoull( argv[4] );
+  const seconds duration { stoull( argv[5] ) };
+  const bool send = ( stoull( argv[6] ) == 1 );
+  const bool recv = ( stoull( argv[7] ) == 1 );
+  const vector<string> memcachedServersStr { argv + 8, argv + argc };
+
+  unique_ptr<TransferAgent> agent;
+
+  if ( memcachedServersStr.empty() ) {
+    auto storageBackend = StorageBackend::create_backend( backendUri );
+    agent = make_unique<S3TransferAgent>( storageBackend, threads );
+  } else {
+    vector<Address> servers;
+    for ( const auto& s : memcachedServersStr ) {
+      string host;
+      uint16_t port = 11211;
+      tie( host, port ) = Address::decompose( s );
+      servers.emplace_back( host, port );
     }
 
-    srand(time(nullptr));
+    agent = make_unique<memcached::TransferAgent>( servers, threads, false );
+  }
 
-    const size_t workerId = stoull(argv[1]);
-    const string backendUri = argv[2];
-    const size_t bagSize = stoull(argv[3]);
-    const size_t threads = stoull(argv[4]);
-    const seconds duration{stoull(argv[5])};
-    const bool send = (stoull(argv[6]) == 1);
-    const bool recv = (stoull(argv[7]) == 1);
-    const vector<string> memcachedServersStr{argv + 8, argv + argc};
+  Poller poller;
 
-    unique_ptr<TransferAgent> agent;
+  const auto start = steady_clock::now();
+  TimerFD printStatsTimer { 1s };
+  TimerFD terminationTimer { duration };
 
-    if (memcachedServersStr.empty()) {
-        auto storageBackend = StorageBackend::create_backend(backendUri);
-        agent = make_unique<S3TransferAgent>(storageBackend, threads);
-    } else {
-        vector<Address> servers;
-        for (const auto& s : memcachedServersStr) {
-            string host;
-            uint16_t port = 11211;
-            tie(host, port) = Address::decompose(s);
-            servers.emplace_back(host, port);
-        }
+  const size_t MAX_OUTSTANDING = static_cast<size_t>( threads * 2 );
+  size_t currentIndex = 0;
 
-        agent = make_unique<memcached::TransferAgent>(servers, threads, false);
+  struct Stats
+  {
+    struct
+    {
+      size_t bytes { 0 };
+      size_t count { 0 };
+    } sent {}, recv {};
+  } stats;
+
+  unordered_map<size_t, pair<Action, string>> outstandingTasks;
+
+  if ( send && recv ) {
+    const string key = "temp/W" + to_string( workerId ) + "/T"
+                       + to_string( rand() % threads ) + "/B"
+                       + to_string( currentIndex++ );
+
+    outstandingTasks.emplace(
+      agent->requestUpload( key, randomString( bagSize ) ),
+      make_pair( Action::Upload, key ) );
+  } else {
+    /* first we need to upload a bunch of things */
+    for ( size_t i = 0; i < MAX_OUTSTANDING; i++ ) {
+      const string key = "temp/W" + to_string( workerId ) + "/T"
+                         + to_string( rand() % threads ) + "/B"
+                         + to_string( i );
+
+      outstandingTasks.emplace(
+        agent->requestUpload( key, randomString( bagSize ) ),
+        make_pair( Action::Upload, key ) );
     }
+  }
 
-    Poller poller;
+  poller.add_action( Poller::Action(
+    terminationTimer,
+    Direction::In,
+    [&terminationTimer]() {
+      terminationTimer.read_event();
+      return ResultType::Exit;
+    },
+    []() { return true; },
+    []() { throw runtime_error( "termination" ); } ) );
 
-    const auto start = steady_clock::now();
-    TimerFD printStatsTimer{1s};
-    TimerFD terminationTimer{duration};
+  poller.add_action( Poller::Action(
+    printStatsTimer,
+    Direction::In,
+    [&]() {
+      printStatsTimer.read_event();
 
-    const size_t MAX_OUTSTANDING = static_cast<size_t>(threads * 2);
-    size_t currentIndex = 0;
+      const auto T
+        = duration_cast<seconds>( steady_clock::now() - start ).count();
 
-    struct Stats {
-        struct {
-            size_t bytes{0};
-            size_t count{0};
-        } sent{}, recv{};
-    } stats;
+      cout << T << ',' << workerId << ',' << stats.sent.count << ','
+           << stats.sent.bytes << ',' << stats.recv.count << ','
+           << stats.recv.bytes << '\n';
 
-    unordered_map<size_t, pair<Action, string>> outstandingTasks;
+      stats = {};
 
-    if (send && recv) {
-        const string key = "temp/W" + to_string(workerId) + "/T" +
-                           to_string(rand() % threads) + "/B" +
-                           to_string(currentIndex++);
+      return ResultType::Continue;
+    },
+    []() { return true; },
+    []() { throw runtime_error( "statstimer" ); } ) );
 
-        outstandingTasks.emplace(
-            agent->requestUpload(key, randomString(bagSize)),
-            make_pair(Action::Upload, key));
-    } else {
-        /* first we need to upload a bunch of things */
-        for (size_t i = 0; i < MAX_OUTSTANDING; i++) {
-            const string key = "temp/W" + to_string(workerId) + "/T" +
-                               to_string(rand() % threads) + "/B" +
-                               to_string(i);
+  poller.add_action( Poller::Action(
+    agent->eventfd(),
+    Direction::In,
+    [&]() {
+      if ( !agent->eventfd().read_event() ) {
+        return ResultType::Continue;
+      }
 
-            outstandingTasks.emplace(
-                agent->requestUpload(key, randomString(bagSize)),
-                make_pair(Action::Upload, key));
-        }
-    }
+      vector<pair<uint64_t, string>> tasks;
+      agent->tryPopBulk( back_inserter( tasks ) );
 
-    poller.add_action(Poller::Action(
-        terminationTimer, Direction::In,
-        [&terminationTimer]() {
-            terminationTimer.read_event();
-            return ResultType::Exit;
-        },
-        []() { return true; }, []() { throw runtime_error("termination"); }));
+      for ( const auto& task : tasks ) {
+        const auto& oa = outstandingTasks.at( task.first );
+        const auto action = oa.first;
+        const auto& key = oa.second;
 
-    poller.add_action(Poller::Action(
-        printStatsTimer, Direction::In,
-        [&]() {
-            printStatsTimer.read_event();
+        switch ( action ) {
+          case Action::Upload:
+            stats.sent.bytes += bagSize;
+            stats.sent.count += 1;
 
-            const auto T =
-                duration_cast<seconds>(steady_clock::now() - start).count();
-
-            cout << T << ',' << workerId << ',' << stats.sent.count << ','
-                 << stats.sent.bytes << ',' << stats.recv.count << ','
-                 << stats.recv.bytes << '\n';
-
-            stats = {};
-
-            return ResultType::Continue;
-        },
-        []() { return true; }, []() { throw runtime_error("statstimer"); }));
-
-    poller.add_action(Poller::Action(
-        agent->eventfd(), Direction::In,
-        [&]() {
-            if (!agent->eventfd().read_event()) {
-                return ResultType::Continue;
+            if ( recv ) {
+              outstandingTasks.emplace( agent->requestDownload( key ),
+                                        make_pair( Action::Download, key ) );
+            } else if ( send ) {
+              outstandingTasks.emplace(
+                agent->requestUpload( key, randomString( bagSize ) ),
+                make_pair( Action::Upload, key ) );
             }
 
-            vector<pair<uint64_t, string>> tasks;
-            agent->tryPopBulk(back_inserter(tasks));
+            break;
 
-            for (const auto& task : tasks) {
-                const auto& oa = outstandingTasks.at(task.first);
-                const auto action = oa.first;
-                const auto& key = oa.second;
+          case Action::Download:
+            stats.recv.bytes += bagSize;
+            stats.recv.count += 1;
 
-                switch (action) {
-                case Action::Upload:
-                    stats.sent.bytes += bagSize;
-                    stats.sent.count += 1;
-
-                    if (recv) {
-                        outstandingTasks.emplace(
-                            agent->requestDownload(key),
-                            make_pair(Action::Download, key));
-                    } else if (send) {
-                        outstandingTasks.emplace(
-                            agent->requestUpload(key, randomString(bagSize)),
-                            make_pair(Action::Upload, key));
-                    }
-
-                    break;
-
-                case Action::Download:
-                    stats.recv.bytes += bagSize;
-                    stats.recv.count += 1;
-
-                    if (send) {
-                        outstandingTasks.emplace(
-                            agent->requestUpload(key, randomString(bagSize)),
-                            make_pair(Action::Upload, key));
-                    } else if (recv) {
-                        outstandingTasks.emplace(
-                            agent->requestDownload(key),
-                            make_pair(Action::Download, key));
-                    }
-
-                    break;
-                }
-
-                outstandingTasks.erase(task.first);
-
-                if (send && recv && outstandingTasks.size() < MAX_OUTSTANDING) {
-                    switch (action) {
-                    case Action::Upload: {
-                        const string key = "temp/W" + to_string(workerId) +
-                                           "/T" + to_string(rand() % threads) +
-                                           "/B" + to_string(currentIndex++);
-
-                        outstandingTasks.emplace(
-                            agent->requestUpload(key, randomString(bagSize)),
-                            make_pair(Action::Upload, key));
-                        break;
-                    }
-
-                    case Action::Download:
-                        outstandingTasks.emplace(
-                            agent->requestDownload(key),
-                            make_pair(Action::Download, key));
-                        break;
-                    }
-                }
+            if ( send ) {
+              outstandingTasks.emplace(
+                agent->requestUpload( key, randomString( bagSize ) ),
+                make_pair( Action::Upload, key ) );
+            } else if ( recv ) {
+              outstandingTasks.emplace( agent->requestDownload( key ),
+                                        make_pair( Action::Download, key ) );
             }
 
-            return ResultType::Continue;
-        },
-        []() { return true; }, []() { throw runtime_error("eventfd"); }));
-
-    while (true) {
-        auto result = poller.poll(-1).result;
-        if (result != Poller::Result::Type::Timeout &&
-            result != Poller::Result::Type::Success) {
             break;
         }
-    }
 
-    return EXIT_SUCCESS;
+        outstandingTasks.erase( task.first );
+
+        if ( send && recv && outstandingTasks.size() < MAX_OUTSTANDING ) {
+          switch ( action ) {
+            case Action::Upload: {
+              const string key = "temp/W" + to_string( workerId ) + "/T"
+                                 + to_string( rand() % threads ) + "/B"
+                                 + to_string( currentIndex++ );
+
+              outstandingTasks.emplace(
+                agent->requestUpload( key, randomString( bagSize ) ),
+                make_pair( Action::Upload, key ) );
+              break;
+            }
+
+            case Action::Download:
+              outstandingTasks.emplace( agent->requestDownload( key ),
+                                        make_pair( Action::Download, key ) );
+              break;
+          }
+        }
+      }
+
+      return ResultType::Continue;
+    },
+    []() { return true; },
+    []() { throw runtime_error( "eventfd" ); } ) );
+
+  while ( true ) {
+    auto result = poller.poll( -1 ).result;
+    if ( result != Poller::Result::Type::Timeout
+         && result != Poller::Result::Type::Success ) {
+      break;
+    }
+  }
+
+  return EXIT_SUCCESS;
 }

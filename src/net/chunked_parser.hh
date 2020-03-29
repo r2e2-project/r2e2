@@ -11,7 +11,7 @@ private:
   std::string::size_type compute_ack_size( const std::string_view haystack,
                                            const std::string_view needle,
                                            size_t input_size );
-  
+
   size_t get_chunk_size( const std::string_view chunk_hdr ) const;
 
   std::string parser_buffer_ { "" };
