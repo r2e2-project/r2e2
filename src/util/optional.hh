@@ -6,158 +6,188 @@
 #include <stdexcept>
 #include <utility>
 
-template <class T>
-class Optional {
-  private:
-    bool initialized_;
-    union {
-        T object_;
-        bool missing_;
-    };
+template<class T>
+class Optional
+{
+private:
+  bool initialized_;
+  union
+  {
+    T object_;
+    bool missing_;
+  };
 
-  public:
-    /* constructor for uninitialized optional */
-    /* missing_ field of union is necessary to get rid of "may be used
-     * uninitialized" warning */
-    Optional() : initialized_(false), missing_() {}
+public:
+  /* constructor for uninitialized optional */
+  /* missing_ field of union is necessary to get rid of "may be used
+   * uninitialized" warning */
+  Optional()
+    : initialized_( false )
+    , missing_()
+  {}
 
-    /* constructor for initialized optional */
-    Optional(T&& other) : initialized_(true), object_(std::move(other)) {}
+  /* constructor for initialized optional */
+  Optional( T&& other )
+    : initialized_( true )
+    , object_( std::move( other ) )
+  {}
 
-    /* conditional constructor */
-    // FIXME, this leads to very misleading results when constructing optional
-    // ints
-    template <typename... Targs>
-    Optional(const bool is_present, Targs&&... Fargs)
-        : initialized_(is_present), missing_() {
-        if (initialized_) {
-            new (&object_) T(std::forward<Targs>(Fargs)...);
-        }
+  /* conditional constructor */
+  // FIXME, this leads to very misleading results when constructing optional
+  // ints
+  template<typename... Targs>
+  Optional( const bool is_present, Targs&&... Fargs )
+    : initialized_( is_present )
+    , missing_()
+  {
+    if ( initialized_ ) {
+      new ( &object_ ) T( std::forward<Targs>( Fargs )... );
+    }
+  }
+
+  /* move constructor */
+  Optional( Optional<T>&& other ) noexcept(
+    std::is_nothrow_move_constructible<T>::value )
+    : initialized_( other.initialized_ )
+    , missing_()
+  {
+    if ( initialized_ ) {
+      new ( &object_ ) T( std::move( other.object_ ) );
+    }
+  }
+
+  /* copy constructor */
+  Optional( const Optional<T>& other )
+    : initialized_( other.initialized_ )
+    , missing_()
+  {
+    if ( initialized_ ) {
+      new ( &object_ ) T( other.object_ );
+    }
+  }
+
+  /* initialize in place */
+  template<typename... Targs>
+  void initialize( Targs&&... Fargs )
+  {
+    assert( not initialized() );
+    new ( &object_ ) T( std::forward<Targs>( Fargs )... );
+    initialized_ = true;
+  }
+
+  /* move assignment operators */
+  const Optional& operator=( Optional<T>&& other )
+  {
+    /* destroy if necessary */
+    if ( initialized_ ) {
+      object_.~T();
     }
 
-    /* move constructor */
-    Optional(Optional<T>&& other) noexcept(
-        std::is_nothrow_move_constructible<T>::value)
-        : initialized_(other.initialized_), missing_() {
-        if (initialized_) {
-            new (&object_) T(std::move(other.object_));
-        }
+    initialized_ = other.initialized_;
+    if ( initialized_ ) {
+      new ( &object_ ) T( std::move( other.object_ ) );
+    }
+    return *this;
+  }
+
+  /* copy assignment operator */
+  const Optional& operator=( const Optional<T>& other )
+  {
+    /* destroy if necessary */
+    if ( initialized_ ) {
+      object_.~T();
     }
 
-    /* copy constructor */
-    Optional(const Optional<T>& other)
-        : initialized_(other.initialized_), missing_() {
-        if (initialized_) {
-            new (&object_) T(other.object_);
-        }
+    initialized_ = other.initialized_;
+    if ( initialized_ ) {
+      new ( &object_ ) T( other.object_ );
     }
+    return *this;
+  }
 
-    /* initialize in place */
-    template <typename... Targs>
-    void initialize(Targs&&... Fargs) {
-        assert(not initialized());
-        new (&object_) T(std::forward<Targs>(Fargs)...);
-        initialized_ = true;
+  /* equality */
+  bool operator==( const Optional<T>& other ) const
+  {
+    if ( initialized_ ) {
+      return other.initialized_ ? ( get() == other.get() ) : false;
+    } else {
+      return !other.initialized_;
     }
+  }
 
-    /* move assignment operators */
-    const Optional& operator=(Optional<T>&& other) {
-        /* destroy if necessary */
-        if (initialized_) {
-            object_.~T();
-        }
+  bool operator!=( const Optional<T>& other ) const
+  {
+    return not operator==( other );
+  }
 
-        initialized_ = other.initialized_;
-        if (initialized_) {
-            new (&object_) T(std::move(other.object_));
-        }
-        return *this;
-    }
+  constexpr const T* operator->() const
+  {
+    assert( initialized() );
+    return &object_;
+  }
+  constexpr T* operator->()
+  {
+    assert( initialized() );
+    return &object_;
+  }
 
-    /* copy assignment operator */
-    const Optional& operator=(const Optional<T>& other) {
-        /* destroy if necessary */
-        if (initialized_) {
-            object_.~T();
-        }
+  constexpr const T& operator*() const
+  {
+    assert( initialized() );
+    return object_;
+  }
+  constexpr T& operator*()
+  {
+    assert( initialized() );
+    return object_;
+  }
 
-        initialized_ = other.initialized_;
-        if (initialized_) {
-            new (&object_) T(other.object_);
-        }
-        return *this;
-    }
+  /* getters */
+  bool initialized( void ) const { return initialized_; }
+  const T& get( void ) const
+  {
+    assert( initialized() );
+    return object_;
+  }
+  const T& get_or( const T& default_value ) const
+  {
+    return initialized() ? object_ : default_value;
+  }
 
-    /* equality */
-    bool operator==(const Optional<T>& other) const {
-        if (initialized_) {
-            return other.initialized_ ? (get() == other.get()) : false;
-        } else {
-            return !other.initialized_;
-        }
-    }
+  T& get( void )
+  {
+    assert( initialized() );
+    return object_;
+  }
 
-    bool operator!=(const Optional<T>& other) const {
-        return not operator==(other);
+  /* destructor */
+  ~Optional()
+  {
+    if ( initialized() ) {
+      object_.~T();
     }
+  }
 
-    constexpr const T* operator->() const {
-        assert(initialized());
-        return &object_;
+  void clear( void )
+  {
+    if ( initialized() ) {
+      object_.~T();
     }
-    constexpr T* operator->() {
-        assert(initialized());
-        return &object_;
-    }
+    initialized_ = false;
+  }
 
-    constexpr const T& operator*() const {
-        assert(initialized());
-        return object_;
+  template<typename... Targs>
+  void reset( Targs&&... Fargs )
+  {
+    if ( initialized() ) {
+      clear();
     }
-    constexpr T& operator*() {
-        assert(initialized());
-        return object_;
-    }
-
-    /* getters */
-    bool initialized(void) const { return initialized_; }
-    const T& get(void) const {
-        assert(initialized());
-        return object_;
-    }
-    const T& get_or(const T& default_value) const {
-        return initialized() ? object_ : default_value;
-    }
-
-    T& get(void) {
-        assert(initialized());
-        return object_;
-    }
-
-    /* destructor */
-    ~Optional() {
-        if (initialized()) {
-            object_.~T();
-        }
-    }
-
-    void clear(void) {
-        if (initialized()) {
-            object_.~T();
-        }
-        initialized_ = false;
-    }
-
-    template <typename... Targs>
-    void reset(Targs&&... Fargs) {
-        if (initialized()) {
-            clear();
-        }
-        initialize(Fargs...);
-    }
+    initialize( Fargs... );
+  }
 };
 
-template <class T>
-Optional<T> make_optional(bool initialized, const T& val) {
-    return Optional<T>(initialized, val);
+template<class T>
+Optional<T> make_optional( bool initialized, const T& val )
+{
+  return Optional<T>( initialized, val );
 }

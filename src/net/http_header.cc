@@ -24,7 +24,8 @@ HTTPHeader::HTTPHeader( const string_view buf )
 
   /* strip whitespace */
   size_t first_nonspace = value_temp.find_first_not_of( " " );
-  if ( first_nonspace == std::string::npos ) { /* handle case where value is only space */
+  if ( first_nonspace
+       == std::string::npos ) { /* handle case where value is only space */
     value_ = value_temp;
   } else {
     value_ = value_temp.substr( first_nonspace );

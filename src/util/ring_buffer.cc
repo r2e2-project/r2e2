@@ -35,14 +35,19 @@ MMap_Region::~MMap_Region()
 RingBuffer::RingBuffer( const size_t capacity )
   : fd_( [&] {
     if ( capacity % sysconf( _SC_PAGESIZE ) ) {
-      throw runtime_error( "RingBuffer capacity must be multiple of page size (" + to_string( sysconf( _SC_PAGESIZE ) )
-                           + ")" );
+      throw runtime_error( "RingBuffer capacity must be multiple of page size ("
+                           + to_string( sysconf( _SC_PAGESIZE ) ) + ")" );
     }
-    FileDescriptor fd { CheckSystemCall( "memfd_create", memfd_create( "RingBuffer", 0 ) ) };
+    FileDescriptor fd { CheckSystemCall( "memfd_create",
+                                         memfd_create( "RingBuffer", 0 ) ) };
     CheckSystemCall( "ftruncate", ftruncate( fd.fd_num(), capacity ) );
     return fd;
   }() )
-  , virtual_address_space_( nullptr, 2 * capacity, PROT_NONE, MAP_SHARED | MAP_ANONYMOUS, -1 )
+  , virtual_address_space_( nullptr,
+                            2 * capacity,
+                            PROT_NONE,
+                            MAP_SHARED | MAP_ANONYMOUS,
+                            -1 )
   , first_mapping_( virtual_address_space_.addr(),
                     capacity,
                     PROT_READ | PROT_WRITE,
@@ -57,12 +62,14 @@ RingBuffer::RingBuffer( const size_t capacity )
 
 std::string_view RingBuffer::writable_region() const
 {
-  return { virtual_address_space_.addr() + next_index_to_write_, capacity() - bytes_stored_ };
+  return { virtual_address_space_.addr() + next_index_to_write_,
+           capacity() - bytes_stored_ };
 }
 
 simple_string_span RingBuffer::writable_region()
 {
-  return { virtual_address_space_.addr() + next_index_to_write_, capacity() - bytes_stored_ };
+  return { virtual_address_space_.addr() + next_index_to_write_,
+           capacity() - bytes_stored_ };
 }
 
 void RingBuffer::push( const size_t num_bytes )
@@ -77,7 +84,8 @@ void RingBuffer::push( const size_t num_bytes )
 
 std::string_view RingBuffer::readable_region() const
 {
-  const size_t next_index_to_read = ( next_index_to_write_ + capacity() - bytes_stored_ ) % capacity();
+  const size_t next_index_to_read
+    = ( next_index_to_write_ + capacity() - bytes_stored_ ) % capacity();
 
   return { virtual_address_space_.addr() + next_index_to_read, bytes_stored_ };
 }

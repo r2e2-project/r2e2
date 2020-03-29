@@ -4,5 +4,5 @@
 
 #include <string>
 
-long int strict_atoi( const std::string & str, const int base = 10 );
-double strict_atof( const std::string & str );
+long int strict_atoi( const std::string& str, const int base = 10 );
+double strict_atof( const std::string& str );

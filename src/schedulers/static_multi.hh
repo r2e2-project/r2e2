@@ -5,15 +5,16 @@
 
 namespace r2t2 {
 
-class StaticMultiScheduler : public Scheduler {
-  private:
-    Allocator allocator;
+class StaticMultiScheduler : public Scheduler
+{
+private:
+  Allocator allocator;
 
-  public:
-    StaticMultiScheduler(const std::string &path);
+public:
+  StaticMultiScheduler( const std::string& path );
 
-    Optional<Schedule> schedule(const size_t maxWorkers,
-                                const std::vector<TreeletStats> &) override;
+  Optional<Schedule> schedule( const size_t maxWorkers,
+                               const std::vector<TreeletStats>& ) override;
 };
 
-}  // namespace r2t2
+} // namespace r2t2

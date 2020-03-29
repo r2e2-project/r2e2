@@ -2,14 +2,14 @@
 
 #include <unistd.h>
 
-#include "pipe.hh"
 #include "exception.hh"
+#include "pipe.hh"
 
 using namespace std;
 
 pair<FileDescriptor, FileDescriptor> make_pipe()
 {
-  int pipe_fds[ 2 ];
+  int pipe_fds[2];
   CheckSystemCall( "pipe", pipe( pipe_fds ) );
-  return { FileDescriptor { pipe_fds[ 0 ] }, FileDescriptor { pipe_fds[ 1 ] } };
+  return { FileDescriptor { pipe_fds[0] }, FileDescriptor { pipe_fds[1] } };
 }

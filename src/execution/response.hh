@@ -2,17 +2,20 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
 #include <exception>
 #include <stdexcept>
+#include <string>
 #include <sys/types.h>
+#include <vector>
 
 #include "util/optional.hh"
 
-class FetchDependenciesError : public std::exception {};
-class ExecutionError : public std::exception {};
-class UploadOutputError : public std::exception {};
+class FetchDependenciesError : public std::exception
+{};
+class ExecutionError : public std::exception
+{};
+class UploadOutputError : public std::exception
+{};
 
 class ExecutionResponse
 {
@@ -20,5 +23,5 @@ private:
   ExecutionResponse() {}
 
 public:
-  static ExecutionResponse parse_message( const std::string & message );
+  static ExecutionResponse parse_message( const std::string& message );
 };

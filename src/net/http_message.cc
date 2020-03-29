@@ -33,7 +33,8 @@ void HTTPMessage::done_with_headers()
   calculate_expected_body_size();
 }
 
-void HTTPMessage::set_expected_body_size( const bool is_known, const size_t value )
+void HTTPMessage::set_expected_body_size( const bool is_known,
+                                          const size_t value )
 {
   assert( state_ == BODY_PENDING );
 
@@ -48,7 +49,8 @@ size_t HTTPMessage::read_in_body( const string_view str )
     /* body size known in advance */
 
     assert( body_.size() <= expected_body_size() );
-    const size_t amount_to_append = min( expected_body_size() - body_.size(), str.size() );
+    const size_t amount_to_append
+      = min( expected_body_size() - body_.size(), str.size() );
 
     body_.append( str.substr( 0, amount_to_append ) );
     if ( body_.size() == expected_body_size() ) {
@@ -75,7 +77,8 @@ void HTTPMessage::eof()
       }
       break;
     case COMPLETE:
-      assert( false ); /* nobody should be calling methods on a complete message */
+      assert(
+        false ); /* nobody should be calling methods on a complete message */
       return;
   }
 }
@@ -112,16 +115,19 @@ static string_view strip_initial_whitespace( const string_view str )
   }
 }
 
-/* check if two strings are equivalent per HTTP 1.1 comparison (case-insensitive) */
+/* check if two strings are equivalent per HTTP 1.1 comparison
+ * (case-insensitive) */
 bool HTTPMessage::equivalent_strings( const string_view a, const string_view b )
 {
-  const string_view new_a = strip_initial_whitespace( a ), new_b = strip_initial_whitespace( b );
+  const string_view new_a = strip_initial_whitespace( a ),
+                    new_b = strip_initial_whitespace( b );
 
   if ( new_a.size() != new_b.size() ) {
     return false;
   }
 
-  for ( auto it_a = new_a.begin(), it_b = new_b.begin(); it_a < new_a.end(); it_a++, it_b++ ) {
+  for ( auto it_a = new_a.begin(), it_b = new_b.begin(); it_a < new_a.end();
+        it_a++, it_b++ ) {
     if ( http_to_lower( *it_a ) != http_to_lower( *it_b ) ) {
       return false;
     }
@@ -142,7 +148,8 @@ bool HTTPMessage::has_header( const string_view header_name ) const
   return false;
 }
 
-const string_view HTTPMessage::get_header_value( const string_view header_name ) const
+const string_view HTTPMessage::get_header_value(
+  const string_view header_name ) const
 {
   for ( const auto& header : headers_ ) {
     /* canonicalize header name per RFC 2616 section 2.1 */
@@ -151,7 +158,8 @@ const string_view HTTPMessage::get_header_value( const string_view header_name )
     }
   }
 
-  throw runtime_error( "HTTPMessage header not found: " + string( header_name ) );
+  throw runtime_error( "HTTPMessage header not found: "
+                       + string( header_name ) );
 }
 
 /* serialize the first line and headers */
@@ -172,7 +180,9 @@ void HTTPMessage::serialize_headers( std::string& output ) const
 }
 
 /* convenience constructor */
-HTTPMessage::HTTPMessage( string&& first_line, vector<HTTPHeader>&& headers, string&& body )
+HTTPMessage::HTTPMessage( string&& first_line,
+                          vector<HTTPHeader>&& headers,
+                          string&& body )
   : first_line_( std::move( first_line ) )
   , headers_( std::move( headers ) )
   , body_( std::move( body ) )

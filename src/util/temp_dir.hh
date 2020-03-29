@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include <vector>
 #include <string>
+#include <vector>
 
 class UniqueDirectory
 {
@@ -14,20 +14,20 @@ protected:
   bool moved_away_;
 
 public:
-  UniqueDirectory( const std::string & dirname_template );
+  UniqueDirectory( const std::string& dirname_template );
   virtual ~UniqueDirectory() {}
 
   std::string name( void ) const;
 
   /* ban copying */
-  UniqueDirectory( const UniqueDirectory & other ) = delete;
-  UniqueDirectory & operator=( const UniqueDirectory & other ) = delete;
+  UniqueDirectory( const UniqueDirectory& other ) = delete;
+  UniqueDirectory& operator=( const UniqueDirectory& other ) = delete;
 
   /* allow move constructor */
-  UniqueDirectory( UniqueDirectory && other );
+  UniqueDirectory( UniqueDirectory&& other );
 
   /* ... but not move assignment operator */
-  UniqueDirectory & operator=( UniqueDirectory && other ) = delete;
+  UniqueDirectory& operator=( UniqueDirectory&& other ) = delete;
 };
 
 /* TempDirectory is deleted when object destroyed */
@@ -37,7 +37,9 @@ public:
   using UniqueDirectory::UniqueDirectory;
 
   /* allow move constructor */
-  TempDirectory( TempDirectory && other ) : UniqueDirectory( std::move( other ) ) {}
+  TempDirectory( TempDirectory&& other )
+    : UniqueDirectory( std::move( other ) )
+  {}
 
   ~TempDirectory();
 };

@@ -4,14 +4,15 @@
 
 namespace r2t2 {
 
-class UniformScheduler : public Scheduler {
-  private:
-    bool scheduledOnce{false};
+class UniformScheduler : public Scheduler
+{
+private:
+  bool scheduledOnce { false };
 
-  public:
-    Optional<Schedule> schedule(
-        const size_t maxWorkers,
-        const std::vector<TreeletStats> &treelets) override;
+public:
+  Optional<Schedule> schedule(
+    const size_t maxWorkers,
+    const std::vector<TreeletStats>& treelets ) override;
 };
 
-}  // namespace r2t2
+} // namespace r2t2

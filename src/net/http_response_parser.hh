@@ -13,5 +13,8 @@ private:
   void initialize_new_message() override;
 
 public:
-  void new_request_arrived( const HTTPRequest& request ) { requests_are_head_.push( request.is_head() ); }
+  void new_request_arrived( const HTTPRequest& request )
+  {
+    requests_are_head_.push( request.is_head() );
+  }
 };
