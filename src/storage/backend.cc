@@ -9,7 +9,6 @@
 #include "storage/backend_gs.hh"
 #include "storage/backend_local.hh"
 #include "storage/backend_s3.hh"
-#include "util/digest.hh"
 #include "util/optional.hh"
 #include "util/uri.hh"
 

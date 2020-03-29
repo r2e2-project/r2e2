@@ -26,7 +26,6 @@
 #include "util/cpu.hh"
 #include "util/eventloop.hh"
 #include "util/histogram.hh"
-#include "util/seq_no_set.hh"
 #include "util/temp_dir.hh"
 #include "util/timerfd.hh"
 #include "util/units.hh"

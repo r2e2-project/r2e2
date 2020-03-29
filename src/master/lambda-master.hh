@@ -22,7 +22,6 @@
 #include "storage/backend.hh"
 #include "util/eventfd.hh"
 #include "util/optional.hh"
-#include "util/seq_no_set.hh"
 #include "util/signalfd.hh"
 #include "util/temp_dir.hh"
 #include "util/timerfd.hh"
