@@ -65,41 +65,41 @@ void LambdaMaster::handle_status_message()
   auto& s = aggregated_stats;
 
   // clang-format off
-    ostringstream oss;
-    oss << "\033[0m" << fixed << setprecision(2)
+  ostringstream oss;
+  oss << "\033[0m" << fixed << setprecision(2)
 
-        // finished paths
-        << BG(true) << " \u21af " << s.finishedPaths
-        << " (" << percent(s.finishedPaths, scene.total_paths) << "%) "
+      // finished paths
+      << BG(true) << " \u21af " << s.finishedPaths
+      << " (" << percent(s.finishedPaths, scene.total_paths) << "%) "
 
-        << BG() << " \u21a6 " << Worker::active_count[Worker::Role::Generator]
-                << "/" << ray_generators << " "
+      << BG() << " \u21a6 " << Worker::active_count[Worker::Role::Generator]
+              << "/" << ray_generators << " "
 
-        << BG() << " \u03bb " << Worker::active_count[Worker::Role::Tracer]
-                << "/" << max_workers << " "
+      << BG() << " \u03bb " << Worker::active_count[Worker::Role::Tracer]
+              << "/" << max_workers << " "
 
-        << BG() << " \u29d6 " << treelets_to_spawn.size() << " "
+      << BG() << " \u29d6 " << treelets_to_spawn.size() << " "
 
-        // lagging workers
-        << BG() << " \u203c " << lagging_workers << " "
+      // lagging workers
+      << BG() << " \u203c " << lagging_workers << " "
 
-        // enqueued bytes
-        << BG() << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
+      // enqueued bytes
+      << BG() << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
 
-        // assigned bytes
-        << BG() << " \u21ba " << percent(s.assigned.bytes - s.dequeued.bytes,
-                                         s.enqueued.bytes) << "% "
+      // assigned bytes
+      << BG() << " \u21ba " << percent(s.assigned.bytes - s.dequeued.bytes,
+                                        s.enqueued.bytes) << "% "
 
-        // dequeued bytes
-        << BG() << " \u2193 " << percent(s.dequeued.bytes, s.enqueued.bytes)
-                << "% "
+      // dequeued bytes
+      << BG() << " \u2193 " << percent(s.dequeued.bytes, s.enqueued.bytes)
+              << "% "
 
-        // elapsed time
-        << BG() << " " << setfill('0')
-                << setw(2) << (elapsed_seconds / 60) << ":" << setw(2)
-                << (elapsed_seconds % 60) << " "
+      // elapsed time
+      << BG() << " " << setfill('0')
+              << setw(2) << (elapsed_seconds / 60) << ":" << setw(2)
+              << (elapsed_seconds % 60) << " "
 
-        << BG();
+      << BG();
   // clang-format on
 
   StatusBar::set_text( oss.str() );
