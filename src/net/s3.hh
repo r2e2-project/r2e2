@@ -3,6 +3,7 @@
 #pragma once
 
 #include <ctime>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <string>
@@ -12,7 +13,6 @@
 #include "http_request.hh"
 #include "requests.hh"
 #include "util/optional.hh"
-#include "util/path.hh"
 
 class S3
 {
@@ -71,7 +71,7 @@ public:
 
   void download_file( const std::string& bucket,
                       const std::string& object,
-                      const roost::path& filename );
+                      const std::filesystem::path& filename );
 
   void upload_files(
     const std::string& bucket,

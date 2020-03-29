@@ -15,6 +15,7 @@
 #include "session.hh"
 #include "socket.hh"
 #include "util/exception.hh"
+#include "util/fileutils.hh"
 #include "util/simple_string_span.hh"
 #include "util/temp_file.hh"
 
@@ -134,7 +135,7 @@ HTTPRequest S3Client::create_download_request( const string& bucket,
 
 void S3Client::download_file( const string& bucket,
                               const string& object,
-                              const roost::path& filename )
+                              const filesystem::path& filename )
 {
   const string endpoint = ( config_.endpoint.length() > 0 )
                             ? config_.endpoint
@@ -160,7 +161,7 @@ void S3Client::download_file( const string& bucket,
 
   FileDescriptor file { CheckSystemCall(
     "open",
-    open( filename.string().c_str(),
+    open( filename.c_str(),
           O_RDWR | O_TRUNC | O_CREAT,
           S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH ) ) };
 

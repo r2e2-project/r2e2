@@ -86,7 +86,7 @@ private:
   ////////////////////////////////////////////////////////////////////////////
 
   const MasterConfiguration config;
-  const TempDirectory scene_dir { "/tmp/r2t2-lambda-master" };
+  const UniqueDirectory scene_dir { "/tmp/r2t2-lambda-master" };
   const std::string job_id;
 
   ////////////////////////////////////////////////////////////////////////////
