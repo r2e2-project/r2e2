@@ -230,14 +230,6 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     },
     [] { return true; } );
 
-  loop.add_rule(
-    "Queued ray bags",
-    bind( &LambdaMaster::handle_queued_ray_bags, this ),
-    [this] {
-      return initialized_workers >= this->max_workers && !free_workers.empty()
-             && ( tiles.camera_rays_remaining() || queued_ray_bags_count > 0 );
-    } );
-
   if ( config.worker_stats_write_interval > 0 ) {
     loop.add_rule( "Worker stats",
                    worker_stats_write_timer,
@@ -498,6 +490,12 @@ void LambdaMaster::run()
       }
 
       finished_https_clients.clear();
+    }
+
+    if ( initialized_workers >= max_workers + ray_generators
+         && !free_workers.empty()
+         && ( tiles.camera_rays_remaining() || queued_ray_bags_count > 0 ) ) {
+      handle_queued_ray_bags();
     }
   }
 
