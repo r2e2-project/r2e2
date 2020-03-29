@@ -150,6 +150,10 @@ void meow::Client<SessionType>::write( RingBuffer& out )
     current_request_unsent_payload_.remove_prefix(
       out.write( current_request_unsent_payload_ ) );
   } else {
+    /* cerr << "\u2192 [msg:"
+         << Message::OPCODE_NAMES[to_underlying( requests_.front().opcode() )]
+         << "] " << endl; */
+
     requests_.pop();
 
     if ( not requests_.empty() ) {
