@@ -535,6 +535,8 @@ void LambdaMaster::run()
     storage_backend->get( get_requests );
     cerr << "done." << endl;
   }
+
+  cerr << endl;
 }
 
 void LambdaMaster::handle_signal( const signalfd_siginfo& sig )
@@ -696,31 +698,30 @@ int main( int argc, char* argv[] )
     }
 
     switch ( opt ) {
-        // clang-format off
-        case 'p': listen_port = stoi(optarg); break;
-        case 'P': client_port = stoi(optarg); break;
-        case 'i': public_ip = optarg; break;
-        case 'r': region = optarg; break;
-        case 'b': storage_backend_uri = optarg; break;
-        case 'm': max_workers = stoi(optarg); break;
-        case 'G': ray_generators = stoi(optarg); break;
-        case 'a': scheduler_name = optarg; break;
-        case 'g': collect_debug_logs = true; break;
-        case 'w': worker_stats_write_interval = stoul(optarg); break;
-        case 'D': logs_directory = optarg; break;
-        case 'S': samples_per_pixel = stoi(optarg); break;
-        case 'M': max_path_depth = stoi(optarg); break;
-        case 'L': ray_log_rate = stof(optarg); break;
-        case 'B': bag_log_rate = stof(optarg); break;
-        case 't': timeout = stoul(optarg); break;
-        case 'j': job_summary_path = optarg; break;
-        case 'n': new_tile_threshold = stoull(optarg); break;
-        case 'I': PbrtOptions.directionalTreelets = true; break;
-        case 'J': max_jobs_on_engine = stoul(optarg); break;
-        case 'd': memcached_servers.emplace_back(optarg); break;
-        case 'E': engines.emplace_back(optarg, max_jobs_on_engine); break;
-        case 'h': usage(argv[0], EXIT_SUCCESS); break;
-
+      // clang-format off
+      case 'p': listen_port = stoi(optarg); break;
+      case 'P': client_port = stoi(optarg); break;
+      case 'i': public_ip = optarg; break;
+      case 'r': region = optarg; break;
+      case 'b': storage_backend_uri = optarg; break;
+      case 'm': max_workers = stoi(optarg); break;
+      case 'G': ray_generators = stoi(optarg); break;
+      case 'a': scheduler_name = optarg; break;
+      case 'g': collect_debug_logs = true; break;
+      case 'w': worker_stats_write_interval = stoul(optarg); break;
+      case 'D': logs_directory = optarg; break;
+      case 'S': samples_per_pixel = stoi(optarg); break;
+      case 'M': max_path_depth = stoi(optarg); break;
+      case 'L': ray_log_rate = stof(optarg); break;
+      case 'B': bag_log_rate = stof(optarg); break;
+      case 't': timeout = stoul(optarg); break;
+      case 'j': job_summary_path = optarg; break;
+      case 'n': new_tile_threshold = stoull(optarg); break;
+      case 'I': PbrtOptions.directionalTreelets = true; break;
+      case 'J': max_jobs_on_engine = stoul(optarg); break;
+      case 'd': memcached_servers.emplace_back(optarg); break;
+      case 'E': engines.emplace_back(optarg, max_jobs_on_engine); break;
+      case 'h': usage(argv[0], EXIT_SUCCESS); break;
         // clang-format on
 
       case 'T': {
