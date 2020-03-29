@@ -20,7 +20,7 @@
 #include <thread>
 #include <vector>
 
-#include "execution/meow/message.hh"
+#include "messages/message.hh"
 #include "messages/utils.hh"
 #include "net/lambda.hh"
 #include "net/requests.hh"

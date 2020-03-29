@@ -1,6 +1,6 @@
 #include "client.hh"
 
-#include "execution/meow/message.hh"
+#include "messages/message.hh"
 #include "http_client.hh"
 #include "session.hh"
 
