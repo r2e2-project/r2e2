@@ -18,7 +18,7 @@
 
 #include "common/lambda.hh"
 #include "common/stats.hh"
-#include "execution/meow/message.hh"
+#include "messages/message.hh"
 #include "master/lambda-master.hh"
 #include "net/address.hh"
 #include "net/s3.hh"

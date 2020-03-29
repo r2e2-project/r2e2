@@ -1,7 +1,7 @@
 #include <chrono>
 #include <typeinfo>
 
-#include "execution/meow/message.hh"
+#include "messages/message.hh"
 #include "lambda-master.hh"
 #include "messages/utils.hh"
 

@@ -34,8 +34,6 @@ add_definitions ( -D PBRT_CONSTEXPR=constexpr )
 file ( GLOB R2T2_SOURCE
     #src/benchmark/*
     src/common/*
-    src/execution/*
-    src/execution/meow/*
     src/master/*
     src/messages/*
     src/net/*
