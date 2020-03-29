@@ -22,12 +22,12 @@ protobuf::RayBagInfo to_protobuf( const RayBagInfo& info )
 {
   protobuf::RayBagInfo proto;
   proto.set_tracked( info.tracked );
-  proto.set_worker_id( info.workerId );
-  proto.set_treelet_id( info.treeletId );
-  proto.set_bag_id( info.bagId );
-  proto.set_ray_count( info.rayCount );
-  proto.set_bag_size( info.bagSize );
-  proto.set_sample_bag( info.sampleBag );
+  proto.set_worker_id( info.worker_id );
+  proto.set_treelet_id( info.treelet_id );
+  proto.set_bag_id( info.bag_id );
+  proto.set_ray_count( info.ray_count );
+  proto.set_bag_size( info.bag_size );
+  proto.set_sample_bag( info.sample_bag );
   return proto;
 }
 
