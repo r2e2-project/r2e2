@@ -1,8 +1,8 @@
 #include <chrono>
 #include <typeinfo>
 
-#include "messages/message.hh"
 #include "lambda-master.hh"
+#include "messages/message.hh"
 #include "messages/utils.hh"
 
 using namespace std;

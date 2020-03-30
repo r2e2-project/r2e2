@@ -9,54 +9,120 @@
 
 using namespace std;
 
-unsigned int EventLoop::FDRule::service_count() const
-{
-  return direction == Direction::In ? fd.read_count() : fd.write_count();
-}
-
 size_t EventLoop::add_category( const string& name )
 {
   _rule_categories.push_back( { name, {} } );
   return _rule_categories.size() - 1;
 }
 
-EventLoop::BasicRule::BasicRule( const size_t category_id,
-                                 const InterestT& interest,
-                                 const CallbackT& callback )
+EventLoop::BasicRule::BasicRule( const size_t category_id )
   : category_id( category_id )
-  , interest( interest )
-  , callback( callback )
   , cancel_requested( false )
 {}
 
-EventLoop::FDRule::FDRule( BasicRule&& base,
-                           FileDescriptor&& fd,
-                           const Direction direction,
-                           const CallbackT& cancel )
-  : BasicRule( base )
-  , fd( move( fd ) )
-  , direction( direction )
-  , cancel( cancel )
+EventLoop::Rule::Rule( const size_t category_id,
+                       const InterestT& interest,
+                       const CallbackT& callback )
+  : BasicRule( category_id )
+  , interest( interest )
+  , callback( callback )
 {}
+
+EventLoop::FDRule::FDRule( const size_t category_id,
+                           const FileDescriptor& epoll_fd,
+                           FileDescriptor&& fd,
+                           const optional<pair<InterestT, CallbackT>>& in,
+                           const optional<pair<InterestT, CallbackT>>& out,
+                           const CallbackT& cancel )
+  : BasicRule( category_id )
+  , fd( move( fd ) )
+  , in( in.value_or( make_pair( [] { return false; }, [] {} ) ) )
+  , out( out.value_or( make_pair( [] { return false; }, [] {} ) ) )
+  , cancel( cancel )
+  , current_in_interested( in )
+  , current_out_interested( out )
+  , epoll_fd_num( epoll_fd.fd_num() )
+{
+  if ( not( in or out ) ) {
+    throw runtime_error( "callback in at least one direction is required" );
+  }
+
+  CheckSystemCall(
+    "epoll_ctl",
+    ::epoll_ctl( epoll_fd_num, EPOLL_CTL_ADD, this->fd.fd_num(), *this ) );
+}
+
+EventLoop::FDRule::~FDRule()
+{
+  struct epoll_event event; // see epoll_ctl(2), BUGS
+  ::epoll_ctl( epoll_fd_num, EPOLL_CTL_DEL, fd.fd_num(), &event );
+}
 
 EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
                                            const FileDescriptor& fd,
-                                           const Direction direction,
-                                           const CallbackT& callback,
-                                           const InterestT& interest,
+                                           const CallbackT& in_callback,
+                                           const InterestT& in_interest,
+                                           const CallbackT& out_callback,
+                                           const InterestT& out_interest,
                                            const CallbackT& cancel )
 {
   if ( category_id >= _rule_categories.size() ) {
     throw out_of_range( "bad category_id" );
   }
 
-  _pending_fd_rules.emplace_back(
-    make_shared<FDRule>( BasicRule { category_id, interest, callback },
+  _fd_rules.emplace_back( make_shared<FDRule>(
+    category_id,
+    _epoll_fd,
+    fd.duplicate(),
+    make_optional( make_pair( in_interest, in_callback ) ),
+    make_optional( make_pair( out_interest, out_callback ) ),
+    cancel ) );
+
+  return _fd_rules.back();
+}
+
+EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
+                                           direction_in_t dir,
+                                           const FileDescriptor& fd,
+                                           const CallbackT& in_callback,
+                                           const InterestT& in_interest,
+                                           const CallbackT& cancel )
+{
+  if ( category_id >= _rule_categories.size() ) {
+    throw out_of_range( "bad category_id" );
+  }
+
+  _fd_rules.emplace_back(
+    make_shared<FDRule>( category_id,
+                         _epoll_fd,
                          fd.duplicate(),
-                         direction,
+                         make_optional( make_pair( in_interest, in_callback ) ),
+                         nullopt,
                          cancel ) );
 
-  return _pending_fd_rules.back();
+  return _fd_rules.back();
+}
+
+EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
+                                           direction_out_t dir,
+                                           const FileDescriptor& fd,
+                                           const CallbackT& out_callback,
+                                           const InterestT& out_interest,
+                                           const CallbackT& cancel )
+{
+  if ( category_id >= _rule_categories.size() ) {
+    throw out_of_range( "bad category_id" );
+  }
+
+  _fd_rules.emplace_back( make_shared<FDRule>(
+    category_id,
+    _epoll_fd,
+    fd.duplicate(),
+    nullopt,
+    make_optional( make_pair( out_interest, out_callback ) ),
+    cancel ) );
+
+  return _fd_rules.back();
 }
 
 EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
@@ -67,10 +133,10 @@ EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
     throw out_of_range( "bad category_id" );
   }
 
-  _pending_non_fd_rules.emplace_back(
-    make_shared<BasicRule>( category_id, interest, callback ) );
+  _non_fd_rules.emplace_back(
+    make_shared<Rule>( category_id, interest, callback ) );
 
-  return _pending_non_fd_rules.back();
+  return _non_fd_rules.back();
 }
 
 void EventLoop::RuleHandle::cancel()
@@ -83,22 +149,6 @@ void EventLoop::RuleHandle::cancel()
 
 EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 {
-  // install all the pending rules
-  for ( auto& rule : _pending_fd_rules ) {
-    if ( !rule->cancel_requested ) {
-      _fd_rules.emplace_back( move( rule ) );
-    }
-  }
-
-  for ( auto& rule : _pending_non_fd_rules ) {
-    if ( !rule->cancel_requested ) {
-      _non_fd_rules.emplace_back( move( rule ) );
-    }
-  }
-
-  _pending_fd_rules = {};
-  _pending_non_fd_rules = {};
-
   // handle the non-file-descriptor-related rules
   {
     unsigned int iterations = 0;
@@ -138,75 +188,82 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
     }
   }
 
-  // now the file-descriptor-related rules. poll any "interested" file
-  // descriptors
-  vector<pollfd> pollfds {};
-  pollfds.reserve( _fd_rules.size() );
-  bool something_to_poll = false;
+  if ( _fd_rules.empty() ) {
+    return Result::Success;
+  }
 
-  // set up the pollfd for each rule
+  bool someone_is_interested = false;
+
   for ( auto it = _fd_rules.begin(); it != _fd_rules.end(); ) {
-    // NOTE: `it` gets erased or incremented in loop body
-    auto& this_rule = **it;
+    auto& rule = **it;
 
-    if ( this_rule.cancel_requested ) {
-      this_rule.cancel();
+    if ( rule.done ) {
+      it = _fd_rules.erase( it );
+      continue;
+    } else if ( rule.cancel_requested ) {
+      rule.cancel();
       it = _fd_rules.erase( it );
       continue;
     }
 
-    if ( this_rule.direction == Direction::In && this_rule.fd.eof() ) {
-      // no more reading on this rule, it's reached eof
-      this_rule.cancel();
+    // FIXME: maybe we're not interested in reading
+    if ( rule.fd.eof() or rule.fd.closed() ) {
+      rule.cancel();
       it = _fd_rules.erase( it );
       continue;
     }
 
-    if ( this_rule.fd.closed() ) {
-      this_rule.cancel();
-      it = _fd_rules.erase( it );
-      continue;
+    const bool in_interested = rule.in.first();
+    const bool out_interested = rule.out.first();
+
+    if ( rule.current_in_interested != in_interested
+         or rule.current_out_interested != out_interested ) {
+      // needs update
+      rule.current_in_interested = in_interested;
+      rule.current_out_interested = out_interested;
+
+      CheckSystemCall(
+        "epoll_ctl",
+        epoll_ctl(
+          _epoll_fd.fd_num(), EPOLL_CTL_MOD, rule.fd.fd_num(), rule ) );
     }
 
-    if ( this_rule.interest() ) {
-      pollfds.push_back( { this_rule.fd.fd_num(),
-                           static_cast<short>( this_rule.direction ),
-                           0 } );
-      something_to_poll = true;
-    } else {
-      pollfds.push_back( { this_rule.fd.fd_num(),
-                           0,
-                           0 } ); // placeholder --- we still want errors
-    }
+    someone_is_interested = someone_is_interested || rule.current_in_interested
+                            || rule.current_out_interested;
+
     ++it;
   }
 
-  // quit if there is nothing left to poll
-  if ( not something_to_poll ) {
+  if ( not someone_is_interested ) {
     return Result::Exit;
   }
+
+  // TODO: make this a class member
+  size_t available_fd_count = 0;
 
   // call poll -- wait until one of the fds satisfies one of the rules
   // (writeable/readable)
   {
     GlobalScopeTimer<Timer::Category::WaitingForEvent> timer;
-    if ( 0
-         == CheckSystemCall(
-           "poll", ::poll( pollfds.data(), pollfds.size(), timeout_ms ) ) ) {
+
+    available_fd_count = CheckSystemCall( "epoll_wait",
+                                          ::epoll_wait( _epoll_fd.fd_num(),
+                                                        _epoll_events.data(),
+                                                        _epoll_events.size(),
+                                                        timeout_ms ) );
+
+    if ( available_fd_count == 0 ) {
       return Result::Timeout;
     }
   }
 
-  // go through the poll results
-  for ( auto [it, idx] = make_pair( _fd_rules.begin(), size_t( 0 ) );
-        it != _fd_rules.end();
-        ++idx ) {
-    const auto& this_pollfd = pollfds[idx];
-    auto& this_rule = **it;
+  for ( size_t i = 0; i < available_fd_count; i++ ) {
+    auto& this_epoll_event = _epoll_events[i];
+    auto& this_rule = *reinterpret_cast<FDRule*>( this_epoll_event.data.ptr );
+    const uint32_t this_events = this_epoll_event.events;
 
-    const auto poll_error
-      = static_cast<bool>( this_pollfd.revents & ( POLLERR | POLLNVAL ) );
-    if ( poll_error ) {
+    // check if we have an error
+    if ( this_events & EPOLLERR ) {
       /* see if fd is a socket */
       int socket_error = 0;
       socklen_t optlen = sizeof( socket_error );
@@ -228,44 +285,48 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
                           socket_error );
       }
 
+      this_rule.done = true;
       this_rule.cancel();
-      it = _fd_rules.erase( it );
       continue;
     }
 
-    const auto poll_ready
-      = static_cast<bool>( this_pollfd.revents & this_pollfd.events );
-    const auto poll_hup = static_cast<bool>( this_pollfd.revents & POLLHUP );
-    if ( poll_hup && this_pollfd.events && !poll_ready ) {
-      // if we asked for the status, and the _only_ condition was a hangup, this
-      // FD is defunct:
-      //   - if it was POLLIN and nothing is readable, no more will ever be
-      //   readable
-      //   - if it was POLLOUT, it will not be writable again
-      this_rule.cancel();
-      it = _fd_rules.erase( it );
-      continue;
-    }
-
-    if ( poll_ready ) {
+    if ( this_rule.current_in_interested && ( this_events & EPOLLIN ) ) {
       RecordScopeTimer<Timer::Category::Nonblock> record_timer {
         _rule_categories.at( this_rule.category_id ).timer
       };
-      // we only want to call callback if revents includes the event we asked
-      // for
-      const auto count_before = this_rule.service_count();
-      this_rule.callback();
 
-      if ( count_before == this_rule.service_count()
-           and ( not this_rule.fd.closed() ) and this_rule.interest() ) {
-        throw runtime_error(
-          "EventLoop: busy wait detected: rule \""
-          + _rule_categories.at( this_rule.category_id ).name
-          + "\" did not read/write fd and is still interested" );
+      const auto count_before = this_rule.fd.read_count();
+      this_rule.in.second(); // call the read callback
+
+      if ( count_before == this_rule.fd.read_count()
+           and ( not this_rule.fd.closed() ) and this_rule.in.first() ) {
+        throw runtime_error( "EventLoop: busy wait detected: rule \""
+                             + _rule_categories.at( this_rule.category_id ).name
+                             + "\" did not read fd and is still interested" );
       }
     }
 
-    ++it; // if we got here, it means we didn't call _fd_rules.erase()
+    if ( this_rule.current_out_interested && ( this_events & EPOLLOUT ) ) {
+      RecordScopeTimer<Timer::Category::Nonblock> record_timer {
+        _rule_categories.at( this_rule.category_id ).timer
+      };
+
+      const auto count_before = this_rule.fd.write_count();
+      this_rule.out.second(); // call the read callback
+
+      if ( count_before == this_rule.fd.write_count()
+           and ( not this_rule.fd.closed() ) and this_rule.out.first() ) {
+        throw runtime_error( "EventLoop: busy wait detected: rule \""
+                             + _rule_categories.at( this_rule.category_id ).name
+                             + "\" did not write fd and is still interested" );
+      }
+    }
+
+    if ( this_events & EPOLLHUP ) {
+      this_rule.done = true;
+      this_rule.cancel();
+      continue;
+    }
   }
 
   return Result::Success;

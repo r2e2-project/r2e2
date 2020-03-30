@@ -1,7 +1,7 @@
 #include <pbrt/core/geometry.h>
 
-#include "messages/message.hh"
 #include "lambda-master.hh"
+#include "messages/message.hh"
 #include "messages/utils.hh"
 
 using namespace std;

@@ -9,17 +9,17 @@
 #include <fstream>
 #include <future>
 #include <iostream>
+#include <optional>
 #include <queue>
 #include <random>
 #include <string>
 #include <thread>
 #include <tuple>
-#include <optional>
 
 #include "common/lambda.hh"
 #include "common/stats.hh"
-#include "messages/message.hh"
 #include "master/lambda-master.hh"
+#include "messages/message.hh"
 #include "net/address.hh"
 #include "net/s3.hh"
 #include "net/transfer.hh"

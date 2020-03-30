@@ -5,8 +5,8 @@
 #include <numeric>
 #include <random>
 
-#include "messages/message.hh"
 #include "lambda-master.hh"
+#include "messages/message.hh"
 #include "messages/utils.hh"
 #include "net/http_client.hh"
 #include "net/lambda.hh"

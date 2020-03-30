@@ -1,7 +1,7 @@
 #include "client.hh"
 
-#include "messages/message.hh"
 #include "http_client.hh"
+#include "messages/message.hh"
 #include "session.hh"
 
 using namespace std;
@@ -33,19 +33,13 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
   }
 
   installed_rules_.push_back( loop.add_rule(
-    rule_categories.session_read,
+    rule_categories.session,
     session_.socket(),
-    Direction::In,
     [&] { session_.do_read(); },
     [&] { return session_.want_read(); },
-    close_callback ) );
-
-  installed_rules_.push_back( loop.add_rule(
-    rule_categories.session_write,
-    session_.socket(),
-    Direction::Out,
     [&] { session_.do_write(); },
-    [&] { return session_.want_write(); } ) );
+    [&] { return session_.want_write(); },
+    close_callback ) );
 
   installed_rules_.push_back( loop.add_rule(
     rule_categories.endpoint_write,
