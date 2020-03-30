@@ -11,7 +11,7 @@ using namespace meow;
 
 using OpCode = Message::OpCode;
 
-constexpr bool COMPRESS_RAY_BAGS = false;
+constexpr bool COMPRESS_RAY_BAGS = true;
 
 void LambdaWorker::handle_out_queue()
 {
