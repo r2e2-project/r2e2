@@ -25,7 +25,6 @@ Our version of R2T2 is dependent on the following libraries (listed by their
 apt package name):
 
 * `libprotobuf-dev`
-* `libcrypto++-dev`
 * `libssl-dev`
 * `libunwind-dev`
 * `liblzma-dev`

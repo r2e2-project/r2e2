@@ -69,7 +69,6 @@ set ( ALL_R2T2_LIBS
     ${ZLIB_LIBRARY}
     ${Protobuf_LIBRARIES}
     ${OPENSSL_LIBRARIES}
-    cryptopp
 )
 
 add_executable ( r2t2-lambda-master src/master/lambda-master.cc )
