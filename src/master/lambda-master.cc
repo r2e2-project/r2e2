@@ -279,6 +279,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
       auto connection_close_handler = [this, worker_id] {
         auto& worker = workers[worker_id];
+        worker.client.uninstall_rules();
 
         if ( worker.state == Worker::State::Terminating ) {
           if ( worker.role == Worker::Role::Generator ) {
