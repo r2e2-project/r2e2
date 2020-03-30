@@ -61,7 +61,8 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
   }
 
   if ( track_bags ) {
-    TLOG( BAG ) << "timestamp,bag,workerId,count,size,action";
+    TLOG( BAG ) << "timestamp,bagTreeletId,bagWorkerId,bagId,thisWorkerId,"
+                   "count,size,action";
   }
 
   pbrt::PbrtOptions.nThreads = 1;
