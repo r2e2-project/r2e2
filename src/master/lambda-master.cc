@@ -84,13 +84,11 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   , storage_backend( StorageBackend::create_backend( storage_backend_uri ) )
   , aws_region( aws_region )
   , aws_address( LambdaInvocationRequest::endpoint( aws_region ), "https" )
-  , worker_rule_categories( { loop.add_category( "Worker read" ),
-                              loop.add_category( "Worker write" ),
+  , worker_rule_categories( { loop.add_category( "Socket" ),
                               loop.add_category( "Message read" ),
                               loop.add_category( "Message write" ),
                               loop.add_category( "Process message" ) } )
-  , https_rule_categories( { loop.add_category( "HTTPS read" ),
-                             loop.add_category( "HTTPS write" ),
+  , https_rule_categories( { loop.add_category( "HTTPS" ),
                              loop.add_category( "HTTPResponse read" ),
                              loop.add_category( "HTTPRequest write" ),
                              loop.add_category( "Process HTTPResponse" ) } )
@@ -203,29 +201,29 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   loop.add_rule(
     "Signals",
-    signal_fd,
     Direction::In,
+    signal_fd,
     [&] { handle_signal( signal_fd.read_signal() ); },
     [] { return true; } );
 
   loop.add_rule(
     "Terminate",
-    terminate_eventfd,
     Direction::In,
+    terminate_eventfd,
     [&] { terminate_eventfd.read_event(); },
     [] { return true; } );
 
   loop.add_rule(
     "Reschedule",
-    reschedule_timer,
     Direction::In,
+    reschedule_timer,
     bind( &LambdaMaster::handle_reschedule, this ),
     [this] { return finished_ray_generators == this->ray_generators; } );
 
   loop.add_rule(
     "Job exit",
-    job_exit_timer,
     Direction::In,
+    job_exit_timer,
     [&] {
       job_exit_timer.read_event();
       terminate();
@@ -234,15 +232,15 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   if ( config.worker_stats_write_interval > 0 ) {
     loop.add_rule( "Worker stats",
-                   worker_stats_write_timer,
                    Direction::In,
+                   worker_stats_write_timer,
                    bind( &LambdaMaster::handle_worker_stats, this ),
                    [this] { return true; } );
   }
 
   loop.add_rule( "Worker invocation",
-                 worker_invocation_timer,
                  Direction::In,
+                 worker_invocation_timer,
                  bind( &LambdaMaster::handle_worker_invocation, this ),
                  [this] {
                    return !treelets_to_spawn.empty()
@@ -251,8 +249,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                  } );
 
   loop.add_rule( "Status",
-                 status_print_timer,
                  Direction::In,
+                 status_print_timer,
                  bind( &LambdaMaster::handle_status_message, this ),
                  [this]() { return true; } );
 
@@ -263,8 +261,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   loop.add_rule(
     "Listener",
-    listener_socket,
     Direction::In,
+    listener_socket,
     [this, max_workers] {
       TCPSocket socket = listener_socket.accept();
 
@@ -452,8 +450,8 @@ void LambdaMaster::run()
 
     memcached_loop.add_rule(
       "eventfd",
-      agent->eventfd(),
       Direction::In,
+      agent->eventfd(),
       [&] {
         if ( !agent->eventfd().read_event() )
           return;

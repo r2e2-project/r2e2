@@ -30,8 +30,7 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
   }() )
   , working_directory( "/tmp/r2t2-worker" )
   , storage_backend( StorageBackend::create_backend( storage_uri ) )
-  , worker_rule_categories( { loop.add_category( "Worker read" ),
-                              loop.add_category( "Worker write" ),
+  , worker_rule_categories( { loop.add_category( "Socket" ),
                               loop.add_category( "Message read" ),
                               loop.add_category( "Message write" ),
                               loop.add_category( "Process message" ) } )
@@ -80,13 +79,13 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                  bind( &LambdaWorker::handle_out_queue, this ),
                  [this] { return out_queue_size > 0; } );
 
-  loop.add_rule( "Sample", bind( &LambdaWorker::handle_samples, this ), [this] {
-    return !samples.empty();
-  } );
+  loop.add_rule( "Samples",
+                 bind( &LambdaWorker::handle_samples, this ),
+                 [this] { return !samples.empty(); } );
 
   loop.add_rule( "Open bags",
-                 seal_bags_timer,
                  Direction::In,
+                 seal_bags_timer,
                  bind( &LambdaWorker::handle_open_bags, this ),
                  [this] { return !open_bags.empty(); } );
 
@@ -95,8 +94,8 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                  [this] { return !sealed_bags.empty(); } );
 
   loop.add_rule( "Sample bags",
-                 sample_bags_timer,
                  Direction::In,
+                 sample_bags_timer,
                  bind( &LambdaWorker::handle_sample_bags, this ),
                  [this] { return !sample_bags.empty(); } );
 
@@ -105,20 +104,20 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                  [this] { return !receive_queue.empty(); } );
 
   loop.add_rule( "Transfer agent",
-                 transfer_agent->eventfd(),
                  Direction::In,
+                 transfer_agent->eventfd(),
                  bind( &LambdaWorker::handle_transfer_results, this, false ),
                  [this] { return !pending_ray_bags.empty(); } );
 
   loop.add_rule( "Samples agent",
-                 samples_transfer_agent->eventfd(),
                  Direction::In,
+                 samples_transfer_agent->eventfd(),
                  bind( &LambdaWorker::handle_transfer_results, this, true ),
                  [this] { return !pending_ray_bags.empty(); } );
 
   loop.add_rule( "Worker stats",
-                 worker_stats_timer,
                  Direction::In,
+                 worker_stats_timer,
                  bind( &LambdaWorker::handle_worker_stats, this ),
                  [this] { return true; } );
 

@@ -9,8 +9,7 @@ class Client
 public:
   struct RuleCategories
   {
-    size_t session_read;
-    size_t session_write;
+    size_t session;
     size_t endpoint_read;
     size_t endpoint_write;
     size_t response;

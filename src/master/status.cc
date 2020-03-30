@@ -29,8 +29,8 @@ void LambdaMaster::handle_status_message()
 
     loop.add_rule(
       "terminate job",
-      job_timeout_timer,
       Direction::In,
+      job_timeout_timer,
       [this] {
         job_timeout_timer.read_event();
         terminate();

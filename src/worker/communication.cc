@@ -114,7 +114,8 @@ void LambdaWorker::handle_samples()
   while ( !samples.empty() ) {
     auto& sample = samples.front();
 
-    if ( out.back().info.bag_size + sample.MaxCompressedSize() > MAX_BAG_SIZE ) {
+    if ( out.back().info.bag_size + sample.MaxCompressedSize()
+         > MAX_BAG_SIZE ) {
       out.emplace( *worker_id, 0, current_sample_bag_id++, true, MAX_BAG_SIZE );
     }
 
