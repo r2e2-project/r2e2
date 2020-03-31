@@ -167,6 +167,9 @@ private:
     WorkerStats stats {};
     WorkerStats last_stats;
 
+    protobuf::RayBags to_be_assigned {};
+    bool marked_free { false };
+
     std::string to_string() const;
 
     static std::map<Role, size_t> active_count;
@@ -241,7 +244,7 @@ private:
 
   /*** Ray Bags *************************************************************/
 
-  bool assign_work( Worker& worker );
+  std::pair<bool, bool> assign_work( Worker& worker );
 
   void handle_queued_ray_bags();
 
