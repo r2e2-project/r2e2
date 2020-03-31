@@ -1,4 +1,4 @@
-#include "lambda-worker.hh"
+#include "worker/lambda-worker.hh"
 
 #include <filesystem>
 #include <getopt.h>

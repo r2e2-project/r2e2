@@ -1,4 +1,4 @@
-#include "lambda-master.hh"
+#include "master/lambda-master.hh"
 
 #include <getopt.h>
 #include <glog/logging.h>

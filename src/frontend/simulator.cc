@@ -1,4 +1,4 @@
-#include "simulator.hh"
+#include "simulator/simulator.hh"
 
 using namespace std;
 using namespace pbrt;

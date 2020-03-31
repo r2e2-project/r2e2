@@ -42,7 +42,6 @@ file ( GLOB R2T2_SOURCE
     #src/server/*
     src/simulator/*
     src/storage/*
-    src/tools/*
     src/util/*
     src/worker/*
 )
@@ -71,7 +70,7 @@ set ( ALL_R2T2_LIBS
     ${OPENSSL_LIBRARIES}
 )
 
-add_executable ( r2t2-lambda-master src/master/lambda-master.cc )
+add_executable ( r2t2-lambda-master src/frontend/lambda-master.cc )
 target_link_libraries( r2t2-lambda-master ${ALL_R2T2_LIBS} )
 
 set ( WORKER_LINK_FLAGS dl z unwind lzma -static -Wl,-allow-multiple-definition
@@ -82,11 +81,11 @@ if ( CMAKE_BUILD_TYPE MATCHES Debug )
   set( WORKER_LINK_FLAGS "" )
 endif()
 
-add_executable ( r2t2-lambda-worker src/worker/lambda-worker.cc )
+add_executable ( r2t2-lambda-worker src/frontend/lambda-worker.cc )
 target_link_libraries( r2t2-lambda-worker ${ALL_R2T2_LIBS} ${WORKER_LINK_FLAGS} )
 
-add_executable ( r2t2-lambda-aggregate src/tools/lambda-aggregate.cc )
+add_executable ( r2t2-lambda-aggregate src/frontend/lambda-aggregate.cc )
 target_link_libraries( r2t2-lambda-aggregate ${ALL_R2T2_LIBS} )
 
-add_executable ( r2t2-simulator src/simulator/simulator.cc )
+add_executable ( r2t2-simulator src/frontend/simulator.cc )
 target_link_libraries( r2t2-simulator ${ALL_R2T2_LIBS} )
