@@ -67,11 +67,20 @@ bool LambdaMaster::assign_work( Worker& worker )
 
 void LambdaMaster::handle_queued_ray_bags()
 {
-  // shuffle(freeWorkers.begin(), freeWorkers.end(), randEngine);
+  shuffle( free_workers.begin(), free_workers.end(), rand_engine );
 
-  for ( Worker& worker : workers ) {
-    assign_work( worker );
+  vector<WorkerId> new_free_workers;
+  new_free_workers.reserve( free_workers.size() );
+
+  for ( const WorkerId worker_id : free_workers ) {
+    auto& worker = workers[worker_id];
+
+    if ( assign_work( worker ) ) {
+      new_free_workers.push_back( worker_id );
+    }
   }
+
+  swap( free_workers, new_free_workers );
 }
 
 template<class T, class C>

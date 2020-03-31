@@ -179,7 +179,7 @@ private:
   uint32_t finished_ray_generators { 0 };
   uint32_t initialized_workers { 0 };
 
-  std::deque<WorkerId> free_workers {};
+  std::vector<WorkerId> free_workers {};
 
   ////////////////////////////////////////////////////////////////////////////
   // Treelets                                                               //
