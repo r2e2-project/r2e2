@@ -2,7 +2,7 @@ if (NOT CLANG_FORMAT)
     if (DEFINED ENV{CLANG_FORMAT})
         set (CLANG_FORMAT_TMP $ENV{CLANG_FORMAT})
     else (NOT DEFINED ENV{CLANG_FORMAT})
-        set (CLANG_FORMAT_TMP clang-format-9)
+        set (CLANG_FORMAT_TMP clang-format)
     endif (DEFINED ENV{CLANG_FORMAT})
 
     # figure out which version of clang-format we're using
