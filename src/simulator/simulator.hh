@@ -10,27 +10,28 @@
 #include <unordered_map>
 #include <vector>
 
-#include "cloud/bvh.hh"
-#include "cloud/manager.hh"
-#include "cloud/r2t2.hh"
-#include "cloud/raystate.hh"
-#include "core/camera.hh"
-#include "core/geometry.hh"
-#include "core/transform.hh"
 #include "messages/serialization.hh"
 #include "messages/utils.hh"
 #include "schedulers/static_multi.hh"
 #include "util/exception.hh"
 
+#include <pbrt/accelerators/cloudbvh.h>
+#include <pbrt/core/geometry.h>
+#define PBRT_THREAD_LOCAL thread_local
+#include <camera.h>
+#include <pbrt/main.h>
+#include <pbrt/raystate.h>
+#include <scene.h>
+
 namespace r2t2 {
 
 struct RayData
 {
-  RayStatePtr ray;
+  pbrt::RayStatePtr ray;
   uint64_t srcTreelet;
   uint64_t dstTreelet;
 
-  RayData( RayStatePtr&& r, uint64_t src, uint64_t dst )
+  RayData( pbrt::RayStatePtr&& r, uint64_t src, uint64_t dst )
     : ray( move( r ) )
     , srcTreelet( src )
     , dstTreelet( dst )
@@ -80,7 +81,8 @@ struct Worker
 class Simulator
 {
 public:
-  Simulator( uint64_t numWorkers_,
+  Simulator( const std::string& scenePath,
+             uint64_t numWorkers_,
              uint64_t workerBandwidth_,
              uint64_t workerLatency_,
              uint64_t msPerRebalance_,
@@ -97,15 +99,17 @@ private:
 
   bool shouldGenNewRays( const Worker& worker );
 
-  Bounds2i nextCameraTile();
+  pbrt::Bounds2i nextCameraTile();
 
   uint64_t getRandomWorker( uint32_t treelet );
 
-  uint64_t getNetworkLen( const RayStatePtr& ray );
+  uint64_t getNetworkLen( const pbrt::RayStatePtr& ray );
 
   void sendCurPacket( Worker& worker, uint64_t dstID );
 
-  void enqueueRay( Worker& worker, RayStatePtr&& ray, uint32_t srcTreelet );
+  void enqueueRay( Worker& worker,
+                   pbrt::RayStatePtr&& ray,
+                   uint32_t srcTreelet );
 
   void generateRays( Worker& worker );
 
@@ -121,6 +125,8 @@ private:
   void processRays( Worker& worker );
 
   void sendPartialPackets();
+
+  pbrt::scene::Base scene;
 
   uint64_t numWorkers;
   uint64_t workerBandwidth;
@@ -140,27 +146,21 @@ private:
     std::unordered_map<uint64_t, std::deque<uint64_t>::iterator>>
     treeletToWorkerLocs;
 
-  std::vector<std::unique_ptr<Transform>> transformCache;
-  std::shared_ptr<GlobalSampler> sampler;
-  std::shared_ptr<Camera> camera;
-  std::vector<std::shared_ptr<Light>> lights;
-  Scene fakeScene;
-
-  Bounds2i sampleBounds;
-  const Vector2i sampleExtent;
+  pbrt::Bounds2i sampleBounds;
+  const pbrt::Vector2i sampleExtent;
   int tileSize;
 
-  std::vector<std::unique_ptr<CloudBVH>> treelets;
+  std::vector<std::unique_ptr<pbrt::CloudBVH>> treelets;
 
   std::list<Packet> inTransit;
 
   uint64_t curCameraTile { 0 };
-  Point2i nCameraTiles;
+  pbrt::Point2i nCameraTiles;
   const uint64_t maxRays = 1'000'000;
 
   uint64_t curMS = 0;
 
-  char rayBuffer[sizeof( RayState )];
+  char rayBuffer[sizeof( pbrt::RayState )];
 
   std::random_device rd {};
   std::mt19937 randgen { rd() };

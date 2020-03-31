@@ -40,7 +40,7 @@ file ( GLOB R2T2_SOURCE
     src/remote/*
     src/schedulers/*
     #src/server/*
-    #src/simulator/*
+    src/simulator/*
     src/storage/*
     src/tools/*
     src/util/*
@@ -87,3 +87,6 @@ target_link_libraries( r2t2-lambda-worker ${ALL_R2T2_LIBS} ${WORKER_LINK_FLAGS} 
 
 add_executable ( r2t2-lambda-aggregate src/tools/lambda-aggregate.cc )
 target_link_libraries( r2t2-lambda-aggregate ${ALL_R2T2_LIBS} )
+
+add_executable ( r2t2-simulator src/simulator/simulator.cc )
+target_link_libraries( r2t2-simulator ${ALL_R2T2_LIBS} )

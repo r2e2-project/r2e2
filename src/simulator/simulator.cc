@@ -1,6 +1,7 @@
 #include "simulator.hh"
 
 using namespace std;
+using namespace pbrt;
 
 void usage( const char* argv0 )
 {
@@ -36,45 +37,8 @@ unordered_map<uint64_t, unordered_set<uint32_t>> loadInitMapping(
   return workerToTreelets;
 }
 
-vector<shared_ptr<Light>> loadLights()
-{
-  vector<shared_ptr<Light>> lights;
-  auto reader = global::manager.GetReader( ObjectType::Lights );
-
-  while ( !reader->eof() ) {
-    protobuf::Light proto_light;
-    reader->read( &proto_light );
-    lights.push_back( move( light::from_protobuf( proto_light ) ) );
-  }
-
-  return lights;
-}
-
-shared_ptr<Camera> loadCamera( vector<unique_ptr<Transform>>& transformCache )
-{
-  auto reader = global::manager.GetReader( ObjectType::Camera );
-  protobuf::Camera proto_camera;
-  reader->read( &proto_camera );
-  return camera::from_protobuf( proto_camera, transformCache );
-}
-
-shared_ptr<GlobalSampler> loadSampler()
-{
-  auto reader = global::manager.GetReader( ObjectType::Sampler );
-  protobuf::Sampler proto_sampler;
-  reader->read( &proto_sampler );
-  return sampler::from_protobuf( proto_sampler );
-}
-
-Scene loadFakeScene()
-{
-  auto reader = global::manager.GetReader( ObjectType::Scene );
-  protobuf::Scene proto_scene;
-  reader->read( &proto_scene );
-  return from_protobuf( proto_scene );
-}
-
-Simulator::Simulator( uint64_t numWorkers_,
+Simulator::Simulator( const string& scene_path,
+                      uint64_t numWorkers_,
                       uint64_t workerBandwidth_,
                       uint64_t workerLatency_,
                       uint64_t msPerRebalance_,
@@ -82,22 +46,18 @@ Simulator::Simulator( uint64_t numWorkers_,
                       uint64_t pathDepth_,
                       const string& initAllocPath,
                       const string& statsPath )
-  : numWorkers( numWorkers_ )
+  : scene( scene_path, 0 )
+  , numWorkers( numWorkers_ )
   , workerBandwidth( workerBandwidth_ )
   , workerLatency( workerLatency_ )
   , msPerRebalance( msPerRebalance_ )
   , samplesPerPixel( samplesPerPixel_ )
   , pathDepth( pathDepth_ )
-  , numTreelets( global::manager.treeletCount() )
+  , numTreelets( scene.GetTreeletCount() )
   , workers( numWorkers )
   , workerToTreelets(
       loadInitMapping( initAllocPath, numWorkers, numTreelets ) )
-  , transformCache()
-  , sampler( loadSampler() )
-  , camera( loadCamera( transformCache ) )
-  , lights( loadLights() )
-  , fakeScene( loadFakeScene() )
-  , sampleBounds( camera->film->GetSampleBounds() )
+  , sampleBounds( scene.camera->film->GetSampleBounds() )
   , sampleExtent( sampleBounds.Diagonal() )
   , maxPacketDelay( workerLatency )
   , statsCSV( statsPath )
@@ -122,10 +82,6 @@ Simulator::Simulator( uint64_t numWorkers_,
   for ( uint64_t id = 0; id < numWorkers; id++ ) {
     workers[id].id = id;
     workers[id].nextPackets.resize( numWorkers );
-  }
-
-  for ( auto& light : lights ) {
-    light->Preprocess( fakeScene );
   }
 
   treelets.resize( numTreelets );
@@ -333,7 +289,7 @@ void Simulator::generateRays( Worker& worker )
         continue;
 
       RayStatePtr ray = graphics::GenerateCameraRay(
-        camera, pixel, sample, pathDepth, sampleExtent, sampler );
+        scene.camera, pixel, sample, pathDepth, sampleExtent, scene.sampler );
 
       enqueueRay( worker, move( ray ), -1 );
 
@@ -528,9 +484,9 @@ void Simulator::processRays( Worker& worker )
         tie( bounceRay, shadowRay )
           = graphics::ShadeRay( move( rayPtr ),
                                 *treelets[rayTreeletId],
-                                lights,
+                                scene.lights,
                                 sampleExtent,
-                                sampler,
+                                scene.sampler,
                                 pathDepth,
                                 arena );
 
@@ -582,9 +538,8 @@ int main( int argc, char const* argv[] )
   uint64_t samplesPerPixel = stoul( argv[6] );
   uint64_t maxDepth = stoul( argv[7] );
 
-  global::manager.init( argv[1] );
-
-  Simulator simulator( numWorkers,
+  Simulator simulator( argv[1],
+                       numWorkers,
                        workerBandwidth,
                        workerLatency,
                        msPerRebalance,
