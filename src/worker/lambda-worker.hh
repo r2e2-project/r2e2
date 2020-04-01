@@ -116,7 +116,7 @@ private:
 
   void generate_rays( const pbrt::Bounds2i& crop_window );
 
-  std::map<TreeletId, std::unique_ptr<pbrt::CloudBVH>> treelets {};
+  std::map<TreeletId, std::shared_ptr<pbrt::CloudBVH>> treelets {};
   std::map<TreeletId, std::queue<pbrt::RayStatePtr>> trace_queue {};
   std::map<TreeletId, std::queue<pbrt::RayStatePtr>> out_queue {};
   std::queue<pbrt::Sample> samples {};

@@ -140,10 +140,6 @@ void LambdaWorker::get_objects( const protobuf::GetObjects& objects )
       continue;
     }
 
-    if ( id.type == ObjectType::Treelet ) {
-      treelets.emplace( id.id, make_unique<CloudBVH>( id.id ) );
-    }
-
     const string file_path = scene::GetObjectName( id.type, id.id );
     requests.emplace_back( file_path, file_path );
   }
