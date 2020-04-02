@@ -183,11 +183,14 @@ def pseudo_eng(divisor, suffix):
 def combined_progress_rate(df, out):
     maxtime = df['timestampS'].max()
     data = df.groupby(['timestampS']).sum()
+    data['runningCompletion'] = data.pathsFinished.cumsum();
+    finish_point = data.runningCompletion.idxmax()
+    data = data.loc[data.index <= finish_point]
+
     enqueued_per_sec = data.raysEnqueued
     dequeued_per_sec = data.raysDequeued
     total_paths = data.pathsFinished.sum()
-    running_completion = data.pathsFinished.cumsum();
-    percent_complete = running_completion / total_paths * 100
+    percent_complete = data.runningCompletion / total_paths * 100
 
     fig, (ax, cax) = plt.subplots(nrows=2, sharex=True, gridspec_kw={'hspace': 0, 'wspace': 0})
     ax.grid(b=True, linewidth=0.5, color='#F6F6F6')
