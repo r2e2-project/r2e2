@@ -76,8 +76,8 @@ void LambdaWorker::log_ray( const RayAction action,
   oss << duration_cast<milliseconds>( system_clock::now().time_since_epoch() )
            .count()
       << ',' << state.sample.id << ',' << state.hop << ',' << state.isShadowRay
-      << ',' << state.remainingBounces << ',' << *worker_id << ','
-      << state.CurrentTreelet() << ',';
+      << ',' << static_cast<int>( state.remainingBounces ) << ',' << *worker_id
+      << ',' << state.CurrentTreelet() << ',';
 
   // clang-format off
     switch(action) {
