@@ -36,20 +36,36 @@ message GenerateRays {
 
 // Job Summary
 
+message Point2 {
+    int32 x = 1;
+    int32 y = 2;
+}
+
 message JobSummary {
-    double total_time = 1;
-    double generation_time = 2;
-    double tracing_time = 3;
-    uint32 num_lambdas = 4;
-    uint64 total_paths = 5;
-    uint64 finished_paths = 6;
-    uint64 finished_rays = 7;
-    uint64 num_enqueues = 8;
-    double ray_throughput = 9;
-    uint64 total_upload = 10;
-    uint64 total_download = 11;
-    uint64 total_samples = 12;
-    double estimated_cost = 13;
+    // Job Info
+    string job_id = 1;
+    uint32 num_lambdas = 2;
+    uint32 num_generators = 3;
+    uint32 treelet_count = 4;
+    Point2 output_size = 5;
+    uint32 spp = 6;
+    Point2 tile_size = 7;
+    uint32 max_depth = 8;
+    uint32 memcached_servers = 9;
+    string storage_backend = 10;
+
+    double total_time = 12;
+    double generation_time = 13;
+    double tracing_time = 14;
+    uint64 total_paths = 16;
+    uint64 finished_paths = 17;
+    uint64 finished_rays = 18;
+    uint64 num_enqueues = 19;
+    double ray_throughput = 20;
+    uint64 total_upload = 21;
+    uint64 total_download = 22;
+    uint64 total_samples = 23;
+    double estimated_cost = 24;
 }
 
 // Ray Bags

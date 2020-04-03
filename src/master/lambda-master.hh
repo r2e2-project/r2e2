@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -45,7 +46,8 @@ struct MasterConfiguration
   uint64_t worker_stats_write_interval;
   float ray_log_rate;
   float bag_log_rate;
-  std::string logs_directory;
+  bool auto_log_directory_name;
+  std::filesystem::path logs_directory;
   std::optional<pbrt::Bounds2i> crop_window;
   int tile_size;
   std::chrono::seconds timeout;
@@ -75,7 +77,7 @@ public:
 
   protobuf::JobSummary get_job_summary() const;
   void print_job_summary() const;
-  void dump_job_summary() const;
+  void dump_job_summary( const std::string& path ) const;
 
 private:
   using steady_clock = std::chrono::steady_clock;
@@ -84,7 +86,7 @@ private:
   // Job Information                                                        //
   ////////////////////////////////////////////////////////////////////////////
 
-  const MasterConfiguration config;
+  MasterConfiguration config;
   const UniqueDirectory scene_dir { "/tmp/r2t2-lambda-master" };
   const std::string job_id;
 

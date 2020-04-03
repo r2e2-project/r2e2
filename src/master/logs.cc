@@ -174,10 +174,22 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
   const double estimatedCost
     = LAMBDA_UNIT_COST * max_workers * ceil( total_time );
 
+  proto.set_job_id( job_id );
+  proto.set_num_lambdas( max_workers );
+  proto.set_num_generators( ray_generators );
+  proto.set_treelet_count( scene.base.GetTreeletCount() );
+  proto.mutable_output_size()->set_x( scene.sample_extent.x );
+  proto.mutable_output_size()->set_y( scene.sample_extent.y );
+  proto.set_spp( scene.base.samplesPerPixel );
+  proto.mutable_tile_size()->set_x( tiles.tile_size );
+  proto.mutable_tile_size()->set_y( tiles.tile_size );
+  proto.set_max_depth( config.max_path_depth );
+  proto.set_memcached_servers( config.memcached_servers.size() );
+  proto.set_storage_backend( storage_backend_uri );
+
   proto.set_total_time( total_time );
   proto.set_generation_time( generation_time );
   proto.set_tracing_time( ray_time );
-  proto.set_num_lambdas( max_workers );
   proto.set_total_paths( scene.total_paths );
   proto.set_finished_paths( aggregated_stats.finishedPaths );
   proto.set_finished_rays( aggregated_stats.samples.rays );
@@ -191,10 +203,10 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
   return proto;
 }
 
-void LambdaMaster::dump_job_summary() const
+void LambdaMaster::dump_job_summary( const string& path ) const
 {
   protobuf::JobSummary proto = get_job_summary();
-  ofstream fout { config.job_summary_path };
+  ofstream fout { path };
   fout << protoutil::to_json( proto ) << endl;
 }
 

@@ -33,6 +33,7 @@ void LambdaWorker::generate_rays( const Bounds2i& bounds )
       if ( treelets.count( next_treelet ) ) {
         trace_queue[next_treelet].push( move( state_ptr ) );
       } else {
+        log_ray( RayAction::Queued, *state_ptr );
         out_queue[next_treelet].push( move( state_ptr ) );
         out_queue_size++;
       }

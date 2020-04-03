@@ -66,7 +66,7 @@ void LambdaWorker::log_ray( const RayAction action,
                             const RayState& state,
                             const RayBagInfo& info )
 {
-  if ( !track_rays || !state.trackRay )
+  if ( !track_rays || !state.trackRay || action == RayAction::Traced )
     return;
 
   ostringstream oss;

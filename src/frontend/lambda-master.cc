@@ -69,8 +69,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                             const string& storage_backend_uri,
                             const string& aws_region,
                             unique_ptr<Scheduler>&& scheduler,
-                            const MasterConfiguration& config )
-  : config( config )
+                            const MasterConfiguration& user_config )
+  : config( user_config )
   , job_id( [] {
     ostringstream oss;
     oss << hex << setfill( '0' ) << setw( 8 ) << time( nullptr );
@@ -156,6 +156,17 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                   scene.base.samplesPerPixel,
                   ray_generators ? ray_generators : max_workers };
 
+  if ( config.auto_log_directory_name ) {
+    // setting the directory name based on job info
+    string dir_name = ParsedURI( storage_backend_uri ).path + "_w"
+                      + to_string( max_workers ) + "_g"
+                      + to_string( ray_generators ) + "_"
+                      + to_string( scene.base.samplesPerPixel ) + "spp_d"
+                      + to_string( config.max_path_depth );
+
+    config.logs_directory /= dir_name;
+  }
+
   /* are we logging anything? */
   if ( config.collect_debug_logs || config.worker_stats_write_interval > 0
        || config.ray_log_rate > 0 || config.bag_log_rate > 0 ) {
@@ -163,8 +174,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   }
 
   if ( config.worker_stats_write_interval > 0 ) {
-    ws_stream.open( config.logs_directory + "/" + "workers.csv", ios::trunc );
-    tl_stream.open( config.logs_directory + "/" + "treelets.csv", ios::trunc );
+    ws_stream.open( config.logs_directory / "workers.csv", ios::trunc );
+    tl_stream.open( config.logs_directory / "treelets.csv", ios::trunc );
 
     ws_stream << "timestamp,workerId,pathsFinished,"
                  "raysEnqueued,raysAssigned,raysDequeued,"
@@ -197,6 +208,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   print_info( "Total paths      ",
               scene.sample_extent.x * scene.sample_extent.y
                 * scene.base.samplesPerPixel );
+  print_info( "Logs directory   ", config.logs_directory.c_str() );
+
   cerr << endl;
 
   loop.add_rule(
@@ -514,8 +527,8 @@ void LambdaMaster::run()
     if ( config.collect_debug_logs || config.ray_log_rate
          || config.bag_log_rate ) {
       get_requests.emplace_back( log_prefix + to_string( worker.id ) + ".INFO",
-                                 config.logs_directory + "/"
-                                   + to_string( worker.id ) + ".INFO" );
+                                 config.logs_directory
+                                   / ( to_string( worker.id ) + ".INFO" ) );
     }
   }
 
@@ -527,7 +540,9 @@ void LambdaMaster::run()
   print_job_summary();
 
   if ( !config.job_summary_path.empty() ) {
-    dump_job_summary();
+    dump_job_summary( config.job_summary_path );
+  } else if ( config.worker_stats_write_interval ) {
+    dump_job_summary( config.logs_directory / "info.json" );
   }
 
   if ( !get_requests.empty() ) {
@@ -598,6 +613,8 @@ void usage( const char* argv0, int exit_code )
        << endl
        << "  -j --job-summary FILE      output the job summary in JSON format"
        << endl
+       << "  -A --auto-name             set log directory name automatically"
+       << endl
        << "  -d --memcached-server      address for memcached" << endl
        << "                             (can be repeated)" << endl
        << "  -h --help                  show help information" << endl;
@@ -640,6 +657,7 @@ int main( int argc, char* argv[] )
   float ray_log_rate = 0.0;
   float bag_log_rate = 0.0;
   string logs_directory = "logs/";
+  bool auto_log_directory_name = false;
   optional<Bounds2i> crop_window;
   uint32_t timeout = 0;
   uint32_t pixels_per_tile = 0;
@@ -682,6 +700,7 @@ int main( int argc, char* argv[] )
     { "jobs", required_argument, nullptr, 'J' },
     { "memcached-server", required_argument, nullptr, 'd' },
     { "engine", required_argument, nullptr, 'E' },
+    { "auto-name", no_argument, nullptr, 'A' },
     { "help", no_argument, nullptr, 'h' },
     { nullptr, 0, nullptr, 0 },
   };
@@ -690,7 +709,7 @@ int main( int argc, char* argv[] )
     const int opt
       = getopt_long( argc,
                      argv,
-                     "p:P:i:r:b:m:G:w:D:a:S:M:L:c:t:j:T:n:J:d:E:B:gh",
+                     "p:P:i:r:b:m:G:w:D:a:S:M:L:c:t:j:T:n:J:d:E:B:gAh",
                      long_options,
                      nullptr );
 
@@ -722,6 +741,7 @@ int main( int argc, char* argv[] )
       case 'J': max_jobs_on_engine = stoul(optarg); break;
       case 'd': memcached_servers.emplace_back(optarg); break;
       case 'E': engines.emplace_back(optarg, max_jobs_on_engine); break;
+      case 'A': auto_log_directory_name = true; break;
       case 'h': usage(argv[0], EXIT_SUCCESS); break;
         // clang-format on
 
@@ -798,6 +818,7 @@ int main( int argc, char* argv[] )
                                  worker_stats_write_interval,
                                  ray_log_rate,
                                  bag_log_rate,
+                                 auto_log_directory_name,
                                  logs_directory,
                                  crop_window,
                                  tile_size,
