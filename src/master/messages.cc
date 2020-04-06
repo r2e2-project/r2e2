@@ -32,6 +32,11 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
     case OpCode::GetObjects:
       initialized_workers++;
+
+      if ( initialized_workers == max_workers + ray_generators ) {
+        scene_initialization_done = steady_clock::now();
+      }
+
       break;
 
     case OpCode::RayBagEnqueued: {

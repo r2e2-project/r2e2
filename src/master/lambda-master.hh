@@ -291,7 +291,8 @@ private:
 
   const steady_clock::time_point start_time { steady_clock::now() };
   steady_clock::time_point last_generator_done { start_time };
-  steady_clock::time_point last_finished_ray {};
+  steady_clock::time_point scene_initialization_done { start_time };
+  steady_clock::time_point last_finished_ray { start_time };
   steady_clock::time_point last_action_time { start_time };
 
   ////////////////////////////////////////////////////////////////////////////

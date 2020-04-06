@@ -54,8 +54,9 @@ message JobSummary {
     uint32 memcached_servers = 9;
     string storage_backend = 10;
 
-    double total_time = 12;
-    double generation_time = 13;
+    double total_time = 11;
+    double generation_time = 12;
+    double initialization_time = 13;
     double tracing_time = 14;
     uint64 total_paths = 16;
     uint64 finished_paths = 17;

@@ -157,14 +157,22 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
 
   generation_time = ( generation_time < 0 ) ? 0 : generation_time;
 
-  double ray_time
-    = duration_cast<milliseconds>( last_finished_ray - last_generator_done )
+  double initialization_time
+    = duration_cast<milliseconds>( scene_initialization_done
+                                   - last_generator_done )
         .count()
       / 1000.0;
 
+  initialization_time = ( initialization_time < 0 ) ? 0 : initialization_time;
+
+  double ray_time = duration_cast<milliseconds>( last_finished_ray
+                                                 - scene_initialization_done )
+                      .count()
+                    / 1000.0;
+
   ray_time = ( ray_time < 0 ) ? 0 : ray_time;
 
-  const double total_time = ray_time + generation_time;
+  const double total_time = ray_time + initialization_time + generation_time;
 
   const double avg_ray_throughput
     = ( total_time > 0 )
@@ -189,6 +197,7 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
 
   proto.set_total_time( total_time );
   proto.set_generation_time( generation_time );
+  proto.set_initialization_time( initialization_time );
   proto.set_tracing_time( ray_time );
   proto.set_total_paths( scene.total_paths );
   proto.set_finished_paths( aggregated_stats.finishedPaths );
@@ -277,6 +286,8 @@ void LambdaMaster::print_job_summary() const
        << Value<double>( proto.total_time() ) << " seconds\n"
        << "    Camera rays        " << Value<double>( proto.generation_time() )
        << " seconds\n"
+       << "    Initialization     "
+       << Value<double>( proto.initialization_time() ) << " seconds\n"
        << "    Ray tracing        " << Value<double>( proto.tracing_time() )
        << " seconds" << endl;
 
