@@ -205,9 +205,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
               to_string( scene.sample_extent.x ) + "\u00d7"
                 + to_string( scene.sample_extent.y ) );
   print_info( "Samples per pixel", scene.base.samplesPerPixel );
-  print_info( "Total paths      ",
-              scene.sample_extent.x * scene.sample_extent.y
-                * scene.base.samplesPerPixel );
+  print_info( "Total paths      ", scene.total_paths );
   print_info( "Logs directory   ", config.logs_directory.c_str() );
 
   cerr << endl;

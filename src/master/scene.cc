@@ -49,7 +49,7 @@ LambdaMaster::SceneData::SceneData( const std::string& scene_path,
   : base( scene_path, samples_per_pixel )
   , sample_bounds( crop_window.has_value() ? *crop_window : base.sampleBounds )
   , sample_extent( sample_bounds.Diagonal() )
-  , total_paths( base.totalPaths )
+  , total_paths( sample_extent.x * sample_extent.y * base.samplesPerPixel )
 {}
 
 int default_tile_size( int spp )
