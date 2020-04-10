@@ -42,6 +42,7 @@ struct MasterConfiguration
 {
   int samples_per_pixel;
   int max_path_depth;
+  std::chrono::milliseconds bagging_delay;
   bool collect_debug_logs;
   uint64_t worker_stats_write_interval;
   float ray_log_rate;

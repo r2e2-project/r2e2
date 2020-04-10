@@ -26,7 +26,7 @@ void LambdaWorker::handle_out_queue()
     log_bag( BagAction::Created, bag.info );
 
     if ( !seal_bags_timer.armed() ) {
-      seal_bags_timer.set( 0s, SEAL_BAGS_INTERVAL );
+      seal_bags_timer.set( 0s, config.bagging_delay );
     }
 
     return bag;
@@ -79,12 +79,12 @@ void LambdaWorker::handle_open_bags()
   for ( auto it = open_bags.begin(); it != open_bags.end(); ) {
     const auto time_since_creation = now - it->second.created_at;
 
-    if ( time_since_creation < SEAL_BAGS_INTERVAL ) {
+    if ( time_since_creation < config.bagging_delay ) {
       it++;
       next_expiry = min( next_expiry,
                          1ns
                            + duration_cast<nanoseconds>(
-                             SEAL_BAGS_INTERVAL - time_since_creation ) );
+                             config.bagging_delay - time_since_creation ) );
 
       continue;
     }

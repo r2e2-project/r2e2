@@ -5,6 +5,7 @@
 #include <sstream>
 #include <string>
 
+constexpr std::chrono::milliseconds DEFAULT_BAGGING_DELAY { 100 };
 constexpr size_t WORKER_MAX_ACTIVE_RAYS = 100'000; /* ~120 MiB of rays */
 
 using WorkerId = uint64_t;

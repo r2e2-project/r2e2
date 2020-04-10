@@ -165,6 +165,7 @@ void usage( const char* argv0, int exitCode )
        << "  -s --storage-backend NAME  storage backend URI" << endl
        << "  -S --samples N             number of samples per pixel" << endl
        << "  -M --max-depth N           maximum path depth" << endl
+       << "  -b --bagging-delay N       bagging delay" << endl
        << "  -L --log-rays RATE         log ray actions" << endl
        << "  -B --log-bags RATE         log bag actions" << endl
        << "  -d --memcached-server      address for memcached" << endl
@@ -185,6 +186,7 @@ int main( int argc, char* argv[] )
   int max_path_depth = 0;
   float ray_log_rate = 0.0;
   float bag_log_rate = 0.0;
+  milliseconds bagging_delay = DEFAULT_BAGGING_DELAY;
 
   vector<Address> memcached_servers;
 
@@ -194,6 +196,7 @@ int main( int argc, char* argv[] )
     { "storage-backend", required_argument, nullptr, 's' },
     { "samples", required_argument, nullptr, 'S' },
     { "max-depth", required_argument, nullptr, 'M' },
+    { "bagging-delay", required_argument, nullptr, 'b' },
     { "log-rays", required_argument, nullptr, 'L' },
     { "log-bags", required_argument, nullptr, 'B' },
     { "directional", no_argument, nullptr, 'I' },
@@ -203,8 +206,8 @@ int main( int argc, char* argv[] )
   };
 
   while ( true ) {
-    const int opt
-      = getopt_long( argc, argv, "p:i:s:S:M:L:B:d:hI", long_options, nullptr );
+    const int opt = getopt_long(
+      argc, argv, "p:i:s:S:M:L:b:B:d:hI", long_options, nullptr );
 
     if ( opt == -1 )
       break;
@@ -216,6 +219,7 @@ int main( int argc, char* argv[] )
     case 's': storage_uri = optarg; break;
     case 'S': samples_per_pixel = stoi(optarg); break;
     case 'M': max_path_depth = stoi(optarg); break;
+    case 'b': bagging_delay = milliseconds{stoul(optarg)}; break;
     case 'L': ray_log_rate = stof(optarg); break;
     case 'B': bag_log_rate = stof(optarg); break;
     case 'I': PbrtOptions.directionalTreelets = true; break;
@@ -235,17 +239,16 @@ int main( int argc, char* argv[] )
   }
 
   if ( listen_port == 0 || samples_per_pixel < 0 || max_path_depth < 0
-       || ray_log_rate < 0 || ray_log_rate > 1.0 || bag_log_rate < 0
-       || bag_log_rate > 1.0 || public_ip.empty() || storage_uri.empty() ) {
+       || bagging_delay <= 0s || ray_log_rate < 0 || ray_log_rate > 1.0
+       || bag_log_rate < 0 || bag_log_rate > 1.0 || public_ip.empty()
+       || storage_uri.empty() ) {
     usage( argv[0], EXIT_FAILURE );
   }
 
   unique_ptr<LambdaWorker> worker;
-  WorkerConfiguration config { samples_per_pixel,
-                               max_path_depth,
-                               ray_log_rate,
-                               bag_log_rate,
-                               move( memcached_servers ) };
+  WorkerConfiguration config { samples_per_pixel, max_path_depth,
+                               bagging_delay,     ray_log_rate,
+                               bag_log_rate,      move( memcached_servers ) };
 
   try {
     worker = make_unique<LambdaWorker>(

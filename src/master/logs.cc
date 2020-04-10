@@ -192,6 +192,7 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
   proto.mutable_tile_size()->set_x( tiles.tile_size );
   proto.mutable_tile_size()->set_y( tiles.tile_size );
   proto.set_max_depth( config.max_path_depth );
+  proto.set_bagging_delay( config.bagging_delay.count() );
   proto.set_memcached_servers( config.memcached_servers.size() );
   proto.set_storage_backend( storage_backend_uri );
 

@@ -30,6 +30,9 @@ def handler(event, context):
     if event['maxPathDepth']:
         command += ['--max-depth', str(event['maxPathDepth'])]
 
+    if event['baggingDelay']:
+        command += ['--bagging-delay', str(event['baggingDelay'])]
+
     if event['rayLogRate']:
         command += ['--log-rays', str(event['rayLogRate'])]
 

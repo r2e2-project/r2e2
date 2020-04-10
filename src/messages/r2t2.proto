@@ -7,10 +7,11 @@ message InvocationPayload {
     string coordinator = 2;
     int32 samples_per_pixel = 3;
     int32 max_path_depth = 4;
-    float ray_log_rate = 5;
-    float bag_log_rate = 6;
-    bool directional_treelets = 7;
-    repeated string memcached_servers = 8;
+    uint32 bagging_delay = 5;
+    float ray_log_rate = 6;
+    float bag_log_rate = 7;
+    bool directional_treelets = 8;
+    repeated string memcached_servers = 9;
 }
 
 message ObjectKey {
@@ -51,13 +52,14 @@ message JobSummary {
     uint32 spp = 6;
     Point2 tile_size = 7;
     uint32 max_depth = 8;
-    uint32 memcached_servers = 9;
-    string storage_backend = 10;
+    uint32 bagging_delay = 9;
+    uint32 memcached_servers = 10;
+    string storage_backend = 11;
 
-    double total_time = 11;
-    double generation_time = 12;
-    double initialization_time = 13;
-    double tracing_time = 14;
+    double total_time = 12;
+    double generation_time = 13;
+    double initialization_time = 14;
+    double tracing_time = 15;
     uint64 total_paths = 16;
     uint64 finished_paths = 17;
     uint64 finished_rays = 18;

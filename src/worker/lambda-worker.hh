@@ -35,7 +35,6 @@
 
 namespace r2t2 {
 
-constexpr std::chrono::milliseconds SEAL_BAGS_INTERVAL { 100 };
 constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL { 1'000 };
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL { 1'000 };
 
@@ -45,8 +44,11 @@ struct WorkerConfiguration
 {
   int samples_per_pixel;
   int max_path_depth;
+  std::chrono::milliseconds bagging_delay;
+
   float ray_log_rate;
   float bag_log_rate;
+
   std::vector<Address> memcached_servers;
 };
 

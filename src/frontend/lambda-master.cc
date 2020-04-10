@@ -105,6 +105,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   invocation_proto.set_coordinator( public_address );
   invocation_proto.set_samples_per_pixel( config.samples_per_pixel );
   invocation_proto.set_max_path_depth( config.max_path_depth );
+  invocation_proto.set_bagging_delay( config.bagging_delay.count() );
   invocation_proto.set_ray_log_rate( config.ray_log_rate );
   invocation_proto.set_bag_log_rate( config.bag_log_rate );
   invocation_proto.set_directional_treelets( PbrtOptions.directionalTreelets );
@@ -598,6 +599,7 @@ void usage( const char* argv0, int exit_code )
        << endl
        << "  -S --samples N             number of samples per pixel" << endl
        << "  -M --max-depth N           maximum path depth" << endl
+       << "  -s --bagging-delay N       bagging delay" << endl
        << "  -a --scheduler TYPE        indicate scheduler type:" << endl
        << "                               - uniform (default)" << endl
        << "                               - static" << endl
@@ -668,6 +670,7 @@ int main( int argc, char* argv[] )
   int samples_per_pixel = 0;
   int max_path_depth = 5;
   int tile_size = 0;
+  milliseconds bagging_delay = DEFAULT_BAGGING_DELAY;
 
   uint32_t max_jobs_on_engine = 1;
   vector<string> memcached_servers;
@@ -689,6 +692,7 @@ int main( int argc, char* argv[] )
     { "logs-dir", required_argument, nullptr, 'D' },
     { "samples", required_argument, nullptr, 'S' },
     { "max-depth", required_argument, nullptr, 'M' },
+    { "bagging-delay", required_argument, nullptr, 's' },
     { "crop-window", required_argument, nullptr, 'c' },
     { "timeout", required_argument, nullptr, 't' },
     { "job-summary", required_argument, nullptr, 'j' },
@@ -707,7 +711,7 @@ int main( int argc, char* argv[] )
     const int opt
       = getopt_long( argc,
                      argv,
-                     "p:P:i:r:b:m:G:w:D:a:S:M:L:c:t:j:T:n:J:d:E:B:gAh",
+                     "p:P:i:r:b:m:G:w:D:a:S:M:s:L:c:t:j:T:n:J:d:E:B:gAh",
                      long_options,
                      nullptr );
 
@@ -730,6 +734,7 @@ int main( int argc, char* argv[] )
       case 'D': logs_directory = optarg; break;
       case 'S': samples_per_pixel = stoi(optarg); break;
       case 'M': max_path_depth = stoi(optarg); break;
+      case 's': bagging_delay = milliseconds{stoul(optarg)}; break;
       case 'L': ray_log_rate = stof(optarg); break;
       case 'B': bag_log_rate = stof(optarg); break;
       case 't': timeout = stoul(optarg); break;
@@ -794,9 +799,10 @@ int main( int argc, char* argv[] )
 
   if ( scheduler == nullptr || listen_port == 0 || max_workers <= 0
        || ray_generators < 0 || samples_per_pixel < 0 || max_path_depth < 0
-       || ray_log_rate < 0 || ray_log_rate > 1.0 || bag_log_rate < 0
-       || bag_log_rate > 1.0 || public_ip.empty() || storage_backend_uri.empty()
-       || region.empty() || new_tile_threshold == 0
+       || bagging_delay <= 0s || ray_log_rate < 0 || ray_log_rate > 1.0
+       || bag_log_rate < 0 || bag_log_rate > 1.0 || public_ip.empty()
+       || storage_backend_uri.empty() || region.empty()
+       || new_tile_threshold == 0
        || ( crop_window.has_value() && pixels_per_tile != 0
             && pixels_per_tile
                  != numeric_limits<typeof( pixels_per_tile )>::max()
@@ -812,6 +818,7 @@ int main( int argc, char* argv[] )
   // TODO clean this up
   MasterConfiguration config = { samples_per_pixel,
                                  max_path_depth,
+                                 bagging_delay,
                                  collect_debug_logs,
                                  worker_stats_write_interval,
                                  ray_log_rate,
