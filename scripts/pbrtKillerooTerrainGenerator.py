@@ -118,7 +118,7 @@ def genkKillerooObj(killeroo_path="geometry/killeroo.pbrt",
                                                parameter_numeric("color Kd",color1),
                                                parameter_numeric("color Kd",color2),
                                                parameter_numeric("float roughness",roughness)])
-    fmt_string += Attribute_string("Include",[parameter_string("geometry/killeroo.pbrt")])
+    fmt_string += Attribute_string("Include",[parameter_string(killeroo_path)])
     fmt_string += Attribute_string("AttributeEnd")
     fmt_string +=  Attribute_string("ObjectEnd")
     fmt_string += Attribute_string("AttributeEnd\n")
