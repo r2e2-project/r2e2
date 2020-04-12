@@ -157,7 +157,7 @@ void S3Client::download_file( const string& bucket,
   s3.write( headers );
 
   char buffer[BUFFER_SIZE];
-  simple_string_span sss { buffer };
+  simple_string_span sss { buffer, BUFFER_SIZE };
 
   while ( responses.empty() ) {
     responses.parse( sss.substr( 0, s3.read( sss ) ) );
