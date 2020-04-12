@@ -42,18 +42,9 @@ void LambdaWorker::process_message( const Message& message )
     case OpCode::GetObjects: {
       protobuf::GetObjects proto;
       protoutil::from_string( message.payload(), proto );
-      get_objects( proto );
-      scene.base = { working_directory.name(), scene.samples_per_pixel };
-
-      for ( const protobuf::ObjectKey& object_key : proto.object_ids() ) {
-        const ObjectKey id = from_protobuf( object_key );
-
-        if ( id.type == ObjectType::Treelet ) {
-          treelets.emplace( id.id, pbrt::scene::LoadTreelet( ".", id.id ) );
-        }
-      }
-
+      get_and_setup_scene( proto );
       master_connection.push_request( { *worker_id, OpCode::GetObjects, "" } );
+
       break;
     }
 

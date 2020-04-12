@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <getopt.h>
 #include <signal.h>
+#include <sys/mman.h>
 
 #include "messages/utils.hh"
 #include "net/transfer_mcd.hh"
@@ -129,22 +130,46 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
     [this] { this->terminate(); } );
 }
 
-void LambdaWorker::get_objects( const protobuf::GetObjects& objects )
+void LambdaWorker::get_and_setup_scene( const protobuf::GetObjects& proto )
 {
   vector<storage::GetRequest> requests;
+  vector<TreeletId> target_treelets;
 
-  for ( const protobuf::ObjectKey& object_key : objects.object_ids() ) {
-    const ObjectKey id = from_protobuf( object_key );
-    if ( id.type == ObjectType::TriangleMesh ) {
+  for ( const protobuf::ObjectKey& object_key : proto.object_ids() ) {
+    const ObjectKey obj = from_protobuf( object_key );
+    if ( obj.type == ObjectType::Treelet ) {
+      target_treelets.push_back( obj.id );
+      continue;
+    } else if ( obj.type == ObjectType::TriangleMesh ) {
       /* triangle meshes are packed into treelets, so ignore */
       continue;
     }
 
-    const string file_path = scene::GetObjectName( id.type, id.id );
+    const string file_path = scene::GetObjectName( obj.type, obj.id );
     requests.emplace_back( file_path, file_path );
   }
 
+  /* get all the non-treelet (base) objects */
   storage_backend->get( requests );
+
+  /* create the scene object */
+  scene.base = { working_directory.name(), scene.samples_per_pixel };
+
+  /* now it's time to fetch the treelets into memory */
+  auto& s3_backend = *dynamic_cast<S3StorageBackend*>( storage_backend.get() );
+  S3Client s3_client { s3_backend.client() };
+  const string s3_bucket = s3_backend.bucket();
+  const string s3_prefix = s3_backend.prefix();
+
+  for ( const auto t : target_treelets ) {
+    FileDescriptor fd { CheckSystemCall( "memfd",
+                                         memfd_create( "treelet", 0 ) ) };
+
+    s3_client.download_file( s3_bucket, s3_prefix + "T" + to_string( t ), fd );
+    CheckSystemCall( "lseek", lseek( fd.fd_num(), 0, SEEK_SET ) );
+
+    treelets.emplace( t, pbrt::scene::LoadTreelet( ".", t, fd.fd_num() ) );
+  }
 }
 
 void LambdaWorker::run()

@@ -138,7 +138,7 @@ private:
   void process_message( const meow::Message& message );
 
   /* downloads the necessary scene objects */
-  void get_objects( const protobuf::GetObjects& objects );
+  void get_and_setup_scene( const protobuf::GetObjects& objects );
 
   /* process incoming messages */
   void handle_messages();
