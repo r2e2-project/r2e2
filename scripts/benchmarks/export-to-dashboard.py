@@ -21,26 +21,47 @@ parser.add_argument('-d', '--directory', required=True)
 s3 = boto3.resource('s3')
 s3_client = boto3.client('s3')
 
+def percentile(n):
+    def percentile_(x):
+        return np.percentile(x, n)
+    percentile_.__name__ = 'p%s' % n
+    return percentile_
 
 def generate_data_csv(df, out):
     df['timestampS'] = (df.timestamp / 1000).astype('int32')
     df['totalTransferred'] = df.bytesEnqueued + df.bytesDequeued
+    df['bytesPerBag'] = (df.bytesEnqueued / df.bagsEnqueued)
 
-    data = df.groupby(['timestampS']).sum()
+    data = df.groupby(['timestampS']).agg({
+        'raysEnqueued': ['sum'],
+        'raysDequeued': ['sum'],
+        'bytesEnqueued': ['sum'],
+        'bytesDequeued': ['sum'],
+        'totalTransferred': ['sum'],
+        'bytesPerBag': ['mean'],
+        'pathsFinished': ['sum'],
+        'cpuUsage': ['mean', 'median', percentile(90), percentile(95)]
+    }).sort_values('timestampS')
+
     data['runningCompletion'] = data.pathsFinished.cumsum()
-
     finish_point = data.runningCompletion.idxmax()
     data = data.loc[data.index <= finish_point]
+    data.columns = [x[0] if x[1] in ["", "sum"] else "_".join(x) for x in data.columns.ravel()]
 
-    data.to_csv(out, index=False)
+    data.fillna(method='ffill', inplace=True)
 
+    data.to_csv(out)
 
 def generate_treelet_csv(df, out):
     df['timestampS'] = (df.timestamp / 1000).astype('int32')
 
-    data = df[['timestampS', 'treeletId', 'raysEnqueued']]
-    data.to_csv(out, index=False)
+    data = (df.sort_values(['timestampS', 'treeletId'])
+              .groupby(['timestampS', 'treeletId']).sum())
 
+    data = data.reset_index()
+    data = data[['timestampS', 'treeletId', 'raysEnqueued', 'raysDequeued']]
+
+    data.to_csv(out, index=False)
 
 def dashboard_obj(x):
     return os.path.join("dashboard", x)
