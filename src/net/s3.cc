@@ -135,11 +135,12 @@ HTTPRequest S3Client::create_download_request( const string& bucket,
 
 void S3Client::download_file( const string& bucket,
                               const string& object,
-                              const filesystem::path& filename )
+                              FileDescriptor& out_fd )
 {
   const string endpoint = ( config_.endpoint.length() > 0 )
                             ? config_.endpoint
                             : S3::endpoint( config_.region, bucket );
+
   const Address s3_address { endpoint, "https" };
 
   SSLContext ssl_context;
@@ -154,16 +155,9 @@ void S3Client::download_file( const string& bucket,
   string headers;
   outgoing_request.serialize_headers( headers );
   s3.write( headers );
-  // s3.write( outgoing_request.body() );
 
   char buffer[BUFFER_SIZE];
   simple_string_span sss { buffer };
-
-  FileDescriptor file { CheckSystemCall(
-    "open",
-    open( filename.c_str(),
-          O_RDWR | O_TRUNC | O_CREAT,
-          S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH ) ) };
 
   while ( responses.empty() ) {
     responses.parse( sss.substr( 0, s3.read( sss ) ) );
@@ -172,7 +166,7 @@ void S3Client::download_file( const string& bucket,
   if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
     throw runtime_error( "HTTP failure in S3Client::download_file" );
   } else {
-    file.write_all( responses.front().body() );
+    out_fd.write_all( responses.front().body() );
   }
 }
 

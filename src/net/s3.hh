@@ -12,6 +12,7 @@
 #include "aws.hh"
 #include "http_request.hh"
 #include "requests.hh"
+#include "util/file_descriptor.hh"
 
 class S3
 {
@@ -70,7 +71,7 @@ public:
 
   void download_file( const std::string& bucket,
                       const std::string& object,
-                      const std::filesystem::path& filename );
+                      FileDescriptor& out_fd );
 
   void upload_files(
     const std::string& bucket,
