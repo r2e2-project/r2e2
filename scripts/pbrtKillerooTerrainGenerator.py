@@ -12,23 +12,23 @@ def HillGenerator(x0,y0,x1,y1,r): # position of hill center,current position and
     z = r ** 2 - ((x1 - x0) ** 2 + (y1 - y0) ** 2)
     return z
 def genHillTerrain(nx=64,ny=64,iters=440,seed=None):
-	hill_terrain = np.zeros((nx,ny))
-	if seed != None:
-	    np.random.seed(seed)
-	radii = np.random.randint(0,int(nx/2),iters)
-	centers = nx * np.random.randn(iters,2)
-	for k in tqdm(range(iters)):
-	    radius = radii[k]
-	    hill_center = centers[k]
-	    accum_terrain = np.zeros((nx,ny)) 
-	    x,y = np.meshgrid(range(0,nx),range(0,ny))
-	    accum_terrain += HillGenerator(hill_center[0],hill_center[1],x,y,radius)
-	    accum_terrain = np.clip(accum_terrain,a_min=0,a_max=None)
-	    hill_terrain += accum_terrain
+    hill_terrain = np.zeros((nx,ny))
+    if seed != None:
+        np.random.seed(seed)
+    radii = np.random.randint(0,int(nx/2),iters)
+    centers = nx * np.random.randn(iters,2)
+    for k in tqdm(range(iters)):
+        radius = radii[k]
+        hill_center = centers[k]
+        accum_terrain = np.zeros((nx,ny)) 
+        x,y = np.meshgrid(range(0,nx),range(0,ny))
+        accum_terrain += HillGenerator(hill_center[0],hill_center[1],x,y,radius)
+        accum_terrain = np.clip(accum_terrain,a_min=0,a_max=None)
+        hill_terrain += accum_terrain
 
-	hill_terrain = (2 * ((hill_terrain - np.min(hill_terrain))/(np.ptp(hill_terrain))) - 1) * 0.9
-	hill_terrain = (hill_terrain ** 2  )
-	return hill_terrain
+    hill_terrain = (2 * ((hill_terrain - np.min(hill_terrain))/(np.ptp(hill_terrain))) - 1) * 0.9
+    hill_terrain = (hill_terrain ** 2  )
+    return hill_terrain
 def genLandPbrt(filename: str,hill_terrain):
     np.set_printoptions(threshold=sys.maxsize,suppress=True,precision=5)
     nx,ny = hill_terrain.shape
@@ -216,6 +216,10 @@ def genAboveLight():
                                             parameter_numeric("float st",[0,0,1,0,1,1,0,0,1])])
     fmt_string += Attribute_string("AttributeEnd\n")  
     return fmt_string
+def genAccelerator(maxtreeletbytes: int = 1000000000):
+    fmt_string = Attribute_string("Accelerator",[parameter_string("treeletdumpbvh"),
+                                                parameter_numeric("integer maxtreeletbytes",[maxtreeletbytes])])
+    return fmt_string
 def genKillerooTerrain(output_filename: str,
                        xres: int,
                        yres: int,
@@ -226,8 +230,8 @@ def genKillerooTerrain(output_filename: str,
                        l_scale_coeff: int = 100,
                        height_coeff: int = 30,
                        k_coeff: int = 10,
-                       num_killeroos_unique = 25,
-                       num_killeroos_instance =25,
+                       num_killeroos = 25,
+                       prop = 0.1,
                        random_seed: int = None,
                        killeroo_path: str = "geometry/killeroo.pbrt" ,
                        land_filename: str = "./geometry/gen_killeroo_land.pbrt",
@@ -246,6 +250,7 @@ def genKillerooTerrain(output_filename: str,
     #Camera,Sampling, and Integrator parameters
     fmt_string = genCamera(LookAt,50,xres,yres,output_filename[:output_filename.rfind(".")] + ".exr" )
     fmt_string += genSampler(8)
+    fmt_string += genAccelerator();
     fmt_string += Attribute_string("WorldBegin\n")
     
     #Above square trianglemesh light source
@@ -260,6 +265,7 @@ def genKillerooTerrain(output_filename: str,
     fmt_string += Attribute_string("AttributeEnd\n") 
     
     #Land 
+    print("Generating Land...")
     genLandPbrt(land_filename,hill_terrain);
     fmt_string += Attribute_string("AttributeBegin")
     fmt_string += Attribute_string("Material",[parameter_string("matte"),
@@ -279,70 +285,66 @@ def genKillerooTerrain(output_filename: str,
     #kileroo gen
     t = open(killeroos_filename,'w')
     m,n = hill_terrain.shape
-    nearby_dict = {}
-    near_eps = (2/k_coeff) *  1.25 * (100/l_scale_coeff)
-    for k in tqdm(range(int(num_killeroos_unique + num_killeroos_instance))):
-        i = np.random.uniform(low=-4,high=4)
-        j = np.random.uniform(low=-4,high=4)
-        rotate_val = None
-        if (i,j) not in nearby_dict:
-            nearby_dict[(i,j)] = np.random.uniform(low=0,high=360)
-        
-        for key in nearby_dict:
-            distance = np.sqrt((i - key[0]) ** 2 + (j - key[1]) ** 2 )
-            if abs(distance) < near_eps:
-                rotate_val = nearby_dict[key]
-                break
-        if k < num_killeroos_unique:
-            t.write(genKilleroo(m,n,i,j,k_coeff,l_scale_coeff,height_coeff,hill_terrain,rotate_val,False,killeroo_path))
-        else:
-            t.write(genKilleroo(m,n,i,j,k_coeff,l_scale_coeff,height_coeff,hill_terrain,rotate_val,True,killeroo_path))
-def main():
-	parser = argparse.ArgumentParser(description=("'Generate a parameterized pbrt file of killeroos on hilly terrain"))
-	scale_step = 10
-	prop = .1
-	parser.add_argument('--xres',default =700,help=("x resolution target of pbrt file"))
-	parser.add_argument('--yres',default =700,help=("y resolution target of pbrt file"))
-	parser.add_argument('--landiters',default =440,help=("number of iterations hill generator should take"))
-	parser.add_argument('--k_coeff',default =2,help=("scale of killeroos "))
-	parser.add_argument('--LookAt',default =[[0,300,-300],[0,0,0],[0,1,0]],
-						help=("LookAt params for pbrt camera"))
-	parser.add_argument('--killeroo_path',default="./geometry/killeroo.pbrt",
-	                    help=(' input file path for kilerooo pbrt file'
-	                        ))
-	parser.add_argument('--output_path', default="killeroo_terrain.pbrt",
-	                    help=('output file path for main pbrt file'
-	                        ))
-	parser.add_argument('--output_land_path', default="./geometry/gen_killeroo_land.pbrt",
-	                    help=('output file path for hill terrain'
-	                        ))
-	parser.add_argument('--output_geometry_path', default="./geometry/gen_killeroo_geometry.pbrt",
-	                    help=('output file path for generated killeroos'
-	                        ))
-	parser.add_argument('--num_killeroos_unique',default =(100 * prop) * scale_step)
-	parser.add_argument('--num_killeroos_instance',default =100 * (1-prop) * scale_step)
-	parser.add_argument('--landxres',default =100 * scale_step,help=("resolution of heightmap x"))
-	parser.add_argument('--landyres',default =100 * scale_step,help=("resolution of heightmap y"))
-	parser.add_argument('--land_scale',default =100 * scale_step,help=("scale of physical width and breadth of heightmap"))
-	parser.add_argument('--height_scale',default =30 * scale_step,help=("scale of physical height of heightmap"))
-	parser.add_argument('--random_seed',default =2)
+    
+    print("Placing killeroos...")
+    total_killeroos = num_killeroos
+    num_sparse_killeroos = int(math.ceil(prop * total_killeroos))
+    num_killeroos_per_sparse = int((total_killeroos - num_sparse_killeroos)/(num_sparse_killeroos))
 
-	args = parser.parse_args()
-	genKillerooTerrain("killeroo_terrain.pbrt",
-	                   xres=int(args.xres),
-	                   yres=int(args.yres),
-	                   landxres =int(args.landxres),
-	                   landyres = int(args.landyres),
-	                   landiters=int(args.landiters),
-	                   LookAt= args.LookAt,
-	                   l_scale_coeff=float(args.land_scale),
-	                   height_coeff=float(args.height_scale),
-	                   k_coeff=float(args.k_coeff),
-	                   num_killeroos_unique=int(args.num_killeroos_unique),
-	                   num_killeroos_instance=int(args.num_killeroos_instance),
-	                   random_seed=int(args.random_seed),
-	                   killeroo_path=args.killeroo_path,
-	                   land_filename=args.output_land_path,
-                   	   killeroos_filename=args.output_geometry_path)
+    samples,step = np.linspace(-4,4,int(num_sparse_killeroos ** 0.5),retstep=True)
+    grid = np.meshgrid(samples,
+                       samples)
+    sparse_positions = np.vstack([grid[0].flatten(),grid[1].flatten()])
+    for k in tqdm(range(sparse_positions.shape[1])):
+        i,j = sparse_positions[:,k]
+        i = np.clip(i + np.random.uniform(-step/2,step/2),-4,4)
+        j = np.clip(j + np.random.uniform(-step/2,step/2),-4,4)
+        rotate_val = np.random.uniform(0,360)
+        t.write(genKilleroo(m,n,i,j,k_coeff,l_scale_coeff,height_coeff,hill_terrain,rotate_val,False,killeroo_path))
+        for r in range(num_killeroos_per_sparse):
+            u = np.clip(i + np.random.uniform(-step/3,step/3),-4,4)
+            v = np.clip(j + np.random.uniform(-step/3,step/3),-4,4)
+            t.write(genKilleroo(m,n,u,v,k_coeff,l_scale_coeff,height_coeff,hill_terrain,rotate_val,True,killeroo_path))
+    
+def main():
+    parser = argparse.ArgumentParser(description=("'Generate a parameterized pbrt file of killeroos on hilly terrain"))
+    scale_step = 10
+    parser.add_argument('--xres',default =700,help=("x resolution target of pbrt file"))
+    parser.add_argument('--yres',default =700,help=("y resolution target of pbrt file"))
+    parser.add_argument('--landiters',default =440,help=("number of iterations hill generator should take"))
+    parser.add_argument('--k_coeff',default =2,help=("scale of killeroos "))
+    parser.add_argument('--LookAt',default =[[0,300,-300],[0,0,0],[0,1,0]],
+                        help=("LookAt params for pbrt camera"))
+    parser.add_argument('--killeroo_path',default="./geometry/killeroo.pbrt",
+                        help=(' input file path for kilerooo pbrt file'
+                            ))
+    parser.add_argument('--output_path', default="./",
+                        help=('output folder path for all files  generated by script main pbrt file'
+                            ))
+    parser.add_argument('--num_killeroos',default =(1000 * scale_step))
+    parser.add_argument('--unique_prop',default =.01,help=("proportion of killeroos that are unique"))
+    parser.add_argument('--landxres',default =100 * scale_step,help=("resolution of heightmap x"))
+    parser.add_argument('--landyres',default =100 * scale_step,help=("resolution of heightmap y"))
+    parser.add_argument('--land_scale',default =100 * scale_step,help=("scale of physical width and breadth of heightmap"))
+    parser.add_argument('--height_scale',default =30 * scale_step,help=("scale of physical height of heightmap"))
+    parser.add_argument('--random_seed',default =2)
+
+    args = parser.parse_args()
+    genKillerooTerrain( args.output_path+"killeroo_terrain.pbrt",
+                       xres=int(args.xres),
+                       yres=int(args.yres),
+                       landxres =int(args.landxres),
+                       landyres = int(args.landyres),
+                       landiters=int(args.landiters),
+                       LookAt= args.LookAt,
+                       l_scale_coeff=float(args.land_scale),
+                       height_coeff=float(args.height_scale),
+                       k_coeff=float(args.k_coeff),
+                       num_killeroos=int(args.num_killeroos),
+                       prop = float(args.unique_prop),
+                       random_seed=int(args.random_seed),
+                       killeroo_path=args.killeroo_path,
+                       land_filename=args.output_path + "gen_killeroo_land.pbrt",
+                       killeroos_filename=args.output_path + "gen_killeroo_geometry.pbrt")
 if __name__ == '__main__':
-	main()
+    main()
