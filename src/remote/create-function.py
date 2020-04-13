@@ -40,7 +40,7 @@ def install_lambda_package(package_file, function_name, role, region, delete=Fal
         Code={
             'ZipFile': package_data
         },
-        Timeout=900,
+        Timeout=300,
         MemorySize=3008
     )
 
