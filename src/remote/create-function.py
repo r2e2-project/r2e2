@@ -34,7 +34,7 @@ def install_lambda_package(package_file, function_name, role, region, delete=Fal
 
     response = client.create_function(
         FunctionName=function_name,
-        Runtime='python3.6',
+        Runtime='python3.8',
         Role=role,
         Handler='main.handler',
         Code={
@@ -45,6 +45,13 @@ def install_lambda_package(package_file, function_name, role, region, delete=Fal
     )
 
     print("Created function '{}' ({}).".format(function_name, response['FunctionArn']))
+
+    client.update_function_event_invoke_config(
+            FunctionName=response['FunctionArn'],
+            MaximumRetryAttempts=0,
+            MaximumEventAgeInSeconds=60)
+
+    print("Set max retries to 0.")
 
 def main():
     parser = argparse.ArgumentParser(description="Generate and install Lambda functions.")
