@@ -89,3 +89,6 @@ target_link_libraries( r2t2-lambda-aggregate ${ALL_R2T2_LIBS} )
 
 add_executable ( r2t2-simulator src/frontend/simulator.cc )
 target_link_libraries( r2t2-simulator ${ALL_R2T2_LIBS} )
+
+add_executable ( load-treelet src/frontend/load-treelet.cc )
+target_link_libraries( load-treelet ${ALL_R2T2_LIBS} )
