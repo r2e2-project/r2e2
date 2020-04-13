@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "${0%/*}"
+
 terraform output -json ip_addresses  | python3 -c '
 data = eval(input())
 for port in range(11211, 11211 + 4):
