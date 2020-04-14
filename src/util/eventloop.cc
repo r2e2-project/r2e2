@@ -269,6 +269,10 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
       socklen_t optlen = sizeof( socket_error );
       const int ret = getsockopt(
         this_rule.fd.fd_num(), SOL_SOCKET, SO_ERROR, &socket_error, &optlen );
+
+      this_rule.done = true;
+      this_rule.cancel();
+
       if ( ret == -1 and errno == ENOTSOCK ) {
         throw runtime_error( "error on polled file descriptor for rule \""
                              + _rule_categories.at( this_rule.category_id ).name
@@ -285,8 +289,6 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
                           socket_error );
       }
 
-      this_rule.done = true;
-      this_rule.cancel();
       continue;
     }
 
