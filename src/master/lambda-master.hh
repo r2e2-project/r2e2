@@ -278,9 +278,10 @@ private:
   void record_assign( const WorkerId worker_id, const RayBagInfo& info );
   void record_dequeue( const WorkerId worker_id, const RayBagInfo& info );
 
-  /* object for writing worker & treelet stats */
+  /* object for writing worker & treelet stats, and allocations */
   std::ofstream ws_stream {};
   std::ofstream tl_stream {};
+  std::ofstream alloc_stream {};
 
   /* write worker stats periodically */
   void handle_worker_stats();

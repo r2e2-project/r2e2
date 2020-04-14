@@ -177,6 +177,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   if ( config.worker_stats_write_interval > 0 ) {
     ws_stream.open( config.logs_directory / "workers.csv", ios::trunc );
     tl_stream.open( config.logs_directory / "treelets.csv", ios::trunc );
+    alloc_stream.open( config.logs_directory / "allocations.csv", ios::trunc );
 
     ws_stream << "timestamp,workerId,pathsFinished,"
                  "raysEnqueued,raysAssigned,raysDequeued,"
@@ -186,6 +187,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
     tl_stream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
                  "bytesEnqueued,bytesDequeued,bagsEnqueued,bagsDequeued\n";
+
+    alloc_stream << "workerId,treeletId,action\n";
   }
 
   auto print_info = []( char const* key, auto value ) {
@@ -371,6 +374,10 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           assign_base_objects( worker );
           assign_treelet( worker, treelet );
 
+          if ( config.worker_stats_write_interval ) {
+            alloc_stream << worker_id << ',' << treelet_id << ",add\n";
+          }
+
           /* (1) saying hi, assigning id to the worker */
           protobuf::Hey hey_proto;
           hey_proto.set_worker_id( worker_id );
@@ -517,6 +524,7 @@ void LambdaMaster::run()
 
   ws_stream.close();
   tl_stream.close();
+  alloc_stream.close();
 
   for ( auto& worker : workers ) {
     if ( worker.state != Worker::State::Terminated ) {
