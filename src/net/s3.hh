@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -71,7 +72,7 @@ public:
 
   void download_file( const std::string& bucket,
                       const std::string& object,
-                      FileDescriptor& out_fd );
+                      std::string& output );
 
   void upload_files(
     const std::string& bucket,

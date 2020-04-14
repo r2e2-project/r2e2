@@ -135,7 +135,7 @@ HTTPRequest S3Client::create_download_request( const string& bucket,
 
 void S3Client::download_file( const string& bucket,
                               const string& object,
-                              FileDescriptor& out_fd )
+                              string& output )
 {
   const string endpoint = ( config_.endpoint.length() > 0 )
                             ? config_.endpoint
@@ -166,7 +166,7 @@ void S3Client::download_file( const string& bucket,
   if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
     throw runtime_error( "HTTP failure in S3Client::download_file" );
   } else {
-    out_fd.write_all( responses.front().body() );
+    output.swap( responses.front().body() );
   }
 }
 
