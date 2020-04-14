@@ -63,7 +63,7 @@ void LambdaWorker::process_message( const Message& message )
       for ( const protobuf::RayBagInfo& item : proto.items() ) {
         RayBagInfo info { from_protobuf( item ) };
         const auto id
-          = transfer_agent->requestDownload( info.str( ray_bags_key_prefix ) );
+          = transfer_agent->request_download( info.str( ray_bags_key_prefix ) );
         pending_ray_bags[id] = make_pair( Task::Download, info );
 
         log_bag( BagAction::Requested, info );

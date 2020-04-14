@@ -7,38 +7,38 @@ using namespace chrono;
 
 TransferAgent::~TransferAgent() {}
 
-void TransferAgent::doAction( Action&& action )
+void TransferAgent::do_action( Action&& action )
 {
   {
-    unique_lock<mutex> lock { outstandingMutex };
-    outstanding.push( move( action ) );
+    unique_lock<mutex> lock { _outstanding_mutex };
+    _outstanding.push( move( action ) );
   }
 
-  cv.notify_one();
+  _cv.notify_one();
   return;
 }
 
-uint64_t TransferAgent::requestDownload( const string& key )
+uint64_t TransferAgent::request_download( const string& key )
 {
-  doAction( { nextId, Task::Download, key, string() } );
-  return nextId++;
+  do_action( { _next_id, Task::Download, key, string() } );
+  return _next_id++;
 }
 
-uint64_t TransferAgent::requestUpload( const string& key, string&& data )
+uint64_t TransferAgent::request_upload( const string& key, string&& data )
 {
-  doAction( { nextId, Task::Upload, key, move( data ) } );
-  return nextId++;
+  do_action( { _next_id, Task::Upload, key, move( data ) } );
+  return _next_id++;
 }
 
-bool TransferAgent::tryPop( pair<uint64_t, string>& output )
+bool TransferAgent::try_pop( pair<uint64_t, string>& output )
 {
-  unique_lock<mutex> lock { resultsMutex };
+  unique_lock<mutex> lock { _results_mutex };
 
-  if ( results.empty() )
+  if ( _results.empty() )
     return false;
 
-  output = move( results.front() );
-  results.pop();
+  output = move( _results.front() );
+  _results.pop();
 
   return true;
 }

@@ -476,13 +476,13 @@ void LambdaMaster::run()
           return;
 
         vector<pair<uint64_t, string>> actions;
-        agent->tryPopBulk( back_inserter( actions ) );
+        agent->try_pop_bulk( back_inserter( actions ) );
 
         flushed_count += actions.size();
       },
       [&] { return flushed_count < config.memcached_servers.size(); } );
 
-    agent->flushAll();
+    agent->flush_all();
 
     while ( memcached_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
       continue;

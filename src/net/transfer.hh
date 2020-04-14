@@ -46,55 +46,56 @@ protected:
     {}
   };
 
-  uint64_t nextId { 1 };
+  uint64_t _next_id { 1 };
 
   static constexpr size_t MAX_THREADS { 8 };
-  size_t threadCount { MAX_THREADS };
+  size_t _thread_count { MAX_THREADS };
 
-  std::vector<std::thread> threads {};
-  std::mutex resultsMutex {};
-  std::mutex outstandingMutex {};
-  std::condition_variable cv {};
+  std::vector<std::thread> _threads {};
+  std::mutex _results_mutex {};
+  std::mutex _outstanding_mutex {};
+  std::condition_variable _cv {};
 
-  std::queue<Action> outstanding {};
-  std::queue<std::pair<uint64_t, std::string>> results {};
+  std::queue<Action> _outstanding {};
+  std::queue<std::pair<uint64_t, std::string>> _results {};
 
-  EventFD eventFD { false };
+  EventFD _event_fd { false };
 
-  virtual void doAction( Action&& action );
-  virtual void workerThread( const size_t threadId ) = 0;
+  virtual void do_action( Action&& action );
+  virtual void worker_thread( const size_t threadId ) = 0;
 
 public:
   TransferAgent() {}
-
-  uint64_t requestDownload( const std::string& key );
-  uint64_t requestUpload( const std::string& key, std::string&& data );
   virtual ~TransferAgent();
 
-  EventFD& eventfd() { return eventFD; }
+  uint64_t request_download( const std::string& key );
+  uint64_t request_upload( const std::string& key, std::string&& data );
+
+  EventFD& eventfd() { return _event_fd; }
 
   bool empty() const;
-  bool tryPop( std::pair<uint64_t, std::string>& output );
+  bool try_pop( std::pair<uint64_t, std::string>& output );
 
   template<class Container>
-  size_t tryPopBulk( std::back_insert_iterator<Container> insertIt,
-                     const size_t maxCount
-                     = std::numeric_limits<size_t>::max() );
+  size_t try_pop_bulk( std::back_insert_iterator<Container> insert_it,
+                       const size_t max_count
+                       = std::numeric_limits<size_t>::max() );
 };
 
 template<class Container>
-size_t TransferAgent::tryPopBulk( std::back_insert_iterator<Container> insertIt,
-                                  const size_t maxCount )
+size_t TransferAgent::try_pop_bulk(
+  std::back_insert_iterator<Container> insert_it,
+  const size_t max_count )
 {
-  std::unique_lock<std::mutex> lock { resultsMutex };
+  std::unique_lock<std::mutex> lock { _results_mutex };
 
-  if ( results.empty() )
+  if ( _results.empty() )
     return 0;
 
   size_t count;
-  for ( count = 0; !results.empty() && count < maxCount; count++ ) {
-    insertIt = std::move( results.front() );
-    results.pop();
+  for ( count = 0; !_results.empty() && count < max_count; count++ ) {
+    insert_it = std::move( _results.front() );
+    _results.pop();
   }
 
   return count;

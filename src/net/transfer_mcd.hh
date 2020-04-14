@@ -11,23 +11,23 @@ namespace memcached {
 class TransferAgent : public ::TransferAgent
 {
 protected:
-  std::vector<Address> servers {};
+  std::vector<Address> _servers {};
 
-  std::vector<std::queue<Action>> outstandings;
-  std::vector<std::mutex> outstandingMutexes;
-  std::vector<std::condition_variable> cvs;
+  std::vector<std::queue<Action>> _outstandings;
+  std::vector<std::mutex> _outstanding_mutexes;
+  std::vector<std::condition_variable> _cvs;
 
-  const bool autoDelete { true };
+  const bool _auto_delete { true };
 
-  void doAction( Action&& action ) override;
-  void workerThread( const size_t threadId ) override;
+  void do_action( Action&& action ) override;
+  void worker_thread( const size_t thread_id ) override;
 
 public:
   TransferAgent( const std::vector<Address>& servers,
-                 const size_t threadCount = 0,
-                 const bool autoDelete = true );
+                 const size_t thread_count = 0,
+                 const bool auto_delete = true );
 
-  void flushAll();
+  void flush_all();
 
   ~TransferAgent();
 };

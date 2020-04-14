@@ -9,76 +9,78 @@ const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
 S3TransferAgent::S3Config::S3Config( const unique_ptr<StorageBackend>& backend )
 {
-  auto s3Backend = dynamic_cast<S3StorageBackend*>( backend.get() );
+  auto s3_backend = dynamic_cast<S3StorageBackend*>( backend.get() );
 
-  if ( s3Backend != nullptr ) {
-    credentials = s3Backend->client().credentials();
-    region = s3Backend->client().config().region;
-    bucket = s3Backend->bucket();
-    prefix = s3Backend->prefix();
+  if ( s3_backend != nullptr ) {
+    credentials = s3_backend->client().credentials();
+    region = s3_backend->client().config().region;
+    bucket = s3_backend->bucket();
+    prefix = s3_backend->prefix();
     endpoint = S3::endpoint( region, bucket );
     address.store( Address { endpoint, "http" } );
   } else {
-    auto gsBackend = dynamic_cast<GoogleStorageBackend*>( backend.get() );
+    auto gs_backend = dynamic_cast<GoogleStorageBackend*>( backend.get() );
 
-    if ( gsBackend == nullptr ) {
+    if ( gs_backend == nullptr ) {
       throw runtime_error( "unsupported backend" );
     }
 
-    credentials = gsBackend->client().credentials();
-    region = gsBackend->client().config().region;
-    bucket = gsBackend->bucket();
-    prefix = gsBackend->prefix();
-    endpoint = gsBackend->client().config().endpoint;
+    credentials = gs_backend->client().credentials();
+    region = gs_backend->client().config().region;
+    bucket = gs_backend->bucket();
+    prefix = gs_backend->prefix();
+    endpoint = gs_backend->client().config().endpoint;
     address.store( Address { endpoint, "http" } );
   }
 }
 
 S3TransferAgent::S3TransferAgent( const unique_ptr<StorageBackend>& backend,
-                                  const size_t threadCount,
-                                  const bool uploadAsPublic )
+                                  const size_t thread_count /* NOT USED? */,
+                                  const bool upload_as_public )
   : TransferAgent()
-  , clientConfig( backend )
-  , uploadAsPublic( uploadAsPublic )
+  , _client_config( backend )
+  , _upload_as_public( upload_as_public )
 {
-  if ( threadCount == 0 ) {
+  _thread_count = thread_count;
+
+  if ( _thread_count == 0 ) {
     throw runtime_error( "thread count cannot be zero" );
   }
 
-  for ( size_t i = 0; i < threadCount; i++ ) {
-    threads.emplace_back( &S3TransferAgent::workerThread, this, i );
+  for ( size_t i = 0; i < _thread_count; i++ ) {
+    _threads.emplace_back( &S3TransferAgent::worker_thread, this, i );
   }
 }
 
 S3TransferAgent::~S3TransferAgent()
 {
   {
-    unique_lock<mutex> lock { outstandingMutex };
-    outstanding.emplace( nextId++, Task::Terminate, "", "" );
+    unique_lock<mutex> lock { _outstanding_mutex };
+    _outstanding.emplace( _next_id++, Task::Terminate, "", "" );
   }
 
-  cv.notify_all();
-  for ( auto& t : threads )
+  _cv.notify_all();
+  for ( auto& t : _threads )
     t.join();
 }
 
-HTTPRequest S3TransferAgent::getRequest( const Action& action )
+HTTPRequest S3TransferAgent::get_request( const Action& action )
 {
   switch ( action.task ) {
     case Task::Upload:
-      return S3PutRequest( clientConfig.credentials,
-                           clientConfig.endpoint,
-                           clientConfig.region,
+      return S3PutRequest( _client_config.credentials,
+                           _client_config.endpoint,
+                           _client_config.region,
                            action.key,
                            action.data,
                            UNSIGNED_PAYLOAD,
-                           uploadAsPublic )
+                           _upload_as_public )
         .to_http_request();
 
     case Task::Download:
-      return S3GetRequest( clientConfig.credentials,
-                           clientConfig.endpoint,
-                           clientConfig.region,
+      return S3GetRequest( _client_config.credentials,
+                           _client_config.endpoint,
+                           _client_config.region,
                            action.key )
         .to_http_request();
 
@@ -91,80 +93,81 @@ HTTPRequest S3TransferAgent::getRequest( const Action& action )
   try {                                                                        \
     x;                                                                         \
   } catch ( exception & ex ) {                                                 \
-    tryCount++;                                                                \
-    connectionOkay = false;                                                    \
+    try_count++;                                                               \
+    connection_okay = false;                                                   \
     s3.close();                                                                \
     y;                                                                         \
   }
 
-void S3TransferAgent::workerThread( const size_t threadId )
+void S3TransferAgent::worker_thread( const size_t thread_id )
 {
   constexpr milliseconds backoff { 50 };
-  size_t tryCount = 0;
+  size_t try_count = 0;
 
   deque<Action> actions;
 
-  auto lastAddrUpdate = steady_clock::now() + seconds { threadId };
-  Address s3Address = clientConfig.address.load();
+  auto last_addr_update = steady_clock::now() + seconds { thread_id };
+  Address s3_address = _client_config.address.load();
 
   while ( true ) {
     TCPSocket s3;
     auto parser = make_unique<HTTPResponseParser>();
-    bool connectionOkay = true;
-    size_t requestCount = 0;
+    bool connection_okay = true;
+    size_t request_count = 0;
 
-    if ( tryCount > 0 ) {
-      tryCount = min<size_t>( tryCount, 7u ); // caps at 3.2s
-      this_thread::sleep_for( backoff * ( 1 << ( tryCount - 1 ) ) );
+    if ( try_count > 0 ) {
+      try_count = min<size_t>( try_count, 7u ); // caps at 3.2s
+      this_thread::sleep_for( backoff * ( 1 << ( try_count - 1 ) ) );
     }
 
-    if ( steady_clock::now() - lastAddrUpdate >= ADDR_UPDATE_INTERVAL ) {
-      s3Address = clientConfig.address.load();
-      lastAddrUpdate = steady_clock::now();
+    if ( steady_clock::now() - last_addr_update >= ADDR_UPDATE_INTERVAL ) {
+      s3_address = _client_config.address.load();
+      last_addr_update = steady_clock::now();
     }
 
-    TRY_OPERATION( s3.connect( s3Address ), continue );
+    TRY_OPERATION( s3.connect( s3_address ), continue );
 
-    while ( connectionOkay ) {
+    while ( connection_okay ) {
       /* make sure we have an action to perfom */
       if ( actions.empty() ) {
-        unique_lock<mutex> lock { outstandingMutex };
+        unique_lock<mutex> lock { _outstanding_mutex };
 
-        cv.wait( lock, [this]() { return !outstanding.empty(); } );
+        _cv.wait( lock, [this]() { return !_outstanding.empty(); } );
 
-        if ( outstanding.front().task == Task::Terminate )
+        if ( _outstanding.front().task == Task::Terminate )
           return;
 
-        const auto capacity = MAX_REQUESTS_ON_CONNECTION - requestCount;
+        const auto capacity = MAX_REQUESTS_ON_CONNECTION - request_count;
 
         do {
-          actions.push_back( move( outstanding.front() ) );
-          outstanding.pop();
-        } while ( !outstanding.empty() && outstanding.size() / threadCount >= 1
+          actions.push_back( move( _outstanding.front() ) );
+          _outstanding.pop();
+        } while ( !_outstanding.empty()
+                  && _outstanding.size() / _thread_count >= 1
                   && actions.size() < capacity );
       }
 
       for ( const auto& action : actions ) {
         string headers;
-        HTTPRequest request = getRequest( action );
+        HTTPRequest request = get_request( action );
         parser->new_request_arrived( request );
         request.serialize_headers( headers );
         TRY_OPERATION( s3.write_all( headers ), break );
         TRY_OPERATION( s3.write_all( request.body() ), break );
-        requestCount++;
+        request_count++;
       }
 
       char buffer[1024 * 1024];
       simple_string_span buffer_span { buffer, sizeof( buffer ) };
 
-      while ( connectionOkay && !actions.empty() ) {
+      while ( connection_okay && !actions.empty() ) {
         size_t read_count;
         TRY_OPERATION( read_count = s3.read( buffer_span ), break );
 
         if ( read_count == 0 ) {
           // connection was closed by the other side
-          tryCount++;
-          connectionOkay = false;
+          try_count++;
+          connection_okay = false;
           s3.close();
           break;
         }
@@ -178,18 +181,18 @@ void S3TransferAgent::workerThread( const size_t threadId )
           switch ( status[0] ) {
             case '2': // successful
             {
-              unique_lock<mutex> lock { resultsMutex };
-              results.emplace( actions.front().id, move( data ) );
+              unique_lock<mutex> lock { _results_mutex };
+              _results.emplace( actions.front().id, move( data ) );
             }
 
-              tryCount = 0;
+              try_count = 0;
               actions.pop_front();
-              eventFD.write_event();
+              _event_fd.write_event();
               break;
 
             case '5': // we need to slow down
-              connectionOkay = false;
-              tryCount++;
+              connection_okay = false;
+              try_count++;
               break;
 
             default: // unexpected response, like 404 or something
@@ -201,19 +204,19 @@ void S3TransferAgent::workerThread( const size_t threadId )
         }
       }
 
-      if ( requestCount >= MAX_REQUESTS_ON_CONNECTION ) {
-        connectionOkay = false;
+      if ( request_count >= MAX_REQUESTS_ON_CONNECTION ) {
+        connection_okay = false;
       }
     }
   }
 }
 
-void S3TransferAgent::doAction( Action&& action )
+void S3TransferAgent::do_action( Action&& action )
 {
-  if ( steady_clock::now() - lastAddrUpdate >= ADDR_UPDATE_INTERVAL ) {
-    clientConfig.address.store( Address { clientConfig.endpoint, "http" } );
-    lastAddrUpdate = steady_clock::now();
+  if ( steady_clock::now() - _last_addr_update >= ADDR_UPDATE_INTERVAL ) {
+    _client_config.address.store( Address { _client_config.endpoint, "http" } );
+    _last_addr_update = steady_clock::now();
   }
 
-  TransferAgent::doAction( move( action ) );
+  TransferAgent::do_action( move( action ) );
 }
