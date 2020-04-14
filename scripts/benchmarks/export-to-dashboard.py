@@ -7,6 +7,8 @@ import argparse
 import json
 import tempfile
 
+from collections import OrderedDict
+
 import boto3
 import botocore
 import pandas as pd
@@ -21,11 +23,21 @@ parser.add_argument('-d', '--directory', required=True)
 s3 = boto3.resource('s3')
 s3_client = boto3.client('s3')
 
+
 def percentile(n):
     def percentile_(x):
         return np.percentile(x, n)
     percentile_.__name__ = 'p%s' % n
     return percentile_
+
+
+def generate_info_json(info, alloc_df, out):
+    alloc_data = alloc_df.groupby(['treeletId']).agg({'workerId': 'count'})
+    info['allocation'] = alloc_data.workerId.tolist()
+
+    with open(out, "w") as fout:
+        json.dump(info, fout)
+
 
 def generate_data_csv(df, out):
     df['timestampS'] = (df.timestamp / 1000).astype('int32')
@@ -46,11 +58,13 @@ def generate_data_csv(df, out):
     data['runningCompletion'] = data.pathsFinished.cumsum()
     finish_point = data.runningCompletion.idxmax()
     data = data.loc[data.index <= finish_point]
-    data.columns = [x[0] if x[1] in ["", "sum"] else "_".join(x) for x in data.columns.ravel()]
+    data.columns = [x[0] if x[1] in ["", "sum"]
+                    else "_".join(x) for x in data.columns.ravel()]
 
     data.fillna(method='ffill', inplace=True)
 
     data.to_csv(out)
+
 
 def generate_treelet_csv(df, out):
     df['timestampS'] = (df.timestamp / 1000).astype('int32')
@@ -62,6 +76,35 @@ def generate_treelet_csv(df, out):
     data = data[['timestampS', 'treeletId', 'raysEnqueued', 'raysDequeued']]
 
     data.to_csv(out, index=False)
+
+
+def generate_worker_csv(df, alloc_df, out):
+    allocation_data = (alloc_df.sort_values(['treeletId'])
+                       .reset_index(drop=True)
+                       .reset_index()
+                       .rename(columns={'index': 'tempWorkerId'}))
+
+    data = df.merge(allocation_data, on='workerId', how='left')
+    del data['workerId']
+
+    data['timestampS'] = (data.timestamp / 1000).astype('int32')
+
+    data = (data.sort_values(['timestampS', 'treeletId', 'tempWorkerId'])
+                .groupby(['timestampS', 'tempWorkerId']).agg(
+                    {
+                        'treeletId': 'max',
+                        'raysDequeued': 'sum',
+                        'raysEnqueued': 'sum'
+                    }))
+
+    data = data.reset_index()
+    data = data[['timestampS', 'tempWorkerId',
+                 'treeletId', 'raysEnqueued', 'raysDequeued']]
+
+    data = data[(data.raysDequeued > 0) | (data.raysEnqueued > 0)]
+
+    data.to_csv(out, index=False)
+
 
 def dashboard_obj(x):
     return os.path.join("dashboard", x)
@@ -128,19 +171,34 @@ def main(bucket, scene_name, run_name, logs_directory):
     RUN_DIR = os.path.join("dashboard", scene_name, run_name)
 
     # Generate necessary files
-    with tempfile.NamedTemporaryFile() as df, tempfile.NamedTemporaryFile() as tf:
+    with tempfile.NamedTemporaryFile() as df, \
+            tempfile.NamedTemporaryFile() as tf, \
+            tempfile.NamedTemporaryFile() as wf, \
+            tempfile.NamedTemporaryFile() as nf:
+
+        with open(os.path.join(logs_directory, 'info.json')) as fin:
+            info = json.load(fin, object_pairs_hook=OrderedDict)
+
+        allocation_data = pd.read_csv(
+            os.path.join(logs_directory, 'allocations.csv'))
         worker_data = pd.read_csv(os.path.join(logs_directory, 'workers.csv'))
         treelet_data = pd.read_csv(
             os.path.join(logs_directory, 'treelets.csv'))
 
+        del allocation_data['action']
+
+        generate_info_json(info, allocation_data, nf.name)
+        generate_worker_csv(worker_data, allocation_data, wf.name)
         generate_data_csv(worker_data, df.name)
         generate_treelet_csv(treelet_data, tf.name)
 
         df.flush()
         tf.flush()
+        wf.flush()
+        nf.flush()
 
         print("Uploading 'info.json'... ", end='')
-        s3_client.upload_file(Filename=os.path.join(logs_directory, "info.json"),
+        s3_client.upload_file(Filename=nf.name,
                               Bucket=bucket,
                               Key=os.path.join(RUN_DIR, "info.json"),
                               ExtraArgs={'ACL': 'public-read'})
@@ -157,6 +215,13 @@ def main(bucket, scene_name, run_name, logs_directory):
         s3_client.upload_file(Filename=tf.name,
                               Bucket=bucket,
                               Key=os.path.join(RUN_DIR, "treelet.csv"),
+                              ExtraArgs={'ACL': 'public-read'})
+        print("done.")
+
+        print("Uploading 'worker.csv'... ", end='')
+        s3_client.upload_file(Filename=wf.name,
+                              Bucket=bucket,
+                              Key=os.path.join(RUN_DIR, "worker.csv"),
                               ExtraArgs={'ACL': 'public-read'})
         print("done.")
 
