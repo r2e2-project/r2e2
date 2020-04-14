@@ -174,7 +174,6 @@ void S3TransferAgent::workerThread( const size_t threadId )
         while ( !parser->empty() ) {
           const string_view status = parser->front().status_code();
           const string data = move( parser->front().body() );
-          parser->pop();
 
           switch ( status[0] ) {
             case '2': // successful
@@ -194,8 +193,11 @@ void S3TransferAgent::workerThread( const size_t threadId )
               break;
 
             default: // unexpected response, like 404 or something
-              throw runtime_error( "transfer failed" );
+              throw runtime_error( "s3 transfer failed: "
+                                   + string( parser->front().status_code() ) );
           }
+
+          parser->pop();
         }
       }
 
