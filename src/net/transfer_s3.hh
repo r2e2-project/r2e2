@@ -25,21 +25,21 @@ protected:
     std::atomic<Address> address { Address { "0", 0 } };
 
     S3Config( const std::unique_ptr<StorageBackend>& backend );
-  } clientConfig;
+  } _client_config;
 
   static constexpr size_t MAX_REQUESTS_ON_CONNECTION { 1 };
-  std::chrono::steady_clock::time_point lastAddrUpdate {};
-  const bool uploadAsPublic;
+  std::chrono::steady_clock::time_point _last_addr_update {};
+  const bool _upload_as_public;
 
-  HTTPRequest getRequest( const Action& action );
+  HTTPRequest get_request( const Action& action );
 
-  void doAction( Action&& action ) override;
-  void workerThread( const size_t threadId ) override;
+  void do_action( Action&& action ) override;
+  void worker_thread( const size_t thread_id ) override;
 
 public:
   S3TransferAgent( const std::unique_ptr<StorageBackend>& backend,
-                   const size_t threadCount = MAX_THREADS,
-                   const bool uploadAsPublic = false );
+                   const size_t thread_count = MAX_THREADS,
+                   const bool upload_as_public = false );
 
   ~S3TransferAgent();
 };

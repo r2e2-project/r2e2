@@ -7,45 +7,45 @@ namespace memcached {
 
 TransferAgent::TransferAgent( const vector<Address>& s,
                               const size_t tc,
-                              const bool autoDelete )
+                              const bool auto_delete )
   : ::TransferAgent()
-  , servers( s )
-  , outstandings( servers.size() )
-  , outstandingMutexes( servers.size() )
-  , cvs( servers.size() )
-  , autoDelete( autoDelete )
+  , _servers( s )
+  , _outstandings( _servers.size() )
+  , _outstanding_mutexes( _servers.size() )
+  , _cvs( _servers.size() )
+  , _auto_delete( auto_delete )
 {
-  threadCount = tc ? tc : servers.size() * 2;
+  _thread_count = tc ? tc : _servers.size() * 2;
 
-  if ( servers.size() == 0 ) {
+  if ( _servers.size() == 0 ) {
     throw runtime_error( "no servers specified" );
   }
 
-  if ( threadCount == 0 ) {
+  if ( _thread_count == 0 ) {
     throw runtime_error( "thread count cannot be zero" );
   }
 
-  for ( size_t i = 0; i < threadCount; i++ ) {
-    threads.emplace_back( &TransferAgent::workerThread, this, i );
+  for ( size_t i = 0; i < _thread_count; i++ ) {
+    _threads.emplace_back( &TransferAgent::worker_thread, this, i );
   }
 }
 
 TransferAgent::~TransferAgent()
 {
-  for ( size_t serverId = 0; serverId < servers.size(); serverId++ ) {
+  for ( size_t server_id = 0; server_id < _servers.size(); server_id++ ) {
     {
-      unique_lock<mutex> lock { outstandingMutexes[serverId] };
-      outstandings[serverId].emplace( nextId++, Task::Terminate, "", "" );
+      unique_lock<mutex> lock { _outstanding_mutexes[server_id] };
+      _outstandings[server_id].emplace( _next_id++, Task::Terminate, "", "" );
     }
 
-    cvs[serverId].notify_all();
+    _cvs[server_id].notify_all();
   }
 
-  for ( auto& t : threads )
+  for ( auto& t : _threads )
     t.join();
 }
 
-size_t getHash( const string& key )
+size_t get_hash( const string& key )
 {
   size_t result = 5381;
   for ( const char c : key )
@@ -53,31 +53,31 @@ size_t getHash( const string& key )
   return result;
 }
 
-void TransferAgent::flushAll()
+void TransferAgent::flush_all()
 {
-  for ( size_t serverId = 0; serverId < servers.size(); serverId++ ) {
-    Action action { nextId++, Task::Flush, "", "" };
+  for ( size_t server_id = 0; server_id < _servers.size(); server_id++ ) {
+    Action action { _next_id++, Task::Flush, "", "" };
 
     {
-      unique_lock<mutex> lock { outstandingMutexes[serverId] };
-      outstandings[serverId].push( move( action ) );
+      unique_lock<mutex> lock { _outstanding_mutexes[server_id] };
+      _outstandings[server_id].push( move( action ) );
     }
 
-    cvs[serverId].notify_one();
+    _cvs[server_id].notify_one();
   }
 }
 
-void TransferAgent::doAction( Action&& action )
+void TransferAgent::do_action( Action&& action )
 {
   /* what is the server id for this key? */
-  const size_t serverId = getHash( action.key ) % servers.size();
+  const size_t server_id = get_hash( action.key ) % _servers.size();
 
   {
-    unique_lock<mutex> lock { outstandingMutexes[serverId] };
-    outstandings[serverId].push( move( action ) );
+    unique_lock<mutex> lock { _outstanding_mutexes[server_id] };
+    _outstandings[server_id].push( move( action ) );
   }
 
-  cvs[serverId].notify_one();
+  _cvs[server_id].notify_one();
   return;
 }
 
@@ -85,53 +85,53 @@ void TransferAgent::doAction( Action&& action )
   try {                                                                        \
     x;                                                                         \
   } catch ( exception & ex ) {                                                 \
-    tryCount++;                                                                \
-    connectionOkay = false;                                                    \
+    try_count++;                                                               \
+    connection_okay = false;                                                   \
     sock.close();                                                              \
     y;                                                                         \
   }
 
-void TransferAgent::workerThread( const size_t threadId )
+void TransferAgent::worker_thread( const size_t thread_id )
 {
   constexpr milliseconds backoff { 50 };
-  size_t tryCount = 0;
+  size_t try_count = 0;
 
-  const size_t serverId = threadId % servers.size();
+  const size_t server_id = thread_id % _servers.size();
 
-  const Address address = servers.at( serverId );
+  const Address address = _servers.at( server_id );
 
   deque<Action> actions;
-  deque<Action> secondaryActions;
+  deque<Action> secondary_actions;
 
   while ( true ) {
     TCPSocket sock;
     auto parser = make_unique<ResponseParser>();
-    bool connectionOkay = true;
+    bool connection_okay = true;
 
     sock.set_read_timeout( 1s );
     sock.set_write_timeout( 1s );
 
-    if ( tryCount > 0 ) {
-      tryCount = min<size_t>( tryCount, 7u ); // caps at 3.2s
-      this_thread::sleep_for( backoff * ( 1 << ( tryCount - 1 ) ) );
+    if ( try_count > 0 ) {
+      try_count = min<size_t>( try_count, 7u ); // caps at 3.2s
+      this_thread::sleep_for( backoff * ( 1 << ( try_count - 1 ) ) );
     }
 
     TRY_OPERATION( sock.connect( address ), continue );
 
-    while ( connectionOkay ) {
+    while ( connection_okay ) {
       /* make sure we have an action to perfom */
       if ( actions.empty() ) {
-        unique_lock<mutex> lock { outstandingMutexes[serverId] };
+        unique_lock<mutex> lock { _outstanding_mutexes[server_id] };
 
-        cvs[serverId].wait( lock,
-                            [&]() { return !outstandings[serverId].empty(); } );
+        _cvs[server_id].wait(
+          lock, [&]() { return !_outstandings[server_id].empty(); } );
 
-        if ( outstandings[serverId].front().task == Task::Terminate )
+        if ( _outstandings[server_id].front().task == Task::Terminate )
           return;
 
         do {
-          actions.push_back( move( outstandings[serverId].front() ) );
-          outstandings[serverId].pop();
+          actions.push_back( move( _outstandings[server_id].front() ) );
+          _outstandings[server_id].pop();
         } while ( false );
       }
 
@@ -162,8 +162,8 @@ void TransferAgent::workerThread( const size_t threadId )
         }
 
         /* piggybacking of delete requests */
-        if ( !secondaryActions.empty() ) {
-          auto& front = secondaryActions.front();
+        if ( !secondary_actions.empty() ) {
+          auto& front = secondary_actions.front();
 
           if ( front.task == Task::Delete ) {
             auto request = DeleteRequest { front.key };
@@ -171,7 +171,7 @@ void TransferAgent::workerThread( const size_t threadId )
             requestStr += request.str();
           }
 
-          secondaryActions.pop_front();
+          secondary_actions.pop_front();
         }
 
         TRY_OPERATION( sock.write_all( requestStr ), break );
@@ -180,14 +180,14 @@ void TransferAgent::workerThread( const size_t threadId )
       char buffer[1024 * 1024];
       simple_string_span buffer_span { buffer, sizeof( buffer ) };
 
-      while ( connectionOkay && !actions.empty() ) {
+      while ( connection_okay && !actions.empty() ) {
         size_t read_count;
         TRY_OPERATION( read_count = sock.read( buffer_span ), break );
 
         if ( read_count == 0 ) {
           // connection was closed by the other side
-          tryCount++;
-          connectionOkay = false;
+          try_count++;
+          connection_okay = false;
           sock.close();
           break;
         }
@@ -199,31 +199,31 @@ void TransferAgent::workerThread( const size_t threadId )
 
           switch ( type ) {
             case Response::Type::VALUE:
-              if ( autoDelete ) {
+              if ( _auto_delete ) {
                 /* tell the memcached server to remove the object */
-                secondaryActions.emplace_back(
+                secondary_actions.emplace_back(
                   0, Task::Delete, actions.front().key, "" );
                 /* fall-through */
               }
 
             case Response::Type::OK:
             case Response::Type::STORED:
-              tryCount = 0;
+              try_count = 0;
 
               {
-                unique_lock<mutex> lock { resultsMutex };
-                results.emplace( actions.front().id,
-                                 move( parser->front().unstructured_data() ) );
+                unique_lock<mutex> lock { _results_mutex };
+                _results.emplace( actions.front().id,
+                                  move( parser->front().unstructured_data() ) );
               }
 
               actions.pop_front();
-              eventFD.write_event();
+              _event_fd.write_event();
               break;
 
             case Response::Type::NOT_STORED:
             case Response::Type::ERROR:
-              connectionOkay = false;
-              tryCount++;
+              connection_okay = false;
+              try_count++;
               break;
 
             case Response::Type::DELETED:

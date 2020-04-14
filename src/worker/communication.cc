@@ -152,7 +152,7 @@ void LambdaWorker::handle_sealed_bags()
 
     log_bag( BagAction::Submitted, bag.info );
 
-    const auto id = transfer_agent->requestUpload(
+    const auto id = transfer_agent->request_upload(
       bag.info.str( ray_bags_key_prefix ), move( bag.data ) );
 
     pending_ray_bags[id] = make_pair( Task::Upload, bag.info );
@@ -168,7 +168,7 @@ void LambdaWorker::handle_sample_bags()
     RayBag& bag = sample_bags.front();
     bag.data.erase( bag.info.bag_size );
 
-    const auto id = samples_transfer_agent->requestUpload(
+    const auto id = samples_transfer_agent->request_upload(
       bag.info.str( ray_bags_key_prefix ), move( bag.data ) );
 
     pending_ray_bags[id] = make_pair( Task::Upload, bag.info );
@@ -236,7 +236,7 @@ void LambdaWorker::handle_transfer_results( const bool sample_bags )
   }
 
   vector<pair<uint64_t, string>> actions;
-  agent->tryPopBulk( back_inserter( actions ) );
+  agent->try_pop_bulk( back_inserter( actions ) );
 
   for ( auto& action : actions ) {
     auto infoIt = pending_ray_bags.find( action.first );
