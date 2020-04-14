@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <getopt.h>
 #include <signal.h>
+#include <streambuf>
 #include <sys/mman.h>
 
 #include "messages/utils.hh"
@@ -130,6 +131,11 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
     [this] { this->terminate(); } );
 }
 
+struct membuf : streambuf
+{
+  membuf( char* begin, char* end ) { this->setg( begin, begin, end ); }
+};
+
 void LambdaWorker::get_and_setup_scene( const protobuf::GetObjects& proto )
 {
   vector<storage::GetRequest> requests;
@@ -162,13 +168,14 @@ void LambdaWorker::get_and_setup_scene( const protobuf::GetObjects& proto )
   const string s3_prefix = s3_backend.prefix();
 
   for ( const auto t : target_treelets ) {
-    FileDescriptor fd { CheckSystemCall( "memfd",
-                                         memfd_create( "treelet", 0 ) ) };
+    string output {};
 
-    s3_client.download_file( s3_bucket, s3_prefix + "T" + to_string( t ), fd );
-    CheckSystemCall( "lseek", lseek( fd.fd_num(), 0, SEEK_SET ) );
+    s3_client.download_file(
+      s3_bucket, s3_prefix + "T" + to_string( t ), output );
 
-    treelets.emplace( t, pbrt::scene::LoadTreelet( ".", t, fd.fd_num() ) );
+    membuf output_buf( output.data(), output.data() + output.size() );
+    istream in( &output_buf );
+    treelets.emplace( t, pbrt::scene::LoadTreelet( ".", t, &in ) );
   }
 }
 
