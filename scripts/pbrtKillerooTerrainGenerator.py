@@ -219,8 +219,7 @@ def genAccelerator(maxtreeletbytes: int = 1000000000):
     fmt_string = Attribute_string("Accelerator",[parameter_string("treeletdumpbvh"),
                                                 parameter_numeric("integer maxtreeletbytes",[maxtreeletbytes]),
                                                 parameter_numeric("string partition",['"nvidia"']),
-                                                parameter_numeric("string traversal",['"sendcheck"']),
-                                                parameter_numeric("integer copyablethreshold",[0])])
+                                                parameter_numeric("string traversal",['"sendcheck"'])])
     return fmt_string
 def genKillerooTerrain(output_filename: str,
                        xres: int,
