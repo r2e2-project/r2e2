@@ -72,12 +72,12 @@ void LambdaWorker::log_ray( const RayAction action,
   ostringstream oss;
 
   /* timestamp,pathId,hop,shadowRay,remainingBounces,workerId,treeletId,
-      action,bag */
+      ray origin,raydirection,action,bag */
   oss << duration_cast<milliseconds>( system_clock::now().time_since_epoch() )
            .count()
       << ',' << state.sample.id << ',' << state.hop << ',' << state.isShadowRay
       << ',' << static_cast<int>( state.remainingBounces ) << ',' << *worker_id
-      << ',' << state.CurrentTreelet() << ',';
+      << ',' << state.CurrentTreelet() << ',' << state.ray.o << ',' << state.ray.d << ',';
 
   // clang-format off
     switch(action) {
