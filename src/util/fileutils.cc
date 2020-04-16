@@ -29,7 +29,7 @@ namespace roost {
 
 void rename( const filesystem::path& oldpath, const filesystem::path& newpath )
 {
-  CheckSystemCall( "rename", ::rename( oldpath.c_str(), newpath.c_str() ) );
+  SystemCall( "rename", ::rename( oldpath.c_str(), newpath.c_str() ) );
 }
 
 void atomic_create( const string& contents,
@@ -47,8 +47,7 @@ void atomic_create( const string& contents,
     }
 
     if ( set_mode ) {
-      CheckSystemCall( "fchmod",
-                       fchmod( tmp_file.fd().fd_num(), target_mode ) );
+      SystemCall( "fchmod", fchmod( tmp_file.fd().fd_num(), target_mode ) );
     }
 
     /* allow block to end so the UniqueFile gets closed() before rename. */
@@ -62,11 +61,11 @@ void atomic_create( const string& contents,
 string read_file( const filesystem::path& pathn )
 {
   /* read input file into memory */
-  FileDescriptor in_file { CheckSystemCall(
+  FileDescriptor in_file { SystemCall(
     "open (" + pathn.string() + ")",
     open( pathn.string().c_str(), O_RDONLY ) ) };
   struct stat pathn_info;
-  CheckSystemCall( "fstat", fstat( in_file.fd_num(), &pathn_info ) );
+  SystemCall( "fstat", fstat( in_file.fd_num(), &pathn_info ) );
 
   if ( not S_ISREG( pathn_info.st_mode ) ) {
     throw runtime_error( pathn.string() + " is not a regular file" );

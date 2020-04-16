@@ -29,7 +29,7 @@ TempDirectory::~TempDirectory()
   }
 
   try {
-    CheckSystemCall( "rmdir " + name(), rmdir( name().c_str() ) );
+    SystemCall( "rmdir " + name(), rmdir( name().c_str() ) );
   } catch ( const exception& e ) {
     cerr << e.what() << endl;
   }

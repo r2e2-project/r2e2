@@ -97,8 +97,8 @@ private:
     }
   };
 
-  FileDescriptor _epoll_fd { CheckSystemCall( "epoll_create1",
-                                              ::epoll_create1( 0 ) ) };
+  FileDescriptor _epoll_fd { SystemCall( "epoll_create1",
+                                         ::epoll_create1( 0 ) ) };
   std::array<epoll_event, 512> _epoll_events {};
 
   std::vector<RuleCategory> _rule_categories {};
