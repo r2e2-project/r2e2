@@ -206,7 +206,6 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
       it = _fd_rules.erase( it );
       continue;
     } else if ( rule.cancel_requested ) {
-      rule.cancel();
       it = _fd_rules.erase( it );
       continue;
     }
