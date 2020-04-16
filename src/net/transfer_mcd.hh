@@ -1,35 +1,30 @@
 #pragma once
 
-#include <cstring>
+#include <vector>
 
+#include "address.hh"
 #include "memcached.hh"
 #include "transfer.hh"
-#include "util/tokenize.hh"
+#include "util/eventloop.hh"
 
 namespace memcached {
 
 class TransferAgent : public ::TransferAgent
 {
-protected:
+private:
   std::vector<Address> _servers {};
 
-  std::vector<std::queue<Action>> _outstandings;
-  std::vector<std::mutex> _outstanding_mutexes;
-  std::vector<std::condition_variable> _cvs;
-
-  const bool _auto_delete { true };
+  EventLoop _loop;
+  EventFD _action_event {};
 
   void do_action( Action&& action ) override;
   void worker_thread( const size_t thread_id ) override;
 
 public:
-  TransferAgent( const std::vector<Address>& servers,
-                 const size_t thread_count = 0,
-                 const bool auto_delete = true );
+  TransferAgent( const std::vector<Address>& servers );
+  ~TransferAgent();
 
   void flush_all();
-
-  ~TransferAgent();
 };
 
 } // namespace memcached
