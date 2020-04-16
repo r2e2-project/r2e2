@@ -13,7 +13,7 @@ namespace r2t2 {
 namespace protobuf {
 
 RecordWriter::RecordWriter( const string& filename )
-  : RecordWriter( FileDescriptor( CheckSystemCall(
+  : RecordWriter( FileDescriptor( SystemCall(
     filename,
     open( filename.c_str(),
           O_WRONLY | O_CREAT | O_TRUNC,
@@ -62,7 +62,7 @@ void RecordWriter::write( const uint64_t& integer )
 
 RecordReader::RecordReader( const string& filename )
   : RecordReader( FileDescriptor(
-    CheckSystemCall( filename, open( filename.c_str(), O_RDONLY, 0 ) ) ) )
+    SystemCall( filename, open( filename.c_str(), O_RDONLY, 0 ) ) ) )
 {}
 
 RecordReader::RecordReader( FileDescriptor&& fd )

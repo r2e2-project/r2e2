@@ -27,7 +27,7 @@ int do_fork()
   /* Verify that process is single-threaded before forking */
   {
     struct stat my_stat;
-    CheckSystemCall( "stat", stat( "/proc/self/task", &my_stat ) );
+    SystemCall( "stat", stat( "/proc/self/task", &my_stat ) );
 
     if ( my_stat.st_nlink != 3 ) {
       throw runtime_error(
@@ -35,7 +35,7 @@ int do_fork()
     }
   }
 
-  return CheckSystemCall( "fork", fork() );
+  return SystemCall( "fork", fork() );
 }
 
 /* start up a child process running the supplied lambda */
@@ -71,12 +71,11 @@ bool ChildProcess::waitable( void ) const
 
   siginfo_t infop;
   zero( infop );
-  CheckSystemCall(
-    "waitid",
-    waitid( P_PID,
-            pid_,
-            &infop,
-            WEXITED | WSTOPPED | WCONTINUED | WNOHANG | WNOWAIT ) );
+  SystemCall( "waitid",
+              waitid( P_PID,
+                      pid_,
+                      &infop,
+                      WEXITED | WSTOPPED | WCONTINUED | WNOHANG | WNOWAIT ) );
 
   if ( infop.si_pid == 0 ) {
     return false;
@@ -96,7 +95,7 @@ void ChildProcess::wait( const bool nonblocking )
 
   siginfo_t infop;
   zero( infop );
-  CheckSystemCall(
+  SystemCall(
     "waitid",
     waitid( P_PID,
             pid_,
@@ -155,7 +154,7 @@ void ChildProcess::signal( const int sig )
   assert( !moved_away_ );
 
   if ( !terminated_ ) {
-    CheckSystemCall( "kill", kill( pid_, sig ) );
+    SystemCall( "kill", kill( pid_, sig ) );
   }
 }
 

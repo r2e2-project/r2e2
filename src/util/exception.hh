@@ -54,7 +54,7 @@ inline void print_nested_exception( const std::exception& e, size_t level = 0 )
   }
 }
 
-inline int CheckSystemCall( const char* s_attempt, const int return_value )
+inline int SystemCall( const char* s_attempt, const int return_value )
 {
   if ( return_value >= 0 ) {
     return return_value;
@@ -63,8 +63,7 @@ inline int CheckSystemCall( const char* s_attempt, const int return_value )
   throw unix_error( s_attempt );
 }
 
-inline int CheckSystemCall( const std::string& s_attempt,
-                            const int return_value )
+inline int SystemCall( const std::string& s_attempt, const int return_value )
 {
-  return CheckSystemCall( s_attempt.c_str(), return_value );
+  return SystemCall( s_attempt.c_str(), return_value );
 }

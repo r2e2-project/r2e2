@@ -12,10 +12,10 @@ using namespace std;
 SignalMask::SignalMask( const initializer_list<int> signals )
   : mask_()
 {
-  CheckSystemCall( "sigemptyset", sigemptyset( &mask_ ) );
+  SystemCall( "sigemptyset", sigemptyset( &mask_ ) );
 
   for ( const auto signal : signals ) {
-    CheckSystemCall( "sigaddset", sigaddset( &mask_, signal ) );
+    SystemCall( "sigaddset", sigaddset( &mask_, signal ) );
   }
 }
 
@@ -24,8 +24,7 @@ SignalMask SignalMask::current_mask( void )
 {
   SignalMask mask = {};
 
-  CheckSystemCall( "sigprocmask",
-                   sigprocmask( SIG_BLOCK, nullptr, &mask.mask_ ) );
+  SystemCall( "sigprocmask", sigprocmask( SIG_BLOCK, nullptr, &mask.mask_ ) );
 
   return mask;
 }
@@ -47,12 +46,12 @@ bool SignalMask::operator==( const SignalMask& other ) const
 /* (because we'll use a signalfd instead to read them */
 void SignalMask::set_as_mask( void ) const
 {
-  CheckSystemCall( "sigprocmask", sigprocmask( SIG_SETMASK, &mask_, nullptr ) );
+  SystemCall( "sigprocmask", sigprocmask( SIG_SETMASK, &mask_, nullptr ) );
 }
 
 SignalFD::SignalFD( const SignalMask& signals )
   : FileDescriptor(
-    CheckSystemCall( "signalfd", signalfd( -1, &signals.mask(), 0 ) ) )
+    SystemCall( "signalfd", signalfd( -1, &signals.mask(), 0 ) ) )
 {}
 
 /* read one signal */

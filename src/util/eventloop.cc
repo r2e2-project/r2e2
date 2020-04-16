@@ -47,7 +47,7 @@ EventLoop::FDRule::FDRule( const size_t category_id,
     throw runtime_error( "callback in at least one direction is required" );
   }
 
-  CheckSystemCall(
+  SystemCall(
     "epoll_ctl",
     ::epoll_ctl( epoll_fd_num, EPOLL_CTL_ADD, this->fd.fd_num(), *this ) );
 }
@@ -226,7 +226,7 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
       rule.current_in_interested = in_interested;
       rule.current_out_interested = out_interested;
 
-      CheckSystemCall(
+      SystemCall(
         "epoll_ctl",
         epoll_ctl(
           _epoll_fd.fd_num(), EPOLL_CTL_MOD, rule.fd.fd_num(), rule ) );
@@ -250,11 +250,11 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
   {
     GlobalScopeTimer<Timer::Category::WaitingForEvent> timer;
 
-    available_fd_count = CheckSystemCall( "epoll_wait",
-                                          ::epoll_wait( _epoll_fd.fd_num(),
-                                                        _epoll_events.data(),
-                                                        _epoll_events.size(),
-                                                        timeout_ms ) );
+    available_fd_count = SystemCall( "epoll_wait",
+                                     ::epoll_wait( _epoll_fd.fd_num(),
+                                                   _epoll_events.data(),
+                                                   _epoll_events.size(),
+                                                   timeout_ms ) );
 
     if ( available_fd_count == 0 ) {
       return Result::Timeout;

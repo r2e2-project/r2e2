@@ -101,13 +101,13 @@ string run( const string& filename,
 
   ChildProcess command_process( args[0], [&]() {
     if ( read_stdout_until_eof ) {
-      CheckSystemCall( "dup2", dup2( pipe->second.fd_num(), STDOUT_FILENO ) );
+      SystemCall( "dup2", dup2( pipe->second.fd_num(), STDOUT_FILENO ) );
     }
 
     if ( suppress_errors ) {
-      FileDescriptor devnull { CheckSystemCall(
-        "open /dev/null", open( "/dev/null", O_RDONLY ) ) };
-      CheckSystemCall( "dup2", dup2( devnull.fd_num(), STDERR_FILENO ) );
+      FileDescriptor devnull { SystemCall( "open /dev/null",
+                                           open( "/dev/null", O_RDONLY ) ) };
+      SystemCall( "dup2", dup2( devnull.fd_num(), STDERR_FILENO ) );
     }
 
     return ezexec( filename, args, env, use_environ, path_search );

@@ -27,7 +27,7 @@ vector<char> to_mutable( const string& str )
 /* use mkstemp to get a unique filename on disk */
 UniqueFile::UniqueFile( const string& filename_template )
   : mutable_temp_filename_( to_mutable( filename_template + ".XXXXXX" ) )
-  , fd_( CheckSystemCall( "mkstemp", mkstemp( &mutable_temp_filename_[0] ) ) )
+  , fd_( SystemCall( "mkstemp", mkstemp( &mutable_temp_filename_[0] ) ) )
   , moved_away_( false )
 {}
 
@@ -36,11 +36,10 @@ UniqueFile::UniqueFile( const string& filename_prefix,
                         const string& filename_suffix )
   : mutable_temp_filename_(
     to_mutable( filename_prefix + "." + filename_suffix ) )
-  , fd_(
-      CheckSystemCall( "open (" + filename_prefix + "." + filename_suffix + ")",
-                       open( &mutable_temp_filename_.front(),
-                             O_RDWR | O_CREAT | O_EXCL,
-                             S_IRUSR | S_IWUSR ) ) )
+  , fd_( SystemCall( "open (" + filename_prefix + "." + filename_suffix + ")",
+                     open( &mutable_temp_filename_.front(),
+                           O_RDWR | O_CREAT | O_EXCL,
+                           S_IRUSR | S_IWUSR ) ) )
   , moved_away_( false )
 {}
 
@@ -52,7 +51,7 @@ TempFile::~TempFile()
   }
 
   try {
-    CheckSystemCall( "unlink " + name(), unlink( name().c_str() ) );
+    SystemCall( "unlink " + name(), unlink( name().c_str() ) );
   } catch ( const exception& e ) {
     print_exception( "TempFile", e );
   }
