@@ -147,6 +147,11 @@ void EventLoop::RuleHandle::cancel()
   }
 }
 
+void EventLoop::set_fd_failure_callback( const CallbackT& callback )
+{
+  _fd_failure_callback = callback;
+}
+
 EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 {
   // handle the non-file-descriptor-related rules
@@ -273,7 +278,9 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
       this_rule.done = true;
       this_rule.cancel();
 
-      if ( ret == -1 and errno == ENOTSOCK ) {
+      if ( _fd_failure_callback ) {
+        ( *_fd_failure_callback )();
+      } else if ( ret == -1 and errno == ENOTSOCK ) {
         throw runtime_error( "error on polled file descriptor for rule \""
                              + _rule_categories.at( this_rule.category_id ).name
                              + "\"" );
