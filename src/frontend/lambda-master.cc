@@ -463,7 +463,7 @@ void LambdaMaster::run()
 
     EventLoop memcached_loop;
     unique_ptr<memcached::TransferAgent> agent
-      = make_unique<memcached::TransferAgent>( servers, servers.size() );
+      = make_unique<memcached::TransferAgent>( servers );
 
     size_t flushed_count = 0;
 

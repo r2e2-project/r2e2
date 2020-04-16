@@ -23,7 +23,7 @@ public:
     Download,
     Upload,
     Delete,
-    Flush,
+    FlushAll,
     Terminate
   };
 
