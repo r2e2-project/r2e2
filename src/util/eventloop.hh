@@ -109,6 +109,8 @@ private:
   std::list<std::shared_ptr<FDRule>> _pending_fd_rules {};
   std::list<std::shared_ptr<Rule>> _pending_non_fd_rules {};
 
+  std::optional<CallbackT> _fd_failure_callback;
+
   const uint64_t _beginning_timestamp { Timer::timestamp_ns() };
 
 public:
@@ -165,6 +167,8 @@ public:
     const size_t category_id,
     const CallbackT& callback,
     const InterestT& interest = [] { return true; } );
+
+  void set_fd_failure_callback( const CallbackT& callback );
 
   //! Calls [poll(2)](\ref man2::poll) and then executes callback for each ready
   //! fd.
