@@ -25,8 +25,7 @@ public:
   template<class DurationA, class DurationB>
   TimerFD( const DurationA& interval, const DurationB& initial )
     : FileDescriptor(
-      CheckSystemCall( "timerfd",
-                       timerfd_create( CLOCK_MONOTONIC, TFD_NONBLOCK ) ) )
+      SystemCall( "timerfd", timerfd_create( CLOCK_MONOTONIC, TFD_NONBLOCK ) ) )
   {
     set( interval, initial );
   }
@@ -41,8 +40,8 @@ public:
   {
     to_timespec( interval, timerspec_.it_interval );
     to_timespec( initial, timerspec_.it_value );
-    CheckSystemCall( "timerfd_settime",
-                     timerfd_settime( fd_num(), 0, &timerspec_, nullptr ) );
+    SystemCall( "timerfd_settime",
+                timerfd_settime( fd_num(), 0, &timerspec_, nullptr ) );
 
     armed_ = ( initial != std::chrono::nanoseconds::zero() );
     recurring_ = ( interval != std::chrono::nanoseconds::zero() );
