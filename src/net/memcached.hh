@@ -125,8 +125,8 @@ public:
 class ResponseParser
 {
 private:
-  std::queue<Request::Type> requests_;
-  std::queue<Response> responses_;
+  std::queue<Request::Type> requests_ {};
+  std::queue<Response> responses_ {};
 
   std::string raw_buffer_ {};
 
@@ -137,10 +137,10 @@ private:
     LastLinePending
   };
 
-  State state_;
+  State state_ { State::FirstLinePending };
   size_t expected_body_length_ { 0 };
 
-  Response response_;
+  Response response_ {};
 
 public:
   template<class T>
