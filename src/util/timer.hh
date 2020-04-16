@@ -84,7 +84,7 @@ public:
 
 inline Timer& global_timer()
 {
-  static Timer the_global_timer;
+  static thread_local Timer the_global_timer;
   return the_global_timer;
 }
 
