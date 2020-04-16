@@ -3,6 +3,8 @@
 #include <cstring>
 #include <string_view>
 
+#include "client.hh"
+#include "session.hh"
 #include "transfer.hh"
 #include "util/tokenize.hh"
 
@@ -22,33 +24,26 @@ public:
   };
 
 private:
+  Type type_;
   std::string first_line_ {};
   std::string unstructured_data_ {};
 
 public:
+  Type type() const { return type_; }
   const std::string& first_line() const { return first_line_; }
   const std::string& unstructured_data() const { return unstructured_data_; }
 
-  Request( const std::string& first_line, const std::string& unstructured_data )
-    : first_line_( first_line )
+  Request( Type type,
+           const std::string& first_line,
+           const std::string& unstructured_data )
+    : type_( type )
+    , first_line_( first_line )
     , unstructured_data_( unstructured_data )
-  {}
-
-  std::string str() const
   {
-    std::string output;
-    output.reserve( first_line_.length() + 2 + unstructured_data_.length()
-                    + 2 );
-
-    output.append( first_line_ );
-    output.append( CRLF );
-
-    if ( !unstructured_data_.empty() ) {
-      output.append( unstructured_data_ );
-      output.append( CRLF );
+    first_line_.append( CRLF );
+    if ( not unstructured_data_.empty() ) {
+      unstructured_data_.append( CRLF );
     }
-
-    return output;
   }
 };
 
@@ -56,39 +51,34 @@ class SetRequest : public Request
 {
 public:
   SetRequest( const std::string& key, const std::string& data )
-    : Request( "set " + key + " 0 0 " + std::to_string( data.length() ), data )
+    : Request( Request::Type::SET,
+               "set " + key + " 0 0 " + std::to_string( data.length() ),
+               data )
   {}
-
-  constexpr Request::Type type() const { return Request::Type::SET; }
 };
 
 class GetRequest : public Request
 {
 public:
   GetRequest( const std::string& key )
-    : Request( "get " + key, "" )
+    : Request( Request::Type::GET, "get " + key, "" )
   {}
-
-  constexpr Request::Type type() const { return Request::Type::GET; }
 };
 
 class DeleteRequest : public Request
 {
 public:
   DeleteRequest( const std::string& key )
-    : Request( "delete " + key, "" )
+    : Request( Request::Type::DELETE, "delete " + key, "" )
   {}
-
-  constexpr Request::Type type() const { return Request::Type::DELETE; }
 };
 
 class FlushRequest : public Request
 {
 public:
   FlushRequest()
-    : Request( "flush_all", "" )
+    : Request( Request::Type::FLUSH, "flush_all", "" )
   {}
-  constexpr Request::Type type() const { return Request::Type::FLUSH; }
 };
 
 class Response
@@ -149,12 +139,13 @@ public:
     requests_.push( req.type() );
   }
 
-  void parse( const std::string_view data )
+  size_t parse( const std::string_view data )
   {
     auto startswith = []( const std::string& token, const char* cstr ) -> bool {
       return ( token.compare( 0, strlen( cstr ), cstr ) == 0 );
     };
 
+    const size_t input_length = data.length();
     raw_buffer_.append( data );
 
     bool must_continue = true;
@@ -253,11 +244,38 @@ public:
         }
       }
     }
+
+    return input_length;
   }
 
   bool empty() const { return responses_.empty(); }
   Response& front() { return responses_.front(); }
   void pop() { responses_.pop(); }
+};
+
+class Client : public ::Client<TCPSession, Request, Response>
+{
+private:
+  std::queue<Request> requests_;
+  ResponseParser responses_;
+
+  std::string_view current_request_first_line_;
+  std::string_view current_request_data_;
+
+  void load();
+
+  bool requests_empty() const override;
+  bool responses_empty() const override { return responses_.empty(); }
+  Response& responses_front() override { return responses_.front(); }
+  void responses_pop() override { responses_.pop(); }
+
+  void write( RingBuffer& out ) override;
+  void read( RingBuffer& in ) override;
+
+public:
+  using ::Client<TCPSession, Request, Response>::Client;
+
+  void push_request( Request&& req ) override;
 };
 
 }
