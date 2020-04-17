@@ -1,5 +1,7 @@
 import numpy as np 
 import os
+from pathlib import Path
+
 import sys
 import functools
 import operator
@@ -68,9 +70,15 @@ def killeroo_string(height_coeff,
                     is_instance = False,
                     instance_name = "killerooInstance",
                     killeroo_path ="geometry/killeroo.pbrt" ):
-    
     fmt_string = Attribute_string("AttributeBegin")
-    
+    if is_instance == False:
+        fmt_string += Attribute_string("ObjectBegin",[parameter_string(instance_name)])
+        fmt_string += Attribute_string("Material",[parameter_string("plastic"),
+                                                   parameter_numeric("color Kd",color1),
+                                                   parameter_numeric("color Kd",color2),
+                                                   parameter_numeric("float roughness",roughness)])
+        fmt_string += Attribute_string("Include",[parameter_string(killeroo_path)])
+        fmt_string +=  Attribute_string("ObjectEnd")
     #base scale
     fmt_string += Attribute_string("Scale",[parameter_coordinate([0.01,0.01,0.01])])
     if scale != None:
@@ -78,59 +86,39 @@ def killeroo_string(height_coeff,
             fmt_string += Attribute_string("Scale",[parameter_coordinate(scale)])
         else:
             fmt_string += Attribute_string("Scale",[parameter_coordinate([scale,scale,scale])])
-    
-    
+
+
     #base rotation
     fmt_string += Attribute_string("Rotate",[parameter_coordinate([90,-1 ,0,0])])
-    
+
     if translation != None:
         fmt_string += Attribute_string("Translate",[parameter_coordinate(translation)])
-    
+
     if rotation != None:
         fmt_string += Attribute_string("Rotate",[parameter_coordinate([rotation[0],1,0,0])])
         fmt_string += Attribute_string("Rotate",[parameter_coordinate([rotation[1],0,1,0])])
         fmt_string += Attribute_string("Rotate",[parameter_coordinate([rotation[2],0,0,1])])
-    
+
     #base translation
     fmt_string += Attribute_string("Translate",[parameter_coordinate([0,0,
-                                            140])])
-    if is_instance == False:
-        fmt_string += Attribute_string("Material",[parameter_string("plastic"),
-                                                   parameter_numeric("color Kd",color1),
-                                                   parameter_numeric("color Kd",color2),
-                                                   parameter_numeric("float roughness",roughness)])
-        fmt_string += Attribute_string("Include",[parameter_string(killeroo_path)])
-    if is_instance == True:
-        fmt_string += Attribute_string("ObjectInstance",[parameter_string(instance_name)])
+                                            140])])        
+    # if is_instance == True:
+    fmt_string += Attribute_string("ObjectInstance",[parameter_string(instance_name)])
     fmt_string += Attribute_string("AttributeEnd")
             
-    return fmt_string
-def genkKillerooObj(killeroo_path="geometry/killeroo.pbrt",
-                    color1: list = [.7,.3,.3],
-                    color2: list = [.7,.2,.1],
-                    roughness: float = .15,
-                    name = "killerooInstance"):
-    fmt_string = Attribute_string("AttributeBegin")
-    fmt_string += Attribute_string("ObjectBegin",[parameter_string(name)])
-    fmt_string += Attribute_string("AttributeBegin")
-    fmt_string += Attribute_string("Material",[parameter_string("plastic"),
-                                               parameter_numeric("color Kd",color1),
-                                               parameter_numeric("color Kd",color2),
-                                               parameter_numeric("float roughness",roughness)])
-    fmt_string += Attribute_string("Include",[parameter_string(killeroo_path)])
-    fmt_string += Attribute_string("AttributeEnd")
-    fmt_string +=  Attribute_string("ObjectEnd")
-    fmt_string += Attribute_string("AttributeEnd\n")
     return fmt_string
     
 
 def genKilleroo(m,n,i,j,
                 k_coeff,
+                color1,
+                color2,
                 l_scale_coeff,
                 height_coeff,
                 hill_terrain,
                 rotate_val = None,
                 is_instance = False,
+                instance_name = "killerooInstance",
                 killeroo_path = "geometry/killeroo.pbrt"):
     #ensure that indicies are never at the edge of heightmap to exclude boundary cases
     #for inward facing normals
@@ -179,7 +167,10 @@ def genKilleroo(m,n,i,j,
                                     scale = k_coeff,
                                     translation=[tx,ty,tz],
                                     rotation = [-theta_x,-theta_y,theta_z],
+                                    color1 = color1,
+                                    color2 = color2,
                                     is_instance=is_instance,
+                                    instance_name = instance_name,
                                     killeroo_path=killeroo_path)
     return fmt_string
 def genCamera(LookAt,fov,xres,yres,output_name):
@@ -275,12 +266,15 @@ def genKillerooTerrain(output_filename: str,
     fmt_string += Attribute_string("Translate",[parameter_coordinate([-l_scale_coeff//2,0,l_scale_coeff//2])])
     fmt_string += Attribute_string("Rotate",[parameter_coordinate([90,-1,0,0])])
     fmt_string += Attribute_string("Scale",[parameter_coordinate([l_scale_coeff,l_scale_coeff,height_coeff])])
-    fmt_string += Attribute_string("Include",[parameter_string(land_filename)])
+    fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(land_filename,
+                                                                os.path.dirname(output_filename)))])
     fmt_string += Attribute_string("AttributeEnd\n") 
      
     #killerooObj gen
-    fmt_string += genkKillerooObj(killeroo_path)
-    fmt_string += Attribute_string("Include",[parameter_string(killeroos_filename)])
+    # fmt_string += genkKillerooObj(killeroo_path)
+
+    fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(killeroos_filename,
+                                                                os.path.dirname(output_filename)))])
     fmt_string += Attribute_string("WorldEnd")
     f.write(fmt_string)
     
@@ -302,11 +296,20 @@ def genKillerooTerrain(output_filename: str,
         i = np.clip(i + np.random.uniform(-step/2,step/2),-4,4)
         j = np.clip(j + np.random.uniform(-step/2,step/2),-4,4)
         rotate_val = np.random.uniform(0,360)
-        t.write(genKilleroo(m,n,i,j,k_coeff,l_scale_coeff,height_coeff,hill_terrain,rotate_val,False,killeroo_path))
+        instance_name = "killerooInstance" + str(k)
+        color1 = np.random.uniform(0,1,(3)).tolist()
+        color2 = np.random.uniform(0,1,(3)).tolist()
+        t.write(genKilleroo(m,n,i,j,k_coeff,color1,color2,
+                            l_scale_coeff,height_coeff,
+                            hill_terrain,rotate_val,False,
+                            instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
         for r in range(num_killeroos_per_sparse):
             u = np.clip(i + np.random.uniform(-step/3,step/3),-4,4)
             v = np.clip(j + np.random.uniform(-step/3,step/3),-4,4)
-            t.write(genKilleroo(m,n,u,v,k_coeff,l_scale_coeff,height_coeff,hill_terrain,rotate_val,True,killeroo_path))
+            t.write(genKilleroo(m,n,u,v,k_coeff,color1,color2,
+                                l_scale_coeff,height_coeff,
+                                hill_terrain,rotate_val,True,
+                                instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
     
 def main():
     parser = argparse.ArgumentParser(description=("'Generate a parameterized pbrt file of killeroos on hilly terrain"))
@@ -331,8 +334,12 @@ def main():
     parser.add_argument('--height_scale',default =30 * scale_step,help=("scale of physical height of heightmap"))
     parser.add_argument('--random_seed',default =2)
 
+
     args = parser.parse_args()
-    genKillerooTerrain( args.output_path+"killeroo_terrain.pbrt",
+    if not os.path.exists(args.output_path):
+        os.mkdir(args.output_path)
+
+    genKillerooTerrain(os.path.join(args.output_path,"killeroo_terrain.pbrt"),
                        xres=int(args.xres),
                        yres=int(args.yres),
                        landxres =int(args.landxres),
@@ -346,7 +353,7 @@ def main():
                        prop = float(args.unique_prop),
                        random_seed=int(args.random_seed),
                        killeroo_path=args.killeroo_path,
-                       land_filename=args.output_path + "gen_killeroo_land.pbrt",
-                       killeroos_filename=args.output_path + "gen_killeroo_geometry.pbrt")
+                       land_filename=os.path.join(args.output_path,"gen_killeroo_land.pbrt"),
+                       killeroos_filename=os.path.join(args.output_path,"gen_killeroo_geometry.pbrt"))
 if __name__ == '__main__':
     main()
