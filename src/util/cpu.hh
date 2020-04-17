@@ -11,14 +11,14 @@ public:
 
   static const int64_t TIME_UNIT; /* ticks per second */
 
-  uint64_t user;
-  uint64_t nice;
-  uint64_t system;
-  uint64_t idle;
-  uint64_t iowait;
-  uint64_t irq;
-  uint64_t soft_irq;
-  uint64_t steal;
-  uint64_t guest;
-  uint64_t guest_nice;
+  uint64_t user { 0 };
+  uint64_t nice { 0 };
+  uint64_t system { 0 };
+  uint64_t idle { 0 };
+  uint64_t iowait { 0 };
+  uint64_t irq { 0 };
+  uint64_t soft_irq { 0 };
+  uint64_t steal { 0 };
+  uint64_t guest { 0 };
+  uint64_t guest_nice { 0 };
 };

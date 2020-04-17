@@ -13,7 +13,7 @@
 class TimerFD : public FileDescriptor
 {
 private:
-  itimerspec timerspec_;
+  itimerspec timerspec_ {};
   bool armed_ { false };
   bool recurring_ { false };
 

@@ -98,7 +98,8 @@ LambdaMaster::Tiles::Tiles( const int size,
 
 bool LambdaMaster::Tiles::camera_rays_remaining() const
 {
-  return cur_tile < n_tiles.x * n_tiles.y;
+  return cur_tile < ( static_cast<size_t>( n_tiles.x )
+                      * static_cast<size_t>( n_tiles.y ) );
 }
 
 Bounds2i LambdaMaster::Tiles::next_camera_tile()

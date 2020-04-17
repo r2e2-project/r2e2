@@ -36,18 +36,18 @@ struct RayBagInfo
     return oss.str();
   }
 
-  RayBagInfo( const WorkerId worker_id,
-              const TreeletId treelet_id,
-              const BagId bag_id,
-              const size_t ray_count,
-              const size_t bag_size,
-              const bool sample_bag )
-    : worker_id( worker_id )
-    , treelet_id( treelet_id )
-    , bag_id( bag_id )
-    , ray_count( ray_count )
-    , bag_size( bag_size )
-    , sample_bag( sample_bag )
+  RayBagInfo( const WorkerId worker_id_,
+              const TreeletId treelet_id_,
+              const BagId bag_id_,
+              const size_t ray_count_,
+              const size_t bag_size_,
+              const bool sample_bag_ )
+    : worker_id( worker_id_ )
+    , treelet_id( treelet_id_ )
+    , bag_id( bag_id_ )
+    , ray_count( ray_count_ )
+    , bag_size( bag_size_ )
+    , sample_bag( sample_bag_ )
   {}
 
   RayBagInfo() = default;
@@ -88,8 +88,8 @@ struct RayBag
     , data( max_bag_len, '\0' )
   {}
 
-  RayBag( const RayBagInfo& info, std::string&& data )
-    : info( info )
-    , data( std::move( data ) )
+  RayBag( const RayBagInfo& info_, std::string&& data_ )
+    : info( info_ )
+    , data( std::move( data_ ) )
   {}
 };

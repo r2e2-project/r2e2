@@ -63,12 +63,12 @@ LambdaMaster::~LambdaMaster()
 
 LambdaMaster::LambdaMaster( const uint16_t listen_port,
                             const uint16_t client_port,
-                            const uint32_t max_workers,
-                            const uint32_t ray_generators,
-                            const string& public_address,
-                            const string& storage_backend_uri,
-                            const string& aws_region,
-                            unique_ptr<Scheduler>&& scheduler,
+                            const uint32_t max_workers_,
+                            const uint32_t ray_generators_,
+                            const string& public_address_,
+                            const string& storage_backend_uri_,
+                            const string& aws_region_,
+                            unique_ptr<Scheduler>&& scheduler_,
                             const MasterConfiguration& user_config )
   : config( user_config )
   , job_id( [] {
@@ -76,14 +76,14 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     oss << hex << setfill( '0' ) << setw( 8 ) << time( nullptr );
     return oss.str();
   }() )
-  , max_workers( max_workers )
-  , ray_generators( ray_generators )
-  , scheduler( move( scheduler ) )
-  , public_address( public_address )
-  , storage_backend_uri( storage_backend_uri )
-  , storage_backend( StorageBackend::create_backend( storage_backend_uri ) )
-  , aws_region( aws_region )
+  , public_address( public_address_ )
+  , storage_backend_uri( storage_backend_uri_ )
+  , storage_backend( StorageBackend::create_backend( storage_backend_uri_ ) )
+  , aws_region( aws_region_ )
   , aws_address( LambdaInvocationRequest::endpoint( aws_region ), "https" )
+  , max_workers( max_workers_ )
+  , ray_generators( ray_generators_ )
+  , scheduler( move( scheduler_ ) )
   , worker_rule_categories( { loop.add_category( "Socket" ),
                               loop.add_category( "Message read" ),
                               loop.add_category( "Message write" ),
@@ -192,7 +192,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   }
 
   auto print_info = []( char const* key, auto value ) {
-    cerr << "  " << key << "    \e[1m" << value << "\e[0m" << endl;
+    cerr << "  " << key << "    \x1B[1m" << value << "\x1B[0m" << endl;
   };
 
   cerr << endl << "Job info:" << endl;
@@ -278,7 +278,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     "Listener",
     Direction::In,
     listener_socket,
-    [this, max_workers] {
+    [this] {
       TCPSocket socket = listener_socket.accept();
 
       /* do we want this worker? */
@@ -630,9 +630,9 @@ void usage( const char* argv0, int exit_code )
   exit( exit_code );
 }
 
-optional<Bounds2i> parse_crop_window_optarg( const string& optarg )
+optional<Bounds2i> parse_crop_window_optarg( const string& arg )
 {
-  vector<string> args = split( optarg, "," );
+  vector<string> args = split( arg, "," );
   if ( args.size() != 4 )
     return {};
 
@@ -814,7 +814,8 @@ int main( int argc, char* argv[] )
        || ( crop_window.has_value() && pixels_per_tile != 0
             && pixels_per_tile
                  != numeric_limits<typeof( pixels_per_tile )>::max()
-            && pixels_per_tile > crop_window->Area() ) ) {
+            && pixels_per_tile
+                 > static_cast<uint32_t>( crop_window->Area() ) ) ) {
     usage( argv[0], 2 );
   }
 

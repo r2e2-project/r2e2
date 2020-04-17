@@ -90,8 +90,15 @@ private:
     operator epoll_event*()
     {
       _epoll_event.data.ptr = static_cast<void*>( this );
-      _epoll_event.events = ( current_in_interested ? EPOLLIN : 0 )
-                            | ( current_out_interested ? EPOLLOUT : 0 );
+      _epoll_event.events = 0;
+
+      if ( current_in_interested ) {
+        _epoll_event.events |= EPOLLIN;
+      }
+
+      if ( current_out_interested ) {
+        _epoll_event.events |= EPOLLOUT;
+      }
 
       return &_epoll_event;
     }
@@ -109,7 +116,7 @@ private:
   std::list<std::shared_ptr<FDRule>> _pending_fd_rules {};
   std::list<std::shared_ptr<Rule>> _pending_non_fd_rules {};
 
-  std::optional<CallbackT> _fd_failure_callback;
+  std::optional<CallbackT> _fd_failure_callback { std::nullopt };
 
   const uint64_t _beginning_timestamp { Timer::timestamp_ns() };
 

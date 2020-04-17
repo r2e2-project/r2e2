@@ -16,7 +16,7 @@ namespace meow {
 class Message
 {
 public:
-  enum class OpCode : char
+  enum class OpCode : uint8_t
   {
     Hey = 0x1,
     Ping,

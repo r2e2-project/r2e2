@@ -98,9 +98,9 @@ private:
   const std::string public_address;
   const std::string storage_backend_uri;
   const std::unique_ptr<StorageBackend> storage_backend;
-  const Address aws_address;
-  const std::string aws_region;
   const AWSCredentials aws_credentials {};
+  const std::string aws_region;
+  const Address aws_address;
   const std::string lambda_function_name {
     safe_getenv_or( "R2T2_LAMBDA_FUNCTION", "r2t2-lambda-function" )
   };
@@ -126,9 +126,9 @@ private:
       Aggregator
     };
 
-    Worker( const WorkerId id, const Role role, TCPSocket&& sock )
-      : id( id )
-      , role( role )
+    Worker( const WorkerId id_, const Role role_, TCPSocket&& sock )
+      : id( id_ )
+      , role( role_ )
       , client( TCPSession { std::move( sock ) } )
     {
       Worker::active_count[role]++;
@@ -157,7 +157,7 @@ private:
 
       uint64_t terminated { 0 };
       uint64_t enqueued { 0 };
-    } rays;
+    } rays {};
 
     uint64_t active_rays() const
     {
@@ -168,7 +168,7 @@ private:
     // Statistics
     bool is_logged { true };
     WorkerStats stats {};
-    WorkerStats last_stats;
+    WorkerStats last_stats {};
 
     protobuf::RayBags to_be_assigned {};
     bool marked_free { false };
@@ -198,8 +198,8 @@ private:
     std::set<WorkerId> workers {};
     std::pair<bool, TreeletStats> last_stats { true, {} };
 
-    Treelet( const TreeletId id )
-      : id( id )
+    Treelet( const TreeletId treelet_id )
+      : id( treelet_id )
     {}
   };
 
@@ -222,8 +222,8 @@ private:
   void invoke_workers( const size_t n );
 
   std::unique_ptr<Scheduler> scheduler;
-  std::deque<TreeletId> treelets_to_spawn;
-  std::string invocation_payload;
+  std::deque<TreeletId> treelets_to_spawn {};
+  std::string invocation_payload {};
 
   ////////////////////////////////////////////////////////////////////////////
   // Worker <-> Object Assignments                                          //
@@ -252,19 +252,19 @@ private:
   void handle_queued_ray_bags();
 
   /* ray bags that are going to be assigned to workers */
-  std::vector<std::queue<RayBagInfo>> queued_ray_bags;
+  std::vector<std::queue<RayBagInfo>> queued_ray_bags {};
   size_t queued_ray_bags_count { 0 };
 
   /* ray bags that there are no workers for them */
-  std::vector<std::queue<RayBagInfo>> pending_ray_bags;
+  std::vector<std::queue<RayBagInfo>> pending_ray_bags {};
 
   /* sample bags */
-  std::vector<RayBagInfo> sample_bags;
+  std::vector<RayBagInfo> sample_bags {};
 
   void move_from_pending_to_queued( const TreeletId treelet_id );
   void move_from_queued_to_pending( const TreeletId treelet_id );
 
-  std::map<TreeletId, size_t> queue_size;
+  std::map<TreeletId, size_t> queue_size {};
 
   ////////////////////////////////////////////////////////////////////////////
   // Stats                                                                  //
@@ -359,7 +359,7 @@ private:
 
   void handle_signal( const signalfd_siginfo& sig );
 
-  SSLContext ssl_context;
+  SSLContext ssl_context {};
   std::list<HTTPClient<SSLSession>> https_clients {};
   std::list<decltype( https_clients )::iterator> finished_https_clients {};
   HTTPClient<SSLSession>::RuleCategories https_rule_categories;

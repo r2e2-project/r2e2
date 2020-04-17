@@ -14,7 +14,7 @@ using timepoint_t = std::chrono::time_point<std::chrono::system_clock>;
 inline timepoint_t now()
 {
   return std::chrono::system_clock::now();
-};
+}
 
 struct TreeletStats
 {
@@ -26,7 +26,7 @@ struct TreeletStats
   };
 
   Stats enqueued {}, dequeued {};
-  std::vector<Stats> enqueuedTo, dequeuedFrom;
+  std::vector<Stats> enqueuedTo {}, dequeuedFrom {};
 
   TreeletStats operator-( const TreeletStats& other ) const;
 };

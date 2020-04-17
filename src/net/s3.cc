@@ -321,9 +321,6 @@ void S3Client::download_files(
 
               if ( not responses.empty() ) {
                 if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
-                  const size_t response_index
-                    = first_file_idx + response_count * thread_count;
-
                   throw runtime_error( "HTTP failure in downloading" );
                 } else {
                   const size_t response_index

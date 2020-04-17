@@ -39,16 +39,15 @@ void Histogram<T>::add( const T value )
 
 template<>
 Histogram<uint64_t>::Histogram( const protobuf::HistogramUInt64& proto )
+  : width_( proto.width() )
+  , lower_bound_( proto.lower_bound() )
+  , upper_bound_( proto.upper_bound() )
+  , count_( proto.count() )
+  , min_value_( proto.min() )
+  , max_value_( proto.max() )
+  , sum_( proto.sum() )
+  , squares_sum_( proto.squares_sum() )
 {
-  width_ = proto.width();
-  lower_bound_ = proto.lower_bound();
-  upper_bound_ = proto.upper_bound();
-  count_ = proto.count();
-  min_value_ = proto.min();
-  max_value_ = proto.max();
-  sum_ = proto.sum();
-  squares_sum_ = proto.squares_sum();
-
   bins_.resize(
     static_cast<size_t>( ( upper_bound_ - lower_bound_ + width_ ) / width_ ) );
 

@@ -104,11 +104,11 @@ void TransferAgent::worker_thread( const size_t )
     };
 
     function<void( void )> cancel_callback = [&, i = i] {
-      TCPSocket socket;
-      socket.set_blocking( false );
-      socket.connect( _servers[i] );
+      TCPSocket new_socket;
+      new_socket.set_blocking( false );
+      new_socket.connect( _servers[i] );
 
-      clients[i] = make_unique<memcached::Client>( move( socket ) );
+      clients[i] = make_unique<memcached::Client>( move( new_socket ) );
       clients[i]->install_rules(
         _loop, rule_categories, response_callback, cancel_callback );
 
