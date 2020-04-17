@@ -27,8 +27,8 @@ unordered_map<uint64_t, unordered_set<uint32_t>> loadInitMapping(
   unordered_map<uint64_t, unordered_set<uint32_t>> workerToTreelets;
   uint64_t workerID = 0;
   for ( uint32_t treeletID = 0; treeletID < numTreelets; treeletID++ ) {
-    uint64_t numWorkers = schedule[treeletID];
-    for ( uint64_t i = 0; i < numWorkers; i++ ) {
+    uint64_t n = schedule[treeletID];
+    for ( uint64_t i = 0; i < n; i++ ) {
       workerToTreelets[workerID].emplace( treeletID );
       workerID++;
     }
@@ -138,8 +138,9 @@ void Simulator::simulate()
              << curStats.bounceRaysLaunched << ", "
              << curStats.shadowRaysLaunched << ", " << curStats.raysCompleted
              << ", " << curStats.bytesTransferred << ", "
-             << (double)curStats.bytesTransferred
-                  / (double)( numWorkers * ( workerBandwidth / 1000 ) )
+             << static_cast<double>( curStats.bytesTransferred )
+                  / static_cast<double>( numWorkers
+                                         * ( workerBandwidth / 1000 ) )
              << endl;
 
     curMS++;
@@ -157,7 +158,9 @@ void Simulator::dump_stats()
   cout << "Shadow rays launched: " << totalShadowRaysLaunched << endl;
   cout << "Total rays launched: " << totalRaysLaunched << endl;
   cout << "Average transfers/ray: "
-       << (double)totalRaysTransferred / (double)totalRaysLaunched << endl;
+       << ( static_cast<double>( totalRaysTransferred )
+            / static_cast<double>( totalRaysLaunched ) )
+       << endl;
   cout << "Average bytes/ray: " << totalBytesTransferred / totalRaysTransferred
        << endl;
 
@@ -191,7 +194,8 @@ bool Simulator::shouldGenNewRays( const Worker& worker )
 {
   return workerToTreelets.at( worker.id ).count( 0 )
          && worker.inQueue.size() + worker.outstanding < maxRays / 10
-         && curCameraTile < nCameraTiles.x * nCameraTiles.y;
+         && curCameraTile < static_cast<uint32_t>( nCameraTiles.x )
+                              * static_cast<uint32_t>( nCameraTiles.y );
 }
 
 Bounds2i Simulator::nextCameraTile()
@@ -238,7 +242,7 @@ void Simulator::sendCurPacket( Worker& worker, uint64_t dstID )
 void Simulator::Demand::addDemand( uint32_t srcTreelet, uint32_t dstTreelet )
 {
   perTreelet[dstTreelet]++;
-  if ( srcTreelet != -1 ) {
+  if ( srcTreelet != numeric_limits<uint32_t>::max() ) {
     pairwise[srcTreelet][dstTreelet]++;
   }
 }
@@ -246,7 +250,7 @@ void Simulator::Demand::addDemand( uint32_t srcTreelet, uint32_t dstTreelet )
 void Simulator::Demand::removeDemand( uint32_t srcTreelet, uint32_t dstTreelet )
 {
   perTreelet[dstTreelet]--;
-  if ( srcTreelet != -1 ) {
+  if ( srcTreelet != numeric_limits<uint32_t>::max() ) {
     pairwise[srcTreelet][dstTreelet]--;
   }
 }
@@ -291,7 +295,7 @@ void Simulator::generateRays( Worker& worker )
       RayStatePtr ray = graphics::GenerateCameraRay(
         scene.camera, pixel, sample, pathDepth, sampleExtent, scene.sampler );
 
-      enqueueRay( worker, move( ray ), -1 );
+      enqueueRay( worker, move( ray ), numeric_limits<uint32_t>::max() );
 
       curStats.cameraRaysLaunched++;
       totalRaysLaunched++;
