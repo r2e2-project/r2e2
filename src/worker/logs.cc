@@ -1,5 +1,6 @@
 #include <sys/resource.h>
 #include <sys/time.h>
+#include <iomanip>
 
 #include "lambda-worker.hh"
 #include "messages/utils.hh"
@@ -62,6 +63,20 @@ void LambdaWorker::upload_logs()
   storage_backend->put( put_logs_request );
 }
 
+string toCSVString(const Vector3f &ray) {
+    ostringstream oss;
+
+     oss << fixed << setprecision(3) << "[" << ray.x << ' '
+        << ray.y << ' ' << ray.z << "]";
+     return oss.str();
+}
+string toCSVString(const Point3f &point) {
+    ostringstream oss;
+
+     oss << fixed << setprecision(3) << "[" << point.x << ' '
+        << point.y << ' ' << point.z << "]";
+     return oss.str();
+}
 void LambdaWorker::log_ray( const RayAction action,
                             const RayState& state,
                             const RayBagInfo& info )
@@ -70,14 +85,25 @@ void LambdaWorker::log_ray( const RayAction action,
     return;
 
   ostringstream oss;
-
   /* timestamp,pathId,hop,shadowRay,remainingBounces,workerId,treeletId,
-      ray origin,raydirection,action,bag */
-  oss << duration_cast<milliseconds>( system_clock::now().time_since_epoch() )
-           .count()
-      << ',' << state.sample.id << ',' << state.hop << ',' << state.isShadowRay
-      << ',' << static_cast<int>( state.remainingBounces ) << ',' << *worker_id
-      << ',' << state.CurrentTreelet() << ',' << state.ray.o << ',' << state.ray.d << ',';
+      ray origin,ray direction,action,bag */
+  if (action ==  RayAction::Generated){
+    oss << duration_cast<milliseconds>( system_clock::now().time_since_epoch() )
+             .count()
+        << ',' << state.sample.id << ',' << state.hop << ',' << state.isShadowRay
+        << ',' << static_cast<int>( state.remainingBounces ) << ',' << *worker_id
+        << ',' << state.CurrentTreelet() << ',' << toCSVString(state.ray.o) << ',' 
+        << toCSVString(state.ray.d) << ',';
+  }
+  else{
+  /* timestamp,pathId,hop,shadowRay,remainingBounces,workerId,treeletId,
+      action,bag */
+      oss << duration_cast<milliseconds>( system_clock::now().time_since_epoch() )
+               .count()
+          << ',' << state.sample.id << ',' << state.hop << ',' << state.isShadowRay
+          << ',' << static_cast<int>( state.remainingBounces ) << ',' << *worker_id
+          << ',' << state.CurrentTreelet() << ',';
+    }
 
   // clang-format off
     switch(action) {
