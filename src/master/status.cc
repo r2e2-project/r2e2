@@ -48,7 +48,8 @@ void LambdaMaster::handle_status_message()
     = duration_cast<seconds>( now - start_time ).count();
 
   auto percent = []( const uint64_t n, const uint64_t total ) -> double {
-    return total ? ( ( ( uint64_t )( 100 * ( 100.0 * n / total ) ) ) / 100.0 )
+    return total ? ( ( static_cast<uint64_t>( 100 * ( 100.0 * n / total ) ) )
+                     / 100.0 )
                  : 0.0;
   };
 

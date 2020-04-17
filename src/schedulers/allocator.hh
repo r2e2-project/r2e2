@@ -14,10 +14,11 @@ struct AllocationInfo
   double targetWeight;
   uint32_t allocations;
   TreeletId id;
-  AllocationInfo( double tw, uint32_t allocN, TreeletId id )
+
+  AllocationInfo( double tw, uint32_t allocN, TreeletId treeletId )
     : targetWeight( tw )
     , allocations( allocN )
-    , id( id )
+    , id( treeletId )
   {}
 };
 

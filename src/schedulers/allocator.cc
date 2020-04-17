@@ -10,9 +10,9 @@ using namespace std;
 
 Allocator::Allocator()
   : unassignedTreelets {}
-  , netAllocations { 0 }
   , allocations {}
   , targetWeights {}
+  , netAllocations { 0 }
   , sortedTreelets {}
   , workersPerTreelet {}
 {}

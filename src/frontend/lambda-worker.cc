@@ -21,8 +21,9 @@ using OpCode = Message::OpCode;
 LambdaWorker::LambdaWorker( const string& coordinator_ip,
                             const uint16_t coordinator_port,
                             const string& storage_uri,
-                            const WorkerConfiguration& config )
-  : config( config )
+                            const WorkerConfiguration& user_config )
+  : config( user_config )
+  , working_directory( "/tmp/r2t2-worker" )
   , coordinator_addr( coordinator_ip, coordinator_port )
   , master_connection( [this] {
     TCPSocket socket;
@@ -30,8 +31,16 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
     socket.connect( this->coordinator_addr );
     return socket;
   }() )
-  , working_directory( "/tmp/r2t2-worker" )
   , storage_backend( StorageBackend::create_backend( storage_uri ) )
+  , transfer_agent( [this]() -> unique_ptr<TransferAgent> {
+    if ( not config.memcached_servers.empty() ) {
+      return make_unique<memcached::TransferAgent>( config.memcached_servers );
+    } else {
+      return make_unique<S3TransferAgent>( storage_backend );
+    }
+  }() )
+  , samples_transfer_agent(
+      make_unique<S3TransferAgent>( storage_backend, 2, true ) )
   , worker_rule_categories( { loop.add_category( "Socket" ),
                               loop.add_category( "Message read" ),
                               loop.add_category( "Message write" ),
@@ -39,16 +48,6 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
 {
   // let the program handle SIGPIPE
   signal( SIGPIPE, SIG_IGN );
-
-  if ( !config.memcached_servers.empty() ) {
-    transfer_agent
-      = make_unique<memcached::TransferAgent>( config.memcached_servers );
-  } else {
-    transfer_agent = make_unique<S3TransferAgent>( storage_backend );
-  }
-
-  samples_transfer_agent
-    = make_unique<S3TransferAgent>( storage_backend, 2, true );
 
   cerr << "* starting worker in " << working_directory.name() << endl;
   filesystem::current_path( working_directory.name() );

@@ -24,7 +24,8 @@ string AWSv4Sig::sha256buf_to_string_( const unsigned char* buf )
 string AWSv4Sig::sha256_( const string& in )
 {
   unsigned char buf[SHA256_DIGEST_LENGTH];
-  SHA256( (const unsigned char*)in.c_str(), in.length(), buf );
+  SHA256(
+    reinterpret_cast<const unsigned char*>( in.c_str() ), in.length(), buf );
   return sha256buf_to_string_( buf );
 }
 
@@ -41,7 +42,7 @@ vector<uint8_t> AWSv4Sig::derive_signing_key_( const string& secret,
   HMAC( EVP_sha256(),
         ( "AWS4" + secret ).c_str(),
         4 + secret.length(),
-        (const unsigned char*)date.c_str(),
+        reinterpret_cast<const unsigned char*>( date.c_str() ),
         date.length(),
         buf0,
         nullptr );
@@ -50,7 +51,7 @@ vector<uint8_t> AWSv4Sig::derive_signing_key_( const string& secret,
   HMAC( EVP_sha256(),
         buf0,
         SHA256_DIGEST_LENGTH,
-        (const unsigned char*)region.c_str(),
+        reinterpret_cast<const unsigned char*>( region.c_str() ),
         region.length(),
         buf1,
         nullptr );
@@ -59,7 +60,7 @@ vector<uint8_t> AWSv4Sig::derive_signing_key_( const string& secret,
   HMAC( EVP_sha256(),
         buf1,
         SHA256_DIGEST_LENGTH,
-        (const unsigned char*)service.c_str(),
+        reinterpret_cast<const unsigned char*>( service.c_str() ),
         service.length(),
         buf0,
         nullptr );
@@ -68,7 +69,7 @@ vector<uint8_t> AWSv4Sig::derive_signing_key_( const string& secret,
   HMAC( EVP_sha256(),
         buf0,
         SHA256_DIGEST_LENGTH,
-        (const unsigned char*)"aws4_request",
+        reinterpret_cast<const unsigned char*>( "aws4_request" ),
         12,
         out.data(),
         nullptr );
@@ -148,7 +149,7 @@ void AWSv4Sig::sign_request( const std::string& first_line,
   HMAC( EVP_sha256(),
         skey.data(),
         SHA256_DIGEST_LENGTH,
-        (const unsigned char*)string_to_sign.c_str(),
+        reinterpret_cast<const unsigned char*>( string_to_sign.c_str() ),
         string_to_sign.length(),
         buf,
         nullptr );

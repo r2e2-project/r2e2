@@ -35,7 +35,7 @@ public:
   void write_empty();
 
 private:
-  std::optional<FileDescriptor> fd_ {};
+  std::optional<FileDescriptor> fd_ { std::nullopt };
 
   std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> output_stream_;
   google::protobuf::io::CodedOutputStream coded_output_;
@@ -65,13 +65,13 @@ public:
 private:
   void initialize();
 
-  std::optional<FileDescriptor> fd_;
-  std::optional<std::istringstream> istream_;
+  std::optional<FileDescriptor> fd_ { std::nullopt };
+  std::optional<std::istringstream> istream_ { std::nullopt };
 
   std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> input_stream_;
   google::protobuf::io::CodedInputStream coded_input_;
 
-  google::protobuf::uint32 next_size_;
+  google::protobuf::uint32 next_size_{ 0 };
   bool eof_ { false };
 };
 

@@ -15,35 +15,35 @@ size_t EventLoop::add_category( const string& name )
   return _rule_categories.size() - 1;
 }
 
-EventLoop::BasicRule::BasicRule( const size_t category_id )
-  : category_id( category_id )
+EventLoop::BasicRule::BasicRule( const size_t category_id_ )
+  : category_id( category_id_ )
   , cancel_requested( false )
 {}
 
-EventLoop::Rule::Rule( const size_t category_id,
-                       const InterestT& interest,
-                       const CallbackT& callback )
-  : BasicRule( category_id )
-  , interest( interest )
-  , callback( callback )
+EventLoop::Rule::Rule( const size_t category_id_,
+                       const InterestT& interest_,
+                       const CallbackT& callback_ )
+  : BasicRule( category_id_ )
+  , interest( interest_ )
+  , callback( callback_ )
 {}
 
-EventLoop::FDRule::FDRule( const size_t category_id,
+EventLoop::FDRule::FDRule( const size_t category_id_,
                            const FileDescriptor& epoll_fd,
-                           FileDescriptor&& fd,
-                           const optional<pair<InterestT, CallbackT>>& in,
-                           const optional<pair<InterestT, CallbackT>>& out,
-                           const CallbackT& cancel )
-  : BasicRule( category_id )
-  , fd( move( fd ) )
-  , in( in.value_or( make_pair( [] { return false; }, [] {} ) ) )
-  , out( out.value_or( make_pair( [] { return false; }, [] {} ) ) )
-  , cancel( cancel )
-  , current_in_interested( in )
-  , current_out_interested( out )
+                           FileDescriptor&& fd_,
+                           const optional<pair<InterestT, CallbackT>>& in_,
+                           const optional<pair<InterestT, CallbackT>>& out_,
+                           const CallbackT& cancel_ )
+  : BasicRule( category_id_ )
+  , fd( move( fd_ ) )
+  , in( in_.value_or( make_pair( [] { return false; }, [] {} ) ) )
+  , out( out_.value_or( make_pair( [] { return false; }, [] {} ) ) )
+  , cancel( cancel_ )
+  , current_in_interested( in_ )
+  , current_out_interested( out_ )
   , epoll_fd_num( epoll_fd.fd_num() )
 {
-  if ( not( in or out ) ) {
+  if ( not( in_ or out_ ) ) {
     throw runtime_error( "callback in at least one direction is required" );
   }
 
@@ -82,7 +82,7 @@ EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
 }
 
 EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
-                                           direction_in_t dir,
+                                           direction_in_t,
                                            const FileDescriptor& fd,
                                            const CallbackT& in_callback,
                                            const InterestT& in_interest,
@@ -104,7 +104,7 @@ EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
 }
 
 EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
-                                           direction_out_t dir,
+                                           direction_out_t,
                                            const FileDescriptor& fd,
                                            const CallbackT& out_callback,
                                            const InterestT& out_interest,
@@ -351,8 +351,8 @@ private:
   T value;
 
 public:
-  Value( T value )
-    : value( value )
+  Value( T v )
+    : value( v )
   {}
 
   T get() const { return value; }
@@ -361,7 +361,7 @@ public:
 template<class T>
 ostream& operator<<( ostream& o, const Value<T>& v )
 {
-  o << "\e[1m" << v.get() << "\e[0m";
+  o << "\x1B[1m" << v.get() << "\x1B[0m";
   return o;
 }
 
@@ -396,8 +396,8 @@ string EventLoop::summary() const
 
     accounted += timer.total_ns;
 
-    out << "\e[2m [max=" << Timer::pp_ns( timer.max_ns );
-    out << ", count=" << timer.count << "]\e[0m";
+    out << "\x1B[2m [max=" << Timer::pp_ns( timer.max_ns );
+    out << ", count=" << timer.count << "]\x1B[0m";
     out << "\n";
   }
 

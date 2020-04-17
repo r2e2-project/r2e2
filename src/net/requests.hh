@@ -14,18 +14,18 @@ struct PutRequest
   std::string object_key;
   std::optional<std::string> content_hash { std::nullopt };
 
-  PutRequest( const std::filesystem::path& filename,
-              const std::string& object_key,
-              const std::string& content_hash )
-    : filename( filename )
-    , object_key( object_key )
-    , content_hash( content_hash )
+  PutRequest( const std::filesystem::path& name,
+              const std::string& key,
+              const std::string& hash )
+    : filename( name )
+    , object_key( key )
+    , content_hash( hash )
   {}
 
-  PutRequest( const std::filesystem::path& filename,
-              const std::string& object_key )
-    : filename( filename )
-    , object_key( object_key )
+  PutRequest( const std::filesystem::path& name,
+              const std::string& key )
+    : filename( name )
+    , object_key( key )
   {}
 };
 
@@ -35,18 +35,18 @@ struct GetRequest
   std::filesystem::path filename;
   std::optional<mode_t> mode { std::nullopt };
 
-  GetRequest( const std::string& object_key,
-              const std::filesystem::path& filename )
-    : object_key( object_key )
-    , filename( filename )
+  GetRequest( const std::string& key,
+              const std::filesystem::path& name )
+    : object_key( key )
+    , filename( name )
   {}
 
-  GetRequest( const std::string& object_key,
-              const std::filesystem::path& filename,
-              const mode_t mode )
-    : object_key( object_key )
-    , filename( filename )
-    , mode( mode )
+  GetRequest( const std::string& key,
+              const std::filesystem::path& name,
+              const mode_t m )
+    : object_key( key )
+    , filename( name )
+    , mode( m )
   {}
 };
 

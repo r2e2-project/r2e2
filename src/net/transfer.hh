@@ -35,14 +35,14 @@ protected:
     std::string key;
     std::string data;
 
-    Action( const uint64_t id,
-            const Task task,
-            const std::string& key,
-            std::string&& data )
-      : id( id )
-      , task( task )
-      , key( key )
-      , data( move( data ) )
+    Action( const uint64_t id_,
+            const Task task_,
+            const std::string& key_,
+            std::string&& data_ )
+      : id( id_ )
+      , task( task_ )
+      , key( key_ )
+      , data( move( data_ ) )
     {}
   };
 

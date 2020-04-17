@@ -32,7 +32,8 @@ string uri_encode( const string& unencoded )
     if ( !isalnum( c ) && c != '-' && c != '_' && c != '.' && c != '~'
          && c != '/' ) {
       // Encode it
-      encoded << '%' << uppercase << setw( 2 ) << int( (unsigned char)c )
+      encoded << '%' << uppercase << setw( 2 )
+              << static_cast<int>( static_cast<unsigned char>( c ) )
               << nouppercase;
     } else {
       encoded << c;

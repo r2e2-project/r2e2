@@ -6,7 +6,6 @@
 #include "client.hh"
 #include "session.hh"
 #include "transfer.hh"
-#include "util/tokenize.hh"
 
 namespace memcached {
 
@@ -86,6 +85,7 @@ class Response
 public:
   enum class Type
   {
+    UNKNOWN_MSG_TYPE,
     STORED,
     NOT_STORED,
     NOT_FOUND,
@@ -96,7 +96,7 @@ public:
   };
 
 private:
-  Type type_;
+  Type type_ { Type::UNKNOWN_MSG_TYPE };
   std::string first_line_ {};
   std::string unstructured_data_ {};
 
@@ -256,11 +256,11 @@ public:
 class Client : public ::Client<TCPSession, Request, Response>
 {
 private:
-  std::queue<Request> requests_;
-  ResponseParser responses_;
+  std::queue<Request> requests_ {};
+  ResponseParser responses_ {};
 
-  std::string_view current_request_first_line_;
-  std::string_view current_request_data_;
+  std::string_view current_request_first_line_ {};
+  std::string_view current_request_data_ {};
 
   void load();
 

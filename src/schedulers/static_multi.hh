@@ -8,7 +8,7 @@ namespace r2t2 {
 class StaticMultiScheduler : public Scheduler
 {
 private:
-  Allocator allocator;
+  Allocator allocator {};
 
 public:
   StaticMultiScheduler( const std::string& path );

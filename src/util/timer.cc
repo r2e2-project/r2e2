@@ -19,8 +19,8 @@ private:
   T value;
 
 public:
-  Value( T value )
-    : value( value )
+  Value( T v )
+    : value( v )
   {}
   T get() const { return value; }
 };
@@ -28,7 +28,7 @@ public:
 template<class T>
 ostream& operator<<( ostream& o, const Value<T>& v )
 {
-  o << "\e[1m" << v.get() << "\e[0m";
+  o << "\x1B[1m" << v.get() << "\x1B[0m";
   return o;
 }
 
@@ -62,8 +62,8 @@ string Timer::summary() const
         << "%";
     accounted += _records.at( i ).total_ns;
 
-    out << "\e[2m [max=" << pp_ns( _records.at( i ).max_ns );
-    out << ", count=" << _records.at( i ).count << "]\e[0m";
+    out << "\x1B[2m [max=" << pp_ns( _records.at( i ).max_ns );
+    out << ", count=" << _records.at( i ).count << "]\x1B[0m";
     out << "\n";
   }
 

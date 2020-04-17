@@ -105,7 +105,7 @@ void LambdaMaster::execute_schedule( const Schedule& schedule )
   }
 
   const auto total_requested_workers
-    = accumulate( schedule.begin(), schedule.end(), 0 );
+    = accumulate( schedule.begin(), schedule.end(), 0ull );
 
   if ( total_requested_workers > max_workers ) {
     throw runtime_error( "not enough workers available for the schedule" );
@@ -127,15 +127,16 @@ void LambdaMaster::execute_schedule( const Schedule& schedule )
       treelets_to_spawn.insert(
         treelets_to_spawn.end(), requested - current, tid );
     } else /* (requested < current) */ {
-      auto& workers = treelets[tid].workers;
+      auto& treelet_workers = treelets[tid].workers;
       for ( size_t i = 0; i < current - requested; i++ ) {
-        auto it = random::sample( workers.begin(), workers.end() );
+        auto it
+          = random::sample( treelet_workers.begin(), treelet_workers.end() );
         workers_to_take_down.push_back( *it );
-        workers.erase( it );
+        treelet_workers.erase( it );
       }
 
       /* no workers are left for this treelet */
-      if ( workers.empty() ) {
+      if ( treelet_workers.empty() ) {
         unassigned_treelets.insert( tid );
         move_from_queued_to_pending( tid );
       }

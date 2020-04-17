@@ -91,8 +91,8 @@ private:
 
   const WorkerConfiguration config;
   const UniqueDirectory working_directory;
-  std::optional<WorkerId> worker_id;
-  std::optional<std::string> job_id;
+  std::optional<WorkerId> worker_id {};
+  std::optional<std::string> job_id {};
   bool terminated { false };
 
   ////////////////////////////////////////////////////////////////////////////
@@ -110,7 +110,7 @@ private:
     uint8_t max_depth { 5 };
 
     SceneData() {}
-  } scene;
+  } scene {};
 
   /*** Ray Tracing **********************************************************/
 
@@ -210,7 +210,7 @@ private:
   {
     uint64_t generated { 0 };
     uint64_t terminated { 0 };
-  } rays;
+  } rays {};
 
   ////////////////////////////////////////////////////////////////////////////
   // Logging                                                                //

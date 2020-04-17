@@ -149,8 +149,6 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
 {
   protobuf::JobSummary proto;
 
-  constexpr static double LAMBDA_UNIT_COST = 0.00004897; /* $/lambda/sec */
-
   double generation_time
     = duration_cast<milliseconds>( last_generator_done - start_time ).count()
       / 1000.0;
@@ -179,8 +177,10 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
         ? ( 10 * aggregated_stats.samples.rays / max_workers / total_time )
         : 0;
 
-  const double estimatedCost
-    = LAMBDA_UNIT_COST * max_workers * ceil( total_time );
+  // FIXME cost estimation
+  /* constexpr static double LAMBDA_UNIT_COST = 0.00004897; // $/lambda/sec
+  const double estimated_cost
+    = LAMBDA_UNIT_COST * max_workers * ceil( total_time ); */
 
   proto.set_job_id( job_id );
   proto.set_num_lambdas( max_workers );
@@ -227,8 +227,8 @@ private:
   T value;
 
 public:
-  Value( T value )
-    : value( value )
+  Value( T v )
+    : value( v )
   {}
   T get() const { return value; }
 };
@@ -236,14 +236,15 @@ public:
 template<class T>
 ostream& operator<<( ostream& o, const Value<T>& v )
 {
-  o << "\e[1m" << v.get() << "\e[0m";
+  o << "\x1B[1m" << v.get() << "\x1B[0m";
   return o;
 }
 
 void LambdaMaster::print_job_summary() const
 {
   auto percent = []( const uint64_t n, const uint64_t total ) -> double {
-    return total ? ( ( ( uint64_t )( 100 * ( 100.0 * n / total ) ) ) / 100.0 )
+    return total ? ( ( static_cast<uint64_t>( 100 * ( 100.0 * n / total ) ) )
+                     / 100.0 )
                  : 0.0;
   };
 

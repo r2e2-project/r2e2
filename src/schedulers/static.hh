@@ -9,7 +9,7 @@ class StaticScheduler : public Scheduler
 {
 private:
   bool scheduledOnce { false };
-  Allocator allocator;
+  Allocator allocator {};
 
 public:
   StaticScheduler( const std::string& path );

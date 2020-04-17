@@ -15,7 +15,7 @@ void LambdaWorker::generate_rays( const Bounds2i& bounds )
   /* for ray tracking */
   bernoulli_distribution bd { config.ray_log_rate };
 
-  for ( size_t sample = 0; sample < scene.base.samplesPerPixel; sample++ ) {
+  for ( int sample = 0; sample < scene.base.samplesPerPixel; sample++ ) {
     for ( const Point2i pixel : bounds ) {
       RayStatePtr state_ptr
         = graphics::GenerateCameraRay( scene.base.camera,
@@ -58,12 +58,12 @@ void LambdaWorker::handle_trace_queue()
       if ( rays_it == trace_queue.end() )
         continue;
 
-      auto& rays = rays_it->second;
+      auto& queue = rays_it->second;
 
-      while ( !rays.empty() && steady_clock::now() <= trace_until ) {
+      while ( !queue.empty() && steady_clock::now() <= trace_until ) {
         traced_count++;
-        RayStatePtr ray_ptr = move( rays.front() );
-        rays.pop();
+        RayStatePtr ray_ptr = move( queue.front() );
+        queue.pop();
 
         this->rays.terminated++;
 
@@ -73,7 +73,6 @@ void LambdaWorker::handle_trace_queue()
         log_ray( RayAction::Traced, ray );
 
         if ( !ray.toVisitEmpty() ) {
-          const uint32_t ray_treelet = ray.toVisitTop().treelet;
           auto new_ray_ptr = graphics::TraceRay( move( ray_ptr ), treelet );
           auto& new_ray = *new_ray_ptr;
 
@@ -144,7 +143,7 @@ void LambdaWorker::handle_trace_queue()
         }
       }
 
-      if ( rays.empty() ) {
+      if ( queue.empty() ) {
         trace_queue.erase( rays_it );
       }
     }

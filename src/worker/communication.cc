@@ -185,7 +185,7 @@ void LambdaWorker::handle_receive_queue()
     /* (1) XXX do we have this treelet? */
 
     /* (2) let's unpack this treelet and add the rays to the trace queue */
-    auto& rays = trace_queue[bag.info.treelet_id];
+    auto& treelet_trace_queue = trace_queue[bag.info.treelet_id];
     size_t total_size = bag.data.size();
 
     if ( COMPRESS_RAY_BAGS ) {
@@ -217,19 +217,19 @@ void LambdaWorker::handle_receive_queue()
 
       log_ray( RayAction::Unbagged, *ray, bag.info );
 
-      rays.push( move( ray ) );
+      treelet_trace_queue.push( move( ray ) );
     }
 
     log_bag( BagAction::Opened, bag.info );
   }
 }
 
-void LambdaWorker::handle_transfer_results( const bool sample_bags )
+void LambdaWorker::handle_transfer_results( const bool for_sample_bags )
 {
   protobuf::RayBags enqueued_proto;
   protobuf::RayBags dequeued_proto;
 
-  auto& agent = sample_bags ? samples_transfer_agent : transfer_agent;
+  auto& agent = for_sample_bags ? samples_transfer_agent : transfer_agent;
 
   if ( !agent->eventfd().read_event() ) {
     return;
