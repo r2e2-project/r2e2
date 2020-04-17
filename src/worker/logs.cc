@@ -93,9 +93,9 @@ void LambdaWorker::log_ray( const RayAction action,
         << ',' << state.sample.id << ',' << state.hop << ',' << state.isShadowRay
         << ',' << static_cast<int>( state.remainingBounces ) << ',' << *worker_id
         << ',' << state.CurrentTreelet() << ',' << toCSVString(state.ray.o) << ',' 
-        << toCSVString(state.ray.d * state.ray.time) << ',';
+        ;
   }
-  else{
+  else if(action != RayAction::Unbagged){
   /* timestamp,pathId,hop,shadowRay,remainingBounces,workerId,treeletId,
       action,bag */
       oss << duration_cast<milliseconds>( system_clock::now().time_since_epoch() )
@@ -104,6 +104,14 @@ void LambdaWorker::log_ray( const RayAction action,
           << ',' << static_cast<int>( state.remainingBounces ) << ',' << *worker_id
           << ',' << state.CurrentTreelet() << ',';
     }
+  else{
+    oss << duration_cast<milliseconds>( system_clock::now().time_since_epoch() )
+             .count()
+        << ',' << state.sample.id << ',' << state.hop << ',' << state.isShadowRay
+        << ',' << static_cast<int>( state.remainingBounces ) << ',' << *worker_id
+        << ',' << state.CurrentTreelet() << ',' << toCSVString(state.ray.d * state.ray.time) << ',';
+  }
+
 
   // clang-format off
     switch(action) {
