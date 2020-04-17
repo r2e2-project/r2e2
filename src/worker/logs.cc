@@ -93,7 +93,7 @@ void LambdaWorker::log_ray( const RayAction action,
         << ',' << state.sample.id << ',' << state.hop << ',' << state.isShadowRay
         << ',' << static_cast<int>( state.remainingBounces ) << ',' << *worker_id
         << ',' << state.CurrentTreelet() << ',' << toCSVString(state.ray.o) << ',' 
-        << toCSVString(state.ray.d) << ',';
+        << toCSVString(state.ray.d * state.ray.time) << ',';
   }
   else{
   /* timestamp,pathId,hop,shadowRay,remainingBounces,workerId,treeletId,
