@@ -55,7 +55,7 @@ struct Packet
 
   uint64_t numRays = 0;
 
-  std::list<RayData> rays;
+  std::list<RayData> rays {};
 };
 
 struct TreeletData
@@ -67,15 +67,15 @@ struct TreeletData
 
 struct Worker
 {
-  uint64_t id;
+  uint64_t id { 0 };
 
-  std::list<RayData> inQueue;
-  std::list<Packet> inTransit;
+  std::list<RayData> inQueue {};
+  std::list<Packet> inTransit {};
   uint64_t outstanding = 0;
 
-  std::vector<Packet> nextPackets;
+  std::vector<Packet> nextPackets {};
 
-  std::list<TreeletData> newTreelets;
+  std::list<TreeletData> newTreelets {};
 };
 
 class Simulator
@@ -140,22 +140,22 @@ private:
   std::vector<Worker> workers;
 
   std::unordered_map<uint64_t, std::unordered_set<uint32_t>> workerToTreelets;
-  std::unordered_map<uint32_t, std::deque<uint64_t>> treeletToWorkers;
+  std::unordered_map<uint32_t, std::deque<uint64_t>> treeletToWorkers {};
   std::unordered_map<
     uint32_t,
     std::unordered_map<uint64_t, std::deque<uint64_t>::iterator>>
-    treeletToWorkerLocs;
+    treeletToWorkerLocs {};
 
   pbrt::Bounds2i sampleBounds;
   const pbrt::Vector2i sampleExtent;
-  int tileSize;
+  int tileSize { 0 };
 
-  std::vector<std::unique_ptr<pbrt::CloudBVH>> treelets;
+  std::vector<std::unique_ptr<pbrt::CloudBVH>> treelets {};
 
-  std::list<Packet> inTransit;
+  std::list<Packet> inTransit {};
 
   uint64_t curCameraTile { 0 };
-  pbrt::Point2i nCameraTiles;
+  pbrt::Point2i nCameraTiles {};
   const uint64_t maxRays = 1'000'000;
 
   uint64_t curMS = 0;
@@ -170,12 +170,12 @@ private:
 
   struct Demand
   {
-    std::vector<uint64_t> perTreelet;
-    std::vector<std::vector<uint64_t>> pairwise;
+    std::vector<uint64_t> perTreelet {};
+    std::vector<std::vector<uint64_t>> pairwise {};
 
     void addDemand( uint32_t srcTreelet, uint32_t dstTreelet );
     void removeDemand( uint32_t srcTreelet, uint32_t dstTreelet );
-  } curDemand;
+  } curDemand {};
 
   // Stats
   std::ofstream statsCSV;
@@ -187,7 +187,7 @@ private:
   uint64_t totalShadowRaysLaunched = 0;
   uint64_t totalRaysCompleted = 0;
 
-  std::vector<uint64_t> treeletHits;
+  std::vector<uint64_t> treeletHits {};
 
   struct TimeStats
   {
@@ -200,7 +200,7 @@ private:
     uint64_t shadowRaysLaunched = 0;
     uint64_t bounceRaysLaunched = 0;
     uint64_t raysCompleted = 0;
-  } curStats;
+  } curStats {};
 };
 
 }
