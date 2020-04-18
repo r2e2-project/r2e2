@@ -2,9 +2,16 @@
 
 cd "${0%/*}"
 
-terraform output -json ip_addresses  | python3 -c '
-data = eval(input())
-for port in range(11211, 11211 + 4):
-    for server in data:
+terraform output -json  | python3 -c '
+import sys
+import json
+
+data = json.loads(sys.stdin.read())
+
+servers = data["ip_addresses"]["value"]
+count = data["servers_per_instance"]["value"]
+
+for port in range(11211, 11211 + count):
+    for server in servers:
         print("-d {}:{}".format(server, port), end=" ")
 print()'

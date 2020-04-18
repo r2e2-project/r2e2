@@ -1,11 +1,13 @@
 instance_count = 2
-
 region = "us-west-2"
 
 amis = {
-    "us-west-1" = "ami-028b4d44a17e9e6cd"
-    "us-west-2" = "ami-02859c9ef8beb9bef"
-    "us-east-1" = "ami-017aa75941f294732"
+    "us-west-1" = "ami-03c5b55b809ce25f3"
+    "us-west-2" = "ami-0d11e47ca7049df43"
 }
 
-instance_type = "c5n.4xlarge"
+servers_per_instance = 2
+threads_per_server = 1
+memory_per_server = 4096
+
+instance_type = "c5n.large"
