@@ -528,6 +528,7 @@ void LambdaMaster::run()
 
   for ( auto& worker : workers ) {
     if ( worker.state != Worker::State::Terminated ) {
+      worker.client.session().socket().shutdown( SHUT_RDWR );
       worker.client.session().socket().close();
     }
 
