@@ -6,8 +6,8 @@ amis = {
     "us-west-2" = "ami-0d11e47ca7049df43"
 }
 
-servers_per_instance = 2
-threads_per_server = 1
-memory_per_server = 4096
+servers_per_instance = 4
+threads_per_server = 4
+memory_per_server = 11274
 
-instance_type = "c5n.large"
+instance_type = "c5n.4xlarge"
