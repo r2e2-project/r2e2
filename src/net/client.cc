@@ -44,7 +44,12 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
 
   installed_rules_.push_back( loop.add_rule(
     rule_categories.endpoint_write,
-    [&] { write( session_.outbound_plaintext() ); },
+    [&] {
+      do {
+        write( session_.outbound_plaintext() );
+      } while ( ( not session_.outbound_plaintext().writable_region().empty() )
+                and ( not requests_empty() ) );
+    },
     [&] {
       return ( not session_.outbound_plaintext().writable_region().empty() )
              and ( not requests_empty() );
