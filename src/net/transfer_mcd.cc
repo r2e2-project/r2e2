@@ -1,5 +1,6 @@
 #include "transfer_mcd.hh"
 
+#include <functional>
 #include <list>
 
 using namespace std;
@@ -49,77 +50,71 @@ size_t get_hash( const string& key )
 
 void TransferAgent::worker_thread( const size_t )
 {
+  using namespace std::placeholders;
+
+  auto make_client = []( const Address& addr ) {
+    TCPSocket socket;
+    socket.set_blocking( false );
+    socket.connect( addr );
+    return make_unique<Client>( move( socket ) );
+  };
+
   queue<pair<uint64_t, string>> thread_results;
 
   std::queue<Action> actions;
-  vector<queue<Action>> pending_actions;
 
-  vector<unique_ptr<memcached::Client>> clients;
+  auto pending_actions = make_unique<queue<Action>[]>( _servers.size() );
+  auto clients = make_unique<unique_ptr<Client>[]>( _servers.size() );
 
-  pending_actions.resize( _servers.size() );
-  clients.resize( _servers.size() );
+  queue<size_t> dead_clients {};
 
-  memcached::Client::RuleCategories rule_categories {
-    _loop.add_category( "TCP Session" ),
-    _loop.add_category( "Client Read" ),
-    _loop.add_category( "Client Write" ),
-    _loop.add_category( "Response" )
+  Client::RuleCategories rule_categories { _loop.add_category( "TCP Session" ),
+                                           _loop.add_category( "Client Read" ),
+                                           _loop.add_category( "Client Write" ),
+                                           _loop.add_category( "Response" ) };
+
+  auto response_callback = [&actions, &pending_actions, &thread_results](
+                             const size_t i, Response&& response ) {
+    switch ( response.type() ) {
+      case Response::Type::VALUE:
+        actions.emplace( 0, Task::Delete, pending_actions[i].front().key, "" );
+
+        [[fallthrough]];
+
+      case Response::Type::OK:
+      case Response::Type::STORED:
+        thread_results.emplace( pending_actions[i].front().id,
+                                move( response.unstructured_data() ) );
+        pending_actions[i].pop();
+        break;
+
+      case Response::Type::NOT_STORED:
+      case Response::Type::ERROR:
+        throw runtime_error( "client errored" );
+        break;
+
+      case Response::Type::DELETED:
+      case Response::Type::NOT_FOUND:
+        break;
+
+      default:
+        throw runtime_error( "invalid response: " + response.first_line() );
+    }
   };
+
+  auto cancel_callback
+    = [&dead_clients]( const size_t i ) { dead_clients.push( i ); };
 
   for ( size_t i = 0; i < _servers.size(); i++ ) {
     const auto& server = _servers[i];
 
-    TCPSocket socket;
-    socket.set_blocking( false );
-    socket.connect( server );
-    clients[i] = make_unique<memcached::Client>( move( socket ) );
-
-    auto response_callback = [&, i = i]( Response&& response ) {
-      switch ( response.type() ) {
-        case Response::Type::VALUE:
-          actions.emplace(
-            0, Task::Delete, pending_actions[i].front().key, "" );
-
-          [[fallthrough]];
-
-        case Response::Type::OK:
-        case Response::Type::STORED:
-          thread_results.emplace( pending_actions[i].front().id,
-                                  move( response.unstructured_data() ) );
-          pending_actions[i].pop();
-          break;
-
-        case Response::Type::NOT_STORED:
-        case Response::Type::ERROR:
-          throw runtime_error( "client errored" );
-          break;
-
-        case Response::Type::DELETED:
-        case Response::Type::NOT_FOUND:
-          break;
-
-        default:
-          throw runtime_error( "invalid response: " + response.first_line() );
-      }
-    };
-
-    function<void( void )> cancel_callback = [&, i = i] {
-      TCPSocket new_socket;
-      new_socket.set_blocking( false );
-      new_socket.connect( _servers[i] );
-
-      clients[i] = make_unique<memcached::Client>( move( new_socket ) );
-      clients[i]->install_rules(
-        _loop, rule_categories, response_callback, cancel_callback );
-
-      while ( not pending_actions[i].empty() ) {
-        actions.emplace( move( pending_actions[i].front() ) );
-        pending_actions[i].pop();
-      }
-    };
-
+    clients[i] = make_client( server );
     clients[i]->install_rules(
-      _loop, rule_categories, response_callback, cancel_callback );
+      _loop,
+      rule_categories,
+      [f = response_callback, i]( Response&& res ) { f( i, move( res ) ); },
+      [f = cancel_callback, i] { f( i ); },
+      [f = cancel_callback, i] { f( i ); } );
   }
 
   _loop.add_rule(
@@ -131,10 +126,8 @@ void TransferAgent::worker_thread( const size_t )
         return;
       }
 
-      {
-        unique_lock<mutex> lock { _outstanding_mutex };
-        swap( _outstanding, actions );
-      }
+      unique_lock<mutex> lock { _outstanding_mutex };
+      swap( _outstanding, actions );
     },
     [] { return true; } );
 
@@ -154,6 +147,26 @@ void TransferAgent::worker_thread( const size_t )
     [&thread_results] { return !thread_results.empty(); } );
 
   while ( _loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+    // reconnect dead clients
+    while ( not dead_clients.empty() ) {
+      const auto i = dead_clients.front();
+      dead_clients.pop();
+
+      clients[i] = make_client( _servers[i] );
+      clients[i]->install_rules(
+        _loop,
+        rule_categories,
+        [f = response_callback, i]( Response&& res ) { f( i, move( res ) ); },
+        [f = cancel_callback, i] { f( i ); },
+        [f = cancel_callback, i] { f( i ); } );
+
+      while ( not pending_actions[i].empty() ) {
+        actions.emplace( move( pending_actions[i].front() ) );
+        pending_actions[i].pop();
+      }
+    }
+
+    // handle actions
     while ( not actions.empty() ) {
       auto& action = actions.front();
       const size_t server_id = get_hash( action.key ) % _servers.size();
