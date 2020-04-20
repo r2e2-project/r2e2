@@ -1,5 +1,8 @@
 #pragma once
 
+#include <optional>
+#include <stdexcept>
+
 #include "util/eventloop.hh"
 #include "util/ring_buffer.hh"
 
@@ -39,7 +42,8 @@ public:
     EventLoop& loop,
     const RuleCategories& rule_categories,
     const std::function<void( ResponseType&& )>& response_callback,
-    const std::function<void( void )>& close_callback );
+    const std::function<void( void )>& close_callback,
+    const std::optional<std::function<void()>>& exception_handler = {} );
 
   void uninstall_rules();
 };
