@@ -92,3 +92,6 @@ target_link_libraries( r2t2-simulator ${ALL_R2T2_LIBS} )
 
 add_executable ( load-treelet src/frontend/load-treelet.cc )
 target_link_libraries( load-treelet ${ALL_R2T2_LIBS} )
+
+add_executable ( camera-generator src/frontend/camera-generator.cc )
+target_link_libraries( camera-generator ${ALL_R2T2_LIBS} )
