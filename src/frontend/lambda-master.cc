@@ -658,6 +658,7 @@ void usage( const char* argv0, int exit_code )
        << "                               - static" << endl
        << "                               - all" << endl
        << "                               - none" << endl
+       << "  -F --scheduler-file FILE   set the allocation file" << endl
        << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
        << endl
        << "  -C --camera FILE           specify alternative camera" << endl
@@ -722,6 +723,7 @@ int main( int argc, char* argv[] )
 
   unique_ptr<Scheduler> scheduler = nullptr;
   string scheduler_name;
+  optional<string> scheduler_file = nullopt;
 
   int samples_per_pixel = 0;
   int max_path_depth = 5;
@@ -741,6 +743,7 @@ int main( int argc, char* argv[] )
     { "max-workers", required_argument, nullptr, 'm' },
     { "ray-generators", required_argument, nullptr, 'G' },
     { "scheduler", required_argument, nullptr, 'a' },
+    { "scheduler-file", required_argument, nullptr, 'F' },
     { "debug-logs", no_argument, nullptr, 'g' },
     { "worker-stats", required_argument, nullptr, 'w' },
     { "log-rays", required_argument, nullptr, 'L' },
@@ -786,6 +789,7 @@ int main( int argc, char* argv[] )
       case 'm': max_workers = stoi(optarg); break;
       case 'G': ray_generators = stoi(optarg); break;
       case 'a': scheduler_name = optarg; break;
+      case 'F': scheduler_file = optarg; break;
       case 'g': collect_debug_logs = true; break;
       case 'w': worker_stats_write_interval = stoul(optarg); break;
       case 'D': logs_directory = optarg; break;
@@ -836,15 +840,21 @@ int main( int argc, char* argv[] )
   if ( scheduler_name == "uniform" ) {
     scheduler = make_unique<UniformScheduler>();
   } else if ( scheduler_name == "static" ) {
-    auto storage = StorageBackend::create_backend( storage_backend_uri );
-    TempFile static_file { "/tmp/r2t2-lambda-master.STATIC0" };
+    if ( not scheduler_file ) {
+      auto storage = StorageBackend::create_backend( storage_backend_uri );
+      TempFile static_file { "/tmp/r2t2-lambda-master.STATIC0" };
 
-    cerr << "Downloading static assignment file... ";
-    storage->get( { { scene::GetObjectName( ObjectType::StaticAssignment, 0 ),
-                      static_file.name() } } );
-    cerr << "done." << endl;
+      cerr << "Downloading static assignment file... ";
+      storage->get( { { scene::GetObjectName( ObjectType::StaticAssignment, 0 ),
+                        static_file.name() } } );
+      cerr << "done." << endl;
 
-    scheduler = make_unique<StaticScheduler>( static_file.name() );
+      scheduler = make_unique<StaticScheduler>( static_file.name() );
+    } else {
+      cerr << "Using " << ( *scheduler_file ) << " as static assignment file."
+           << endl;
+      scheduler = make_unique<StaticScheduler>( *scheduler_file );
+    }
   } else if ( scheduler_name == "dynamic" ) {
     scheduler = make_unique<DynamicScheduler>();
   } else if ( scheduler_name == "rootonly" ) {
