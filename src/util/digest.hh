@@ -4,5 +4,7 @@
 #include <string_view>
 
 namespace digest {
-std::string sha256( std::string_view input );
+
+std::string sha256_base58( std::string_view input );
+
 }
