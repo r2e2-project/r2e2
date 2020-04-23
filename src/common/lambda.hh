@@ -7,12 +7,29 @@
 
 #include <pbrt/main.h>
 
+#include "util/uri.hh"
+
 constexpr std::chrono::milliseconds DEFAULT_BAGGING_DELAY { 100 };
 constexpr size_t WORKER_MAX_ACTIVE_RAYS = 100'000; /* ~120 MiB of rays */
 
 using WorkerId = uint64_t;
 using TreeletId = uint32_t;
 using BagId = uint64_t;
+
+struct Storage
+{
+  std::string region {};
+  std::string bucket {};
+  std::string path {};
+
+  Storage( const std::string& uri )
+  {
+    ParsedURI u { uri };
+    region = u.options.count( "region" ) ? u.options["region"] : "us-east-1";
+    bucket = u.host;
+    path = u.path;
+  }
+};
 
 struct SceneObject
 {

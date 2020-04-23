@@ -23,7 +23,7 @@
 #include "net/address.hh"
 #include "net/s3.hh"
 #include "net/transfer.hh"
-#include "storage/backend.hh"
+#include "storage/backend_s3.hh"
 #include "util/cpu.hh"
 #include "util/eventloop.hh"
 #include "util/histogram.hh"
@@ -132,7 +132,9 @@ private:
 
   const Address coordinator_addr;
   meow::Client<TCPSession> master_connection;
-  std::unique_ptr<StorageBackend> storage_backend;
+  Storage storage_backend_info;
+  S3StorageBackend scene_storage_backend;
+  S3StorageBackend job_storage_backend;
 
   /* processes incoming messages; called by handleMessages */
   void process_message( const meow::Message& message );

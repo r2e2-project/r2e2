@@ -59,7 +59,7 @@ void LambdaWorker::upload_logs()
   vector<storage::PutRequest> put_logs_request
     = { { info_log_name, log_prefix + to_string( *worker_id ) + ".INFO" } };
 
-  storage_backend->put( put_logs_request );
+  job_storage_backend.put( put_logs_request );
 }
 
 void LambdaWorker::log_ray( const RayAction action,

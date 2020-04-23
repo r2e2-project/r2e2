@@ -24,7 +24,7 @@ void LambdaWorker::process_message( const Message& message )
       worker_id = proto.worker_id();
       job_id = proto.job_id();
 
-      log_prefix = "logs/" + ( *job_id ) + "/";
+      log_prefix = "jobs/" + ( *job_id ) + "/logs/";
       ray_bags_key_prefix = "jobs/" + ( *job_id ) + "/";
 
       cerr << protoutil::to_json( proto ) << endl;

@@ -31,16 +31,23 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
     socket.connect( this->coordinator_addr );
     return socket;
   }() )
-  , storage_backend( StorageBackend::create_backend( storage_uri ) )
+  , storage_backend_info( storage_uri )
+  , scene_storage_backend( {},
+                           storage_backend_info.bucket,
+                           storage_backend_info.region,
+                           storage_backend_info.path )
+  , job_storage_backend( {},
+                         storage_backend_info.bucket,
+                         storage_backend_info.region )
   , transfer_agent( [this]() -> unique_ptr<TransferAgent> {
     if ( not config.memcached_servers.empty() ) {
       return make_unique<memcached::TransferAgent>( config.memcached_servers );
     } else {
-      return make_unique<S3TransferAgent>( storage_backend );
+      return make_unique<S3TransferAgent>( job_storage_backend );
     }
   }() )
   , samples_transfer_agent(
-      make_unique<S3TransferAgent>( storage_backend, 2, true ) )
+      make_unique<S3TransferAgent>( job_storage_backend, 2, true ) )
   , worker_rule_categories( { loop.add_category( "Socket" ),
                               loop.add_category( "Message read" ),
                               loop.add_category( "Message write" ),
@@ -154,16 +161,15 @@ void LambdaWorker::get_and_setup_scene( const protobuf::GetObjects& proto )
   }
 
   /* get all the non-treelet (base) objects */
-  storage_backend->get( requests );
+  scene_storage_backend.get( requests );
 
   /* create the scene object */
   scene.base = { working_directory.name(), scene.samples_per_pixel };
 
   /* now it's time to fetch the treelets into memory */
-  auto& s3_backend = *dynamic_cast<S3StorageBackend*>( storage_backend.get() );
-  S3Client s3_client { s3_backend.client() };
-  const string s3_bucket = s3_backend.bucket();
-  const string s3_prefix = s3_backend.prefix();
+  S3Client s3_client { scene_storage_backend.client() };
+  const string s3_bucket = scene_storage_backend.bucket();
+  const string s3_prefix = scene_storage_backend.prefix();
 
   for ( const auto t : target_treelets ) {
     string output {};

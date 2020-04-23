@@ -21,7 +21,7 @@
 #include "net/session.hh"
 #include "r2t2.pb.h"
 #include "schedulers/scheduler.hh"
-#include "storage/backend.hh"
+#include "storage/backend_s3.hh"
 #include "util/eventfd.hh"
 #include "util/signalfd.hh"
 #include "util/temp_dir.hh"
@@ -97,10 +97,13 @@ private:
   // Cloud                                                                  //
   ////////////////////////////////////////////////////////////////////////////
 
+  const AWSCredentials aws_credentials {};
+
   const std::string public_address;
   const std::string storage_backend_uri;
-  const std::unique_ptr<StorageBackend> storage_backend;
-  const AWSCredentials aws_credentials {};
+  const Storage storage_backend_info;
+  S3StorageBackend scene_storage_backend;
+  S3StorageBackend job_storage_backend;
   const std::string aws_region;
   const Address aws_address;
   const std::string lambda_function_name {

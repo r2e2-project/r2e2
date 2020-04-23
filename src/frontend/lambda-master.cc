@@ -79,7 +79,14 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   }() )
   , public_address( public_address_ )
   , storage_backend_uri( storage_backend_uri_ )
-  , storage_backend( StorageBackend::create_backend( storage_backend_uri_ ) )
+  , storage_backend_info( storage_backend_uri )
+  , scene_storage_backend( aws_credentials,
+                           storage_backend_info.bucket,
+                           storage_backend_info.region,
+                           storage_backend_info.path )
+  , job_storage_backend( aws_credentials,
+                         storage_backend_info.bucket,
+                         storage_backend_info.region )
   , aws_region( aws_region_ )
   , aws_address( LambdaInvocationRequest::endpoint( aws_region ), "https" )
   , max_workers( max_workers_ )
@@ -133,7 +140,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     };
 
     cerr << "Uploading camera (" << dumped_camera_hash << ")... ";
-    storage_backend->put( { upload_request } );
+    scene_storage_backend.put( { upload_request } );
     cerr << "done." << endl;
   }
 
@@ -172,7 +179,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   }
 
   cerr << "Downloading scene data... ";
-  storage_backend->get( scene_obj_reqs );
+  scene_storage_backend.get( scene_obj_reqs );
   cerr << "done." << endl;
 
   /* now we can initialize the scene */
@@ -564,7 +571,7 @@ void LambdaMaster::run()
   }
 
   vector<storage::GetRequest> get_requests;
-  const string log_prefix = "logs/" + job_id + "/";
+  const string log_prefix = "jobs/" + job_id + "/logs/";
 
   ws_stream.close();
   tl_stream.close();
@@ -600,7 +607,7 @@ void LambdaMaster::run()
   if ( !get_requests.empty() ) {
     cerr << "\nDownloading " << get_requests.size() << " log file(s)... ";
     this_thread::sleep_for( 10s );
-    storage_backend->get( get_requests );
+    job_storage_backend.get( get_requests );
     cerr << "done." << endl;
   }
 

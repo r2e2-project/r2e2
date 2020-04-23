@@ -5,7 +5,6 @@
 #include "net/s3.hh"
 #include "net/secure_socket.hh"
 #include "net/socket.hh"
-#include "storage/backend_gs.hh"
 #include "storage/backend_s3.hh"
 #include "transfer.hh"
 
@@ -24,7 +23,7 @@ protected:
     std::string endpoint {};
     std::atomic<Address> address { Address { "0", 0 } };
 
-    S3Config( const std::unique_ptr<StorageBackend>& backend );
+    S3Config( const S3StorageBackend& backend );
   } _client_config;
 
   static constexpr size_t MAX_REQUESTS_ON_CONNECTION { 1 };
@@ -37,7 +36,7 @@ protected:
   void worker_thread( const size_t thread_id ) override;
 
 public:
-  S3TransferAgent( const std::unique_ptr<StorageBackend>& backend,
+  S3TransferAgent( const S3StorageBackend& backend,
                    const size_t thread_count = MAX_THREADS,
                    const bool upload_as_public = false );
 

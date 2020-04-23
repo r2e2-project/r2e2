@@ -7,34 +7,17 @@ using namespace chrono;
 
 const static std::string UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 
-S3TransferAgent::S3Config::S3Config( const unique_ptr<StorageBackend>& backend )
+S3TransferAgent::S3Config::S3Config( const S3StorageBackend& backend )
 {
-  auto s3_backend = dynamic_cast<S3StorageBackend*>( backend.get() );
-
-  if ( s3_backend != nullptr ) {
-    credentials = s3_backend->client().credentials();
-    region = s3_backend->client().config().region;
-    bucket = s3_backend->bucket();
-    prefix = s3_backend->prefix();
-    endpoint = S3::endpoint( region, bucket );
-    address.store( Address { endpoint, "http" } );
-  } else {
-    auto gs_backend = dynamic_cast<GoogleStorageBackend*>( backend.get() );
-
-    if ( gs_backend == nullptr ) {
-      throw runtime_error( "unsupported backend" );
-    }
-
-    credentials = gs_backend->client().credentials();
-    region = gs_backend->client().config().region;
-    bucket = gs_backend->bucket();
-    prefix = gs_backend->prefix();
-    endpoint = gs_backend->client().config().endpoint;
-    address.store( Address { endpoint, "http" } );
-  }
+  credentials = backend.client().credentials();
+  region = backend.client().config().region;
+  bucket = backend.bucket();
+  prefix = backend.prefix();
+  endpoint = S3::endpoint( region, bucket );
+  address.store( Address { endpoint, "http" } );
 }
 
-S3TransferAgent::S3TransferAgent( const unique_ptr<StorageBackend>& backend,
+S3TransferAgent::S3TransferAgent( const S3StorageBackend& backend,
                                   const size_t thread_count /* NOT USED? */,
                                   const bool upload_as_public )
   : TransferAgent()
