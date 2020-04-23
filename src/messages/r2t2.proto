@@ -56,6 +56,7 @@ message JobSummary {
     uint32 bagging_delay = 9;
     uint32 memcached_servers = 10;
     string storage_backend = 11;
+    string alternative_camera = 25;
 
     double total_time = 12;
     double generation_time = 13;

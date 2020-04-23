@@ -239,7 +239,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   print_info( "Job ID           ", job_id );
   print_info( "Working directory", scene_path );
   print_info( "Public address   ", public_address );
-  print_info( "Maxium workers   ", max_workers );
+  print_info( "Maximum workers  ", max_workers );
   print_info( "Ray generators   ", ray_generators );
   print_info( "Treelet count    ", treelet_count );
   print_info( "Tile size        ",
@@ -251,6 +251,10 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   print_info( "Samples per pixel", scene.base.samplesPerPixel );
   print_info( "Total paths      ", scene.total_paths );
   print_info( "Logs directory   ", config.logs_directory.c_str() );
+
+  if ( not alternative_camera_name.empty() ) {
+    print_info( "Camera name      ", alternative_camera_name );
+  }
 
   cerr << endl;
 
