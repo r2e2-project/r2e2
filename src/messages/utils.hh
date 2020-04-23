@@ -3,6 +3,7 @@
 #include <google/protobuf/util/json_util.h>
 #include <pbrt/common.h>
 
+#include "common/lambda.hh"
 #include "common/stats.hh"
 #include "r2t2.pb.h"
 
@@ -51,11 +52,11 @@ void from_json( const std::string& data, ProtobufType& dest )
 
 namespace r2t2 {
 
-protobuf::ObjectKey to_protobuf( const pbrt::ObjectKey& ObjectKey );
+protobuf::SceneObject to_protobuf( const SceneObject& ObjectKey );
 protobuf::RayBagInfo to_protobuf( const RayBagInfo& RayBagInfo );
 protobuf::WorkerStats to_protobuf( const WorkerStats& stats );
 
-pbrt::ObjectKey from_protobuf( const protobuf::ObjectKey& objectKey );
+SceneObject from_protobuf( const protobuf::SceneObject& objectKey );
 RayBagInfo from_protobuf( const protobuf::RayBagInfo& rayBagInfo );
 WorkerStats from_protobuf( const protobuf::WorkerStats& statsProto );
 

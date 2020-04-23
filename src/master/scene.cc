@@ -12,14 +12,14 @@ using namespace protoutil;
 
 using OpCode = Message::OpCode;
 
-void LambdaMaster::assign_object( Worker& worker, const ObjectKey& object )
+void LambdaMaster::assign_object( Worker& worker, const SceneObject& object )
 {
   worker.objects.insert( object );
 }
 
 void LambdaMaster::assign_treelet( Worker& worker, Treelet& treelet )
 {
-  assign_object( worker, { ObjectType::Treelet, treelet.id } );
+  assign_object( worker, { { ObjectType::Treelet, treelet.id } } );
 
   unassigned_treelets.erase( treelet.id );
   move_from_pending_to_queued( treelet.id );
@@ -30,17 +30,17 @@ void LambdaMaster::assign_treelet( Worker& worker, Treelet& treelet )
   auto& dependencies = scene.base.GetTreeletDependencies( treelet.id );
 
   for ( const auto& obj : dependencies ) {
-    assign_object( worker, obj );
+    assign_object( worker, { obj } );
   }
 }
 
 void LambdaMaster::assign_base_objects( Worker& worker )
 {
-  assign_object( worker, ObjectKey { ObjectType::Scene, 0 } );
-  assign_object( worker, ObjectKey { ObjectType::Camera, 0 } );
-  assign_object( worker, ObjectKey { ObjectType::Sampler, 0 } );
-  assign_object( worker, ObjectKey { ObjectType::Lights, 0 } );
-  assign_object( worker, ObjectKey { ObjectType::Manifest, 0 } );
+  assign_object( worker, { ObjectKey { ObjectType::Scene, 0 } } );
+  assign_object( worker, { ObjectKey { ObjectType::Sampler, 0 } } );
+  assign_object( worker, { ObjectKey { ObjectType::Lights, 0 } } );
+  assign_object( worker, { ObjectKey { ObjectType::Manifest, 0 } } );
+  assign_object( worker, { ObjectKey { ObjectType::Camera, 0 } } );
 }
 
 LambdaMaster::SceneData::SceneData( const std::string& scene_path,

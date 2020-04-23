@@ -10,11 +10,12 @@ using namespace std;
 
 namespace r2t2 {
 
-protobuf::ObjectKey to_protobuf( const pbrt::ObjectKey& key )
+protobuf::SceneObject to_protobuf( const SceneObject& object )
 {
-  protobuf::ObjectKey proto;
-  proto.set_type( to_underlying( key.type ) );
-  proto.set_id( key.id );
+  protobuf::SceneObject proto;
+  proto.set_type( to_underlying( object.key.type ) );
+  proto.set_id( object.key.id );
+  proto.set_alt_name( object.alt_name );
   return proto;
 }
 
@@ -39,10 +40,10 @@ protobuf::WorkerStats to_protobuf( const WorkerStats& stats )
   return proto;
 }
 
-pbrt::ObjectKey from_protobuf( const protobuf::ObjectKey& key )
+SceneObject from_protobuf( const protobuf::SceneObject& object )
 {
-  return pbrt::ObjectKey { static_cast<pbrt::ObjectType>( key.type() ),
-                           key.id() };
+  return { { static_cast<pbrt::ObjectType>( object.type() ), object.id() },
+           object.alt_name() };
 }
 
 RayBagInfo from_protobuf( const protobuf::RayBagInfo& proto )

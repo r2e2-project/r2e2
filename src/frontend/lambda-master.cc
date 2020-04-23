@@ -342,8 +342,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
         /* (2) tell the worker to get the necessary scene objects */
         protobuf::GetObjects objs_proto;
-        for ( const ObjectKey& id : worker.objects ) {
-          *objs_proto.add_object_ids() = to_protobuf( id );
+        for ( const SceneObject& obj : worker.objects ) {
+          *objs_proto.add_objects() = to_protobuf( obj );
         }
 
         worker.client.push_request(
@@ -387,8 +387,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
           /* (2) tell the worker to get the scene objects necessary */
           protobuf::GetObjects objs_proto;
-          for ( const ObjectKey& id : worker.objects ) {
-            *objs_proto.add_object_ids() = to_protobuf( id );
+          for ( const SceneObject& obj : worker.objects ) {
+            *objs_proto.add_objects() = to_protobuf( obj );
           }
 
           worker.client.push_request(

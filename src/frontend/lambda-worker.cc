@@ -140,18 +140,17 @@ void LambdaWorker::get_and_setup_scene( const protobuf::GetObjects& proto )
   vector<storage::GetRequest> requests;
   vector<TreeletId> target_treelets;
 
-  for ( const protobuf::ObjectKey& object_key : proto.object_ids() ) {
-    const ObjectKey obj = from_protobuf( object_key );
-    if ( obj.type == ObjectType::Treelet ) {
-      target_treelets.push_back( obj.id );
-      continue;
-    } else if ( obj.type == ObjectType::TriangleMesh ) {
-      /* triangle meshes are packed into treelets, so ignore */
+  for ( const protobuf::SceneObject& obj_proto : proto.objects() ) {
+    const SceneObject obj = from_protobuf( obj_proto );
+
+    if ( obj.key.type == ObjectType::Treelet ) {
+      target_treelets.push_back( obj.key.id );
       continue;
     }
 
-    const string file_path = scene::GetObjectName( obj.type, obj.id );
-    requests.emplace_back( file_path, file_path );
+    const string file_path = scene::GetObjectName( obj.key.type, obj.key.id );
+    requests.emplace_back( obj.alt_name.empty() ? file_path : obj.alt_name,
+                           file_path );
   }
 
   /* get all the non-treelet (base) objects */

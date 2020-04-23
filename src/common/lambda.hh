@@ -5,12 +5,40 @@
 #include <sstream>
 #include <string>
 
+#include <pbrt/main.h>
+
 constexpr std::chrono::milliseconds DEFAULT_BAGGING_DELAY { 100 };
 constexpr size_t WORKER_MAX_ACTIVE_RAYS = 100'000; /* ~120 MiB of rays */
 
 using WorkerId = uint64_t;
 using TreeletId = uint32_t;
 using BagId = uint64_t;
+
+struct SceneObject
+{
+  pbrt::ObjectKey key;
+  std::string alt_name {};
+
+  SceneObject( const pbrt::ObjectKey& key_ )
+    : key( key_ )
+  {}
+
+  SceneObject( const pbrt::ObjectKey& key_, const std::string& name )
+    : key( key_ )
+    , alt_name( name )
+  {}
+
+  bool operator<( const SceneObject& other ) const
+  {
+    if ( key < other.key ) {
+      return true;
+    } else if ( other.key < key ) {
+      return false;
+    } else {
+      return alt_name < other.alt_name;
+    }
+  }
+};
 
 struct RayBagInfo
 {

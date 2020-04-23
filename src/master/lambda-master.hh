@@ -144,7 +144,7 @@ private:
     std::string aws_log_stream {};
 
     std::vector<TreeletId> treelets {};
-    std::set<pbrt::ObjectKey> objects {};
+    std::set<SceneObject> objects {};
 
     std::set<RayBagInfo> outstanding_ray_bags {};
     size_t outstanding_bytes { 0 };
@@ -229,7 +229,7 @@ private:
   // Worker <-> Object Assignments                                          //
   ////////////////////////////////////////////////////////////////////////////
 
-  void assign_object( Worker& worker, const pbrt::ObjectKey& object );
+  void assign_object( Worker& worker, const SceneObject& object );
   void assign_base_objects( Worker& worker );
   void assign_treelet( Worker& worker, Treelet& treelet );
 
