@@ -72,11 +72,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                             unique_ptr<Scheduler>&& scheduler_,
                             const MasterConfiguration& user_config )
   : config( user_config )
-  , job_id( [] {
-    ostringstream oss;
-    oss << hex << setfill( '0' ) << setw( 8 ) << time( nullptr );
-    return oss.str();
-  }() )
+  , job_id(
+      digest::sha256_base58( to_string( time( nullptr ) ) ).substr( 0, 6 ) )
   , public_address( public_address_ )
   , storage_backend_uri( storage_backend_uri_ )
   , storage_backend_info( storage_backend_uri )
