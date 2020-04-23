@@ -32,6 +32,7 @@
 #include "schedulers/rootonly.hh"
 #include "schedulers/static.hh"
 #include "schedulers/uniform.hh"
+#include "util/digest.hh"
 #include "util/exception.hh"
 #include "util/random.hh"
 #include "util/status_bar.hh"
@@ -100,6 +101,42 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   const string scene_path = scene_dir.name();
   filesystem::create_directories( scene_path );
 
+  if ( config.camera_file ) {
+    // read camera description
+    const string camera_data = [f = *config.camera_file] {
+      ifstream fin { f };
+      stringstream ss;
+      ss << fin.rdbuf();
+      return ss.str();
+    }();
+
+    const auto output_path = filesystem::path( scene_path )
+                             / scene::GetObjectName( ObjectType::Camera, 0 );
+
+    scene::DumpCamera( camera_data, output_path );
+
+    const string dumped_camera_hash =
+      [&output_path] {
+        ifstream fin { output_path };
+        stringstream ss;
+        ss << fin.rdbuf();
+        return digest::sha256_base58( ss.str() );
+      }()
+        .substr( 0, 8 );
+
+    const auto camera_base_name = scene::GetObjectName( ObjectType::Camera, 0 );
+    alternative_camera_name = camera_base_name + "_" + dumped_camera_hash;
+
+    // upload this camera file
+    storage::PutRequest upload_request {
+      filesystem::path( scene_path ) / camera_base_name, alternative_camera_name
+    };
+
+    cerr << "Uploading camera (" << dumped_camera_hash << ")... ";
+    storage_backend->put( { upload_request } );
+    cerr << "done." << endl;
+  }
+
   protobuf::InvocationPayload invocation_proto;
   invocation_proto.set_storage_backend( storage_backend_uri );
   invocation_proto.set_coordinator( public_address );
@@ -125,11 +162,14 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   vector<storage::GetRequest> scene_obj_reqs {
     get_scene_object_request( ObjectType::Manifest ),
-    get_scene_object_request( ObjectType::Camera ),
     get_scene_object_request( ObjectType::Sampler ),
     get_scene_object_request( ObjectType::Lights ),
     get_scene_object_request( ObjectType::Scene ),
   };
+
+  if ( not config.camera_file ) {
+    scene_obj_reqs.push_back( get_scene_object_request( ObjectType::Camera ) );
+  }
 
   cerr << "Downloading scene data... ";
   storage_backend->get( scene_obj_reqs );
@@ -616,6 +656,7 @@ void usage( const char* argv0, int exit_code )
        << "                               - none" << endl
        << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
        << endl
+       << "  -C --camera FILE           specify alternative camera" << endl
        << "  -T --pix-per-tile N        pixels per tile (default=44)" << endl
        << "  -n --new-tile-send N       threshold for sending new tiles" << endl
        << "  -t --timeout T             exit after T seconds of inactivity"
@@ -673,6 +714,8 @@ int main( int argc, char* argv[] )
   uint64_t new_tile_threshold = 10000;
   string job_summary_path;
 
+  optional<filesystem::path> camera_file = nullopt;
+
   unique_ptr<Scheduler> scheduler = nullptr;
   string scheduler_name;
 
@@ -703,6 +746,7 @@ int main( int argc, char* argv[] )
     { "max-depth", required_argument, nullptr, 'M' },
     { "bagging-delay", required_argument, nullptr, 's' },
     { "crop-window", required_argument, nullptr, 'c' },
+    { "camera", required_argument, nullptr, 'C' },
     { "timeout", required_argument, nullptr, 't' },
     { "job-summary", required_argument, nullptr, 'j' },
     { "pix-per-tile", required_argument, nullptr, 'T' },
@@ -720,7 +764,7 @@ int main( int argc, char* argv[] )
     const int opt
       = getopt_long( argc,
                      argv,
-                     "p:P:i:r:b:m:G:w:D:a:S:M:s:L:c:t:j:T:n:J:d:E:B:gAh",
+                     "p:P:i:r:b:m:G:w:D:a:S:M:s:L:c:C:t:j:T:n:J:d:E:B:gAh",
                      long_options,
                      nullptr );
 
@@ -755,6 +799,7 @@ int main( int argc, char* argv[] )
       case 'E': engines.emplace_back(optarg, max_jobs_on_engine); break;
       case 'A': auto_log_directory_name = true; break;
       case 'h': usage(argv[0], EXIT_SUCCESS); break;
+      case 'C': camera_file = optarg; break;
         // clang-format on
 
       case 'T': {
@@ -840,6 +885,7 @@ int main( int argc, char* argv[] )
                                  seconds { timeout },
                                  job_summary_path,
                                  new_tile_threshold,
+                                 camera_file,
                                  move( memcached_servers ),
                                  move( engines ) };
 

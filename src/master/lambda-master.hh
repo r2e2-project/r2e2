@@ -55,6 +55,8 @@ struct MasterConfiguration
   std::string job_summary_path;
   uint64_t new_tile_threshold;
 
+  std::optional<std::filesystem::path> camera_file;
+
   std::vector<std::string> memcached_servers;
   std::vector<std::pair<std::string, uint32_t>> engines;
 };
@@ -233,6 +235,7 @@ private:
   void assign_base_objects( Worker& worker );
   void assign_treelet( Worker& worker, Treelet& treelet );
 
+  std::string alternative_camera_name {};
   std::set<TreeletId> unassigned_treelets {};
 
   ////////////////////////////////////////////////////////////////////////////

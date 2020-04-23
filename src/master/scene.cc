@@ -40,7 +40,8 @@ void LambdaMaster::assign_base_objects( Worker& worker )
   assign_object( worker, { ObjectKey { ObjectType::Sampler, 0 } } );
   assign_object( worker, { ObjectKey { ObjectType::Lights, 0 } } );
   assign_object( worker, { ObjectKey { ObjectType::Manifest, 0 } } );
-  assign_object( worker, { ObjectKey { ObjectType::Camera, 0 } } );
+  assign_object(
+    worker, { ObjectKey { ObjectType::Camera, 0 }, alternative_camera_name } );
 }
 
 LambdaMaster::SceneData::SceneData( const std::string& scene_path,
