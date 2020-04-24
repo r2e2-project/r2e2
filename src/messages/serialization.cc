@@ -167,7 +167,7 @@ bool RecordReader::read( uint64_t* integer )
 
 void RecordReader::initialize()
 {
-  coded_input_.SetTotalBytesLimit( 1'073'741'824, 536'870'912 );
+  coded_input_.SetTotalBytesLimit( 1'073'741'824 );
   eof_ = not coded_input_.ReadLittleEndian32( &next_size_ );
 }
 
