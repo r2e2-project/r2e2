@@ -27,7 +27,7 @@ def genHillTerrain(nx=64,ny=64,iters=440,seed=None):
         accum_terrain = np.clip(accum_terrain,a_min=0,a_max=None)
         hill_terrain += accum_terrain
 
-    hill_terrain = (2 * ((hill_terrain - np.min(hill_terrain))/(np.ptp(hill_terrain))) - 1) * 0.9
+    hill_terrain = (2 * ((hill_terrain - np.min(hill_terrain))/(np.ptp(hill_terrain))) - 1) * 0.99
     hill_terrain = (hill_terrain ** 2  )
     return hill_terrain
 def genLandPbrt(filename: str,hill_terrain):
@@ -173,7 +173,8 @@ def genKilleroo(m,n,i,j,
                                     instance_name = instance_name,
                                     killeroo_path=killeroo_path)
     return fmt_string
-def genCamera(LookAt,fov,xres,yres,output_name):
+def genCamera(LookAt,height_coeff,fov,xres,yres,output_name):
+    LookAt[0] = [int(i *  math.log10(height_coeff)) for i in LookAt[0] ]
     fmt_string = Attribute_string("LookAt",[parameter_coordinate(LookAt[0]),
                                             parameter_coordinate(LookAt[1]),
                                             parameter_coordinate(LookAt[2])])
@@ -192,11 +193,11 @@ def genSampler(samples):
     fmt_string += Attribute_string("Integrator",[parameter_string("path")])
     
     return fmt_string
-def genAboveLight():
+def genAboveLight(height_coeff):
     fmt_string = Attribute_string("AttributeBegin")
     fmt_string += Attribute_string("Material",[parameter_string("matte"),
                                                parameter_numeric("color Kd",[0,0,0])])
-    fmt_string += Attribute_string("Translate",[parameter_coordinate([0,1000,0])])
+    fmt_string += Attribute_string("Translate",[parameter_coordinate([0,int(300 * math.log10(height_coeff)),0])])
     fmt_string += Attribute_string("AreaLightSource",[parameter_string("area"),
                                                       parameter_numeric("color L",[500,500,500]),
                                                       parameter_numeric("integer nsamples",[16])])
@@ -219,7 +220,7 @@ def genKillerooTerrain(output_filename: str,
                        landxres: int,
                        landyres: int,
                        landiters: int,
-                       LookAt: list = [[0,300,-300],[0,0,0],[0,1,0]],
+                       LookAt: list = [[0,500,-500],[0,0,0],[0,1,0]],
                        l_scale_coeff: int = 100,
                        height_coeff: int = 30,
                        k_coeff: int = 10,
@@ -241,13 +242,13 @@ def genKillerooTerrain(output_filename: str,
         hill_terrain = np.ones((landxres,landyres)) * 0.3
     
     #Camera,Sampling, and Integrator parameters
-    fmt_string = genCamera(LookAt,50,xres,yres,output_filename[:output_filename.rfind(".")] + ".exr" )
+    fmt_string = genCamera(LookAt,height_coeff,50,xres,yres,output_filename[:output_filename.rfind(".")] + ".exr" )
     fmt_string += genSampler(8)
     fmt_string += genAccelerator();
     fmt_string += Attribute_string("WorldBegin\n")
     
     #Above square trianglemesh light source
-    fmt_string += genAboveLight()
+    fmt_string += genAboveLight(height_coeff)
     
     #Camera light source 
     fmt_string += Attribute_string("AttributeBegin")
@@ -318,8 +319,8 @@ def main():
     parser.add_argument('--yres',default =700,help=("y resolution target of pbrt file"))
     parser.add_argument('--landiters',default =440,help=("number of iterations hill generator should take"))
     parser.add_argument('--k_coeff',default =2,help=("scale of killeroos "))
-    parser.add_argument('--LookAt',default =[[0,300,-300],[0,0,0],[0,1,0]],
-                        help=("LookAt params for pbrt camera"))
+    # parser.add_argument('--LookAt',default =[[0,500,-500],[0,0,0],[0,1,0]],
+    #                     help=("LookAt params for pbrt camera"))
     parser.add_argument('--killeroo_path',default="./geometry/killeroo.pbrt",
                         help=(' input file path for kilerooo pbrt file'
                             ))
@@ -345,7 +346,6 @@ def main():
                        landxres =int(args.landxres),
                        landyres = int(args.landyres),
                        landiters=int(args.landiters),
-                       LookAt= args.LookAt,
                        l_scale_coeff=float(args.land_scale),
                        height_coeff=float(args.height_scale),
                        k_coeff=float(args.k_coeff),
