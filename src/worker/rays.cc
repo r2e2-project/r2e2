@@ -149,9 +149,7 @@ void LambdaWorker::handle_trace_queue()
   }
 
   while ( !processed_rays.empty() ) {
-    RayStatePtr ray = move( processed_rays.front() );
-    processed_rays.pop();
-
+    RayStatePtr& ray = processed_rays.front();
     const TreeletId next_treelet = ray->CurrentTreelet();
 
     if ( treelets.count( next_treelet ) ) {
@@ -163,5 +161,6 @@ void LambdaWorker::handle_trace_queue()
     }
 
     this->rays.generated++;
+    processed_rays.pop();
   }
 }
