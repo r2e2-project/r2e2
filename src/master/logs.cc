@@ -251,6 +251,9 @@ void LambdaMaster::print_job_summary() const
 
   const protobuf::JobSummary proto = get_job_summary();
 
+  const float completion_percent
+    = percent( proto.finished_paths(), proto.total_paths() );
+
   cerr << "Job summary:" << endl;
   cerr << "  Ray throughput       " << fixed << setprecision( 2 )
        << Value<double>( proto.ray_throughput() ) << " rays/worker/s" << endl;
@@ -259,8 +262,9 @@ void LambdaMaster::print_job_summary() const
        << endl;
 
   cerr << "  Finished paths       " << Value<uint64_t>( proto.finished_paths() )
-       << " (" << fixed << setprecision( 2 )
-       << percent( proto.finished_paths(), proto.total_paths() ) << "%)"
+       << " "
+       << ( ( completion_percent >= 100.0 ) ? "\x1B[1;42m" : "\x1B[1;101m" )
+       << "(" << fixed << setprecision( 2 ) << completion_percent << "%)\x1B[0m"
        << endl;
 
   cerr << "  Finished rays        " << Value<uint64_t>( proto.finished_rays() )
