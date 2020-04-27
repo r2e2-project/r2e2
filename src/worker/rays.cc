@@ -104,11 +104,9 @@ void LambdaWorker::handle_trace_queue()
             log_ray( RayAction::Finished, new_ray );
           }
         } else if ( ray.hit ) {
-
           log_ray( RayAction::Finished, ray );
 
-          RayStatePtr bounce_ray, shadow_ray;
-          tie( bounce_ray, shadow_ray )
+          auto [bounce_ray, shadow_ray]
             = graphics::ShadeRay( move( ray_ptr ),
                                   treelet,
                                   scene.base.lights,
