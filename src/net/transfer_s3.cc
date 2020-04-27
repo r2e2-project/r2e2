@@ -136,7 +136,11 @@ void S3TransferAgent::worker_thread( const size_t thread_id )
         parser->new_request_arrived( request );
         request.serialize_headers( headers );
         TRY_OPERATION( s3.write_all( headers ), break );
-        TRY_OPERATION( s3.write_all( request.body() ), break );
+
+        if ( not request.body().empty() ) {
+          TRY_OPERATION( s3.write_all( request.body() ), break );
+        }
+
         request_count++;
       }
 
