@@ -50,10 +50,6 @@ void LambdaWorker::upload_logs()
   if ( !worker_id )
     return;
 
-  TLOG( RAYHOPS ) << local_stats.ray_hops.str();
-  TLOG( SHADOWHOPS ) << local_stats.shadow_ray_hops.str();
-  TLOG( PATHHOPS ) << local_stats.path_hops.str();
-
   google::FlushLogFiles( google::INFO );
 
   vector<storage::PutRequest> put_logs_request

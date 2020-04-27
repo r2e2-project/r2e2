@@ -274,15 +274,6 @@ private:
   ////////////////////////////////////////////////////////////////////////////
 
   CPUStats cpu_stats {};
-
-  struct LocalStats
-  {
-    constexpr static uint16_t BIN_WIDTH = 5;
-
-    Histogram<uint64_t> path_hops { BIN_WIDTH, 0, UINT16_MAX };
-    Histogram<uint64_t> ray_hops { BIN_WIDTH, 0, UINT16_MAX };
-    Histogram<uint64_t> shadow_ray_hops { BIN_WIDTH, 0, UINT16_MAX };
-  } local_stats {};
 };
 
 } // namespace r2t2

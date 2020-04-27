@@ -81,7 +81,6 @@ void LambdaWorker::handle_trace_queue()
           if ( new_ray.isShadowRay ) {
             if ( hit || empty_visit ) {
               new_ray.Ld = hit ? 0.f : new_ray.Ld;
-              local_stats.shadow_ray_hops.add( new_ray.hop );
               samples.emplace( *new_ray_ptr );
               this->rays.generated++;
 
@@ -90,7 +89,6 @@ void LambdaWorker::handle_trace_queue()
               /* was this the last shadow ray? */
               if ( new_ray.remainingBounces == 0 ) {
                 finished_path_ids.push( path_id );
-                local_stats.path_hops.add( new_ray.pathHop );
               }
             } else {
               processed_rays.push( move( new_ray_ptr ) );
@@ -103,13 +101,10 @@ void LambdaWorker::handle_trace_queue()
             finished_path_ids.push( path_id );
             this->rays.generated++;
 
-            local_stats.ray_hops.add( new_ray.hop );
-            local_stats.path_hops.add( new_ray.pathHop );
-
             log_ray( RayAction::Finished, new_ray );
           }
         } else if ( ray.hit ) {
-          local_stats.ray_hops.add( ray.hop );
+
           log_ray( RayAction::Finished, ray );
 
           RayStatePtr bounce_ray, shadow_ray;
@@ -125,7 +120,6 @@ void LambdaWorker::handle_trace_queue()
           if ( bounce_ray == nullptr && shadow_ray == nullptr ) {
             /* this was the last ray in the path */
             finished_path_ids.push( path_id );
-            local_stats.path_hops.add( ray.pathHop );
           }
 
           if ( bounce_ray != nullptr ) {
