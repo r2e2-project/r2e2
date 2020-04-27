@@ -482,12 +482,15 @@ string LambdaMaster::Worker::to_string() const
     oss << *it;
   }
 
-  oss << ",outstanding=" << outstanding_ray_bags.size()
+  oss << ",outstanding-bags=" << outstanding_ray_bags.size()
       << ",outstanding-bytes=" << oustanding_size
-      << ",enqueued=" << stats.enqueued.bytes
-      << ",assigned=" << stats.assigned.bytes
-      << ",dequeued=" << stats.dequeued.bytes
-      << ",samples=" << stats.samples.bytes;
+      << ",rays={.camera:" << rays.camera << ",.generated:" << rays.generated
+      << ",.dequeued:" << rays.dequeued << ",.terminated:" << rays.terminated
+      << ",.enqueued:" << rays.enqueued << "},active-rays=" << active_rays()
+      << ",enqueued=" << stats.enqueued.rays
+      << ",assigned=" << stats.assigned.rays
+      << ",dequeued=" << stats.dequeued.rays
+      << ",samples=" << stats.samples.rays;
 
   return oss.str();
 }
