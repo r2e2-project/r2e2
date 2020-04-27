@@ -193,6 +193,7 @@ private:
   std::string ray_bags_key_prefix {};
   std::map<TreeletId, BagId> current_bag_id {};
   std::map<uint64_t, std::pair<Task, RayBagInfo>> pending_ray_bags {};
+  std::map<uint64_t, std::pair<Task, RayBagInfo>> pending_sample_bags {};
   BagId current_sample_bag_id { 0 };
 
   /*** Transfer Agent *******************************************************/
@@ -205,7 +206,6 @@ private:
   ////////////////////////////////////////////////////////////////////////////
 
   void handle_worker_stats();
-
   void send_worker_stats();
 
   struct

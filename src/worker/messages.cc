@@ -84,7 +84,7 @@ void LambdaWorker::process_message( const Message& message )
           return trace_queue.empty() && out_queue.empty() && samples.empty()
                  && open_bags.empty() && sealed_bags.empty()
                  && receive_queue.empty() && pending_ray_bags.empty()
-                 && sample_bags.empty();
+                 && pending_sample_bags.empty() && sample_bags.empty();
         } );
 
       break;

@@ -35,8 +35,6 @@ pair<bool, bool> LambdaMaster::assign_work( Worker& worker )
     return { true, false };
   }
 
-  protobuf::RayBags proto;
-
   if ( ( rays_to_generate || work_to_do )
        && worker.active_rays() < WORKER_MAX_ACTIVE_RAYS ) {
     if ( rays_to_generate && !work_to_do ) {

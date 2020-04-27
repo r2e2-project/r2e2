@@ -122,7 +122,7 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                  Direction::In,
                  samples_transfer_agent->eventfd(),
                  bind( &LambdaWorker::handle_transfer_results, this, true ),
-                 [this] { return !pending_ray_bags.empty(); } );
+                 [this] { return !pending_sample_bags.empty(); } );
 
   loop.add_rule( "Worker stats",
                  Direction::In,

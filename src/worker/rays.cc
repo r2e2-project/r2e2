@@ -47,7 +47,6 @@ void LambdaWorker::handle_trace_queue()
 
   // constexpr size_t MAX_RAYS = WORKER_MAX_ACTIVE_RAYS / 2;
   const auto trace_until = steady_clock::now() + 100ms;
-  size_t traced_count = 0;
   MemoryArena arena;
 
   while ( !trace_queue.empty() && steady_clock::now() <= trace_until ) {
@@ -55,13 +54,13 @@ void LambdaWorker::handle_trace_queue()
       const CloudBVH& treelet = *treelet_ptr;
 
       auto rays_it = trace_queue.find( treelet_id );
-      if ( rays_it == trace_queue.end() )
+      if ( rays_it == trace_queue.end() ) {
         continue;
+      }
 
       auto& queue = rays_it->second;
 
       while ( !queue.empty() && steady_clock::now() <= trace_until ) {
-        traced_count++;
         RayStatePtr ray_ptr = move( queue.front() );
         queue.pop();
 

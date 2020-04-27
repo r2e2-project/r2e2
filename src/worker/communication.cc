@@ -170,7 +170,7 @@ void LambdaWorker::handle_sample_bags()
     const auto id = samples_transfer_agent->request_upload(
       bag.info.str( ray_bags_key_prefix ), move( bag.data ) );
 
-    pending_ray_bags[id] = make_pair( Task::Upload, bag.info );
+    pending_sample_bags[id] = make_pair( Task::Upload, bag.info );
     sample_bags.pop();
   }
 }
@@ -229,6 +229,7 @@ void LambdaWorker::handle_transfer_results( const bool for_sample_bags )
   protobuf::RayBags dequeued_proto;
 
   auto& agent = for_sample_bags ? samples_transfer_agent : transfer_agent;
+  auto& pending = for_sample_bags ? pending_sample_bags : pending_ray_bags;
 
   if ( !agent->eventfd().read_event() ) {
     return;
@@ -238,9 +239,9 @@ void LambdaWorker::handle_transfer_results( const bool for_sample_bags )
   agent->try_pop_bulk( back_inserter( actions ) );
 
   for ( auto& action : actions ) {
-    auto infoIt = pending_ray_bags.find( action.first );
+    auto infoIt = pending.find( action.first );
 
-    if ( infoIt != pending_ray_bags.end() ) {
+    if ( infoIt != pending.end() ) {
       const auto& info = infoIt->second.second;
 
       switch ( infoIt->second.first ) {
@@ -262,7 +263,7 @@ void LambdaWorker::handle_transfer_results( const bool for_sample_bags )
           break;
       }
 
-      pending_ray_bags.erase( infoIt );
+      pending.erase( infoIt );
     }
   }
 
