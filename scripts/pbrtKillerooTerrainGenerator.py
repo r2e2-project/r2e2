@@ -9,6 +9,20 @@ import math
 from tqdm import tqdm
 import argparse
 
+
+def blockshaped(arr, nrows, ncols):
+    """
+    Return an array of shape (n, nrows, ncols) where
+    n * nrows * ncols = arr.size
+
+    If arr is a 2D array, the returned array looks like n subblocks with
+    each subblock preserving the "physical" layout of arr.
+    """
+    h, w = arr.shape
+    return (arr.reshape(h//nrows, nrows, -1, ncols)
+               .swapaxes(1,2)
+               .reshape(-1, nrows, ncols))
+
 def HillGenerator(x0,y0,x1,y1,r): # position of hill center,current position and hill radius
     z = r ** 2 - ((x1 - x0) ** 2 + (y1 - y0) ** 2)
     return z
@@ -225,6 +239,7 @@ def genKillerooTerrain(output_filename: str,
                        height_coeff: int = 30,
                        k_coeff: int = 10,
                        num_killeroos = 25,
+                       num_chunks = 2,
                        prop = 0.1,
                        random_seed: int = None,
                        killeroo_path: str = "geometry/killeroo.pbrt" ,
@@ -260,29 +275,37 @@ def genKillerooTerrain(output_filename: str,
     
     #Land 
     print("Generating Land...")
-    genLandPbrt(land_filename,hill_terrain);
-    fmt_string += Attribute_string("AttributeBegin")
-    fmt_string += Attribute_string("Material",[parameter_string("matte"),
-                                        parameter_numeric("color Kd",[.4,.2,.1])])
-    fmt_string += Attribute_string("Translate",[parameter_coordinate([-l_scale_coeff//2,0,l_scale_coeff//2])])
-    fmt_string += Attribute_string("Rotate",[parameter_coordinate([90,-1,0,0])])
-    fmt_string += Attribute_string("Scale",[parameter_coordinate([l_scale_coeff,l_scale_coeff,height_coeff])])
-    fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(land_filename,
-                                                                os.path.dirname(output_filename)))])
-    fmt_string += Attribute_string("AttributeEnd\n") 
-     
-    #killerooObj gen
-    # fmt_string += genkKillerooObj(killeroo_path)
+    m,n = hill_terrain.shape
+    hill_terrain_blocked = blockshaped(hill_terrain,m//num_chunks,n//num_chunks)
+    print(hill_terrain_blocked.shape)
+    s_scale_coeff =  l_scale_coeff / num_chunks
+    for i in range(hill_terrain_blocked.shape[0]):
+        hill_terrain_subset = hill_terrain_blocked[i,:,:]
+        subset_filename = land_filename + str(i) + ".pbrt"
+        genLandPbrt(subset_filename,hill_terrain_subset);
+        fmt_string += Attribute_string("AttributeBegin")
+        fmt_string += Attribute_string("Material",[parameter_string("matte"),
+                                            parameter_numeric("color Kd",[.4,.2,.1])])
+        # translate to terrain space 
+        fmt_string += Attribute_string("Translate",[parameter_coordinate([-(s_scale_coeff * num_chunks)//2,0,(s_scale_coeff * num_chunks )//2])])
+        # translate within terrain space
+        y = i //num_chunks;
+        x = i % num_chunks; 
+        fmt_string += Attribute_string("Translate",[parameter_coordinate([(s_scale_coeff * x),0,-(s_scale_coeff * y )])])
+        fmt_string += Attribute_string("Rotate",[parameter_coordinate([90,-1,0,0])])
+        fmt_string += Attribute_string("Scale",[parameter_coordinate([s_scale_coeff,s_scale_coeff,height_coeff])])
+        fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(subset_filename,
+                                                                    os.path.dirname(output_filename)))])
+        fmt_string += Attribute_string("AttributeEnd\n") 
 
-    fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(killeroos_filename,
-                                                                os.path.dirname(output_filename)))])
+    for i in range(hill_terrain_blocked.shape[0]):
+        open(killeroos_filename + str(i) + ".pbrt", 'w').close()
+        fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(killeroos_filename + str(i) + ".pbrt",
+                                                                                    os.path.dirname(output_filename)))])
     fmt_string += Attribute_string("WorldEnd")
     f.write(fmt_string)
     
-    #kileroo gen
-    t = open(killeroos_filename,'w')
-    m,n = hill_terrain.shape
-    
+    #kileroo gen    
     print("Placing killeroos...")
     total_killeroos = num_killeroos
     num_sparse_killeroos = int(math.ceil(prop * total_killeroos))
@@ -294,8 +317,20 @@ def genKillerooTerrain(output_filename: str,
     sparse_positions = np.vstack([grid[0].flatten(),grid[1].flatten()])
     for k in tqdm(range(sparse_positions.shape[1])):
         i,j = sparse_positions[:,k]
+        # print("i: {}, j: {}".format(i,j))
         i = np.clip(i + np.random.uniform(-step/2,step/2),-4,4)
         j = np.clip(j + np.random.uniform(-step/2,step/2),-4,4)
+        #convert to [0,1] range
+        i_norm = (i + 4)/8
+        j_norm = (j + 4)/8
+        #convert to [0,num_chunks-1] range
+        i_scale = i_norm * (num_chunks - 1)
+        j_scale = j_norm * (num_chunks - 1)
+
+        #1d coordinate
+        coord = int(round(j_scale * num_chunks + i_scale))
+        # print("i_scale: {}, j_scale: {}, coord: {}".format(i_scale,j_scale,coord))
+        t = open(killeroos_filename + str(coord) + ".pbrt",'a')
         rotate_val = np.random.uniform(0,360)
         instance_name = "killerooInstance" + str(k)
         color1 = np.random.uniform(0,1,(3)).tolist()
@@ -328,6 +363,8 @@ def main():
                         help=('output folder path for all files  generated by script main pbrt file'
                             ))
     parser.add_argument('--num_killeroos',default =(1000 * scale_step))
+    parser.add_argument('--num_chunks',default =(2),help=('number of geometry and killeroo chunks per x and y dim'
+                            ))
     parser.add_argument('--unique_prop',default =.01,help=("proportion of killeroos that are unique"))
     parser.add_argument('--landxres',default =100 * scale_step,help=("resolution of heightmap x"))
     parser.add_argument('--landyres',default =100 * scale_step,help=("resolution of heightmap y"))
@@ -350,10 +387,11 @@ def main():
                        height_coeff=float(args.height_scale),
                        k_coeff=float(args.k_coeff),
                        num_killeroos=int(args.num_killeroos),
+                       num_chunks = int(args.num_chunks),
                        prop = float(args.unique_prop),
                        random_seed=int(args.random_seed),
                        killeroo_path=args.killeroo_path,
-                       land_filename=os.path.join(args.output_path,"gen_killeroo_land.pbrt"),
-                       killeroos_filename=os.path.join(args.output_path,"gen_killeroo_geometry.pbrt"))
+                       land_filename=os.path.join(args.output_path,"gen_killeroo_land"),
+                       killeroos_filename=os.path.join(args.output_path,"gen_killeroo_geometry"))
 if __name__ == '__main__':
     main()
