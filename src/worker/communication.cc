@@ -17,7 +17,7 @@ void LambdaWorker::handle_out_queue()
 {
   bernoulli_distribution bd { config.bag_log_rate };
 
-  auto create_new_bag = [&]( const TreeletId treelet_id ) -> RayBag {
+  auto create_new_bag = [&]( const TreeletId treelet_id ) {
     RayBag bag {
       *worker_id, treelet_id, current_bag_id[treelet_id]++, false, MAX_BAG_SIZE
     };
@@ -29,7 +29,7 @@ void LambdaWorker::handle_out_queue()
       seal_bags_timer.set( 0s, config.bagging_delay );
     }
 
-    return bag;
+    return open_bags.insert_or_assign( treelet_id, move( bag ) ).first;
   };
 
   for ( auto it = out_queue.begin(); it != out_queue.end();
@@ -40,21 +40,20 @@ void LambdaWorker::handle_out_queue()
     auto bag_it = open_bags.find( treelet_id );
 
     if ( bag_it == open_bags.end() ) {
-      auto result
-        = open_bags.emplace( treelet_id, create_new_bag( treelet_id ) );
-      bag_it = result.first;
+      bag_it = create_new_bag( treelet_id );
     }
+
+    auto& bag = bag_it->second;
 
     while ( !ray_list.empty() ) {
       auto& ray = ray_list.front();
-      auto& bag = bag_it->second;
 
       if ( bag.info.bag_size + ray->MaxCompressedSize() > MAX_BAG_SIZE ) {
         log_bag( BagAction::Sealed, bag.info );
         sealed_bags.push( move( bag ) );
 
         /* let's create an empty bag */
-        bag = create_new_bag( treelet_id );
+        bag = create_new_bag( treelet_id )->second;
       }
 
       const auto len = ray->Serialize( &bag.data[0] + bag.info.bag_size );
