@@ -328,7 +328,7 @@ def genKillerooTerrain(output_filename: str,
         j_scale = j_norm * (num_chunks - 1)
 
         #1d coordinate
-        coord = int(round(j_scale * num_chunks + i_scale))
+        coord = int(round(j_scale)* num_chunks + round(i_scale))
         # print("i_scale: {}, j_scale: {}, coord: {}".format(i_scale,j_scale,coord))
         t = open(killeroos_filename + str(coord) + ".pbrt",'a')
         rotate_val = np.random.uniform(0,360)
