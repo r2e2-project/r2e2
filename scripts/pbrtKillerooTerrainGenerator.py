@@ -188,7 +188,7 @@ def genKilleroo(m,n,i,j,
                                     killeroo_path=killeroo_path)
     return fmt_string
 def genCamera(LookAt,height_coeff,fov,xres,yres,output_name):
-    LookAt[0] = [int(i *  height_coeff) for i in LookAt[0] ]
+    LookAt[0] = [i *  height_coeff for i in LookAt[0] ]
     fmt_string = Attribute_string("LookAt",[parameter_coordinate(LookAt[0]),
                                             parameter_coordinate(LookAt[1]),
                                             parameter_coordinate(LookAt[2])])
@@ -237,7 +237,7 @@ def genKillerooTerrain(output_filename: str,
                        landxres: int,
                        landyres: int,
                        landiters: int,
-                       LookAt: list = [[0,4,-2],[0,0,0],[0,1,0]],
+                       LookAt: list = [[0,1.5,-0.5],[0,0,0],[0,1,0]],
                        l_scale_coeff: int = 100,
                        height_coeff: int = 30,
                        k_coeff: int = 10,
