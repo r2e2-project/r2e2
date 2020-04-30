@@ -209,23 +209,16 @@ def genSampler(samples):
     return fmt_string
 def genAboveLight(height_coeff):
     fmt_string = Attribute_string("AttributeBegin")
-    fmt_string += Attribute_string("Material",[parameter_string("matte"),
-                                               parameter_numeric("color Kd",[0,0,0])])
-    fmt_string += Attribute_string("Translate",[parameter_coordinate([0,int(1.5 * height_coeff),0])])
-    fmt_string += Attribute_string("AreaLightSource",[parameter_string("area"),
-                                                      parameter_numeric("color L",[500,500,500]),
-                                                      parameter_numeric("integer nsamples",[16])])
-    fmt_string += Attribute_string("Shape",[parameter_string("trianglemesh"),
-                                            parameter_numeric("integer indices",[0,1,2,0,2,3]),
-                                            parameter_numeric("point P",[-height_coeff/10,0,-height_coeff/10,
-                                                                          height_coeff/10,0,-height_coeff/10,
-                                                                          height_coeff/10,0,height_coeff/10,
-                                                                         -height_coeff/10,0,height_coeff/10]),
-                                            parameter_numeric("float st",[0,0,1,0,1,1,0,0,1])])
+    fmt_string += Attribute_string("LightSource",[parameter_string("distant"),
+                                                  parameter_numeric("point from", [0,1.5*height_coeff,0]),
+                                                  parameter_numeric("point to", [0,0,0]),
+                                                   parameter_numeric("color L",[10,
+                                                                                10,
+                                                                                10])])
     fmt_string += Attribute_string("AttributeEnd\n")  
     return fmt_string
 def genAccelerator(maxtreeletbytes: int = 1000000000):
-    fmt_string = Attribute_string("Accelerator",[parameter_string("treeletdumpbvh"),
+    fmt_string = Attribute_string("Accelerator",[parameter_string("bvh"),
                                                 parameter_numeric("integer maxtreeletbytes",[maxtreeletbytes]),
                                                 parameter_numeric("string partition",['"nvidia"']),
                                                 parameter_numeric("string traversal",['"sendcheck"']),
