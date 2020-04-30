@@ -778,7 +778,7 @@ int main( int argc, char* argv[] )
     const int opt
       = getopt_long( argc,
                      argv,
-                     "p:P:i:r:b:m:G:w:D:a:S:M:s:L:c:C:t:j:T:n:J:d:E:B:gAh",
+                     "p:P:i:r:b:m:G:w:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:B:gAh",
                      long_options,
                      nullptr );
 
