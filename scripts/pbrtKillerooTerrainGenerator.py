@@ -218,7 +218,7 @@ def genAboveLight(height_coeff):
     fmt_string += Attribute_string("AttributeEnd\n")  
     return fmt_string
 def genAccelerator(maxtreeletbytes: int = 1000000000):
-    fmt_string = Attribute_string("Accelerator",[parameter_string("bvh"),
+    fmt_string = Attribute_string("Accelerator",[parameter_string("treeletdumpbvh"),
                                                 parameter_numeric("integer maxtreeletbytes",[maxtreeletbytes]),
                                                 parameter_numeric("string partition",['"nvidia"']),
                                                 parameter_numeric("string traversal",['"sendcheck"']),
