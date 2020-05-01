@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <iomanip>
 
 #include "lambda-master.hh"
@@ -6,6 +7,8 @@
 using namespace std;
 using namespace chrono;
 using namespace r2t2;
+
+static const bool R2T2_POWERLINE = ( getenv( "R2T2_POWERLINE" ) != nullptr );
 
 void LambdaMaster::record_enqueue( const WorkerId worker_id,
                                    const RayBagInfo& info )
@@ -253,10 +256,28 @@ void LambdaMaster::print_job_summary() const
                  : 0.0;
   };
 
+  auto box_start = []( const string& color ) {
+    if ( R2T2_POWERLINE ) {
+      return "\x1B[38;5;" + color + "m\ue0b6\x1B[0m\x1B[1;48;5;" + color + "m";
+    } else {
+      return "\x1B[48;5;" + color + "m ";
+    }
+  };
+
+  auto box_end = []( const string& color ) {
+    if ( R2T2_POWERLINE ) {
+      return "\x1B[0m\x1B[38;5;" + color + "m\ue0b4\x1B[0m";
+    } else {
+      return " \x1B[0m"s;
+    }
+  };
+
   const protobuf::JobSummary proto = get_job_summary();
 
   const float completion_percent
     = percent( proto.finished_paths(), proto.total_paths() );
+
+  const string c = ( completion_percent >= 100.0 ) ? "028" : "9";
 
   cerr << "Job summary:" << endl;
   cerr << "  Ray throughput       " << fixed << setprecision( 2 )
@@ -266,10 +287,8 @@ void LambdaMaster::print_job_summary() const
        << endl;
 
   cerr << "  Finished paths       " << Value<uint64_t>( proto.finished_paths() )
-       << " "
-       << ( ( completion_percent >= 100.0 ) ? "\x1B[1;42m" : "\x1B[1;101m" )
-       << "(" << fixed << setprecision( 2 ) << completion_percent << "%)\x1B[0m"
-       << endl;
+       << " " << box_start( c ) << fixed << setprecision( 2 )
+       << completion_percent << "%" << box_end( c ) << endl;
 
   cerr << "  Finished rays        " << Value<uint64_t>( proto.finished_rays() )
        << endl;
