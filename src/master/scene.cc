@@ -36,12 +36,15 @@ void LambdaMaster::assign_treelet( Worker& worker, Treelet& treelet )
 
 void LambdaMaster::assign_base_objects( Worker& worker )
 {
-  assign_object( worker, { ObjectKey { ObjectType::Scene, 0 } } );
-  assign_object( worker, { ObjectKey { ObjectType::Sampler, 0 } } );
-  assign_object( worker, { ObjectKey { ObjectType::Lights, 0 } } );
-  assign_object( worker, { ObjectKey { ObjectType::Manifest, 0 } } );
-  assign_object(
-    worker, { ObjectKey { ObjectType::Camera, 0 }, alternative_camera_name } );
+  for ( const auto scene_obj : SceneData::base_object_types ) {
+    if ( alternative_object_names.count( scene_obj ) ) {
+      assign_object(
+        worker,
+        { ObjectKey { scene_obj, 0 }, alternative_object_names[scene_obj] } );
+    } else {
+      assign_object( worker, { ObjectKey { scene_obj, 0 } } );
+    }
+  }
 }
 
 LambdaMaster::SceneData::SceneData( const std::string& scene_path,

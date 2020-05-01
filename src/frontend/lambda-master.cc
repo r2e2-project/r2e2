@@ -105,42 +105,79 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   const string scene_path = scene_dir.name();
   filesystem::create_directories( scene_path );
 
-  if ( config.camera_file ) {
+  if ( config.alt_scene_file ) {
     // read camera description
-    const string camera_data = [f = *config.camera_file] {
+    const string alt_scene_data = [f = *config.alt_scene_file] {
       ifstream fin { f };
       stringstream ss;
       ss << fin.rdbuf();
       return ss.str();
     }();
 
-    const auto output_path = filesystem::path( scene_path )
-                             / scene::GetObjectName( ObjectType::Camera, 0 );
+    const auto output_path = filesystem::path( scene_path );
+    scene::DumpSceneObjects( alt_scene_data, output_path );
 
-    scene::DumpCamera( camera_data, output_path );
-
-    const string dumped_camera_hash =
-      [&output_path] {
-        ifstream fin { output_path };
-        stringstream ss;
-        ss << fin.rdbuf();
-        return digest::sha256_base58( ss.str() );
-      }()
-        .substr( 0, 8 );
-
-    const auto camera_base_name = scene::GetObjectName( ObjectType::Camera, 0 );
-    alternative_camera_name = camera_base_name + "_" + dumped_camera_hash;
-
-    // upload this camera file
-    storage::PutRequest upload_request {
-      filesystem::path( scene_path ) / camera_base_name, alternative_camera_name
+    auto get_file_hash = []( const filesystem::path& p ) {
+      ifstream fin { p };
+      stringstream ss;
+      ss << fin.rdbuf();
+      return digest::sha256_base58( ss.str() );
     };
 
-    cerr << "Uploading camera (" << dumped_camera_hash << ")... ";
-    scene_storage_backend.put( { upload_request } );
+    vector<storage::PutRequest> upload_requests;
+
+    for ( const auto scene_obj : SceneData::base_object_types ) {
+      const auto base_name = scene::GetObjectName( scene_obj, 0 );
+      const auto p = output_path / base_name;
+      if ( filesystem::exists( p ) ) {
+        const auto object_hash = get_file_hash( p ).substr( 0, 8 );
+        const auto alt_name = base_name + "_" + object_hash;
+        alternative_object_names[scene_obj] = alt_name;
+        upload_requests.emplace_back( p, alt_name );
+      }
+    }
+
+    if ( not upload_requests.empty() ) {
+      cerr << "\u2197 Uploading alternative scene "
+           << pluralize( "object", upload_requests.size() ) << " (";
+
+      for ( size_t i = 0; i < upload_requests.size(); i++ ) {
+        cerr << upload_requests[i].object_key;
+        if ( i != upload_requests.size() - 1 ) {
+          cerr << ", ";
+        }
+      }
+
+      cerr << ")... ";
+      scene_storage_backend.put( upload_requests );
+      cerr << "done." << endl;
+    }
+  }
+
+  /* download required scene objects from the bucket */
+  auto get_scene_object_request = [&scene_path]( const ObjectType type ) {
+    return storage::GetRequest { scene::GetObjectName( type, 0 ),
+                                 filesystem::path( scene_path )
+                                   / scene::GetObjectName( type, 0 ) };
+  };
+
+  vector<storage::GetRequest> scene_obj_reqs;
+  for ( const auto scene_obj : SceneData::base_object_types ) {
+    if ( alternative_object_names.count( scene_obj ) == 0 ) {
+      scene_obj_reqs.push_back( get_scene_object_request( scene_obj ) );
+    }
+  }
+
+  if ( not scene_obj_reqs.empty() ) {
+    cerr << "\u2198 Downloading scene data... ";
+    scene_storage_backend.get( scene_obj_reqs );
     cerr << "done." << endl;
   }
 
+  /* now we can initialize the scene */
+  scene = { scene_path, config.samples_per_pixel, config.crop_window };
+
+  /* create the invocation payload */
   protobuf::InvocationPayload invocation_proto;
   invocation_proto.set_storage_backend( storage_backend_uri );
   invocation_proto.set_coordinator( public_address );
@@ -156,31 +193,6 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   }
 
   invocation_payload = protoutil::to_json( invocation_proto );
-
-  /* download required scene objects from the bucket */
-  auto get_scene_object_request = [&scene_path]( const ObjectType type ) {
-    return storage::GetRequest { scene::GetObjectName( type, 0 ),
-                                 filesystem::path( scene_path )
-                                   / scene::GetObjectName( type, 0 ) };
-  };
-
-  vector<storage::GetRequest> scene_obj_reqs {
-    get_scene_object_request( ObjectType::Manifest ),
-    get_scene_object_request( ObjectType::Sampler ),
-    get_scene_object_request( ObjectType::Lights ),
-    get_scene_object_request( ObjectType::Scene ),
-  };
-
-  if ( not config.camera_file ) {
-    scene_obj_reqs.push_back( get_scene_object_request( ObjectType::Camera ) );
-  }
-
-  cerr << "Downloading scene data... ";
-  scene_storage_backend.get( scene_obj_reqs );
-  cerr << "done." << endl;
-
-  /* now we can initialize the scene */
-  scene = { scene_path, config.samples_per_pixel, config.crop_window };
 
   /* initializing the treelets array */
   const size_t treelet_count = scene.base.GetTreeletCount();
@@ -255,10 +267,6 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   print_info( "Samples per pixel", scene.base.samplesPerPixel );
   print_info( "Total paths      ", scene.total_paths );
   print_info( "Logs directory   ", config.logs_directory.c_str() );
-
-  if ( not alternative_camera_name.empty() ) {
-    print_info( "Camera name      ", alternative_camera_name );
-  }
 
   cerr << endl;
 
@@ -500,7 +508,8 @@ void LambdaMaster::run()
   StatusBar::get();
 
   if ( !config.memcached_servers.empty() ) {
-    cerr << "Flushing " << config.memcached_servers.size() << " memcached "
+    cerr << "\u2192 Flushing " << config.memcached_servers.size()
+         << " memcached "
          << pluralize( "server", config.memcached_servers.size() ) << "... ";
 
     vector<Address> servers;
@@ -544,7 +553,7 @@ void LambdaMaster::run()
 
   if ( ray_generators > 0 ) {
     /* let's invoke the ray generators */
-    cerr << "Launching " << ray_generators << " ray "
+    cerr << "\u2192 Launching " << ray_generators << " ray "
          << pluralize( "generator", ray_generators ) << "... ";
 
     invoke_workers( ray_generators
@@ -605,7 +614,8 @@ void LambdaMaster::run()
   }
 
   if ( !get_requests.empty() ) {
-    cerr << "\nDownloading " << get_requests.size() << " log file(s)... ";
+    cerr << "\n\u2198 Downloading " << get_requests.size()
+         << " log file(s)... ";
     this_thread::sleep_for( 10s );
     job_storage_backend.get( get_requests );
     cerr << "done." << endl;
@@ -668,7 +678,7 @@ void usage( const char* argv0, int exit_code )
        << "  -F --scheduler-file FILE   set the allocation file" << endl
        << "  -c --crop-window X,Y,Z,T   set render bounds to [(X,Y), (Z,T))"
        << endl
-       << "  -C --camera FILE           specify alternative camera" << endl
+       << "  -C --pbrt-scene FILE       specify alternative scene file" << endl
        << "  -T --pix-per-tile N        pixels per tile (default=44)" << endl
        << "  -n --new-tile-send N       threshold for sending new tiles" << endl
        << "  -t --timeout T             exit after T seconds of inactivity"
@@ -726,7 +736,7 @@ int main( int argc, char* argv[] )
   uint64_t new_tile_threshold = 10000;
   string job_summary_path;
 
-  optional<filesystem::path> camera_file = nullopt;
+  optional<filesystem::path> alt_scene_file = nullopt;
 
   unique_ptr<Scheduler> scheduler = nullptr;
   string scheduler_name;
@@ -760,7 +770,7 @@ int main( int argc, char* argv[] )
     { "max-depth", required_argument, nullptr, 'M' },
     { "bagging-delay", required_argument, nullptr, 's' },
     { "crop-window", required_argument, nullptr, 'c' },
-    { "camera", required_argument, nullptr, 'C' },
+    { "pbrt-scene", required_argument, nullptr, 'C' },
     { "timeout", required_argument, nullptr, 't' },
     { "job-summary", required_argument, nullptr, 'j' },
     { "pix-per-tile", required_argument, nullptr, 'T' },
@@ -814,7 +824,7 @@ int main( int argc, char* argv[] )
       case 'E': engines.emplace_back(optarg, max_jobs_on_engine); break;
       case 'A': auto_log_directory_name = true; break;
       case 'h': usage(argv[0], EXIT_SUCCESS); break;
-      case 'C': camera_file = optarg; break;
+      case 'C': alt_scene_file = optarg; break;
         // clang-format on
 
       case 'T': {
@@ -851,15 +861,15 @@ int main( int argc, char* argv[] )
       auto storage = StorageBackend::create_backend( storage_backend_uri );
       TempFile static_file { "/tmp/r2t2-lambda-master.STATIC0" };
 
-      cerr << "Downloading static assignment file... ";
+      cerr << "\u2198 Downloading static assignment file... ";
       storage->get( { { scene::GetObjectName( ObjectType::StaticAssignment, 0 ),
                         static_file.name() } } );
       cerr << "done." << endl;
 
       scheduler = make_unique<StaticScheduler>( static_file.name() );
     } else {
-      cerr << "Using " << ( *scheduler_file ) << " as static assignment file."
-           << endl;
+      cerr << "\u2192 Using " << ( *scheduler_file )
+           << " as static assignment file." << endl;
       scheduler = make_unique<StaticScheduler>( *scheduler_file );
     }
   } else if ( scheduler_name == "dynamic" ) {
@@ -906,7 +916,7 @@ int main( int argc, char* argv[] )
                                  seconds { timeout },
                                  job_summary_path,
                                  new_tile_threshold,
-                                 camera_file,
+                                 alt_scene_file,
                                  move( memcached_servers ),
                                  move( engines ) };
 

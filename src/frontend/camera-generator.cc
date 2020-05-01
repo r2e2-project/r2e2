@@ -10,7 +10,7 @@ using namespace std;
 
 void usage( char* argv0 )
 {
-  cerr << "Usage: " << argv0 << "CAMERA-DESCRIPTION OUTPUT" << endl;
+  cerr << "Usage: " << argv0 << "CAMERA-DESCRIPTION OUTPUT-DIR" << endl;
 }
 
 int main( int argc, char* argv[] )
@@ -30,7 +30,7 @@ int main( int argc, char* argv[] )
     stringstream ss;
     ss << fin.rdbuf();
 
-    pbrt::scene::DumpCamera( ss.str(), argv[2] );
+    pbrt::scene::DumpSceneObjects( ss.str(), argv[2] );
   } catch ( const exception& ex ) {
     print_exception( argv[0], ex );
     return EXIT_FAILURE;

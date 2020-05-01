@@ -195,7 +195,11 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
   proto.set_bagging_delay( config.bagging_delay.count() );
   proto.set_memcached_servers( config.memcached_servers.size() );
   proto.set_storage_backend( storage_backend_uri );
-  proto.set_alternative_camera( alternative_camera_name );
+
+  for ( const auto& [k, v] : alternative_object_names ) {
+    ( *proto.mutable_alt_scene_objects() )[pbrt::scene::GetObjectName( k, 0 )]
+      = v;
+  }
 
   proto.set_total_time( total_time );
   proto.set_generation_time( generation_time );

@@ -55,7 +55,7 @@ struct MasterConfiguration
   std::string job_summary_path;
   uint64_t new_tile_threshold;
 
-  std::optional<std::filesystem::path> camera_file;
+  std::optional<std::filesystem::path> alt_scene_file;
 
   std::vector<std::string> memcached_servers;
   std::vector<std::pair<std::string, uint32_t>> engines;
@@ -238,7 +238,7 @@ private:
   void assign_base_objects( Worker& worker );
   void assign_treelet( Worker& worker, Treelet& treelet );
 
-  std::string alternative_camera_name {};
+  std::map<pbrt::ObjectType, std::string> alternative_object_names {};
   std::set<TreeletId> unassigned_treelets {};
 
   ////////////////////////////////////////////////////////////////////////////
@@ -312,6 +312,13 @@ private:
   struct SceneData
   {
   public:
+    static inline const std::vector<pbrt::ObjectType> base_object_types {
+      pbrt::ObjectType::Manifest,
+      pbrt::ObjectType::Scene,
+      pbrt::ObjectType::Camera,
+      pbrt::ObjectType::Lights,
+      pbrt::ObjectType::Sampler
+    };
     pbrt::scene::Base base {};
 
     pbrt::Bounds2i sample_bounds {};
