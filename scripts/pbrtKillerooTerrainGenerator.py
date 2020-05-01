@@ -44,6 +44,31 @@ def genHillTerrain(nx=64,ny=64,iters=440,seed=None):
     hill_terrain = (2 * ((hill_terrain - np.min(hill_terrain))/(np.ptp(hill_terrain))) - 1) * 0.99
     hill_terrain = (hill_terrain ** 2  )
     return hill_terrain
+def chunkTerrain(num_chunks,hill_terrain,l_scale_coeff,height_coeff,land_filename,output_filename):
+        m,n = hill_terrain.shape
+        hill_terrain_blocked = blockshaped(hill_terrain,m//num_chunks,n//num_chunks)
+        print(hill_terrain_blocked.shape)
+        fmt_string = ""
+        s_scale_coeff =  l_scale_coeff / num_chunks
+        for i in range(hill_terrain_blocked.shape[0]):
+            hill_terrain_subset = hill_terrain_blocked[i,:,:]
+            subset_filename = land_filename + str(i) + ".pbrt"
+            genLandPbrt(subset_filename,hill_terrain_subset);
+            fmt_string += Attribute_string("AttributeBegin")
+            fmt_string += Attribute_string("Material",[parameter_string("matte"),
+                                                parameter_numeric("color Kd",[.4,.2,.1])])
+            # translate to terrain space 
+            fmt_string += Attribute_string("Translate",[parameter_coordinate([-(s_scale_coeff * num_chunks)//2,0,(s_scale_coeff * num_chunks )//2])])
+            # translate within terrain space
+            y = i //num_chunks;
+            x = i % num_chunks; 
+            fmt_string += Attribute_string("Translate",[parameter_coordinate([(s_scale_coeff * x),0,-(s_scale_coeff * y )])])
+            fmt_string += Attribute_string("Rotate",[parameter_coordinate([90,-1,0,0])])
+            fmt_string += Attribute_string("Scale",[parameter_coordinate([s_scale_coeff,s_scale_coeff,height_coeff])])
+            fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(subset_filename,
+                                                                        os.path.dirname(output_filename)))])
+            fmt_string += Attribute_string("AttributeEnd\n") 
+        return fmt_string
 def genLandPbrt(filename: str,hill_terrain):
     np.set_printoptions(threshold=sys.maxsize,suppress=True,precision=5)
     nx,ny = hill_terrain.shape
@@ -100,8 +125,6 @@ def killeroo_string(height_coeff,
             fmt_string += Attribute_string("Scale",[parameter_coordinate(scale)])
         else:
             fmt_string += Attribute_string("Scale",[parameter_coordinate([scale,scale,scale])])
-
-
     #base rotation
     fmt_string += Attribute_string("Rotate",[parameter_coordinate([90,-1 ,0,0])])
 
@@ -271,30 +294,14 @@ def genKillerooTerrain(output_filename: str,
     
     #Land 
     print("Generating Land...")
-    m,n = hill_terrain.shape
-    hill_terrain_blocked = blockshaped(hill_terrain,m//num_chunks,n//num_chunks)
-    print(hill_terrain_blocked.shape)
-    s_scale_coeff =  l_scale_coeff / num_chunks
-    for i in range(hill_terrain_blocked.shape[0]):
-        hill_terrain_subset = hill_terrain_blocked[i,:,:]
-        subset_filename = land_filename + str(i) + ".pbrt"
-        genLandPbrt(subset_filename,hill_terrain_subset);
-        fmt_string += Attribute_string("AttributeBegin")
-        fmt_string += Attribute_string("Material",[parameter_string("matte"),
-                                            parameter_numeric("color Kd",[.4,.2,.1])])
-        # translate to terrain space 
-        fmt_string += Attribute_string("Translate",[parameter_coordinate([-(s_scale_coeff * num_chunks)//2,0,(s_scale_coeff * num_chunks )//2])])
-        # translate within terrain space
-        y = i //num_chunks;
-        x = i % num_chunks; 
-        fmt_string += Attribute_string("Translate",[parameter_coordinate([(s_scale_coeff * x),0,-(s_scale_coeff * y )])])
-        fmt_string += Attribute_string("Rotate",[parameter_coordinate([90,-1,0,0])])
-        fmt_string += Attribute_string("Scale",[parameter_coordinate([s_scale_coeff,s_scale_coeff,height_coeff])])
-        fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(subset_filename,
-                                                                    os.path.dirname(output_filename)))])
-        fmt_string += Attribute_string("AttributeEnd\n") 
+    fmt_string += chunkTerrain(num_chunks,
+                               hill_terrain,
+                               l_scale_coeff,
+                               height_coeff,
+                               land_filename,
+                               output_filename)
 
-    for i in range(hill_terrain_blocked.shape[0]):
+    for i in range(num_chunks ** 2):
         open(killeroos_filename + str(i) + ".pbrt", 'w').close()
         fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(killeroos_filename + str(i) + ".pbrt",
                                                                                     os.path.dirname(output_filename)))])
@@ -303,6 +310,7 @@ def genKillerooTerrain(output_filename: str,
     
     #kileroo gen    
     print("Placing killeroos...")
+    m,n = hill_terrain.shape
     total_killeroos = num_killeroos
     num_sparse_killeroos = int(math.ceil(prop * total_killeroos))
     num_killeroos_per_sparse = int((total_killeroos - num_sparse_killeroos)/(num_sparse_killeroos))
@@ -313,7 +321,6 @@ def genKillerooTerrain(output_filename: str,
     sparse_positions = np.vstack([grid[0].flatten(),grid[1].flatten()])
     for k in tqdm(range(sparse_positions.shape[1])):
         i,j = sparse_positions[:,k]
-        # print("i: {}, j: {}".format(i,j))
         i = np.clip(i + np.random.uniform(-step/2,step/2),-4,4)
         j = np.clip(j + np.random.uniform(-step/2,step/2),-4,4)
         #convert to [0,1] range
@@ -322,7 +329,6 @@ def genKillerooTerrain(output_filename: str,
         #convert to [0,num_chunks-1] range
         i_scale = i_norm * (num_chunks - 1)
         j_scale = j_norm * (num_chunks - 1)
-
         #1d coordinate
         coord = int(round(j_scale)* num_chunks + round(i_scale))
         # print("i_scale: {}, j_scale: {}, coord: {}".format(i_scale,j_scale,coord))
