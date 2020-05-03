@@ -1,7 +1,8 @@
 import numpy as np 
+from scipy import ndimage
 import os
 from pathlib import Path
-
+# import matplotlib.pyplot as plt 
 import sys
 import functools
 import operator
@@ -44,6 +45,206 @@ def genHillTerrain(nx=64,ny=64,iters=440,seed=None):
     hill_terrain = (2 * ((hill_terrain - np.min(hill_terrain))/(np.ptp(hill_terrain))) - 1) * 0.99
     hill_terrain = (hill_terrain ** 2  )
     return hill_terrain
+def erodeTerrainThermal(hill_terrain,iters):
+    c = 0.5
+    T = 1e-3
+    m,n = hill_terrain.shape
+    for j in tqdm(range(iters)):
+        # d1 = np.roll(hill_terrain,1,0) - hill_terrain 
+        # d2 = np.roll(hill_terrain,1,1) - hill_terrain 
+        # d3 = np.roll(hill_terrain,-1,1) - hill_terrain
+        # d4 = np.roll(hill_terrain,-1,0) - hill_terrain 
+        # di = np.dstack(d1,d2,d3,d4)
+        # d_tot = np.sum(np.where(di < T,di,0),axis=2)
+        # d_max = np.amax(di,axis=2)
+        # for i in range(di.shape[2]):
+
+        for x in range(1,m - 1):
+            for y in range(1,n - 1):
+                h = hill_terrain[x,y]
+                xyi = [(x - 1,y),(x,y - 1),(x,y + 1),(x + 1,y)]
+                di = [h - hill_terrain[x - 1,y],
+                      h - hill_terrain[x,y - 1],
+                      h - hill_terrain[x,y + 1],
+                      h - hill_terrain[x + 1,y]]
+                d_tot = sum([ val  for val in di if val > T])
+                d_max = max(di)
+                # print(di)
+                for i in range(len(xyi)):
+                    if di[i] > T:
+                        # print("hit this")
+                        hill_terrain[xyi[i]] = hill_terrain[xyi[i]] + c * (d_max - T) * (di[i]/d_tot)
+                        hill_terrain[x,y] = hill_terrain[x,y] - (c * (d_max - T) * (di[i]/d_tot))
+    return hill_terrain
+def erodeTerrainDroplet(hill_terrain,iters=100,seed = None):
+    if seed != None:
+        np.random.seed(seed)
+    Kq=10
+    Ki = 0.1
+    Kw=0.001
+    Kr=0.9
+    Kd=0.02
+    minSlope=0.05
+    g=20
+    Kg=g*2
+    eps = 1e-2
+    m,n = hill_terrain.shape
+    print("eroding terrain...")
+    print("sum hill terrain: {} ".format(np.sum(hill_terrain)))
+    print("max hill terrain: {}".format(np.amax(hill_terrain)))
+    print("min hill terrain: {}".format(np.amin(hill_terrain)))
+    h_0 = np.copy(hill_terrain[0,:])
+    h_1 = np.copy(hill_terrain[-1,:])
+    h_2 = np.copy(hill_terrain[:,0])
+    h_3 = np.copy(hill_terrain[:,-1])
+    #guards to block sediment from being placed on edges and building spikes 
+    hill_terrain[0,:] = 0.99 * np.ones(m)
+    hill_terrain[-1,:] = 0.99 * np.ones(m)
+    hill_terrain[:,0] = 0.99 * np.ones(n)
+    hill_terrain[:,-1] = 0.99 * np.ones(n)
+    max_path_length = 4 * m 
+
+    def deposit_at(x,y,W,ds):
+        delta = ds * W
+        hill_terrain[x,y] = hill_terrain[x,y] +  delta;
+    def ERODE(x,y,W,ds):
+        delta=ds*(W);
+        hill_terrain[x,y] = hill_terrain[x,y] - delta;
+    def DEPOSIT(H,xi,zi,xf,zf,ds):
+        deposit_at(xi  , zi  , 0.25,ds) 
+        deposit_at(xi+1, zi  , 0.25,ds) 
+        deposit_at(xi  , zi+1, 0.25,ds) 
+        deposit_at(xi+1, zi+1, 0.25,ds)
+        H += ds 
+        return H
+    
+    for i in tqdm(range(iters)):
+        # - 2 to not have to deal with boundary effects 
+        # also, whole of terrain not in use for killeroos in any case
+        xi = int(np.random.uniform(1,m - 2))
+        zi = int(np.random.uniform(1,n - 2))
+
+        xp = xi; zp = zi
+        xf = 0; zf = 0 
+        h = np.copy(hill_terrain[xi,zi]);
+        s = 0; v = 0; w = 1;
+        h00 = h
+        h10 = hill_terrain[xi + 1, zi]
+        h01 = hill_terrain[xi, zi + 1]
+        h11 = hill_terrain[xi + 1, zi + 1]
+        dx = 0; dz = 0
+        for numMoves in range(max_path_length):
+            # grad calc
+            gx=h00+h01-h10-h11;
+            gz=h00+h10-h01-h11;
+
+            # calculate next position
+            dx=(dx-gx)*Ki+gx;
+            dz=(dz-gz)*Ki+gz;
+
+            dl=math.sqrt(dx*dx+dz*dz)
+            if dl <= eps: 
+                a = np.random.uniform(0,1) * 2 * np.pi
+                dx=np.cos(a);
+                dz=np.sin(a);
+            else:
+                dx/=dl;
+                dz/=dl;
+
+            nxp=xp+dx;
+            nzp=zp+dz; 
+
+            # sample next height (clamped to ensure no out of array vals)
+            nxi=int(math.floor(nxp))
+            nzi=int(math.floor(nzp));
+            nxf=nxp-nxi;
+            nzf=nzp-nzi;
+
+            #new height and nearby vals 
+            nh00=hill_terrain[nxi  , nzi  ];
+            nh10=hill_terrain[nxi+1, nzi  ];
+            nh01=hill_terrain[nxi  , nzi+1];
+            nh11=hill_terrain[nxi+1, nzi+1];
+
+            nh=(nh00*0.25+nh10*0.25)+(nh01*0.25+nh11*0.25)
+            # if higher than current, try to deposit sediment up to neighbour height
+            if nh >= h: 
+                ds=(nh-h)
+                if (ds>=s):
+                # deposit all sediment and stop
+                    ds=s;
+                    h  = DEPOSIT(h,xi,zi,xf,zf,ds)
+                    s=0;
+                    break;
+                h = DEPOSIT(h,xi,zi,xf,zf,ds)
+                s -= ds
+                v = 0
+            # compute transport capacity
+            dh=h-nh
+            slope=dh
+            q=max(slope, minSlope)*v*w*Kq;
+
+            # deposit/erode (don't erode more than dh)
+            ds=s-q;
+            if ds >= 0:
+                # deposit 
+                ds*=Kd;
+                dh = DEPOSIT(dh,xi,zi,xf,zf,ds)
+                # dh += ds
+                # DEPOSIT(dh,xi,zi,xf,zf,ds)
+                s-=ds;
+            else:
+                # erode 
+                ds*=-Kr;
+                ds=min(ds, dh*0.99);
+                w_sum  = 0 
+                ERODE(xi  , zi  , 0.25,ds)
+                ERODE(xi+1, zi  , 0.25,ds)
+                ERODE(xi  , zi+1, 0.25,ds)
+                ERODE(xi+1, zi+1, 0.25,ds)
+                # for z in range(zi-1,min(zi+3,m - 1)):
+                #     # z = min(z,n - 1)
+                #     zo=z-zp;
+                #     zo2=zo*zo;
+                #     for x in range(xi-1,min(xi+3,n - 1)):
+                #         # x = min(x,m - 1)
+                #         xo=x-xp;
+                #         w=1-(xo*xo+zo2)*0.25
+                #         if (w<=0):
+                #             continue;
+                #         w*=0.1591549430918953;
+                #         w_sum += w 
+                        # ERODE(x, z, w,ds)
+                # print(w_sum)
+                dh-=ds;
+                assert(dh >= 0)
+                # print(dh)
+                s+=ds;
+            # move to the neighbour
+            dh = max(dh,0)
+            v=math.sqrt(v*v+Kg*dh);
+            w*=1-Kw;
+            xp=nxp; zp=nzp;
+            xi=nxi; zi=nzi;
+            xf=nxf; zf=nzf;
+            h=nh;
+            h00=nh00;
+            h10=nh10;
+            h01=nh01;
+            h11=nh11;
+        # print(numMoves)
+    # guards removed and replaced with previous edge value
+    hill_terrain[0,:] = h_0
+    hill_terrain[-1,:] = h_1
+    hill_terrain[:,0] = h_2
+    hill_terrain[:,-1] = h_3
+    print("sum hill terrain: {} ".format(np.sum(hill_terrain)))
+    print("max hill terrain: {}".format(np.amax(hill_terrain)))
+    print("min hill terrain: {}".format(np.amin(hill_terrain)))
+
+    hill_terrain = ndimage.gaussian_filter(hill_terrain,2)
+    return hill_terrain
+
 def chunkTerrain(num_chunks,hill_terrain,l_scale_coeff,height_coeff,land_filename,output_filename):
         m,n = hill_terrain.shape
         hill_terrain_blocked = blockshaped(hill_terrain,m//num_chunks,n//num_chunks)
@@ -253,7 +454,8 @@ def genKillerooTerrain(output_filename: str,
                        landxres: int,
                        landyres: int,
                        landiters: int,
-                       LookAt: list = [[0,1.5,-0.5],[0,0,0],[0,1,0]],
+                       numDroplets: int = None,
+                       LookAt: list = [[0,2.5,-0.5],[0,0,0],[0,1,0]],
                        l_scale_coeff: int = 100,
                        height_coeff: int = 30,
                        k_coeff: int = 10,
@@ -270,6 +472,15 @@ def genKillerooTerrain(output_filename: str,
     hill_terrain = [];
     if landiters > 0:
         hill_terrain = genHillTerrain(nx=landxres,ny=landyres,iters=landiters,seed=random_seed)
+        if numDroplets != None and numDroplets != -1:
+            hill_terrain = erodeTerrainDroplet(hill_terrain,numDroplets)
+        elif numDroplets != -1:
+            hill_terrain = erodeTerrainDroplet(hill_terrain,int(0.625 * landxres * landyres))
+
+        # plt.figure()
+        # plt.imshow(hill_terrain * 255,cmap='gray')
+        # plt.colorbar()
+        # plt.show()
     else:
         if random_seed != None:
             np.random.seed(random_seed)
@@ -354,6 +565,7 @@ def main():
     parser.add_argument('--xres',default =700,help=("x resolution target of pbrt file"))
     parser.add_argument('--yres',default =700,help=("y resolution target of pbrt file"))
     parser.add_argument('--landiters',default = 440,help=("number of iterations hill generator should take"))
+    parser.add_argument('--numDroplets',default = None,help=("number of droplets to simulate (set to -1 for no erosion)"))
     parser.add_argument('--k_coeff',default = 2,help=("scale of killeroos "))
     # parser.add_argument('--LookAt',default =[[0,500,-500],[0,0,0],[0,1,0]],
     #                     help=("LookAt params for pbrt camera"))
@@ -377,12 +589,17 @@ def main():
     if not os.path.exists(args.output_path):
         os.mkdir(args.output_path)
 
+    if args.numDroplets == None:
+        numDroplets = None
+    else:
+        numDroplets = int(args.numDroplets)
     genKillerooTerrain(os.path.join(args.output_path,"killeroo_terrain.pbrt"),
                        xres=int(args.xres),
                        yres=int(args.yres),
                        landxres =int(args.landxres),
                        landyres = int(args.landyres),
                        landiters=int(args.landiters),
+                       numDroplets=numDroplets,
                        l_scale_coeff=float(args.land_scale),
                        height_coeff=0.5 * float(args.land_scale),
                        k_coeff=float(args.k_coeff),
