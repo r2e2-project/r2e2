@@ -249,12 +249,13 @@ def chunkTerrain(num_chunks,hill_terrain,l_scale_coeff,height_coeff,land_filenam
         m,n = hill_terrain.shape
         hill_terrain_blocked = blockshaped(hill_terrain,m//num_chunks,n//num_chunks)
         print(hill_terrain_blocked.shape)
-        fmt_string = ""
         s_scale_coeff =  l_scale_coeff / num_chunks
+        fmt_strings = []
         for i in range(hill_terrain_blocked.shape[0]):
             hill_terrain_subset = hill_terrain_blocked[i,:,:]
             subset_filename = land_filename + str(i) + ".pbrt"
             genLandPbrt(subset_filename,hill_terrain_subset);
+            fmt_string = ""
             fmt_string += Attribute_string("AttributeBegin")
             fmt_string += Attribute_string("Material",[parameter_string("matte"),
                                                 parameter_numeric("color Kd",[.4,.2,.1])])
@@ -269,7 +270,8 @@ def chunkTerrain(num_chunks,hill_terrain,l_scale_coeff,height_coeff,land_filenam
             fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(subset_filename,
                                                                         os.path.dirname(output_filename)))])
             fmt_string += Attribute_string("AttributeEnd\n") 
-        return fmt_string
+            fmt_strings.append(fmt_string)
+        return fmt_strings
 def genLandPbrt(filename: str,hill_terrain):
     np.set_printoptions(threshold=sys.maxsize,suppress=True,precision=5)
     nx,ny = hill_terrain.shape
@@ -340,7 +342,6 @@ def killeroo_string(height_coeff,
     #base translation
     fmt_string += Attribute_string("Translate",[parameter_coordinate([0,0,
                                             140])])        
-    # if is_instance == True:
     fmt_string += Attribute_string("ObjectInstance",[parameter_string(instance_name)])
     fmt_string += Attribute_string("AttributeEnd")
             
@@ -464,8 +465,9 @@ def genKillerooTerrain(output_filename: str,
                        prop = 0.1,
                        random_seed: int = None,
                        killeroo_path: str = "geometry/killeroo.pbrt" ,
-                       land_filename: str = "./geometry/gen_killeroo_land.pbrt",
-                       killeroos_filename: str = "./geometry/gen_killeroo_geometry.pbrt"):
+                       land_filename: str = "./geometry/gen_killeroo_land",
+                       killeroos_filename: str = "./geometry/gen_killeroo_geometry",
+                       chunks_filename: str = "./geometry/gen_killeroo_master"):
     f = open(output_filename, 'w')
     assert os.path.exists(killeroo_path), "killeroo geometry file not found at: {}".format(killeroo_path)
     #Generate land 
@@ -505,7 +507,7 @@ def genKillerooTerrain(output_filename: str,
     
     #Land 
     print("Generating Land...")
-    fmt_string += chunkTerrain(num_chunks,
+    fmt_strings = chunkTerrain(num_chunks,
                                hill_terrain,
                                l_scale_coeff,
                                height_coeff,
@@ -514,13 +516,12 @@ def genKillerooTerrain(output_filename: str,
 
     for i in range(num_chunks ** 2):
         open(killeroos_filename + str(i) + ".pbrt", 'w').close()
-        fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(killeroos_filename + str(i) + ".pbrt",
-                                                                                    os.path.dirname(output_filename)))])
-    fmt_string += Attribute_string("WorldEnd")
-    f.write(fmt_string)
-    
+        s = open(chunks_filename + str(i) + ".pbrt",'w')
+        #include chunk terrain to chunk master
+        s.write(fmt_strings[i])
     #kileroo gen    
     print("Placing killeroos...")
+
     m,n = hill_terrain.shape
     total_killeroos = num_killeroos
     num_sparse_killeroos = int(math.ceil(prop * total_killeroos))
@@ -548,10 +549,10 @@ def genKillerooTerrain(output_filename: str,
         instance_name = "killerooInstance" + str(k)
         color1 = np.random.uniform(0,1,(3)).tolist()
         color2 = np.random.uniform(0,1,(3)).tolist()
-        t.write(genKilleroo(m,n,i,j,k_coeff,color1,color2,
+        fmt_string += genKilleroo(m,n,i,j,k_coeff,color1,color2,
                             l_scale_coeff,height_coeff,
                             hill_terrain,rotate_val,False,
-                            instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
+                            instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename)))
         for r in range(num_killeroos_per_sparse):
             u = np.clip(i + np.random.uniform(-step/3,step/3),-4,4)
             v = np.clip(j + np.random.uniform(-step/3,step/3),-4,4)
@@ -559,6 +560,17 @@ def genKillerooTerrain(output_filename: str,
                                 l_scale_coeff,height_coeff,
                                 hill_terrain,rotate_val,True,
                                 instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
+
+    for i in range(num_chunks ** 2):
+        s = open(chunks_filename + str(i) + ".pbrt",'a')
+        #include killeroo file to chunk master 
+        s.write(Attribute_string("Include",[parameter_string(os.path.relpath(killeroos_filename + str(i) + ".pbrt",
+                                                                                    os.path.dirname(output_filename)))]))
+        #include chunk master to top master
+        fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(chunks_filename + str(i) + ".pbrt",
+                                                                                    os.path.dirname(output_filename)))])
+    fmt_string += Attribute_string("WorldEnd")
+    f.write(fmt_string)
     
 def main():
     parser = argparse.ArgumentParser(description=("'Generate a parameterized pbrt file of killeroos on hilly terrain"))
@@ -609,6 +621,7 @@ def main():
                        random_seed=int(args.random_seed),
                        killeroo_path=args.killeroo_path,
                        land_filename=os.path.join(args.output_path,"gen_killeroo_land"),
-                       killeroos_filename=os.path.join(args.output_path,"gen_killeroo_geometry"))
+                       killeroos_filename=os.path.join(args.output_path,"gen_killeroo_geometry"),
+                       chunks_filename = os.path.join(args.output_path,"gen_killeroo_master"))
 if __name__ == '__main__':
     main()
