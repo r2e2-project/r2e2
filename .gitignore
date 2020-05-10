@@ -1,8 +1,2 @@
-*~
-src/build
-src/bin
-src/objs
-.sconsign.dblite
-
 /build
-/build-debug
+/.vscode
