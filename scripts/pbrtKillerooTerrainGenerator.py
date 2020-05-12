@@ -302,30 +302,25 @@ def Attribute_string(Attribute: str,parameter_strings: list = None):
     else:
         fmt_string = Attribute + "\n"
     return fmt_string
-
-def killeroo_string_object(instance_name: str = "killerooInstance",
-                           color1: list = [.3,.3,.3],
-                           color2: list = [.4,.5,.4],
-                           roughness: float = .15,
-                           killeroo_path: str = "geometry/killeroo.pbrt"):
-    fmt_string = Attribute_string("AttributeBegin")
-    fmt_string += Attribute_string("ObjectBegin",[parameter_string(instance_name)])
-    fmt_string += Attribute_string("Material",[parameter_string("plastic"),
-                                                   parameter_numeric("color Kd",color1),
-                                                   parameter_numeric("color Kd",color2),
-                                                   parameter_numeric("float roughness",roughness)])
-    fmt_string += Attribute_string("Include",[parameter_string(killeroo_path)])
-    fmt_string +=  Attribute_string("ObjectEnd")
-    fmt_string += Attribute_string("AttributeEnd")
-    return fmt_string
-
-def killeroo_string_instance(height_coeff,
+def killeroo_string(height_coeff,
                     scale: list = None,
                     rotation: list = None,
                     translation: list = None,
+                    color1: list = [.3,.3,.3],
+                    color2: list = [.4,.5,.4],
+                    roughness: float = .15,
+                    is_instance = False,
                     instance_name = "killerooInstance",
                     killeroo_path ="geometry/killeroo.pbrt" ):
     fmt_string = Attribute_string("AttributeBegin")
+    if is_instance == False:
+        fmt_string += Attribute_string("ObjectBegin",[parameter_string(instance_name)])
+        fmt_string += Attribute_string("Material",[parameter_string("plastic"),
+                                                   parameter_numeric("color Kd",color1),
+                                                   parameter_numeric("color Kd",color2),
+                                                   parameter_numeric("float roughness",roughness)])
+        fmt_string += Attribute_string("Include",[parameter_string(killeroo_path)])
+        fmt_string +=  Attribute_string("ObjectEnd")
     #base scale
     fmt_string += Attribute_string("Scale",[parameter_coordinate([0.01,0.01,0.01])])
     if scale != None:
@@ -353,12 +348,15 @@ def killeroo_string_instance(height_coeff,
     return fmt_string
     
 
-def genKillerooInstance(m,n,i,j,
+def genKilleroo(m,n,i,j,
                 k_coeff,
+                color1,
+                color2,
                 l_scale_coeff,
                 height_coeff,
                 hill_terrain,
                 rotate_val = None,
+                is_instance = False,
                 instance_name = "killerooInstance",
                 killeroo_path = "geometry/killeroo.pbrt"):
     #ensure that indicies are never at the edge of heightmap to exclude boundary cases
@@ -404,10 +402,13 @@ def genKillerooInstance(m,n,i,j,
     if rotate_val != None: 
         theta_z = rotate_val
         
-    fmt_string = killeroo_string_instance(height_coeff,
+    fmt_string = killeroo_string(height_coeff,
                                     scale = k_coeff,
                                     translation=[tx,ty,tz],
                                     rotation = [-theta_x,-theta_y,theta_z],
+                                    color1 = color1,
+                                    color2 = color2,
+                                    is_instance=is_instance,
                                     instance_name = instance_name,
                                     killeroo_path=killeroo_path)
     return fmt_string
@@ -442,10 +443,11 @@ def genAboveLight(height_coeff):
     fmt_string += Attribute_string("AttributeEnd\n")  
     return fmt_string
 def genAccelerator(maxtreeletbytes: int = 1000000000):
-    fmt_string = Attribute_string("Accelerator",[parameter_string("proxydumpbvh"),
+    fmt_string = Attribute_string("Accelerator",[parameter_string("treeletdumpbvh"),
                                                 parameter_numeric("integer maxtreeletbytes",[maxtreeletbytes]),
                                                 parameter_numeric("string partition",['"nvidia"']),
-                                                parameter_numeric("string traversal",['"sendcheck"'])])
+                                                parameter_numeric("string traversal",['"sendcheck"']),
+                                                parameter_numeric("string splitmethod",['"hlbvh"'])])
     return fmt_string
 def genKillerooTerrain(output_filename: str,
                        xres: int,
@@ -459,7 +461,6 @@ def genKillerooTerrain(output_filename: str,
                        height_coeff: int = 30,
                        k_coeff: int = 10,
                        num_killeroos = 25,
-                       num_killeroo_instances = 10,
                        num_chunks = 2,
                        prop = 0.1,
                        random_seed: int = None,
@@ -519,31 +520,17 @@ def genKillerooTerrain(output_filename: str,
         #include chunk terrain to chunk master
         s.write(fmt_strings[i])
     #kileroo gen    
-
-    print("creating killeroo instances...")
-    for i in tqdm(range(num_killeroo_instances)):
-        instance_name = "killerooInstance" + str(i)
-        color1 = np.random.uniform(0,1,(3)).tolist()
-        color2 = np.random.uniform(0,1,(3)).tolist()
-        fmt_string += killeroo_string_object(instance_name,
-                                             color1,
-                                             color2,
-                                             killeroo_path=
-                                             os.path.relpath(killeroo_path,
-                                             os.path.dirname(output_filename)))
-
+    print("Placing killeroos...")
 
     m,n = hill_terrain.shape
     total_killeroos = num_killeroos
-    num_sparse_killeroos = int(total_killeroos/100)
-    num_killeroos_per_sparse = int((total_killeroos - num_sparse_killeroos )/num_sparse_killeroos)
+    num_sparse_killeroos = int(math.ceil(prop * total_killeroos))
+    num_killeroos_per_sparse = int((total_killeroos - num_sparse_killeroos)/(num_sparse_killeroos))
 
     samples,step = np.linspace(-4,4,int(num_sparse_killeroos ** 0.5),retstep=True)
     grid = np.meshgrid(samples,
                        samples)
     sparse_positions = np.vstack([grid[0].flatten(),grid[1].flatten()])
-    # k = 100
-    print("Placing killeroos...")
     for k in tqdm(range(sparse_positions.shape[1])):
         i,j = sparse_positions[:,k]
         i = np.clip(i + np.random.uniform(-step/2,step/2),-4,4)
@@ -555,21 +542,23 @@ def genKillerooTerrain(output_filename: str,
         i_scale = i_norm * (num_chunks - 1)
         j_scale = j_norm * (num_chunks - 1)
         #1d coordinate
-        coord = int(round(j_scale) * num_chunks + round(i_scale))
+        coord = int(round(j_scale)* num_chunks + round(i_scale))
         # print("i_scale: {}, j_scale: {}, coord: {}".format(i_scale,j_scale,coord))
         t = open(killeroos_filename + str(coord) + ".pbrt",'a')
         rotate_val = np.random.uniform(0,360)
-        instance_name = "killerooInstance" + str(k % num_killeroo_instances)
-        t.write(genKillerooInstance(m,n,i,j,k_coeff,
+        instance_name = "killerooInstance" + str(k)
+        color1 = np.random.uniform(0,1,(3)).tolist()
+        color2 = np.random.uniform(0,1,(3)).tolist()
+        fmt_string += genKilleroo(m,n,i,j,k_coeff,color1,color2,
                             l_scale_coeff,height_coeff,
-                            hill_terrain,rotate_val,
-                            instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
+                            hill_terrain,rotate_val,False,
+                            instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename)))
         for r in range(num_killeroos_per_sparse):
             u = np.clip(i + np.random.uniform(-step/3,step/3),-4,4)
             v = np.clip(j + np.random.uniform(-step/3,step/3),-4,4)
-            t.write(genKillerooInstance(m,n,u,v,k_coeff,
+            t.write(genKilleroo(m,n,u,v,k_coeff,color1,color2,
                                 l_scale_coeff,height_coeff,
-                                hill_terrain,rotate_val,
+                                hill_terrain,rotate_val,True,
                                 instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
 
     for i in range(num_chunks ** 2):
@@ -599,9 +588,9 @@ def main():
                         help=('output folder path for all files  generated by script main pbrt file'
                             ))
     parser.add_argument('--num_killeroos',default =(10000))
-    parser.add_argument('--num_killeroo_instances',default=(int(10000/100)),help=('number of killeroo instances to choose from when placing killeroos'))
     parser.add_argument('--num_chunks',default =(2),help=('number of geometry and killeroo chunks per x and y dim'
                             ))
+    parser.add_argument('--unique_prop',default =.01,help=("proportion of killeroos that are unique"))
     parser.add_argument('--landxres',default =1000 ,help=("resolution of heightmap x"))
     parser.add_argument('--landyres',default =1000 ,help=("resolution of heightmap y"))
     parser.add_argument('--land_scale',default =1000 ,help=("scale of physical width and breadth of heightmap"))
@@ -627,9 +616,8 @@ def main():
                        height_coeff=0.5 * float(args.land_scale),
                        k_coeff=float(args.k_coeff),
                        num_killeroos=int(args.num_killeroos),
-                       num_killeroo_instances=int(args.num_killeroo_instances),
                        num_chunks = int(args.num_chunks),
-                       # prop = float(args.unique_prop),
+                       prop = float(args.unique_prop),
                        random_seed=int(args.random_seed),
                        killeroo_path=args.killeroo_path,
                        land_filename=os.path.join(args.output_path,"gen_killeroo_land"),
