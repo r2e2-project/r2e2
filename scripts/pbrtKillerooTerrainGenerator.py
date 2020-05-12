@@ -592,7 +592,7 @@ def main():
     parser.add_argument('--yres',default =700,help=("y resolution target of pbrt file"))
     parser.add_argument('--landiters',default = 440,help=("number of iterations hill generator should take"))
     parser.add_argument('--numDroplets',default = None,help=("number of droplets to simulate (set to -1 for no erosion)"))
-    parser.add_argument('--k_coeff',default = 2,help=("scale of killeroos "))
+    # parser.add_argument('--k_coeff',default = 2,help=("scale of killeroos "))
     # parser.add_argument('--LookAt',default =[[0,500,-500],[0,0,0],[0,1,0]],
     #                     help=("LookAt params for pbrt camera"))
     parser.add_argument('--killeroo_path',default="./geometry/killeroo.pbrt",
@@ -619,6 +619,7 @@ def main():
         numDroplets = None
     else:
         numDroplets = int(args.numDroplets)
+    k_coeff = float(20000/int(args.num_killeroos))
     genKillerooTerrain(os.path.join(args.output_path,"killeroo_terrain.pbrt"),
                        xres=int(args.xres),
                        yres=int(args.yres),
@@ -628,7 +629,7 @@ def main():
                        numDroplets=numDroplets,
                        l_scale_coeff=float(args.land_scale),
                        height_coeff=0.5 * float(args.land_scale),
-                       k_coeff=float(args.k_coeff),
+                       k_coeff=k_coeff,
                        num_killeroos=int(args.num_killeroos),
                        num_killeroo_instances=int(args.num_killeroo_instances),
                        num_chunks = int(args.num_chunks),
