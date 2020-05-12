@@ -314,7 +314,10 @@ def killeroo_string_object(instance_name: str = "killerooInstance",
                                                    parameter_numeric("color Kd",color1),
                                                    parameter_numeric("color Kd",color2),
                                                    parameter_numeric("float roughness",roughness)])
-    fmt_string += Attribute_string("Include",[parameter_string(killeroo_path)])
+    # fmt_string += Attribute_string("Include",[parameter_string(killeroo_path)])
+    fmt_string += Attribute_string("Shape",[parameter_string("plymesh"),
+                                            parameter_string("string filename"),
+                                            parameter_string(killeroo_path)])
     fmt_string +=  Attribute_string("ObjectEnd")
     fmt_string += Attribute_string("AttributeEnd")
     return fmt_string
@@ -559,7 +562,7 @@ def genKillerooTerrain(output_filename: str,
         # print("i_scale: {}, j_scale: {}, coord: {}".format(i_scale,j_scale,coord))
         t = open(killeroos_filename + str(coord) + ".pbrt",'a')
         rotate_val = np.random.uniform(0,360)
-        instance_name = "killerooInstance" + str(k % num_killeroo_instances)
+        instance_name = "killerooInstance" + str(np.random.randint(0,num_killeroo_instances))
         t.write(genKillerooInstance(m,n,i,j,k_coeff,
                             l_scale_coeff,height_coeff,
                             hill_terrain,rotate_val,
