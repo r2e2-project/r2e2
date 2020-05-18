@@ -3,6 +3,7 @@
 #include "s3.hh"
 
 #include <cassert>
+#include <chrono>
 #include <fcntl.h>
 #include <future>
 #include <sys/types.h>
@@ -20,6 +21,7 @@
 #include "util/temp_file.hh"
 
 using namespace std;
+using namespace chrono;
 using namespace storage;
 
 constexpr size_t BUFFER_SIZE = 1024 * 1024;
@@ -143,30 +145,75 @@ void S3Client::download_file( const string& bucket,
 
   const Address s3_address { endpoint, "https" };
 
-  SSLContext ssl_context;
-  HTTPResponseParser responses;
-  SimpleSSLSession s3 { ssl_context.make_SSL_handle(),
-                        tcp_connection( s3_address ) };
+  constexpr milliseconds backoff { 50 };
+  size_t try_count = 0;
 
-  S3GetRequest request { credentials_, endpoint, config_.region, object };
-  HTTPRequest outgoing_request = request.to_http_request();
-  responses.new_request_arrived( outgoing_request );
+  while ( true ) {
+    try_count++;
 
-  string headers;
-  outgoing_request.serialize_headers( headers );
-  s3.write( headers );
+    if ( try_count >= 2 ) {
+      if ( try_count >= 7 ) {
+        cerr << "S3Client::download_file: max tries exceeded" << endl;
+        throw runtime_error( "S3Client::download_file: max tries exceeded" );
+      }
 
-  char buffer[BUFFER_SIZE];
-  simple_string_span sss { buffer, BUFFER_SIZE };
+      this_thread::sleep_for( backoff * ( 1 << ( try_count - 2 ) ) );
+    }
 
-  while ( responses.empty() ) {
-    responses.parse( sss.substr( 0, s3.read( sss ) ) );
-  }
+    SSLContext ssl_context;
+    HTTPResponseParser responses;
+    SimpleSSLSession s3 { ssl_context.make_SSL_handle(),
+                          tcp_connection( s3_address ) };
 
-  if ( responses.front().first_line() != "HTTP/1.1 200 OK" ) {
-    throw runtime_error( "HTTP failure in S3Client::download_file" );
-  } else {
-    output.swap( responses.front().body() );
+    S3GetRequest request { credentials_, endpoint, config_.region, object };
+    HTTPRequest outgoing_request = request.to_http_request();
+    responses.new_request_arrived( outgoing_request );
+
+    string headers;
+    outgoing_request.serialize_headers( headers );
+
+    try {
+      s3.write( headers );
+    } catch ( exception& ex ) {
+      cerr << "S3Client::download: s3.write exception: " << ex.what() << endl;
+      continue;
+    }
+
+    char buffer[BUFFER_SIZE];
+    simple_string_span sss { buffer, BUFFER_SIZE };
+
+    bool read_error = false;
+
+    while ( responses.empty() ) {
+      size_t len = 0;
+
+      try {
+        len = s3.read( sss );
+      } catch ( exception& ex ) {
+        cerr << "S3Client::download: s3.read exception: " << ex.what() << endl;
+        read_error = true;
+        break;
+      }
+
+      responses.parse( sss.substr( 0, len ) );
+    }
+
+    if ( read_error ) {
+      continue;
+    }
+
+    const auto status_code = responses.front().status_code();
+
+    if ( status_code == "200" ) {
+      output.swap( responses.front().body() );
+    } else if ( status_code[0] == '4' ) {
+      throw runtime_error( "HTTP failure in S3Client::download_file" );
+    } else {
+      try_count++;
+      continue;
+    }
+
+    return;
   }
 }
 
