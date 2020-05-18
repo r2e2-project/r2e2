@@ -16,7 +16,7 @@ string encode_base_58( const string_view input )
 {
   auto bytes = reinterpret_cast<unsigned const char*>( input.data() );
   const auto len = input.length();
-  vector<unsigned char> digits( len * 137 / 100 );
+  vector<unsigned char> digits( len * 138 / 100 + 1);
 
   size_t digits_len = 1;
 
