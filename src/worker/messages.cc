@@ -11,11 +11,40 @@ using OpCode = Message::OpCode;
 
 constexpr char LOG_STREAM_ENVAR[] = "AWS_LAMBDA_LOG_STREAM_NAME";
 
+void LambdaWorker::handle_pending_messages()
+{
+  while ( not pending_messages.empty() ) {
+    process_message( pending_messages.front() );
+    pending_messages.pop();
+  }
+}
+
 void LambdaWorker::process_message( const Message& message )
 {
 #ifndef NDEBUG
   cerr << "\u2190 " << message.info() << endl;
 #endif
+
+  if ( not scene_loaded ) {
+    bool allowed = false;
+
+    switch ( message.opcode() ) {
+      case OpCode::Hey:
+      case OpCode::Ping:
+      case OpCode::GetObjects:
+      case OpCode::Bye:
+        allowed = true;
+        break;
+
+      default:
+        pending_messages.push( message );
+        break;
+    }
+
+    if ( not allowed ) {
+      return;
+    }
+  }
 
   switch ( message.opcode() ) {
     case OpCode::Hey: {
@@ -40,10 +69,24 @@ void LambdaWorker::process_message( const Message& message )
     }
 
     case OpCode::GetObjects: {
+      if ( scene_loaded or not pending_scene_objects.empty() ) {
+        throw runtime_error( "unexpected GetObjects message" );
+      }
+
       protobuf::GetObjects proto;
       protoutil::from_string( message.payload(), proto );
-      get_and_setup_scene( proto );
-      master_connection.push_request( { *worker_id, OpCode::GetObjects, "" } );
+
+      for ( const protobuf::SceneObject& obj_proto : proto.objects() ) {
+        const SceneObject obj = from_protobuf( obj_proto );
+
+        const auto id = scene_transfer_agent->request_download(
+          scene_storage_backend.prefix()
+          + ( obj.alt_name.empty()
+                ? scene::GetObjectName( obj.key.type, obj.key.id )
+                : obj.alt_name ) );
+
+        pending_scene_objects.insert( make_pair( id, move( obj ) ) );
+      }
 
       break;
     }

@@ -48,6 +48,8 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
   }() )
   , samples_transfer_agent(
       make_unique<S3TransferAgent>( job_storage_backend, 2, true ) )
+  , scene_transfer_agent(
+      make_unique<S3TransferAgent>( scene_storage_backend, 4 ) )
   , worker_rule_categories( { loop.add_category( "Socket" ),
                               loop.add_category( "Message read" ),
                               loop.add_category( "Message write" ),
@@ -124,6 +126,16 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                  bind( &LambdaWorker::handle_transfer_results, this, true ),
                  [this] { return !pending_sample_bags.empty(); } );
 
+  loop.add_rule( "Scene objects agent",
+                 Direction::In,
+                 scene_transfer_agent->eventfd(),
+                 bind( &LambdaWorker::handle_scene_object_results, this ),
+                 [this] { return !scene_loaded; } );
+
+  loop.add_rule( "Pending messages",
+                 bind( &LambdaWorker::handle_pending_messages, this ),
+                 [this] { return scene_loaded && !pending_messages.empty(); } );
+
   loop.add_rule( "Worker stats",
                  Direction::In,
                  worker_stats_timer,
@@ -142,44 +154,51 @@ struct membuf : streambuf
   membuf( char* begin, char* end ) { this->setg( begin, begin, end ); }
 };
 
-void LambdaWorker::get_and_setup_scene( const protobuf::GetObjects& proto )
+void LambdaWorker::handle_scene_object_results()
 {
-  vector<storage::GetRequest> requests;
-  vector<TreeletId> target_treelets;
+  if ( !scene_transfer_agent->eventfd().read_event() ) {
+    return;
+  }
 
-  for ( const protobuf::SceneObject& obj_proto : proto.objects() ) {
-    const SceneObject obj = from_protobuf( obj_proto );
+  vector<pair<uint64_t, string>> actions;
+  scene_transfer_agent->try_pop_bulk( back_inserter( actions ) );
 
-    if ( obj.key.type == ObjectType::Treelet ) {
-      target_treelets.push_back( obj.key.id );
+  for ( auto& action : actions ) {
+    auto obj_it = pending_scene_objects.find( action.first );
+    if ( obj_it == pending_scene_objects.end() ) {
+      // we didn't request this object or already got it
       continue;
     }
 
-    const string file_path = scene::GetObjectName( obj.key.type, obj.key.id );
-    requests.emplace_back( obj.alt_name.empty() ? file_path : obj.alt_name,
-                           file_path );
+    const auto& obj = obj_it->second;
+
+    if ( obj.key.type != ObjectType::Treelet ) {
+      // let's write this object to disk
+      ofstream fout { scene::GetObjectName( obj.key.type, obj.key.id ),
+                      ios::binary };
+      fout.write( action.second.data(), action.second.length() );
+    } else {
+      // treelets should be loaded after everything else
+      downloaded_treelets.emplace_back( obj.key.id, move( action.second ) );
+    }
+
+    pending_scene_objects.erase( obj_it );
   }
 
-  /* get all the non-treelet (base) objects */
-  scene_storage_backend.get( requests );
+  if ( pending_scene_objects.empty() ) { /* everything is loaded */
+    scene.base = { working_directory.name(), scene.samples_per_pixel };
 
-  /* create the scene object */
-  scene.base = { working_directory.name(), scene.samples_per_pixel };
+    for ( auto& [id, data] : downloaded_treelets ) {
+      membuf buf( data.data(), data.data() + data.size() );
+      istream in( &buf );
+      treelets.emplace( id, scene::LoadTreelet( ".", id, &in ) );
+    }
 
-  /* now it's time to fetch the treelets into memory */
-  S3Client s3_client { scene_storage_backend.client() };
-  const string s3_bucket = scene_storage_backend.bucket();
-  const string s3_prefix = scene_storage_backend.prefix();
+    downloaded_treelets.clear();
+    scene_transfer_agent.reset();
+    master_connection.push_request( { *worker_id, OpCode::GetObjects, "" } );
 
-  for ( const auto t : target_treelets ) {
-    string output {};
-
-    s3_client.download_file(
-      s3_bucket, s3_prefix + "T" + to_string( t ), output );
-
-    membuf output_buf( output.data(), output.data() + output.size() );
-    istream in( &output_buf );
-    treelets.emplace( t, pbrt::scene::LoadTreelet( ".", t, &in ) );
+    scene_loaded = true;
   }
 }
 

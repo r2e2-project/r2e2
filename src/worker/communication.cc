@@ -239,12 +239,12 @@ void LambdaWorker::handle_transfer_results( const bool for_sample_bags )
   agent->try_pop_bulk( back_inserter( actions ) );
 
   for ( auto& action : actions ) {
-    auto infoIt = pending.find( action.first );
+    auto info_it = pending.find( action.first );
 
-    if ( infoIt != pending.end() ) {
-      const auto& info = infoIt->second.second;
+    if ( info_it != pending.end() ) {
+      const auto& info = info_it->second.second;
 
-      switch ( infoIt->second.first ) {
+      switch ( info_it->second.first ) {
         case Task::Upload: {
           /* we have to tell the master that we uploaded this */
           *enqueued_proto.add_items() = to_protobuf( info );
@@ -263,7 +263,7 @@ void LambdaWorker::handle_transfer_results( const bool for_sample_bags )
           break;
       }
 
-      pending.erase( infoIt );
+      pending.erase( info_it );
     }
   }
 

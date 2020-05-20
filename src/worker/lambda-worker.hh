@@ -101,6 +101,10 @@ private:
 
   /*** Scene Information ****************************************************/
 
+  bool scene_loaded { false };
+  std::vector<std::pair<TreeletId, std::string>> downloaded_treelets {};
+  std::map<uint64_t, SceneObject> pending_scene_objects {};
+
   struct SceneData
   {
   public:
@@ -136,14 +140,17 @@ private:
   S3StorageBackend scene_storage_backend;
   S3StorageBackend job_storage_backend;
 
-  /* processes incoming messages; called by handleMessages */
+  /* messages that can be processed only when the scene is fully loaded */
+  std::queue<meow::Message> pending_messages {};
+
+  /* processes incoming messages; called by handle_messages */
   void process_message( const meow::Message& message );
 
   /* downloads the necessary scene objects */
   void get_and_setup_scene( const protobuf::GetObjects& objects );
 
-  /* process incoming messages */
-  void handle_messages();
+  /* handle messages that are queued for when the scene is loaded */
+  void handle_pending_messages();
 
   /* process rays supposed to be sent out */
   void handle_out_queue();
@@ -164,6 +171,8 @@ private:
   void handle_sample_bags();
 
   void handle_transfer_results( const bool sample_bags );
+
+  void handle_scene_object_results();
 
   /* queues */
 
@@ -200,6 +209,7 @@ private:
 
   std::unique_ptr<TransferAgent> transfer_agent;
   std::unique_ptr<TransferAgent> samples_transfer_agent;
+  std::unique_ptr<TransferAgent> scene_transfer_agent;
 
   ////////////////////////////////////////////////////////////////////////////
   // Stats                                                                  //
