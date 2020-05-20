@@ -84,6 +84,9 @@ void LambdaMaster::handle_status_message()
       // lagging workers
       << BG() << " \u203c " << lagging_workers << " "
 
+      // initialized workers
+      << BG() << " \u2713 " << initialized_workers << " "
+
       // enqueued bytes
       << BG() << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
 
