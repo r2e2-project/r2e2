@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <sys/resource.h>
 #include <sys/time.h>
 
@@ -52,10 +53,12 @@ void LambdaWorker::upload_logs()
 
   google::FlushLogFiles( google::INFO );
 
-  vector<storage::PutRequest> put_logs_request
-    = { { info_log_name, log_prefix + to_string( *worker_id ) + ".INFO" } };
+  if ( filesystem::exists( info_log_name ) ) {
+    vector<storage::PutRequest> put_logs_request
+      = { { info_log_name, log_prefix + to_string( *worker_id ) + ".INFO" } };
 
-  job_storage_backend.put( put_logs_request );
+    job_storage_backend.put( put_logs_request );
+  }
 }
 
 void LambdaWorker::log_ray( const RayAction action,
