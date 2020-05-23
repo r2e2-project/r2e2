@@ -58,41 +58,15 @@ def genHillTerrain(nx,ny,x,y,radii,centers,iters):
     # hill_terrain = np.zeros((nx,ny))
     n = int(10)
     l = int(100)
-    # radii = np.reshape(radii,(-1,n))
-    # centers = np.reshape(centers,(-1,n,2))
     radii = radii.tolist()
     centers = centers.tolist()
-    # x,y = np.meshgrid(range(0,nx),range(0,ny))
-    ziplist = list(zip(radii,centers))
-    # def genNHills(radii,hill_centers):
-    #     assert len(hill_centers) == len(radii)
-    #     m = len(hill_centers)
-    #     filename = os.path.join(mkdtemp(),'tempfile.dat')
-    #     hills = np.memmap(filename,dtype='float32',mode='w+',shape=(nx,ny))
-    #     for k in range(m):
-    #         radius = radii[k]
-    #         hill_center = hill_centers[k]
-    #         hills += np.clip(HillGenerator(hill_center[0],hill_center[1],x,y,radius),a_min=0,a_max=None)
-    #     return hills
-    # with Parallel(n_jobs=num_cores) as parallel:
-    #     zip_chunk = list(divide_chunks(ziplist,l))
-    #     for k in tqdm(range(len(zip_chunk))):
-    #         results = parallel(delayed(genNHills)(i,j)
-    #                            for i,j in zip_chunk[k])
-    #         hill_terrain += sum(results)  # synchronization barrier
-
-    # results = Parallel(n_jobs=num_cores)(delayed(genNHills)(i,j) for i,j in tqdm(ziplist))
-    # hill_terrain = sum(results)
-
-    for k in tqdm(range(iters)):
+    for k in range(iters):
         radius = radii[k]
         hill_center = centers[k]
         accum_terrain = np.zeros((nx,ny))
         accum_terrain = HillGenerator(hill_center[0],hill_center[1],x,y,radius)
         accum_terrain = np.clip(accum_terrain,a_min=0,a_max=None)
-        hill_terrain += accum_terrain
-
-    
+        hill_terrain += accum_terrain    
     # plt.imshow(hill_terrain)
     # plt.show()
     return hill_terrain
@@ -310,11 +284,8 @@ genChunkTerrain and write to disk immediately
 '''
 
 def genChunkTerrain(nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_filename,output_filename):
-        # m,n = hill_terrain.shape
-        # hill_terrain_blocked = blockshaped(hill_terrain,m//num_chunks,n//num_chunks)
-        # print(hill_terrain_blocked.shape)
+        num_cores = multiprocessing.cpu_count()
         # resolution of each subset 
-
         subset_res_x = nx//num_chunks
         subset_res_y = ny//num_chunks
         print("chunk resolution: ({},{})".format(subset_res_x,subset_res_y))
@@ -326,11 +297,8 @@ def genChunkTerrain(nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_
 
         s_scale_coeff =  l_scale_coeff / num_chunks
         fmt_strings = []
-        max_hill = 0
-        min_hill = 1e48
         #for every chunk
-        for i in tqdm(range(int(num_chunks ** 2 ))):
-            #need to generate this subset's terrain
+        def genHillSubset(i):
             x_index = (i % num_chunks) * subset_res_x 
             y_index = (i // num_chunks) * subset_res_y 
             meshx,meshy = np.meshgrid(range(x_index,x_index + subset_res_x),
@@ -344,11 +312,11 @@ def genChunkTerrain(nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_
             subset_filename = land_filename + str(i) + ".pbrt"
             genLandPbrt(subset_filename,hill_terrain_subset);
             #calculate max and min for future use
-            if np.max(hill_terrain_subset) >= max_hill:
-                max_hill = np.max(hill_terrain_subset)
-            if np.min(hill_terrain_subset) <= min_hill:
-                min_hill = np.min(hill_terrain_subset)
-
+            return [np.min(hill_terrain_subset),np.max(hill_terrain_subset)]
+        #parallel calculation of chunks
+        max_min_list = Parallel(n_jobs=num_cores)(delayed(genHillSubset)(i) for i in tqdm(range(int(num_chunks ** 2 ))))
+        max_hill = np.max(max_min_list)
+        min_hill = np.min(max_min_list)
         for i in tqdm(range(int(num_chunks ** 2 ))):
             #load land back in from text file
             subset_filename = land_filename + str(i) + ".pbrt"
@@ -598,7 +566,7 @@ def genKillerooTerrain(output_filename: str,
     #Land 
     print("Generating Land...")
     #Generate land 
-    hill_terrain = [];
+    # hill_terrain = [];
     # if landiters > 0:
     #     hill_terrain = genHillTerrain(nx=landxres,ny=landyres,iters=landiters,seed=random_seed)
     #     if numDroplets != None and numDroplets != -1:
