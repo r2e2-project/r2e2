@@ -3,14 +3,23 @@ from scipy import ndimage
 import os
 from pathlib import Path
 # import matplotlib.pyplot as plt 
+from tempfile import mkdtemp
+import matplotlib.pyplot as plt 
 import sys
 import functools
 import operator
 import math
 from tqdm import tqdm
 import argparse
-
-
+import multiprocessing
+from joblib import Parallel,delayed
+import noise
+def divide_chunks(l, n): 
+      
+    # looping till length l 
+    for i in range(0, len(l), n):  
+        yield l[i:i + n] 
+  
 def blockshaped(arr, nrows, ncols):
     """
     Return an array of shape (n, nrows, ncols) where
@@ -25,25 +34,68 @@ def blockshaped(arr, nrows, ncols):
                .reshape(-1, nrows, ncols))
 
 def HillGenerator(x0,y0,x1,y1,r): # position of hill center,current position and hill radius
-    z = r ** 2 - ((x1 - x0) ** 2 + (y1 - y0) ** 2)
-    return z
-def genHillTerrain(nx=64,ny=64,iters=440,seed=None):
+    return r ** 2 - ((x1 - x0) ** 2 + (y1 - y0) ** 2)
+def genHillTerrainPerlin(nx,ny):
+    scale = 100
+    octaves = 5
+    persistence = 0.5
+    lacunarity = 2.0
     hill_terrain = np.zeros((nx,ny))
-    if seed != None:
-        np.random.seed(seed)
-    radii = np.random.randint(0,int(nx/2),iters)
-    centers = nx * np.random.randn(iters,2)
-    for k in tqdm(range(iters)):
-        radius = radii[k]
-        hill_center = centers[k]
-        accum_terrain = np.zeros((nx,ny)) 
-        x,y = np.meshgrid(range(0,nx),range(0,ny))
-        accum_terrain += HillGenerator(hill_center[0],hill_center[1],x,y,radius)
-        accum_terrain = np.clip(accum_terrain,a_min=0,a_max=None)
-        hill_terrain += accum_terrain
+    for i in tqdm(range(nx)):
+        for j in range(ny):
+            hill_terrain[i][j] = noise.pnoise2(i/scale, 
+                                        j/scale, 
+                                        octaves=octaves, 
+                                        persistence=persistence, 
+                                        lacunarity=lacunarity, 
+                                        repeatx=1024, 
+                                        repeaty=1024, 
+                                        base=2)
+    return hill_terrain
+def genHillTerrain(nx,ny,x,y,radii,centers):
+    filename = os.path.join(mkdtemp(),'newfile.dat')
+    hill_terrain = np.memmap(filename,dtype='float32',mode='w+',shape =(nx,ny))
+    num_cores = multiprocessing.cpu_count()
+    # hill_terrain = np.zeros((nx,ny))
+    n = int(10)
+    l = int(100)
+    radii = np.reshape(radii,(-1,n))
+    centers = np.reshape(centers,(-1,n,2))
+    radii = radii.tolist()
+    centers = centers.tolist()
+    # x,y = np.meshgrid(range(0,nx),range(0,ny))
+    ziplist = list(zip(radii,centers))
+    def genNHills(radii,hill_centers):
+        assert len(hill_centers) == len(radii)
+        m = len(hill_centers)
+        filename = os.path.join(mkdtemp(),'tempfile.dat')
+        hills = np.memmap(filename,dtype='float32',mode='w+',shape=(nx,ny))
+        for k in range(m):
+            radius = radii[k]
+            hill_center = hill_centers[k]
+            hills += np.clip(HillGenerator(hill_center[0],hill_center[1],x,y,radius),a_min=0,a_max=None)
+        return hills
+    with Parallel(n_jobs=num_cores) as parallel:
+        zip_chunk = list(divide_chunks(ziplist,l))
+        for k in tqdm(range(len(zip_chunk))):
+            results = parallel(delayed(genNHills)(i,j)
+                               for i,j in zip_chunk[k])
+            hill_terrain += sum(results)  # synchronization barrier
 
-    hill_terrain = (2 * ((hill_terrain - np.min(hill_terrain))/(np.ptp(hill_terrain))) - 1) * 0.99
-    hill_terrain = (hill_terrain ** 2  )
+    # results = Parallel(n_jobs=num_cores)(delayed(genNHills)(i,j) for i,j in tqdm(ziplist))
+    # hill_terrain = sum(results)
+
+    # for k in tqdm(range(iters)):
+    #     radius = radii[k]
+    #     hill_center = centers[k]
+    #     accum_terrain = np.zeros((nx,ny))
+    #     accum_terrain = HillGenerator(hill_center[0],hill_center[1],x,y,radius)
+    #     accum_terrain = np.clip(accum_terrain,a_min=0,a_max=None)
+    #     hill_terrain += accum_terrain
+
+    
+    # plt.imshow(hill_terrain)
+    # plt.show()
     return hill_terrain
 def erodeTerrainThermal(hill_terrain,iters):
     c = 0.5
@@ -245,16 +297,64 @@ def erodeTerrainDroplet(hill_terrain,iters=100,seed = None):
     hill_terrain = ndimage.gaussian_filter(hill_terrain,2)
     return hill_terrain
 
-def chunkTerrain(num_chunks,hill_terrain,l_scale_coeff,height_coeff,land_filename,output_filename):
-        m,n = hill_terrain.shape
-        hill_terrain_blocked = blockshaped(hill_terrain,m//num_chunks,n//num_chunks)
-        print(hill_terrain_blocked.shape)
+'''
+instead of simply chunking input terrain, we will now generate all of that terrain in 
+genChunkTerrain and write to disk immediately 
+'''
+
+def genChunkTerrain(nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_filename,output_filename):
+        # m,n = hill_terrain.shape
+        # hill_terrain_blocked = blockshaped(hill_terrain,m//num_chunks,n//num_chunks)
+        # print(hill_terrain_blocked.shape)
+        # resolution of each subset 
+
+        subset_res_x = nx//num_chunks
+        subset_res_y = ny//num_chunks
+        if seed != None:
+            np.random.seed(seed)
+
+        radii = np.random.randint(0,int(nx/2),iters)
+        centers = nx * np.random.randn(iters,2)
+
         s_scale_coeff =  l_scale_coeff / num_chunks
         fmt_strings = []
-        for i in range(hill_terrain_blocked.shape[0]):
-            hill_terrain_subset = hill_terrain_blocked[i,:,:]
+        max_hill = 0
+        min_hill = 1e48
+        for i in tqdm(range(int(num_chunks ** 2 ))):
+            x_index = (i % num_chunks) * subset_res_x 
+            y_index = (i // num_chunks) * subset_res_y 
+            meshx,meshy = np.meshgrid(range(x_index,x_index + subset_res_x),
+                                      range(y_index,y_index + subset_res_y))
+            hill_terrain_subset =  genHillTerrain(subset_res_x,
+                                                  subset_res_y,
+                                                  meshx,meshy,radii,centers)
+            if np.max(hill_terrain_subset) >= max_hill:
+                max_hill = np.max(hill_terrain_subset)
+            if np.min(hill_terrain_subset) <= min_hill:
+                min_hill = np.min(hill_terrain_subset)
+
+
+        #for every chunk
+        # hill_terrain = (2 * ((hill_terrain - np.min(hill_terrain))/(np.ptp(hill_terrain))) - 1) * 0.99
+        # hill_terrain = (hill_terrain ** 2  )
+        for i in tqdm(range(int(num_chunks ** 2 ))):
+            #need to generate this subset's terrain
+            # hill_terrain_subset = hill_terrain_blocked[i,:,:]
+            x_index = (i % num_chunks) * subset_res_x 
+            y_index = (i // num_chunks) * subset_res_y 
+            print("x_index : {} y_index: {} ".format(x_index,y_index))
+            print("x_end: {} y_end: {}".format(x_index + subset_res_x,y_index + subset_res_y))
+            meshx,meshy = np.meshgrid(range(x_index,x_index + subset_res_x),
+                                      range(y_index,y_index + subset_res_y))
+            hill_terrain_subset =  genHillTerrain(subset_res_x,
+                                                  subset_res_y,
+                                                  meshx,meshy,radii,centers)
+            hill_terrain_subset = (2 * ((hill_terrain_subset - min_hill)/((max_hill-min_hill))) - 1) * 0.99
+            hill_terrain_subset = (hill_terrain_subset ** 2  )
             subset_filename = land_filename + str(i) + ".pbrt"
             genLandPbrt(subset_filename,hill_terrain_subset);
+
+            #for inclusion into chunk master 
             fmt_string = ""
             fmt_string += Attribute_string("AttributeBegin")
             fmt_string += Attribute_string("Material",[parameter_string("matte"),
@@ -445,7 +545,7 @@ def genAboveLight(height_coeff):
     fmt_string += Attribute_string("AttributeEnd\n")  
     return fmt_string
 def genAccelerator(maxtreeletbytes: int = 1000000000):
-    fmt_string = Attribute_string("Accelerator",[parameter_string("proxydumpbvh"),
+    fmt_string = Attribute_string("Accelerator",[parameter_string("bvh"),
                                                 parameter_numeric("integer maxtreeletbytes",[maxtreeletbytes]),
                                                 parameter_numeric("string partition",['"nvidia"']),
                                                 parameter_numeric("string traversal",['"sendcheck"'])])
@@ -472,23 +572,6 @@ def genKillerooTerrain(output_filename: str,
                        chunks_filename: str = "./geometry/gen_killeroo_master"):
     f = open(output_filename, 'w')
     assert os.path.exists(killeroo_path), "killeroo geometry file not found at: {}".format(killeroo_path)
-    #Generate land 
-    hill_terrain = [];
-    if landiters > 0:
-        hill_terrain = genHillTerrain(nx=landxres,ny=landyres,iters=landiters,seed=random_seed)
-        if numDroplets != None and numDroplets != -1:
-            hill_terrain = erodeTerrainDroplet(hill_terrain,numDroplets)
-        elif numDroplets != -1:
-            hill_terrain = erodeTerrainDroplet(hill_terrain,int(0.625 * landxres * landyres))
-
-        # plt.figure()
-        # plt.imshow(hill_terrain * 255,cmap='gray')
-        # plt.colorbar()
-        # plt.show()
-    else:
-        if random_seed != None:
-            np.random.seed(random_seed)
-        hill_terrain = np.ones((landxres,landyres)) * 0.3
     
     #Camera,Sampling, and Integrator parameters
     fmt_string = genCamera(LookAt,height_coeff,50,xres,yres,output_filename[:output_filename.rfind(".")] + ".exr" )
@@ -509,71 +592,96 @@ def genKillerooTerrain(output_filename: str,
     
     #Land 
     print("Generating Land...")
-    fmt_strings = chunkTerrain(num_chunks,
-                               hill_terrain,
-                               l_scale_coeff,
-                               height_coeff,
-                               land_filename,
-                               output_filename)
+    #Generate land 
+    hill_terrain = [];
+    # if landiters > 0:
+    #     hill_terrain = genHillTerrain(nx=landxres,ny=landyres,iters=landiters,seed=random_seed)
+    #     if numDroplets != None and numDroplets != -1:
+    #         hill_terrain = erodeTerrainDroplet(hill_terrain,numDroplets)
+    #     elif numDroplets != -1:
+    #         hill_terrain = erodeTerrainDroplet(hill_terrain,int(0.625 * landxres * landyres))
+
+    #     # plt.figure()
+    #     # plt.imshow(hill_terrain * 255,cmap='gray')
+    #     # plt.colorbar()
+    #     # plt.show()
+    # else:
+    #     if random_seed != None:
+    #         np.random.seed(random_seed)
+    #     # hill_terrain = np.ones((landxres,landyres)) * 0.3
+    #     hill_terrain = genHillTerrainPerlin(landxres,landyres)
+    #     hill_terrain = (((hill_terrain - np.min(hill_terrain))/(np.ptp(hill_terrain)))) * 0.90
+    #     hill_terrain = (hill_terrain ** 2  )
+    #     # hill_terrain = ndimage.gaussian_filter(hill_terrain,2)
+    #     # hill_terrain = erodeTerrainDroplet(hill_terrain,int(0.01 * landxres * landyres))
+    #     plt.imshow(hill_terrain)
+    #     plt.show()
+    # nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_filename,output_filename
+    fmt_strings = genChunkTerrain(landxres,landyres,
+                                  num_chunks,landiters,
+                                  random_seed,l_scale_coeff,
+                                  height_coeff,land_filename,
+                                  output_filename)
 
     for i in range(num_chunks ** 2):
         open(killeroos_filename + str(i) + ".pbrt", 'w').close()
         s = open(chunks_filename + str(i) + ".pbrt",'w')
         #include chunk terrain to chunk master
         s.write(fmt_strings[i])
+
+
     #kileroo gen    
 
-    print("creating killeroo instances...")
-    for i in tqdm(range(num_killeroo_instances)):
-        instance_name = "killerooInstance" + str(i)
-        color1 = np.random.uniform(0,1,(3)).tolist()
-        color2 = np.random.uniform(0,1,(3)).tolist()
-        fmt_string += killeroo_string_object(instance_name,
-                                             color1,
-                                             color2,
-                                             killeroo_path=
-                                             os.path.relpath(killeroo_path,
-                                             os.path.dirname(output_filename)))
+    # print("creating killeroo instances...")
+    # for i in tqdm(range(num_killeroo_instances)):
+    #     instance_name = "killerooInstance" + str(i)
+    #     color1 = np.random.uniform(0,1,(3)).tolist()
+    #     color2 = np.random.uniform(0,1,(3)).tolist()
+    #     fmt_string += killeroo_string_object(instance_name,
+    #                                          color1,
+    #                                          color2,
+    #                                          killeroo_path=
+    #                                          os.path.relpath(killeroo_path,
+                                             # os.path.dirname(output_filename)))
 
+    # m,n = hill_terrain.shape
+    # total_killeroos = num_killeroos
+    # num_sparse_killeroos = int(total_killeroos/100)
+    # num_killeroos_per_sparse = int((total_killeroos - num_sparse_killeroos )/num_sparse_killeroos)
 
-    m,n = hill_terrain.shape
-    total_killeroos = num_killeroos
-    num_sparse_killeroos = int(total_killeroos/100)
-    num_killeroos_per_sparse = int((total_killeroos - num_sparse_killeroos )/num_sparse_killeroos)
-
-    samples,step = np.linspace(-4,4,int(num_sparse_killeroos ** 0.5),retstep=True)
-    grid = np.meshgrid(samples,
-                       samples)
-    sparse_positions = np.vstack([grid[0].flatten(),grid[1].flatten()])
+    # samples,step = np.linspace(-4,4,int(num_sparse_killeroos ** 0.5),retstep=True)
+    # grid = np.meshgrid(samples,
+    #                    samples)
+    # sparse_positions = np.vstack([grid[0].flatten(),grid[1].flatten()])
     # k = 100
-    print("Placing killeroos...")
-    for k in tqdm(range(sparse_positions.shape[1])):
-        i,j = sparse_positions[:,k]
-        i = np.clip(i + np.random.uniform(-step/2,step/2),-4,4)
-        j = np.clip(j + np.random.uniform(-step/2,step/2),-4,4)
-        #convert to [0,1] range
-        i_norm = (i + 4)/8
-        j_norm = (j + 4)/8
-        #convert to [0,num_chunks-1] range
-        i_scale = i_norm * (num_chunks - 1)
-        j_scale = j_norm * (num_chunks - 1)
-        #1d coordinate
-        coord = int(round(j_scale) * num_chunks + round(i_scale))
-        # print("i_scale: {}, j_scale: {}, coord: {}".format(i_scale,j_scale,coord))
-        t = open(killeroos_filename + str(coord) + ".pbrt",'a')
-        rotate_val = np.random.uniform(0,360)
-        instance_name = "killerooInstance" + str(np.random.randint(0,num_killeroo_instances))
-        t.write(genKillerooInstance(m,n,i,j,k_coeff,
-                            l_scale_coeff,height_coeff,
-                            hill_terrain,rotate_val,
-                            instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
-        for r in range(num_killeroos_per_sparse):
-            u = np.clip(i + np.random.uniform(-step/3,step/3),-4,4)
-            v = np.clip(j + np.random.uniform(-step/3,step/3),-4,4)
-            t.write(genKillerooInstance(m,n,u,v,k_coeff,
-                                l_scale_coeff,height_coeff,
-                                hill_terrain,rotate_val,
-                                instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
+    # print("Placing killeroos...")
+    # for k in tqdm(range(sparse_positions.shape[1])):
+    #     i,j = sparse_positions[:,k]
+    #     i = np.clip(i + np.random.uniform(-step/2,step/2),-4,4)
+    #     j = np.clip(j + np.random.uniform(-step/2,step/2),-4,4)
+    #     #convert to [0,1] range
+    #     i_norm = (i + 4)/8
+    #     j_norm = (j + 4)/8
+    #     #convert to [0,num_chunks-1] range
+    #     i_scale = i_norm * (num_chunks - 1)
+    #     j_scale = j_norm * (num_chunks - 1)
+    #     #1d coordinate
+    #     coord = int(round(j_scale) * num_chunks + round(i_scale))
+    #     # print("i_scale: {}, j_scale: {}, coord: {}".format(i_scale,j_scale,coord))
+    #     t = open(killeroos_filename + str(coord) + ".pbrt",'a')
+    #     rotate_val = np.random.uniform(0,360)
+    #     instance_name = "killerooInstance" + str(np.random.randint(0,num_killeroo_instances))
+    #     t.write(genKillerooInstance(m,n,i,j,k_coeff,
+    #                         l_scale_coeff,height_coeff,
+    #                         hill_terrain,rotate_val,
+    #                         instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
+    #     for r in range(num_killeroos_per_sparse):
+    #         u = np.clip(i + np.random.uniform(-step/3,step/3),-4,4)
+    #         v = np.clip(j + np.random.uniform(-step/3,step/3),-4,4)
+    #         t.write(genKillerooInstance(m,n,u,v,k_coeff,
+    #                             l_scale_coeff,height_coeff,
+    #                             hill_terrain,rotate_val,
+    #                             instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
 
     for i in range(num_chunks ** 2):
         s = open(chunks_filename + str(i) + ".pbrt",'a')
