@@ -2,7 +2,6 @@ import numpy as np
 from scipy import ndimage
 import os
 from pathlib import Path
-# import matplotlib.pyplot as plt 
 from tempfile import mkdtemp
 import matplotlib.pyplot as plt 
 import sys
@@ -52,46 +51,46 @@ def genHillTerrainPerlin(nx,ny):
                                         repeaty=1024, 
                                         base=2)
     return hill_terrain
-def genHillTerrain(nx,ny,x,y,radii,centers):
+def genHillTerrain(nx,ny,x,y,radii,centers,iters):
     filename = os.path.join(mkdtemp(),'newfile.dat')
     hill_terrain = np.memmap(filename,dtype='float32',mode='w+',shape =(nx,ny))
     num_cores = multiprocessing.cpu_count()
     # hill_terrain = np.zeros((nx,ny))
     n = int(10)
     l = int(100)
-    radii = np.reshape(radii,(-1,n))
-    centers = np.reshape(centers,(-1,n,2))
+    # radii = np.reshape(radii,(-1,n))
+    # centers = np.reshape(centers,(-1,n,2))
     radii = radii.tolist()
     centers = centers.tolist()
     # x,y = np.meshgrid(range(0,nx),range(0,ny))
     ziplist = list(zip(radii,centers))
-    def genNHills(radii,hill_centers):
-        assert len(hill_centers) == len(radii)
-        m = len(hill_centers)
-        filename = os.path.join(mkdtemp(),'tempfile.dat')
-        hills = np.memmap(filename,dtype='float32',mode='w+',shape=(nx,ny))
-        for k in range(m):
-            radius = radii[k]
-            hill_center = hill_centers[k]
-            hills += np.clip(HillGenerator(hill_center[0],hill_center[1],x,y,radius),a_min=0,a_max=None)
-        return hills
-    with Parallel(n_jobs=num_cores) as parallel:
-        zip_chunk = list(divide_chunks(ziplist,l))
-        for k in tqdm(range(len(zip_chunk))):
-            results = parallel(delayed(genNHills)(i,j)
-                               for i,j in zip_chunk[k])
-            hill_terrain += sum(results)  # synchronization barrier
+    # def genNHills(radii,hill_centers):
+    #     assert len(hill_centers) == len(radii)
+    #     m = len(hill_centers)
+    #     filename = os.path.join(mkdtemp(),'tempfile.dat')
+    #     hills = np.memmap(filename,dtype='float32',mode='w+',shape=(nx,ny))
+    #     for k in range(m):
+    #         radius = radii[k]
+    #         hill_center = hill_centers[k]
+    #         hills += np.clip(HillGenerator(hill_center[0],hill_center[1],x,y,radius),a_min=0,a_max=None)
+    #     return hills
+    # with Parallel(n_jobs=num_cores) as parallel:
+    #     zip_chunk = list(divide_chunks(ziplist,l))
+    #     for k in tqdm(range(len(zip_chunk))):
+    #         results = parallel(delayed(genNHills)(i,j)
+    #                            for i,j in zip_chunk[k])
+    #         hill_terrain += sum(results)  # synchronization barrier
 
     # results = Parallel(n_jobs=num_cores)(delayed(genNHills)(i,j) for i,j in tqdm(ziplist))
     # hill_terrain = sum(results)
 
-    # for k in tqdm(range(iters)):
-    #     radius = radii[k]
-    #     hill_center = centers[k]
-    #     accum_terrain = np.zeros((nx,ny))
-    #     accum_terrain = HillGenerator(hill_center[0],hill_center[1],x,y,radius)
-    #     accum_terrain = np.clip(accum_terrain,a_min=0,a_max=None)
-    #     hill_terrain += accum_terrain
+    for k in tqdm(range(iters)):
+        radius = radii[k]
+        hill_center = centers[k]
+        accum_terrain = np.zeros((nx,ny))
+        accum_terrain = HillGenerator(hill_center[0],hill_center[1],x,y,radius)
+        accum_terrain = np.clip(accum_terrain,a_min=0,a_max=None)
+        hill_terrain += accum_terrain
 
     
     # plt.imshow(hill_terrain)
@@ -297,6 +296,14 @@ def erodeTerrainDroplet(hill_terrain,iters=100,seed = None):
     hill_terrain = ndimage.gaussian_filter(hill_terrain,2)
     return hill_terrain
 
+def loadFromLand(land_filename,x,y):
+    f = open(land_filename,"r")
+    line= f.readline()
+    arr_line = np.fromstring(line[line.rfind("[")+1:line.rfind("]")],sep=' ')
+    # print(arr_line)
+    # heightfield = np.array(list(arr_line),dtype=float)
+    heightfield = np.reshape(arr_line,(x,y))
+    return heightfield
 '''
 instead of simply chunking input terrain, we will now generate all of that terrain in 
 genChunkTerrain and write to disk immediately 
@@ -310,6 +317,7 @@ def genChunkTerrain(nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_
 
         subset_res_x = nx//num_chunks
         subset_res_y = ny//num_chunks
+        print("chunk resolution: ({},{})".format(subset_res_x,subset_res_y))
         if seed != None:
             np.random.seed(seed)
 
@@ -320,38 +328,35 @@ def genChunkTerrain(nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_
         fmt_strings = []
         max_hill = 0
         min_hill = 1e48
+        #for every chunk
         for i in tqdm(range(int(num_chunks ** 2 ))):
+            #need to generate this subset's terrain
             x_index = (i % num_chunks) * subset_res_x 
             y_index = (i // num_chunks) * subset_res_y 
             meshx,meshy = np.meshgrid(range(x_index,x_index + subset_res_x),
                                       range(y_index,y_index + subset_res_y))
+            # note this is unnormalized terrain, will need to go back in with
+            # global max and min to normalize and apply postprocessing
             hill_terrain_subset =  genHillTerrain(subset_res_x,
                                                   subset_res_y,
-                                                  meshx,meshy,radii,centers)
+                                                  meshx,meshy,radii,
+                                                  centers,iters)
+            subset_filename = land_filename + str(i) + ".pbrt"
+            genLandPbrt(subset_filename,hill_terrain_subset);
+            #calculate max and min for future use
             if np.max(hill_terrain_subset) >= max_hill:
                 max_hill = np.max(hill_terrain_subset)
             if np.min(hill_terrain_subset) <= min_hill:
                 min_hill = np.min(hill_terrain_subset)
 
-
-        #for every chunk
-        # hill_terrain = (2 * ((hill_terrain - np.min(hill_terrain))/(np.ptp(hill_terrain))) - 1) * 0.99
-        # hill_terrain = (hill_terrain ** 2  )
         for i in tqdm(range(int(num_chunks ** 2 ))):
-            #need to generate this subset's terrain
-            # hill_terrain_subset = hill_terrain_blocked[i,:,:]
-            x_index = (i % num_chunks) * subset_res_x 
-            y_index = (i // num_chunks) * subset_res_y 
-            print("x_index : {} y_index: {} ".format(x_index,y_index))
-            print("x_end: {} y_end: {}".format(x_index + subset_res_x,y_index + subset_res_y))
-            meshx,meshy = np.meshgrid(range(x_index,x_index + subset_res_x),
-                                      range(y_index,y_index + subset_res_y))
-            hill_terrain_subset =  genHillTerrain(subset_res_x,
-                                                  subset_res_y,
-                                                  meshx,meshy,radii,centers)
+            #load land back in from text file
+            subset_filename = land_filename + str(i) + ".pbrt"
+            hill_terrain_subset =  loadFromLand(subset_filename,subset_res_x,subset_res_y)
+            #apply global normalization + post processsing
             hill_terrain_subset = (2 * ((hill_terrain_subset - min_hill)/((max_hill-min_hill))) - 1) * 0.99
             hill_terrain_subset = (hill_terrain_subset ** 2  )
-            subset_filename = land_filename + str(i) + ".pbrt"
+            #rewrite back to textfile
             genLandPbrt(subset_filename,hill_terrain_subset);
 
             #for inclusion into chunk master 
