@@ -637,28 +637,42 @@ def genKillerooTerrain(output_filename: str,
     subset_res_x,subset_res_y = (m //num_chunks,n // num_chunks)
 
     num_killeroos_per_chunk = int(total_killeroos/(num_chunks ** 2))
-    num_groups_per_chunk = max(1,int(num_killeroos_per_chunk // 1000))
+    num_groups_per_chunk = max(1,int(num_killeroos_per_chunk // 100))
+    num_killeroos_per_group = int(num_killeroos_per_chunk/num_groups_per_chunk)
     #generate killeroos per chunk 
+    print("placing killeroos...")
     for k in tqdm(range(num_chunks ** 2)): 
         # open killeroo file 
         t = open(killeroos_filename + str(k) + ".pbrt",'a')
         # grab random instance name
-        instance_name = "killerooInstance" + str(np.random.randint(0,num_killeroo_instances))
         #grab terrain 
         subset_hill_terrain = loadFromLand(land_filename + str(k) + '.pbrt',subset_res_x,subset_res_y)
 
         # middle of terrain
-        i = int(subset_res_x/2 )
-        j = int(subset_res_y/2 )
-
-        rotate_val = np.random.uniform(0,360)
-
-        t.write(genKillerooInstance(i,j,num_chunks,k,
-                                    subset_hill_terrain,
-                                    k_coeff,l_scale_coeff,
-                                    height_coeff,rotate_val,
-                                    instance_name = instance_name,
-                                    killeroo_path = killeroo_path))
+        # i = int(subset_res_x/2 )
+        # j = int(subset_res_y/2 )
+        for m in range(num_groups_per_chunk):
+            instance_name = "killerooInstance" + str(np.random.randint(0,num_killeroo_instances))
+            # random position in terrain for leader
+            i = np.random.randint(subset_res_x/10,subset_res_x * 9/10)
+            j = np.random.randint(subset_res_y/10,subset_res_y * 9/10)
+            rotate_val = np.random.uniform(0,360)
+            t.write(genKillerooInstance(i,j,num_chunks,k,
+                                            subset_hill_terrain,
+                                            k_coeff,l_scale_coeff,
+                                            height_coeff,rotate_val,
+                                            instance_name = instance_name,
+                                            killeroo_path = killeroo_path))
+            for l in range(num_killeroos_per_group):
+                #random placement of group near leader 
+                u = np.clip(i + np.random.randint(-subset_res_x/10,subset_res_x/10),0,subset_res_x - 2)
+                v = np.clip(j + np.random.randint(-subset_res_y/10,subset_res_y/10),0,subset_res_y - 2)
+                t.write(genKillerooInstance(u,v,num_chunks,k,
+                                            subset_hill_terrain,
+                                            k_coeff,l_scale_coeff,
+                                            height_coeff,rotate_val,
+                                            instance_name = instance_name,
+                                            killeroo_path = killeroo_path))
 
 
 
