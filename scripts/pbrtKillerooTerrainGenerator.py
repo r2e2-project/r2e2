@@ -429,63 +429,77 @@ def killeroo_string_instance(height_coeff,
     return fmt_string
     
 
-def genKillerooInstance(m,n,i,j,
+def genKillerooInstance(i,j,num_chunks,
+                land_idx,
+                subset_hill_terrain,
                 k_coeff,
                 l_scale_coeff,
                 height_coeff,
-                hill_terrain,
-                rotate_val = None,
+                rotate_val,
                 instance_name = "killerooInstance",
                 killeroo_path = "geometry/killeroo.pbrt"):
     #ensure that indicies are never at the edge of heightmap to exclude boundary cases
     #for inward facing normals
+
     eps = 1
-    maxu = (10 * 5)/k_coeff * l_scale_coeff
-    minu = (10 * -5)/k_coeff * l_scale_coeff
-    
-    #base coord
-    tx = (10 * i)/k_coeff * l_scale_coeff
-    ty = (10 * j)/k_coeff * l_scale_coeff
-    
-    u = (m - 1) * (abs(tx - minu)/abs(maxu - minu))
-    v = (n - 1) * (abs(ty - minu)/abs(maxu - minu))
-    
-    #coordinates for u vector
-    tx1 = (10 * (i + eps))/k_coeff * l_scale_coeff  
-    u1 = (m - 1) * (abs(tx1 - minu)/abs(maxu - minu))
-    v1 = v
-    
-    #coordinates for v vector
-    ty2 = (10 * (j + eps))/k_coeff * l_scale_coeff
-    u2 = u
-    v2 = (n - 1) * (abs(ty2 - minu)/abs(maxu - minu))
+    i1 = i + 1
+    j1 = j + 1
+
+    subset_res_x,subset_res_y = subset_hill_terrain.shape 
+    landxres,landyres = (subset_res_x * num_chunks,subset_res_y * num_chunks)
+
+    land_x = (land_idx % num_chunks) * subset_res_x 
+    land_y = (land_idx // num_chunks) * subset_res_y 
     
 
+    #physical extent of land in x and y 
+    maxu =  maxv = ((10 * 5)/k_coeff) * l_scale_coeff
+    minu =  minv = ((10 * -5)/k_coeff) * l_scale_coeff
+    
+    #position in total hill terrain
+    position_x = land_x + i
+    position_y = land_y + j
+
+    position_x1 = land_x + i1
+    position_y1 = position_y
+
+    position_x2 = position_x 
+    position_y2 = land_y + j1
+    #position of new killeroo in terms of physical extent
+    extent_space_x = (position_x/landxres) * 10 - 5
+    extent_space_y = (position_y/landyres) * 10 - 5
+
+    extent_space_x1 = (position_x1/landxres) * 10 - 5
+    extent_space_y2 = (position_y2/landyres) * 10 - 5
+
+    tx = (10 * extent_space_x)/k_coeff * l_scale_coeff
+    ty = (10 * extent_space_y)/k_coeff * l_scale_coeff
+
+    tx1 = (10 * (extent_space_x1 + eps))/k_coeff * l_scale_coeff  
+
+    #coordinates for v vector
+    ty2 = (10 * (extent_space_y2 + eps))/k_coeff * l_scale_coeff
+
     #extract height values
-    h_val = hill_terrain[int(v),int(u)]
-    h_uval = hill_terrain[int(v1),int(u1)]
-    h_vval = hill_terrain[int(v2),int(u2)]
-    
-    tz = (height_coeff *  (100/k_coeff)) * h_val 
-    tz1 = (height_coeff * (100/k_coeff)) * h_uval
-    tz2 = (height_coeff * (100/k_coeff)) * h_uval
-    
-    #coordinate for original height field index
-    
+    h_val  = subset_hill_terrain[int(j),int(i)]
+    h_uval = subset_hill_terrain[int(j),int(i1)]
+    h_vval = subset_hill_terrain[int(j1),int(i)]
+
+    tz =  (height_coeff * (100/k_coeff )) * h_val 
+    tz1 = (height_coeff * (100/k_coeff )) * h_uval 
+    tz2 = (height_coeff * (100/k_coeff )) * h_vval 
+
     theta_x = np.degrees(np.arctan2((tz2 - tz),(ty2 - ty)))
     theta_y = np.degrees(np.arctan2((tz1 - tz),(tx1 - tx)))
-    
-    #rotate about z axis
-    theta_z = np.random.uniform(low=0,high=360)
-    if rotate_val != None: 
-        theta_z = rotate_val
-        
+    theta_z = rotate_val
+    # theta_z = 0
+
     fmt_string = killeroo_string_instance(height_coeff,
-                                    scale = k_coeff,
-                                    translation=[tx,ty,tz],
-                                    rotation = [-theta_x,-theta_y,theta_z],
-                                    instance_name = instance_name,
-                                    killeroo_path=killeroo_path)
+                                scale = k_coeff,
+                                translation=[tx,ty,tz],
+                                rotation = [theta_x,theta_y,theta_z],
+                                instance_name = instance_name,
+                                killeroo_path=killeroo_path)
     return fmt_string
 def genCamera(LookAt,height_coeff,fov,xres,yres,output_name):
     LookAt[0] = [i *  height_coeff for i in LookAt[0] ]
@@ -625,7 +639,7 @@ def genKillerooTerrain(output_filename: str,
     num_killeroos_per_chunk = int(total_killeroos/(num_chunks ** 2))
     num_groups_per_chunk = max(1,int(num_killeroos_per_chunk // 1000))
     #generate killeroos per chunk 
-    for k in range(num_chunks ** 2): 
+    for k in tqdm(range(num_chunks ** 2)): 
         # open killeroo file 
         t = open(killeroos_filename + str(k) + ".pbrt",'a')
         # grab random instance name
@@ -636,37 +650,15 @@ def genKillerooTerrain(output_filename: str,
         # middle of terrain
         i = int(subset_res_x/2 )
         j = int(subset_res_y/2 )
-        #grab random position in local terrain
-        # i = np.random.uniform(0,subset_res_x - 1)
-        # j = np.random.uniform(0,subset_res_y - 1)
-        #starting x,y position of subset in total hill_terrain
-        land_x = (k % num_chunks) * subset_res_x 
-        land_y = (k // num_chunks) * subset_res_y 
-        
 
-        #physical extent of land in x and y 
-        maxu =  maxv = ((10 * 5)/k_coeff) * l_scale_coeff
-        minu =  minv = ((10 * -5)/k_coeff) * l_scale_coeff
-        
-        #position in total hill terrain
-        position_x = land_x + i
-        position_y = land_y + j
-        #position of new killeroo in terms of physical extent
-        extent_space_x = (position_x/landxres) * 10 - 5
-        extent_space_y = (position_y/landyres) * 10 - 5
-        tx = (10 * extent_space_x)/k_coeff * l_scale_coeff
-        ty = (10 * extent_space_y)/k_coeff * l_scale_coeff
-        # tx = (10 * i)/k_coeff * l_scale_coeff
-        # ty = (10 * j)/k_coeff * l_scale_coeff
-        h_val = subset_hill_terrain[int(j),int(i)]
-        tz = (height_coeff * (100/k_coeff )) * h_val 
+        rotate_val = np.random.uniform(0,360)
 
-        t.write(killeroo_string_instance(height_coeff,
-                                    scale = k_coeff,
-                                    translation=[tx,ty,tz],
-                                    rotation = [0,0,60],
+        t.write(genKillerooInstance(i,j,num_chunks,k,
+                                    subset_hill_terrain,
+                                    k_coeff,l_scale_coeff,
+                                    height_coeff,rotate_val,
                                     instance_name = instance_name,
-                                    killeroo_path=killeroo_path))
+                                    killeroo_path = killeroo_path))
 
 
 
