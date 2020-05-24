@@ -466,7 +466,7 @@ def genKillerooInstance(m,n,i,j,
     h_uval = hill_terrain[int(v1),int(u1)]
     h_vval = hill_terrain[int(v2),int(u2)]
     
-    tz = (height_coeff * (100/k_coeff )) * h_val 
+    tz = (height_coeff *  (100/k_coeff)) * h_val 
     tz1 = (height_coeff * (100/k_coeff)) * h_uval
     tz2 = (height_coeff * (100/k_coeff)) * h_uval
     
@@ -618,15 +618,62 @@ def genKillerooTerrain(output_filename: str,
                                              os.path.dirname(output_filename)))
 
     m,n = (landxres,landyres)
-    subset_res_x,subset_res_y = (m //num_chunks,n // num_chunks)
     total_killeroos = num_killeroos
-    num_sparse_killeroos = int(total_killeroos/100)
-    num_killeroos_per_sparse = int((total_killeroos - num_sparse_killeroos )/num_sparse_killeroos)
 
-    samples,step = np.linspace(-4,4,int(num_sparse_killeroos ** 0.5),retstep=True)
-    grid = np.meshgrid(samples,
-                       samples)
-    sparse_positions = np.vstack([grid[0].flatten(),grid[1].flatten()])
+    subset_res_x,subset_res_y = (m //num_chunks,n // num_chunks)
+
+    num_killeroos_per_chunk = int(total_killeroos/(num_chunks ** 2))
+    num_groups_per_chunk = max(1,int(num_killeroos_per_chunk // 1000))
+    #generate killeroos per chunk 
+    for k in range(num_chunks ** 2): 
+        # open killeroo file 
+        t = open(killeroos_filename + str(k) + ".pbrt",'a')
+        # grab random instance name
+        instance_name = "killerooInstance" + str(np.random.randint(0,num_killeroo_instances))
+        #grab terrain 
+        subset_hill_terrain = loadFromLand(land_filename + str(k) + '.pbrt',subset_res_x,subset_res_y)
+
+        # middle of terrain
+        i = int(subset_res_x/2 )
+        j = int(subset_res_y/2 )
+        #grab random position in local terrain
+        # i = np.random.uniform(0,subset_res_x - 1)
+        # j = np.random.uniform(0,subset_res_y - 1)
+        #starting x,y position of subset in total hill_terrain
+        land_x = (k % num_chunks) * subset_res_x 
+        land_y = (k // num_chunks) * subset_res_y 
+        
+
+        #physical extent of land in x and y 
+        maxu =  maxv = ((10 * 5)/k_coeff) * l_scale_coeff
+        minu =  minv = ((10 * -5)/k_coeff) * l_scale_coeff
+        
+        #position in total hill terrain
+        position_x = land_x + i
+        position_y = land_y + j
+        #position of new killeroo in terms of physical extent
+        extent_space_x = (position_x/landxres) * 10 - 5
+        extent_space_y = (position_y/landyres) * 10 - 5
+        tx = (10 * extent_space_x)/k_coeff * l_scale_coeff
+        ty = (10 * extent_space_y)/k_coeff * l_scale_coeff
+        # tx = (10 * i)/k_coeff * l_scale_coeff
+        # ty = (10 * j)/k_coeff * l_scale_coeff
+        h_val = subset_hill_terrain[int(j),int(i)]
+        tz = (height_coeff * (100/k_coeff )) * h_val 
+
+        t.write(killeroo_string_instance(height_coeff,
+                                    scale = k_coeff,
+                                    translation=[tx,ty,tz],
+                                    rotation = [0,0,60],
+                                    instance_name = instance_name,
+                                    killeroo_path=killeroo_path))
+
+
+
+    # samples,step = np.linspace(-4,4,int(num_sparse_killeroos ** 0.5),retstep=True)
+    # grid = np.meshgrid(samples,
+    #                    samples)
+    # sparse_positions = np.vstack([grid[0].flatten(),grid[1].flatten()])
     # print("Placing killeroos...")
     # for k in tqdm(range(sparse_positions.shape[1])):
     #     i,j = sparse_positions[:,k]
