@@ -36,7 +36,7 @@ namespace r2t2 {
 
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL { 1'000 };
 constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL { 1'000 };
-constexpr std::chrono::milliseconds WORKER_INVOCATION_INTERVAL { 2'000 };
+constexpr std::chrono::milliseconds WORKER_INVOCATION_INTERVAL { 5'000 };
 
 struct MasterConfiguration
 {
