@@ -213,13 +213,16 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                   scene.base.samplesPerPixel,
                   ray_generators ? ray_generators : max_workers };
 
-  if ( config.auto_log_directory_name ) {
+  if ( config.auto_name_log_dir_tag ) {
     // setting the directory name based on job info
     string dir_name = ParsedURI( storage_backend_uri ).path + "_w"
-                      + to_string( max_workers ) + "_g"
                       + to_string( ray_generators ) + "_"
                       + to_string( scene.base.samplesPerPixel ) + "spp_d"
                       + to_string( config.max_path_depth );
+
+    if ( not config.auto_name_log_dir_tag->empty() ) {
+      dir_name += "_" + ( *config.auto_name_log_dir_tag );
+    }
 
     config.logs_directory /= dir_name;
   }
@@ -729,7 +732,7 @@ int main( int argc, char* argv[] )
   float ray_log_rate = 0.0;
   float bag_log_rate = 0.0;
   string logs_directory = "logs/";
-  bool auto_log_directory_name = false;
+  optional<string> auto_name_log_dir_tag = nullopt;
   optional<Bounds2i> crop_window;
   uint32_t timeout = 0;
   uint32_t pixels_per_tile = 0;
@@ -779,7 +782,7 @@ int main( int argc, char* argv[] )
     { "jobs", required_argument, nullptr, 'J' },
     { "memcached-server", required_argument, nullptr, 'd' },
     { "engine", required_argument, nullptr, 'E' },
-    { "auto-name", no_argument, nullptr, 'A' },
+    { "auto-name", required_argument, nullptr, 'A' },
     { "help", no_argument, nullptr, 'h' },
     { nullptr, 0, nullptr, 0 },
   };
@@ -788,7 +791,7 @@ int main( int argc, char* argv[] )
     const int opt
       = getopt_long( argc,
                      argv,
-                     "p:P:i:r:b:m:G:w:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:B:gAh",
+                     "p:P:i:r:b:m:G:w:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:B:A:gh",
                      long_options,
                      nullptr );
 
@@ -822,7 +825,7 @@ int main( int argc, char* argv[] )
       case 'J': max_jobs_on_engine = stoul(optarg); break;
       case 'd': memcached_servers.emplace_back(optarg); break;
       case 'E': engines.emplace_back(optarg, max_jobs_on_engine); break;
-      case 'A': auto_log_directory_name = true; break;
+      case 'A': auto_name_log_dir_tag = optarg; break;
       case 'h': usage(argv[0], EXIT_SUCCESS); break;
       case 'C': alt_scene_file = optarg; break;
         // clang-format on
@@ -909,7 +912,7 @@ int main( int argc, char* argv[] )
                                  worker_stats_write_interval,
                                  ray_log_rate,
                                  bag_log_rate,
-                                 auto_log_directory_name,
+                                 auto_name_log_dir_tag,
                                  logs_directory,
                                  crop_window,
                                  tile_size,

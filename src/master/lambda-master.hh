@@ -47,7 +47,7 @@ struct MasterConfiguration
   uint64_t worker_stats_write_interval;
   float ray_log_rate;
   float bag_log_rate;
-  bool auto_log_directory_name;
+  std::optional<std::string> auto_name_log_dir_tag;
   std::filesystem::path logs_directory;
   std::optional<pbrt::Bounds2i> crop_window;
   int tile_size;
