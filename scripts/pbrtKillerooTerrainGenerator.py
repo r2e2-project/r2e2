@@ -286,6 +286,7 @@ def genChunkTerrain(nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_
         subset_res_x = nx//num_chunks
         subset_res_y = ny//num_chunks
         print("chunk resolution: ({},{})".format(subset_res_x,subset_res_y))
+        print("num_cores: {}".format(num_cores))
         if seed != None:
             np.random.seed(seed)
 
