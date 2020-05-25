@@ -380,7 +380,7 @@ private:
   /* Timers */
   TimerFD status_print_timer { STATUS_PRINT_INTERVAL };
   TimerFD worker_invocation_timer { WORKER_INVOCATION_INTERVAL,
-                                    std::chrono::seconds { 0 } };
+                                    std::chrono::milliseconds { 1 } };
   TimerFD reschedule_timer { RESCHEDULE_INTERVAL,
                              std::chrono::milliseconds { 500 } };
   TimerFD worker_stats_write_timer;
