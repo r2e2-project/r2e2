@@ -312,7 +312,7 @@ def genChunkTerrain(nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_
             #calculate max and min for future use
             return [np.min(hill_terrain_subset),np.max(hill_terrain_subset)]
         #parallel calculation of chunks
-        max_min_list = Parallel(n_jobs=num_cores,backend='threading')(delayed(genHillSubset)(i) for i in tqdm(range(int(num_chunks ** 2 ))))
+        max_min_list = Parallel(n_jobs=num_cores)(delayed(genHillSubset)(i) for i in tqdm(range(int(num_chunks ** 2 ))))
         max_hill = np.max(max_min_list)
         min_hill = np.min(max_min_list)
         for i in tqdm(range(int(num_chunks ** 2 ))):
