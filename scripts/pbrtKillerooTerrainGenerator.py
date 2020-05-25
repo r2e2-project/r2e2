@@ -315,7 +315,7 @@ def genChunkTerrain(nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_
         max_min_list = Parallel(n_jobs=num_cores)(delayed(genHillSubset)(i) for i in tqdm(range(int(num_chunks ** 2 ))))
         max_hill = np.max(max_min_list)
         min_hill = np.min(max_min_list)
-        for i in tqdm(range(int(num_chunks ** 2 ))):
+        def normalizeHillSubset(i):
             #load land back in from text file
             subset_filename = land_filename + str(i) + ".pbrt"
             hill_terrain_subset =  loadFromLand(subset_filename,subset_res_x,subset_res_y)
@@ -341,7 +341,9 @@ def genChunkTerrain(nx,ny,num_chunks,iters,seed,l_scale_coeff,height_coeff,land_
             fmt_string += Attribute_string("Include",[parameter_string(os.path.relpath(subset_filename,
                                                                         os.path.dirname(output_filename)))])
             fmt_string += Attribute_string("AttributeEnd\n") 
-            fmt_strings.append(fmt_string)
+            return fmt_string
+        fmt_strings =  Parallel(n_jobs=num_cores)(delayed(normalizeHillSubset)(i) for i in tqdm(range(int(num_chunks ** 2 ))))
+            
         return fmt_strings
 def genLandPbrt(filename: str,hill_terrain):
     np.set_printoptions(threshold=sys.maxsize,suppress=True,precision=5)
