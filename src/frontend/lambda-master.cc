@@ -216,7 +216,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   if ( config.auto_name_log_dir_tag ) {
     // setting the directory name based on job info
     string dir_name = ParsedURI( storage_backend_uri ).path + "_w"
-                      + to_string( ray_generators ) + "_"
+                      + to_string( max_workers ) + "_"
                       + to_string( scene.base.samplesPerPixel ) + "spp_d"
                       + to_string( config.max_path_depth );
 
