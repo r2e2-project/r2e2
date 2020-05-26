@@ -558,6 +558,7 @@ def genKillerooTerrain(output_filename: str,
                        killeroos_filename: str = "./geometry/gen_killeroo_geometry",
                        chunks_filename: str = "./geometry/gen_killeroo_master"):
     f = open(output_filename, 'w')
+    num_cores = multiprocessing.cpu_count()
     assert os.path.exists(killeroo_path), "killeroo geometry file not found at: {}".format(killeroo_path)
     
     #Camera,Sampling, and Integrator parameters
@@ -643,7 +644,7 @@ def genKillerooTerrain(output_filename: str,
     s = 8
     #generate killeroos per chunk 
     print("placing killeroos...")
-    for k in tqdm(range(num_chunks ** 2)): 
+    def placeKillerooGroups(k):
         # open killeroo file 
         t = open(killeroos_filename + str(k) + ".pbrt",'a')
         # grab random instance name
@@ -684,42 +685,7 @@ def genKillerooTerrain(output_filename: str,
                                             height_coeff,rotate_val,
                                             instance_name = instance_name,
                                             killeroo_path = killeroo_path))
-
-
-
-    # samples,step = np.linspace(-4,4,int(num_sparse_killeroos ** 0.5),retstep=True)
-    # grid = np.meshgrid(samples,
-    #                    samples)
-    # sparse_positions = np.vstack([grid[0].flatten(),grid[1].flatten()])
-    # print("Placing killeroos...")
-    # for k in tqdm(range(sparse_positions.shape[1])):
-    #     i,j = sparse_positions[:,k]
-    #     i = np.clip(i + np.random.uniform(-step/2,step/2),-4,4)
-    #     j = np.clip(j + np.random.uniform(-step/2,step/2),-4,4)
-    #     #convert to [0,1] range
-    #     i_norm = (i + 4)/8
-    #     j_norm = (j + 4)/8
-    #     #convert to [0,num_chunks-1] range
-    #     i_scale = i_norm * (num_chunks - 1)
-    #     j_scale = j_norm * (num_chunks - 1)
-    #     #1d coordinate
-    #     coord = int(round(j_scale) * num_chunks + round(i_scale))
-    #     # print("i_scale: {}, j_scale: {}, coord: {}".format(i_scale,j_scale,coord))
-    #     t = open(killeroos_filename + str(coord) + ".pbrt",'a')
-
-    #     rotate_val = np.random.uniform(0,360)
-    #     instance_name = "killerooInstance" + str(np.random.randint(0,num_killeroo_instances))
-    #     t.write(genKillerooInstance(m,n,i,j,k_coeff,
-    #                         l_scale_coeff,height_coeff,
-    #                         hill_terrain,rotate_val,
-    #                         instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
-    #     for r in range(num_killeroos_per_sparse):
-    #         u = np.clip(i + np.random.uniform(-step/3,step/3),-4,4)
-    #         v = np.clip(j + np.random.uniform(-step/3,step/3),-4,4)
-    #         t.write(genKillerooInstance(m,n,u,v,k_coeff,
-    #                             l_scale_coeff,height_coeff,
-    #                             hill_terrain,rotate_val,
-    #                             instance_name,os.path.relpath(killeroo_path,os.path.dirname(output_filename))))
+    Parallel(n_jobs=num_cores)(delayed(placeKillerooGroups)(i) for i in tqdm(range(int(num_chunks ** 2 ))))
 
     for i in range(num_chunks ** 2):
         s = open(chunks_filename + str(i) + ".pbrt",'a')
