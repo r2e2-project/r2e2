@@ -559,6 +559,8 @@ def genKillerooTerrain(output_filename: str,
                        chunks_filename: str = "./geometry/gen_killeroo_master"):
     f = open(output_filename, 'w')
     num_cores = multiprocessing.cpu_count()
+    if random_seed != None:
+        np.random.seed(random_seed)
     assert os.path.exists(killeroo_path), "killeroo geometry file not found at: {}".format(killeroo_path)
     
     #Camera,Sampling, and Integrator parameters
