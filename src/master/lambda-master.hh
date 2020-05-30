@@ -27,7 +27,6 @@
 #include "util/temp_dir.hh"
 #include "util/timerfd.hh"
 #include "util/util.hh"
-#include "util/uuid.hh"
 
 #include <pbrt/core/geometry.h>
 #include <pbrt/main.h>

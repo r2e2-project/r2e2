@@ -19,63 +19,27 @@ command to also fetch the dependencies:
 $ git submodule update --init --recursive
 ```
 
-### Library Dependencies
+### Dependencies
 
-Our version of R2T2 is dependent on the following libraries (listed by their
+Our version of R2T2 is dependent on the following libraries and tools (listed by their
 apt package name):
 
+* `g++`
+* `gcc`
+* `cmake`
+* `protobuf-compiler`
 * `libprotobuf-dev`
 * `libssl-dev`
 * `libunwind-dev`
 * `liblzma-dev`
 * `liblz4-dev`
-* `uuid-dev`
 
 Before building, you'll need to install each of these using your package manager.
 On Ubuntu this is done by running something of the form:
 
-    apt install <package-name>
-
-### Tool Dependencies
-
-Building R2T2 requires that you have the following tools installed on your
-system (listed by their apt package name):
-
-* `protobuf-compiler`
-
-Before building you should install them using your package manager.
-
-### CMake
-R2T2 uses [CMake](http://www.cmake.org/) for its build system.  On Linux
-and OS X, cmake is available via most package management systems.  To get
-cmake for Windows, or to build it from source, see the [CMake downloads
-page](http://www.cmake.org/download/).  Once you have CMake, the next step
-depends on your operating system.
-
-### Makefile builds (Linux, other Unixes, and Mac) ###
-
-Create a new directory for the build, change to that directory, and run `cmake
-[path to r2t2]`. A Makefile will be created in the current directory.  Next, run
-`make`. Depending on the number of cores in your system, you will probably want
-to supply make with the `-j` parameter to specify the number of compilation jobs
-to run in parallel (e.g. `make -j8`).
-
-By default, the makefiles that are created that will compile an optimized
-release build of R2T2. These builds give the highest performance when
-rendering, but many runtime checks are disabled in these builds and
-optimized builds are generally difficult to trace in a debugger.
-
-To build a debug version of R2T2, set the `CMAKE_BUILD_TYPE` flag to `Debug`
-when you run `cmake` to create build files to make a debug build.  To do so,
-provide `cmake` with the argument `-DCMAKE_BUILD_TYPE=Debug` and build R2T2
-using the resulting makefiles. (You may want to keep two build directories, one
-for release builds and one for debug builds, so that you don't need to switch
-back and forth.)
-
-Debug versions of the system run much more slowly than release builds.
-Therefore, in order to avoid surprisingly slow renders when debugging support
-isn't desired, debug versions of R2T2 print a banner message indicating that
-they were built for debugging at startup time.
+```bash
+$ apt install <package-name>
+```
 
 Running R2T2
 ------------------------
