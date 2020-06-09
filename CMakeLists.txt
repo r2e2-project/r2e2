@@ -30,6 +30,7 @@ add_subdirectory ( src/messages )
 include_directories ( "${CMAKE_CURRENT_BINARY_DIR}/src/messages" )
 
 add_definitions ( -D PBRT_CONSTEXPR=constexpr )
+add_definitions ( -D PBRT_THREAD_LOCAL=thread_local )
 
 file ( GLOB R2T2_SOURCE
     #src/benchmark/*
