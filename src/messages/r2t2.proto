@@ -150,3 +150,25 @@ message TimeLog {
     repeated CategoryInfo categories = 2;
     CategoryInfo unaccounted = 3;
 }
+
+message AccumulatedStats {
+    message ItemInt64     { string title = 1; int64  value = 2; }
+    message ItemFloat     { string title = 1; double value = 2; }
+    message ItemInt64Pair { string title = 1; int64  first = 2; int64 second = 3; }
+
+    repeated ItemInt64 counters = 1;
+    repeated ItemInt64 memory_counters = 2;
+
+    repeated ItemInt64 int_distribution_sums = 3;
+    repeated ItemInt64 int_distribution_counts = 4;
+    repeated ItemInt64 int_distribution_mins = 5;
+    repeated ItemInt64 int_distribution_maxs = 6;
+
+    repeated ItemFloat float_distribution_sums = 7;
+    repeated ItemInt64 float_distribution_counts = 8;
+    repeated ItemFloat float_distribution_mins = 9;
+    repeated ItemFloat float_distribution_maxs = 10;
+
+    repeated ItemInt64Pair percentages = 11;
+    repeated ItemInt64Pair ratios = 12;
+}

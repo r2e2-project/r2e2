@@ -52,12 +52,14 @@ void from_json( const std::string& data, ProtobufType& dest )
 
 namespace r2t2 {
 
-protobuf::SceneObject to_protobuf( const SceneObject& ObjectKey );
-protobuf::RayBagInfo to_protobuf( const RayBagInfo& RayBagInfo );
-protobuf::WorkerStats to_protobuf( const WorkerStats& stats );
+protobuf::SceneObject to_protobuf( const SceneObject& obj );
+protobuf::RayBagInfo to_protobuf( const RayBagInfo& obj );
+protobuf::WorkerStats to_protobuf( const WorkerStats& obj );
+protobuf::AccumulatedStats to_protobuf( const pbrt::AccumulatedStats& obj );
 
-SceneObject from_protobuf( const protobuf::SceneObject& objectKey );
-RayBagInfo from_protobuf( const protobuf::RayBagInfo& rayBagInfo );
-WorkerStats from_protobuf( const protobuf::WorkerStats& statsProto );
+SceneObject from_protobuf( const protobuf::SceneObject& proto );
+RayBagInfo from_protobuf( const protobuf::RayBagInfo& proto );
+WorkerStats from_protobuf( const protobuf::WorkerStats& proto );
+pbrt::AccumulatedStats from_protobuf( const protobuf::AccumulatedStats& proto );
 
 } // namespace r2t2
