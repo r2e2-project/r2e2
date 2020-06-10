@@ -289,6 +289,7 @@ private:
   ////////////////////////////////////////////////////////////////////////////
 
   WorkerStats aggregated_stats {};
+  pbrt::AccumulatedStats pbrt_stats {};
 
   /*** Outputting stats *****************************************************/
 
