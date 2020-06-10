@@ -248,6 +248,131 @@ ostream& operator<<( ostream& o, const Value<T>& v )
   return o;
 }
 
+pair<string_view, string_view> get_category_and_title( const string_view s )
+{
+  auto pos = s.find( '/' );
+
+  if ( pos == string::npos ) {
+    return { {}, s };
+  }
+
+  return { s.substr( 0, pos ), s.substr( pos + 1 ) };
+}
+
+void LambdaMaster::print_pbrt_stats() const
+{
+  map<string_view, vector<string>> to_print;
+
+  constexpr size_t FIELD_WIDTH = 30;
+
+  for ( auto& [k, v] : pbrt_stats.counters ) {
+    if ( !v )
+      continue;
+
+    auto [category, title] = get_category_and_title( k );
+
+    ostringstream oss;
+    oss << setw( FIELD_WIDTH - 4 ) << left << title.substr( 0, FIELD_WIDTH - 6 )
+        << Value<int64_t>( v );
+    to_print[category].push_back( oss.str() );
+  }
+
+  for ( auto& [k, v] : pbrt_stats.memoryCounters ) {
+    if ( !v )
+      continue;
+
+    auto [category, title] = get_category_and_title( k );
+
+    ostringstream oss;
+    oss << setw( FIELD_WIDTH - 4 ) << left << title.substr( 0, FIELD_WIDTH - 6 )
+        << Value<string>( format_bytes( v ) );
+    to_print[category].push_back( oss.str() );
+  }
+
+  for ( auto& [k, count] : pbrt_stats.intDistributionCounts ) {
+    if ( !count )
+      continue;
+
+    const auto sum = pbrt_stats.intDistributionSums.at( k );
+    const auto minimum = pbrt_stats.intDistributionMins.at( k );
+    const auto maximum = pbrt_stats.intDistributionMaxs.at( k );
+
+    auto [category, title] = get_category_and_title( k );
+
+    const double average
+      = static_cast<double>( sum ) / static_cast<double>( count );
+
+    ostringstream oss;
+    oss << setw( FIELD_WIDTH - 4 ) << left << title.substr( 0, FIELD_WIDTH - 6 )
+        << fixed << setprecision( 3 ) << Value<double>( average )
+        << " avg [range " << minimum << " - " << maximum << "]";
+    to_print[category].push_back( oss.str() );
+  }
+
+  for ( auto& [k, count] : pbrt_stats.floatDistributionCounts ) {
+    if ( !count )
+      continue;
+
+    const auto sum = pbrt_stats.floatDistributionSums.at( k );
+    const auto minimum = pbrt_stats.floatDistributionMins.at( k );
+    const auto maximum = pbrt_stats.floatDistributionMaxs.at( k );
+
+    auto [category, title] = get_category_and_title( k );
+
+    const double average
+      = static_cast<double>( sum ) / static_cast<double>( count );
+
+    ostringstream oss;
+    oss << setw( FIELD_WIDTH - 4 ) << left << title.substr( 0, FIELD_WIDTH - 6 )
+        << fixed << setprecision( 3 ) << Value<double>( average )
+        << " avg [range " << minimum << " - " << maximum << "]";
+    to_print[category].push_back( oss.str() );
+  }
+
+  for ( auto& [k, v] : pbrt_stats.percentages ) {
+    if ( !v.second )
+      continue;
+
+    auto [category, title] = get_category_and_title( k );
+
+    const double percentage = 100.0 * v.first / v.second;
+
+    ostringstream oss;
+    oss << setw( FIELD_WIDTH - 4 ) << left << title.substr( 0, FIELD_WIDTH - 6 )
+        << fixed << setprecision( 2 ) << Value<double>( percentage )
+        << "% [" << v.first << " / " << v.second << "]";
+    to_print[category].push_back( oss.str() );
+  }
+
+  for ( auto& [k, v] : pbrt_stats.ratios ) {
+    if ( !v.second )
+      continue;
+
+    auto [category, title] = get_category_and_title( k );
+
+    const double ratio
+      = static_cast<double>( v.first ) / static_cast<double>( v.second );
+
+    ostringstream oss;
+    oss << setw( FIELD_WIDTH - 4 ) << left << title.substr( 0, FIELD_WIDTH - 6 )
+        << fixed << setprecision( 2 ) << Value<double>( ratio ) << "x ["
+        << v.first << " / " << v.second << "]";
+    to_print[category].push_back( oss.str() );
+  }
+
+  cout << "PBRT statistics:" << endl;
+
+  for ( const auto& [category, items] : to_print ) {
+    cout << "  " << ( category.empty() ? "No category"s : category ) << endl;
+
+    for ( const auto& item : items ) {
+      cout << "    " << item << endl;
+    }
+
+    cout << endl;
+  }
+}
+
 void LambdaMaster::print_job_summary() const
 {
   auto percent = []( const uint64_t n, const uint64_t total ) -> double {

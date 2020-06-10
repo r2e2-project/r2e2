@@ -604,6 +604,7 @@ void LambdaMaster::run()
   cerr << loop.summary() << endl;
   cerr << global_timer().summary() << endl;
 
+  print_pbrt_stats();
   print_job_summary();
 
   if ( !config.job_summary_path.empty() ) {

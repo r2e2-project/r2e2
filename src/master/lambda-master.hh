@@ -79,6 +79,7 @@ public:
 
   protobuf::JobSummary get_job_summary() const;
   void print_job_summary() const;
+  void print_pbrt_stats() const;
   void dump_job_summary( const std::string& path ) const;
 
 private:
