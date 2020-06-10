@@ -120,7 +120,13 @@ void LambdaWorker::process_message( const Message& message )
         "Finish up",
         [this]() {
           send_worker_stats();
-          master_connection.push_request( { *worker_id, OpCode::Bye, "" } );
+
+          master_connection.push_request(
+            { *worker_id,
+              OpCode::Bye,
+              protoutil::to_string(
+                to_protobuf( pbrt::stats::GetThreadStats() ) ) } );
+
           finish_up_rule->cancel();
         },
         [this]() {
