@@ -57,7 +57,7 @@ protobuf::AccumulatedStats to_protobuf( const pbrt::AccumulatedStats& stats )
       };
 
   for ( auto& [k, v] : stats.counters ) {
-    if ( !v ) {
+    if ( v ) {
       set_item( *proto.add_counters(), k, v );
     }
   }
