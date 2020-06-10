@@ -97,11 +97,15 @@ protobuf::AccumulatedStats to_protobuf( const pbrt::AccumulatedStats& stats )
   }
 
   for ( auto& [k, v] : stats.percentages ) {
-    set_pair( *proto.add_percentages(), k, v.first, v.second );
+    if ( v.second ) {
+      set_pair( *proto.add_percentages(), k, v.first, v.second );
+    }
   }
 
   for ( auto& [k, v] : stats.ratios ) {
-    set_pair( *proto.add_ratios(), k, v.first, v.second );
+    if ( v.second ) {
+      set_pair( *proto.add_ratios(), k, v.first, v.second );
+    }
   }
 
   return proto;
