@@ -2,13 +2,12 @@
 
 #include "lambda-master.hh"
 #include "messages/utils.hh"
+#include "schedulers/null.hh"
 #include "util/status_bar.hh"
 
 using namespace std;
 using namespace std::chrono;
 using namespace r2t2;
-
-constexpr milliseconds EXIT_GRACE_PERIOD { 5'000 };
 
 void LambdaMaster::handle_status_message()
 {
@@ -17,25 +16,10 @@ void LambdaMaster::handle_status_message()
   const auto now = steady_clock::now();
 
   if ( config.timeout.count() && now - last_action_time >= config.timeout ) {
-    cerr << "Job terminated due to inactivity." << endl;
-    return;
-  } else if ( not job_timeout_timer.armed()
+    terminate( "Inactivity threshold has been exceeded." );
+  } else if ( state_ == State::Active
               and scene.total_paths == aggregated_stats.finishedPaths ) {
-    cerr << "Done! Terminating the job in "
-         << duration_cast<seconds>( EXIT_GRACE_PERIOD ).count() << "s..."
-         << endl;
-
-    job_timeout_timer.set( 0s, EXIT_GRACE_PERIOD );
-
-    loop.add_rule(
-      "terminate job",
-      Direction::In,
-      job_timeout_timer,
-      [this] {
-        job_timeout_timer.read_event();
-        terminate();
-      },
-      [] { return true; } );
+    terminate( "Job done." );
   }
 
   const auto lagging_workers

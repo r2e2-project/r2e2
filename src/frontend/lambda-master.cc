@@ -49,6 +49,8 @@ using namespace pbrt;
 
 using OpCode = Message::OpCode;
 
+constexpr milliseconds EXIT_GRACE_PERIOD { 30'000 };
+
 map<LambdaMaster::Worker::Role, size_t> LambdaMaster::Worker::active_count = {};
 WorkerId LambdaMaster::Worker::next_id = 0;
 
@@ -281,13 +283,6 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     [] { return true; } );
 
   loop.add_rule(
-    "Terminate",
-    Direction::In,
-    terminate_eventfd,
-    [&] { terminate_eventfd.read_event(); },
-    [] { return true; } );
-
-  loop.add_rule(
     "Reschedule",
     Direction::In,
     reschedule_timer,
@@ -300,7 +295,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     job_exit_timer,
     [&] {
       job_exit_timer.read_event();
-      terminate();
+      terminate( "Job timeout has been exceeded." );
     },
     [] { return true; } );
 
@@ -564,7 +559,7 @@ void LambdaMaster::run()
     cerr << "done." << endl;
   }
 
-  while ( !terminated
+  while ( state_ != State::Terminated
           && loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
     // cleaning up finished http clients
     if ( not finished_https_clients.empty() ) {
@@ -575,6 +570,7 @@ void LambdaMaster::run()
       finished_https_clients.clear();
     }
 
+    /* XXX What's happening here? */
     if ( initialized_workers >= max_workers + ray_generators
          && !free_workers.empty()
          && ( tiles.camera_rays_remaining() || queued_ray_bags_count > 0 ) ) {
@@ -637,7 +633,7 @@ void LambdaMaster::handle_signal( const signalfd_siginfo& sig )
 
     case SIGINT:
       cerr << endl;
-      terminate();
+      terminate( "Interrupted by signal." );
       break;
 
     default:
@@ -645,10 +641,38 @@ void LambdaMaster::handle_signal( const signalfd_siginfo& sig )
   }
 }
 
-void LambdaMaster::terminate()
+void LambdaMaster::terminate( const string& why )
 {
-  terminated = true;
-  terminate_eventfd.write_event();
+  if ( state_ != State::Active ) {
+    return;
+  }
+
+  cerr << "\u2192 " << why << endl;
+  cerr << "\u2192 Winding down workers, will forcefully terminate in "
+       << duration_cast<seconds>( EXIT_GRACE_PERIOD ).count() << "s..." << endl;
+
+  state_ = State::WindingDown;
+  scheduler = make_unique<NullScheduler>();
+
+  job_timeout_timer.set( 0s, EXIT_GRACE_PERIOD );
+
+  loop.add_rule(
+    "gracefully terminate",
+    [this] { state_ = State::Terminated; },
+    [this] {
+      return state_ == State::WindingDown
+             && Worker::active_count[Worker::Role::Tracer] == 0;
+    } );
+
+  loop.add_rule(
+    "forcefully terminate",
+    Direction::In,
+    job_timeout_timer,
+    [this] {
+      job_timeout_timer.read_event();
+      state_ = State::Terminated;
+    },
+    [] { return true; } );
 }
 
 void usage( const char* argv0, int exit_code )

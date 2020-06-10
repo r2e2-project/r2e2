@@ -85,6 +85,19 @@ private:
   using steady_clock = std::chrono::steady_clock;
 
   ////////////////////////////////////////////////////////////////////////////
+  // Master State                                                           //
+  ////////////////////////////////////////////////////////////////////////////
+
+  enum class State
+  {
+    Active,
+    WindingDown,
+    Terminated
+  };
+
+  State state_ { State::Active };
+
+  ////////////////////////////////////////////////////////////////////////////
   // Job Information                                                        //
   ////////////////////////////////////////////////////////////////////////////
 
@@ -358,9 +371,7 @@ private:
   // Other Stuff                                                            //
   ////////////////////////////////////////////////////////////////////////////
 
-  void terminate();
-  bool terminated { false };
-  EventFD terminate_eventfd {};
+  void terminate( const std::string& why );
 
   EventLoop loop {};
   meow::Client<TCPSession>::RuleCategories worker_rule_categories;
