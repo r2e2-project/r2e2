@@ -140,19 +140,19 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     }
 
     if ( not upload_requests.empty() ) {
-      cerr << "\u2197 Uploading alternative scene "
+      cout << "\u2197 Uploading alternative scene "
            << pluralize( "object", upload_requests.size() ) << " (";
 
       for ( size_t i = 0; i < upload_requests.size(); i++ ) {
-        cerr << upload_requests[i].object_key;
+        cout << upload_requests[i].object_key;
         if ( i != upload_requests.size() - 1 ) {
-          cerr << ", ";
+          cout << ", ";
         }
       }
 
-      cerr << ")... ";
+      cout << ")... ";
       scene_storage_backend.put( upload_requests );
-      cerr << "done." << endl;
+      cout << "done." << endl;
     }
   }
 
@@ -171,9 +171,9 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   }
 
   if ( not scene_obj_reqs.empty() ) {
-    cerr << "\u2198 Downloading scene data... ";
+    cout << "\u2198 Downloading scene data... ";
     scene_storage_backend.get( scene_obj_reqs );
-    cerr << "done." << endl;
+    cout << "done." << endl;
   }
 
   /* now we can initialize the scene */
@@ -252,28 +252,31 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     alloc_stream << "workerId,treeletId,action\n";
   }
 
-  auto print_info = []( char const* key, auto value ) {
-    cerr << "  " << key << "    \x1B[1m" << value << "\x1B[0m" << endl;
+  auto print_info = []( const string& key, auto value ) {
+    constexpr size_t FIELD_WIDTH = 25;
+    cout << "  " << setw( FIELD_WIDTH - 2 ) << left
+         << key.substr( 0, FIELD_WIDTH - 4 ) << "    \x1B[1m" << value
+         << "\x1B[0m" << endl;
   };
 
-  cerr << endl << "Job info:" << endl;
-  print_info( "Job ID           ", job_id );
+  cout << endl << "Job info:" << endl;
+  print_info( "Job ID", job_id );
   print_info( "Working directory", scene_path );
-  print_info( "Public address   ", public_address );
-  print_info( "Maximum workers  ", max_workers );
-  print_info( "Ray generators   ", ray_generators );
-  print_info( "Treelet count    ", treelet_count );
-  print_info( "Tile size        ",
+  print_info( "Public address", public_address );
+  print_info( "Maximum workers", max_workers );
+  print_info( "Ray generators", ray_generators );
+  print_info( "Treelet count", treelet_count );
+  print_info( "Tile size",
               to_string( tiles.tile_size ) + "\u00d7"
                 + to_string( tiles.tile_size ) );
   print_info( "Output dimensions",
               to_string( scene.sample_extent.x ) + "\u00d7"
                 + to_string( scene.sample_extent.y ) );
   print_info( "Samples per pixel", scene.base.samplesPerPixel );
-  print_info( "Total paths      ", scene.total_paths );
-  print_info( "Logs directory   ", config.logs_directory.c_str() );
+  print_info( "Total paths", scene.total_paths );
+  print_info( "Logs directory", config.logs_directory.c_str() );
 
-  cerr << endl;
+  cout << endl;
 
   loop.add_rule(
     "Signals",
@@ -506,7 +509,7 @@ void LambdaMaster::run()
   StatusBar::get();
 
   if ( !config.memcached_servers.empty() ) {
-    cerr << "\u2192 Flushing " << config.memcached_servers.size()
+    cout << "\u2192 Flushing " << config.memcached_servers.size()
          << " memcached "
          << pluralize( "server", config.memcached_servers.size() ) << "... ";
 
@@ -546,17 +549,17 @@ void LambdaMaster::run()
       continue;
     }
 
-    cerr << "done." << endl;
+    cout << "done." << endl;
   }
 
   if ( ray_generators > 0 ) {
     /* let's invoke the ray generators */
-    cerr << "\u2192 Launching " << ray_generators << " ray "
+    cout << "\u2192 Launching " << ray_generators << " ray "
          << pluralize( "generator", ray_generators ) << "... ";
 
     invoke_workers( ray_generators
                     + static_cast<size_t>( 0.1 * ray_generators ) );
-    cerr << "done." << endl;
+    cout << "done." << endl;
   }
 
   while ( state_ != State::Terminated
@@ -599,10 +602,10 @@ void LambdaMaster::run()
     }
   }
 
-  cerr << endl;
+  cout << endl;
 
-  cerr << loop.summary() << endl;
-  cerr << global_timer().summary() << endl;
+  cout << loop.summary() << endl;
+  cout << global_timer().summary() << endl;
 
   print_pbrt_stats();
   print_job_summary();
@@ -614,14 +617,14 @@ void LambdaMaster::run()
   }
 
   if ( !get_requests.empty() ) {
-    cerr << "\n\u2198 Downloading " << get_requests.size()
+    cout << "\n\u2198 Downloading " << get_requests.size()
          << " log file(s)... ";
     this_thread::sleep_for( 10s );
     job_storage_backend.get( get_requests );
-    cerr << "done." << endl;
+    cout << "done." << endl;
   }
 
-  cerr << endl;
+  cout << endl;
 }
 
 void LambdaMaster::handle_signal( const signalfd_siginfo& sig )
@@ -633,7 +636,7 @@ void LambdaMaster::handle_signal( const signalfd_siginfo& sig )
       throw runtime_error( "interrupted by signal" );
 
     case SIGINT:
-      cerr << endl;
+      cout << endl;
       terminate( "Interrupted by signal." );
       break;
 
@@ -648,8 +651,8 @@ void LambdaMaster::terminate( const string& why )
     return;
   }
 
-  cerr << "\u2192 " << why << endl;
-  cerr << "\u2192 Winding down workers, will forcefully terminate in "
+  cout << "\u2192 " << why << endl;
+  cout << "\u2192 Winding down workers, will forcefully terminate in "
        << duration_cast<seconds>( EXIT_GRACE_PERIOD ).count() << "s..." << endl;
 
   state_ = State::WindingDown;
@@ -658,7 +661,7 @@ void LambdaMaster::terminate( const string& why )
   job_timeout_timer.set( 0s, EXIT_GRACE_PERIOD );
 
   loop.add_rule(
-    "gracefully terminate",
+    "Graceful termination",
     [this] { state_ = State::Terminated; },
     [this] {
       return state_ == State::WindingDown
@@ -666,7 +669,7 @@ void LambdaMaster::terminate( const string& why )
     } );
 
   loop.add_rule(
-    "forcefully terminate",
+    "Forceful termination",
     Direction::In,
     job_timeout_timer,
     [this] {
@@ -889,14 +892,14 @@ int main( int argc, char* argv[] )
       auto storage = StorageBackend::create_backend( storage_backend_uri );
       TempFile static_file { "/tmp/r2t2-lambda-master.STATIC0" };
 
-      cerr << "\u2198 Downloading static assignment file... ";
+      cout << "\u2198 Downloading static assignment file... ";
       storage->get( { { scene::GetObjectName( ObjectType::StaticAssignment, 0 ),
                         static_file.name() } } );
-      cerr << "done." << endl;
+      cout << "done." << endl;
 
       scheduler = make_unique<StaticScheduler>( static_file.name() );
     } else {
-      cerr << "\u2192 Using " << ( *scheduler_file )
+      cout << "\u2192 Using " << ( *scheduler_file )
            << " as static assignment file." << endl;
       scheduler = make_unique<StaticScheduler>( *scheduler_file );
     }

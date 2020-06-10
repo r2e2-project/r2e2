@@ -367,7 +367,7 @@ ostream& operator<<( ostream& o, const Value<T>& v )
 
 string EventLoop::summary() const
 {
-  constexpr size_t WIDTH = 23;
+  constexpr size_t WIDTH = 25;
 
   ostringstream out;
   const uint64_t now = Timer::timestamp_ns();

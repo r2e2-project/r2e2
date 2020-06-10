@@ -263,7 +263,7 @@ void LambdaMaster::print_pbrt_stats() const
 {
   map<string_view, vector<string>> to_print;
 
-  constexpr size_t FIELD_WIDTH = 30;
+  constexpr size_t FIELD_WIDTH = 25;
 
   for ( auto& [k, v] : pbrt_stats.counters ) {
     if ( !v )
@@ -339,8 +339,8 @@ void LambdaMaster::print_pbrt_stats() const
 
     ostringstream oss;
     oss << setw( FIELD_WIDTH - 4 ) << left << title.substr( 0, FIELD_WIDTH - 6 )
-        << fixed << setprecision( 2 ) << Value<double>( percentage )
-        << "% [" << v.first << " / " << v.second << "]";
+        << fixed << setprecision( 2 ) << Value<double>( percentage ) << "% ["
+        << v.first << " / " << v.second << "]";
     to_print[category].push_back( oss.str() );
   }
 
@@ -368,9 +368,9 @@ void LambdaMaster::print_pbrt_stats() const
     for ( const auto& item : items ) {
       cout << "    " << item << endl;
     }
-
-    cout << endl;
   }
+
+  cout << endl;
 }
 
 void LambdaMaster::print_job_summary() const
@@ -397,55 +397,69 @@ void LambdaMaster::print_job_summary() const
     }
   };
 
+  auto print_title = []( const string& title ) {
+    constexpr size_t FIELD_WIDTH = 25;
+    cout << "  " << setw( FIELD_WIDTH - 2 ) << left
+         << title.substr( 0, FIELD_WIDTH - 4 );
+  };
+
   const protobuf::JobSummary proto = get_job_summary();
 
   const float completion_percent
     = percent( proto.finished_paths(), proto.total_paths() );
 
+  // color (red | green)
   const string c = ( completion_percent >= 100.0 ) ? "028" : "9";
 
-  cerr << "Job summary:" << endl;
-  cerr << "  Ray throughput       " << fixed << setprecision( 2 )
-       << Value<double>( proto.ray_throughput() ) << " rays/worker/s" << endl;
+  cout << "Job summary:" << endl;
+  print_title( "Ray throughput" );
+  cout << fixed << setprecision( 2 ) << Value<double>( proto.ray_throughput() )
+       << " rays/worker/s" << endl;
 
-  cerr << "  Total paths          " << Value<uint64_t>( proto.total_paths() )
-       << endl;
+  print_title( "Total paths" );
+  cout << Value<uint64_t>( proto.total_paths() ) << endl;
 
-  cerr << "  Finished paths       " << Value<uint64_t>( proto.finished_paths() )
-       << " " << box_start( c ) << fixed << setprecision( 2 )
-       << completion_percent << "%" << box_end( c ) << endl;
+  print_title( "Finished paths" );
+  cout << Value<uint64_t>( proto.finished_paths() ) << " " << box_start( c )
+       << fixed << setprecision( 2 ) << completion_percent << "%"
+       << box_end( c ) << endl;
 
-  cerr << "  Finished rays        " << Value<uint64_t>( proto.finished_rays() )
-       << endl;
+  print_title( "Finished rays" );
+  cout << Value<uint64_t>( proto.finished_rays() ) << endl;
 
-  cerr << "  Total transfers      " << Value<uint64_t>( proto.num_enqueues() );
+  print_title( "Total transfers" );
+  cout << Value<uint64_t>( proto.num_enqueues() );
 
   if ( aggregated_stats.samples.rays > 0 ) {
-    cerr << " (" << fixed << setprecision( 2 )
+    cout << " (" << fixed << setprecision( 2 )
          << ( 1.0 * proto.num_enqueues() / proto.finished_rays() )
          << " transfers/ray)";
   }
 
-  cerr << endl;
+  cout << endl;
 
-  cerr << "  Total upload         "
-       << Value<string>( format_bytes( proto.total_upload() ) ) << endl;
+  print_title( "Total upload" );
+  cout << Value<string>( format_bytes( proto.total_upload() ) ) << endl;
 
-  cerr << "  Total download       "
-       << Value<string>( format_bytes( proto.total_download() ) ) << endl;
+  print_title( "Total download" );
+  cout << Value<string>( format_bytes( proto.total_download() ) ) << endl;
 
-  cerr << "  Total sample size    "
-       << Value<string>( format_bytes( proto.total_samples() ) ) << endl;
+  print_title( "Total sample size" );
+  cout << Value<string>( format_bytes( proto.total_samples() ) ) << endl;
 
-  cerr << "  Total time           " << fixed << setprecision( 2 )
-       << Value<double>( proto.total_time() ) << " seconds\n"
-       << "    Camera rays        " << Value<double>( proto.generation_time() )
-       << " seconds\n"
-       << "    Initialization     "
-       << Value<double>( proto.initialization_time() ) << " seconds\n"
-       << "    Ray tracing        " << Value<double>( proto.tracing_time() )
+  print_title( "Total time" );
+  cout << fixed << setprecision( 2 ) << Value<double>( proto.total_time() )
        << " seconds" << endl;
 
-  cerr << "  Estimated cost       "
-       << "N/A" << endl;
+  print_title( "  Camera rays" );
+  cout << Value<double>( proto.generation_time() ) << " seconds" << endl;
+
+  print_title( "  Initialization" );
+  cout << Value<double>( proto.initialization_time() ) << " seconds" << endl;
+
+  print_title( "  Ray tracing" );
+  cout << Value<double>( proto.tracing_time() ) << " seconds" << endl;
+
+  print_title( "Estimated cost" );
+  cout << "N/A" << endl;
 }

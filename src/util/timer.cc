@@ -34,7 +34,7 @@ ostream& operator<<( ostream& o, const Value<T>& v )
 
 string Timer::summary() const
 {
-  constexpr size_t WIDTH = 23;
+  constexpr size_t WIDTH = 25;
 
   const uint64_t now = timestamp_ns();
   const uint64_t elapsed = now - _beginning_timestamp;
