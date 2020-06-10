@@ -314,9 +314,5 @@ int main( int argc, char* argv[] )
     exit_status = EXIT_FAILURE;
   }
 
-  if ( worker ) {
-    worker->upload_logs();
-  }
-
   return exit_status;
 }
