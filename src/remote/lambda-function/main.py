@@ -22,13 +22,11 @@ def handler(event, context):
     command = ["r2t2-lambda-worker",
                "--ip", coordinator_host,
                "--port", coordinator_port,
-               "--storage-backend", storage_backend]
+               "--storage-backend", storage_backend,
+               "--max-depth", str(event['maxPathDepth'])]
 
     if event['samplesPerPixel']:
         command += ['--samples', str(event['samplesPerPixel'])]
-
-    if event['maxPathDepth']:
-        command += ['--max-depth', str(event['maxPathDepth'])]
 
     if event['baggingDelay']:
         command += ['--bagging-delay', str(event['baggingDelay'])]
