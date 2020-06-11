@@ -310,7 +310,7 @@ int main( int argc, char* argv[] )
       public_ip, listen_port, storage_uri, config );
     worker->run();
   } catch ( const exception& e ) {
-    cerr << argv[0] << ": " << e.what() << endl;
+    print_exception( argv[0], e );
     exit_status = EXIT_FAILURE;
   }
 
