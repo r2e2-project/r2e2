@@ -218,6 +218,8 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
   proto.set_total_samples( aggregated_stats.samples.bytes );
   proto.set_estimated_cost( 0.0 );
 
+  *proto.mutable_pbrt_stats() = to_protobuf( pbrt_stats );
+
   return proto;
 }
 

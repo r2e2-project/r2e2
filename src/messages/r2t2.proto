@@ -36,43 +36,6 @@ message GenerateRays {
     int32 y1 = 4;
 }
 
-// Job Summary
-
-message Point2 {
-    int32 x = 1;
-    int32 y = 2;
-}
-
-message JobSummary {
-    // Job Info
-    string job_id = 1;
-    uint32 num_lambdas = 2;
-    uint32 num_generators = 3;
-    uint32 treelet_count = 4;
-    Point2 output_size = 5;
-    uint32 spp = 6;
-    Point2 tile_size = 7;
-    uint32 max_depth = 8;
-    uint32 bagging_delay = 9;
-    uint32 memcached_servers = 10;
-    string storage_backend = 11;
-    map<string, string> alt_scene_objects = 25;
-
-    double total_time = 12;
-    double generation_time = 13;
-    double initialization_time = 14;
-    double tracing_time = 15;
-    uint64 total_paths = 16;
-    uint64 finished_paths = 17;
-    uint64 finished_rays = 18;
-    uint64 num_enqueues = 19;
-    double ray_throughput = 20;
-    uint64 total_upload = 21;
-    uint64 total_download = 22;
-    uint64 total_samples = 23;
-    double estimated_cost = 24;
-}
-
 // Ray Bags
 
 message RayBagInfo {
@@ -171,4 +134,43 @@ message AccumulatedStats {
 
     repeated ItemInt64Pair percentages = 11;
     repeated ItemInt64Pair ratios = 12;
+}
+
+// Job Summary
+
+message Point2 {
+    int32 x = 1;
+    int32 y = 2;
+}
+
+message JobSummary {
+    // Job Info
+    string job_id = 1;
+    uint32 num_lambdas = 2;
+    uint32 num_generators = 3;
+    uint32 treelet_count = 4;
+    Point2 output_size = 5;
+    uint32 spp = 6;
+    Point2 tile_size = 7;
+    uint32 max_depth = 8;
+    uint32 bagging_delay = 9;
+    uint32 memcached_servers = 10;
+    string storage_backend = 11;
+    map<string, string> alt_scene_objects = 25;
+
+    double total_time = 12;
+    double generation_time = 13;
+    double initialization_time = 14;
+    double tracing_time = 15;
+    uint64 total_paths = 16;
+    uint64 finished_paths = 17;
+    uint64 finished_rays = 18;
+    uint64 num_enqueues = 19;
+    double ray_throughput = 20;
+    uint64 total_upload = 21;
+    uint64 total_download = 22;
+    uint64 total_samples = 23;
+    double estimated_cost = 24;
+
+    AccumulatedStats pbrt_stats = 26;
 }
