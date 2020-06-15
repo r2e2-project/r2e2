@@ -19,6 +19,8 @@ include ( FindOpenSSL )
 
 include ( etc/find_lz4.cmake )
 
+include ( etc/find_zstd.cmake )
+
 include_directories ( SYSTEM
   "${CMAKE_CURRENT_LIST_DIR}/lib/pbrt/src/include"
   "${CMAKE_CURRENT_LIST_DIR}/lib/pbrt/src/core"
@@ -66,6 +68,7 @@ set ( ALL_R2T2_LIBS
     glog
     Ptex_static
     ${LZ4_LIBRARY}
+    ${ZSTD_LIBRARY}
     ${ZLIB_LIBRARY}
     ${Protobuf_LIBRARIES}
     ${OPENSSL_LIBRARIES}

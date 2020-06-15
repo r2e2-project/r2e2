@@ -1,4 +1,4 @@
-#include <lz4.h>
+#include <zstd.h>
 
 #include "lambda-worker.hh"
 #include "messages/utils.hh"
@@ -133,12 +133,16 @@ void LambdaWorker::handle_sealed_bags()
     auto& bag = sealed_bags.front();
 
     if ( COMPRESS_RAY_BAGS ) {
-      const size_t upper_bound = LZ4_COMPRESSBOUND( bag.info.bag_size );
+      const size_t upper_bound = ZSTD_compressBound( bag.info.bag_size );
       string compressed( upper_bound, '\0' );
-      const size_t compressed_size = LZ4_compress_default(
-        bag.data.data(), &compressed[0], bag.info.bag_size, upper_bound );
+      const size_t compressed_size = ZSTD_compress( bag.data.data(),
+                                                    upper_bound,
+                                                    &compressed[0],
+                                                    bag.info.bag_size,
+                                                    ZSTD_maxCLevel() );
 
-      if ( compressed_size == 0 ) {
+      if ( ZSTD_isError( compressed_size ) ) {
+        cerr << "bag compression failed" << endl;
         throw runtime_error( "bag compression failed" );
       }
 
@@ -190,10 +194,11 @@ void LambdaWorker::handle_receive_queue()
     if ( COMPRESS_RAY_BAGS ) {
       string decompressed( bag.info.ray_count * RayState::MaxPackedSize, '\0' );
 
-      int decompressed_size = LZ4_decompress_safe(
-        bag.data.data(), &decompressed[0], total_size, decompressed.size() );
+      size_t decompressed_size = ZSTD_decompress(
+        &decompressed[0], decompressed.size(), bag.data.data(), total_size );
 
-      if ( decompressed_size < 0 ) {
+      if ( ZSTD_isError( decompressed_size ) ) {
+        cerr << "bag decompression failed: " << ZSTD_getErrorName( decompressed_size ) << endl;
         throw runtime_error( "bag decompression failed" );
       }
 
