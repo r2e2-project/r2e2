@@ -135,9 +135,9 @@ void LambdaWorker::handle_sealed_bags()
     if ( COMPRESS_RAY_BAGS ) {
       const size_t upper_bound = ZSTD_compressBound( bag.info.bag_size );
       string compressed( upper_bound, '\0' );
-      const size_t compressed_size = ZSTD_compress( bag.data.data(),
-                                                    upper_bound,
-                                                    &compressed[0],
+      const size_t compressed_size = ZSTD_compress( &compressed[0],
+                                                    compressed.length(),
+                                                    bag.data.data(),
                                                     bag.info.bag_size,
                                                     ZSTD_maxCLevel() );
 
@@ -198,7 +198,8 @@ void LambdaWorker::handle_receive_queue()
         &decompressed[0], decompressed.size(), bag.data.data(), total_size );
 
       if ( ZSTD_isError( decompressed_size ) ) {
-        cerr << "bag decompression failed: " << ZSTD_getErrorName( decompressed_size ) << endl;
+        cerr << "bag decompression failed: "
+             << ZSTD_getErrorName( decompressed_size ) << endl;
         throw runtime_error( "bag decompression failed" );
       }
 
