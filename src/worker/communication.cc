@@ -139,7 +139,7 @@ void LambdaWorker::handle_sealed_bags()
                                                     compressed.length(),
                                                     bag.data.data(),
                                                     bag.info.bag_size,
-                                                    ZSTD_maxCLevel() );
+                                                    1 );
 
       if ( ZSTD_isError( compressed_size ) ) {
         cerr << "bag compression failed" << endl;
