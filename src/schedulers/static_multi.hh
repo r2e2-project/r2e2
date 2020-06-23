@@ -14,7 +14,9 @@ public:
   StaticMultiScheduler( const std::string& path );
 
   std::optional<Schedule> schedule( const size_t maxWorkers,
-                                    const std::vector<TreeletStats>& ) override;
+                                    const std::vector<TreeletStats>&,
+                                    const WorkerStats&,
+                                    const size_t ) override;
 };
 
 } // namespace r2t2

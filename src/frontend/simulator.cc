@@ -21,7 +21,7 @@ unordered_map<uint64_t, unordered_set<uint32_t>> loadInitMapping(
 {
   StaticMultiScheduler scheduler = StaticMultiScheduler( fname );
   vector<TreeletStats> treelets( numTreelets );
-  auto opt_schedule = scheduler.schedule( numWorkers, treelets );
+  auto opt_schedule = scheduler.schedule( numWorkers, treelets, {}, 0 );
   auto& schedule = *opt_schedule;
 
   unordered_map<uint64_t, unordered_set<uint32_t>> workerToTreelets;

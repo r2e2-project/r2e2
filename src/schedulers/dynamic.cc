@@ -10,7 +10,9 @@ constexpr seconds SCHEDULING_INTERVAL { 20 };
 
 std::optional<Schedule> DynamicScheduler::schedule(
   const size_t maxWorkers,
-  const vector<TreeletStats>& stats )
+  const vector<TreeletStats>& stats,
+  const WorkerStats&,
+  const size_t )
 {
   if ( steady_clock::now() - lastSchedule < SCHEDULING_INTERVAL ) {
     return nullopt;

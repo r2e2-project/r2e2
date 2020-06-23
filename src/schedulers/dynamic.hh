@@ -17,9 +17,10 @@ private:
 public:
   DynamicScheduler() {}
 
-  std::optional<Schedule> schedule(
-    const size_t maxWorkers,
-    const std::vector<TreeletStats>& stats ) override;
+  std::optional<Schedule> schedule( const size_t maxWorkers,
+                                    const std::vector<TreeletStats>& stats,
+                                    const WorkerStats& aggregated_stats,
+                                    const size_t total_paths ) override;
 };
 
 } // namespace r2t2

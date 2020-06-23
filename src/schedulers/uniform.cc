@@ -7,7 +7,9 @@ using namespace r2t2;
 
 optional<Schedule> UniformScheduler::schedule(
   const size_t maxWorkers,
-  const vector<TreeletStats>& treelets )
+  const vector<TreeletStats>& treelets,
+  const WorkerStats&,
+  const size_t )
 {
   if ( scheduledOnce )
     return nullopt;

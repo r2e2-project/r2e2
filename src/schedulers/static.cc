@@ -49,9 +49,10 @@ StaticScheduler::StaticScheduler( const string& path )
   allocator.setTargetWeights( move( probsMap ) );
 }
 
-optional<Schedule> StaticScheduler::schedule(
-  const size_t maxWorkers,
-  const vector<TreeletStats>& stats )
+optional<Schedule> StaticScheduler::schedule( const size_t maxWorkers,
+                                              const vector<TreeletStats>& stats,
+                                              const WorkerStats&,
+                                              const size_t )
 {
   if ( scheduledOnce ) {
     return nullopt;

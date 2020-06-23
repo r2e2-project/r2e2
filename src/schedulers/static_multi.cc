@@ -41,7 +41,9 @@ StaticMultiScheduler::StaticMultiScheduler( const string& path )
 
 optional<Schedule> StaticMultiScheduler::schedule(
   const size_t maxWorkers,
-  const vector<TreeletStats>& stats )
+  const vector<TreeletStats>& stats,
+  const WorkerStats&,
+  const size_t )
 {
   Schedule result;
   result.resize( stats.size(), 0 );

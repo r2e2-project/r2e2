@@ -10,9 +10,10 @@ private:
   bool scheduled_once_ { false };
 
 public:
-  std::optional<Schedule> schedule(
-    const size_t,
-    const std::vector<TreeletStats>& treelets ) override
+  std::optional<Schedule> schedule( const size_t,
+                                    const std::vector<TreeletStats>& treelets,
+                                    const WorkerStats&,
+                                    const size_t ) override
   {
     if ( scheduled_once_ ) {
       return std::nullopt;

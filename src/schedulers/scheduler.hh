@@ -17,7 +17,9 @@ class Scheduler
 public:
   virtual std::optional<Schedule> schedule(
     const size_t maxWorkers,
-    const std::vector<TreeletStats>& treelets )
+    const std::vector<TreeletStats>& treelets,
+    const WorkerStats& aggregated_stats,
+    const size_t total_paths )
     = 0;
 
   virtual ~Scheduler() {}
