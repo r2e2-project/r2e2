@@ -27,6 +27,7 @@
 #include "net/socket.hh"
 #include "net/transfer_mcd.hh"
 #include "net/util.hh"
+#include "schedulers/adaptive.hh"
 #include "schedulers/dynamic.hh"
 #include "schedulers/null.hh"
 #include "schedulers/rootonly.hh"
@@ -887,7 +888,7 @@ int main( int argc, char* argv[] )
 
   if ( scheduler_name == "uniform" ) {
     scheduler = make_unique<UniformScheduler>();
-  } else if ( scheduler_name == "static" ) {
+  } else if ( scheduler_name == "static" || scheduler_name == "adaptive" ) {
     if ( not scheduler_file ) {
       auto storage = StorageBackend::create_backend( storage_backend_uri );
       TempFile static_file { "/tmp/r2t2-lambda-master.STATIC0" };
@@ -897,11 +898,20 @@ int main( int argc, char* argv[] )
                         static_file.name() } } );
       cout << "done." << endl;
 
-      scheduler = make_unique<StaticScheduler>( static_file.name() );
+      if ( scheduler_name == "static" ) {
+        scheduler = make_unique<StaticScheduler>( static_file.name() );
+      } else {
+        scheduler = make_unique<AdaptiveScheduler>( static_file.name() );
+      }
     } else {
       cout << "\u2192 Using " << ( *scheduler_file )
            << " as static assignment file." << endl;
-      scheduler = make_unique<StaticScheduler>( *scheduler_file );
+
+      if ( scheduler_name == "static" ) {
+        scheduler = make_unique<StaticScheduler>( *scheduler_file );
+      } else {
+        scheduler = make_unique<AdaptiveScheduler>( *scheduler_file );
+      }
     }
   } else if ( scheduler_name == "dynamic" ) {
     scheduler = make_unique<DynamicScheduler>();
