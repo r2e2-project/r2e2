@@ -18,15 +18,12 @@ inline timepoint_t now()
 
 struct TreeletStats
 {
-  struct Stats
+  struct
   {
     uint64_t rays { 0 };
     uint64_t bytes { 0 };
     uint64_t count { 0 };
-  };
-
-  Stats enqueued {}, dequeued {};
-  std::vector<Stats> enqueuedTo {}, dequeuedFrom {};
+  } enqueued {}, dequeued {};
 
   TreeletStats operator-( const TreeletStats& other ) const;
 };
