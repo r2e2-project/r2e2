@@ -17,7 +17,10 @@ private:
     PERCENT_95,
   };
 
+  std::chrono::steady_clock::time_point last_schedule_ {};
+
   Stage stage_ { Stage::INITIAL };
+  size_t last_worker_count_ { 0 };
   std::string path_;
 
 public:
