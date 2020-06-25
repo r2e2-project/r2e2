@@ -886,14 +886,17 @@ int main( int argc, char* argv[] )
     }
   }
 
+  TempFile static_file { "/tmp/r2t2-lambda-master.STATIC0" };
+
   if ( scheduler_name == "uniform" ) {
     scheduler = make_unique<UniformScheduler>();
   } else if ( scheduler_name == "static" || scheduler_name == "adaptive" ) {
     if ( not scheduler_file ) {
       auto storage = StorageBackend::create_backend( storage_backend_uri );
-      TempFile static_file { "/tmp/r2t2-lambda-master.STATIC0" };
 
-      cout << "\u2198 Downloading static assignment file... ";
+      cout << "\u2198 Downloading static assignment file to "
+           << static_file.name() << "...";
+
       storage->get( { { scene::GetObjectName( ObjectType::StaticAssignment, 0 ),
                         static_file.name() } } );
       cout << "done." << endl;
