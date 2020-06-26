@@ -291,6 +291,7 @@ private:
 
   WorkerStats aggregated_stats {};
   pbrt::AccumulatedStats pbrt_stats {};
+  double estimated_cost { 0 };
 
   /*** Outputting stats *****************************************************/
 

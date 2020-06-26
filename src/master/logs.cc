@@ -123,6 +123,8 @@ void LambdaMaster::handle_worker_stats()
               << ( stats.samples.bytes / T ) << ','
               << ( stats.samples.count / T ) << ',' << fixed
               << setprecision( 2 ) << ( 100 * stats.cpuUsage ) << '\n';
+
+    estimated_cost += T;
   }
 
   for ( size_t treelet_id = 0; treelet_id < treelets.size(); treelet_id++ ) {
@@ -216,7 +218,7 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
   proto.set_total_upload( aggregated_stats.enqueued.bytes );
   proto.set_total_download( aggregated_stats.dequeued.bytes );
   proto.set_total_samples( aggregated_stats.samples.bytes );
-  proto.set_estimated_cost( 0.0 );
+  proto.set_estimated_cost( estimated_cost );
 
   *proto.mutable_pbrt_stats() = to_protobuf( pbrt_stats );
 
@@ -462,6 +464,6 @@ void LambdaMaster::print_job_summary() const
   print_title( "  Ray tracing" );
   cout << Value<double>( proto.tracing_time() ) << " seconds" << endl;
 
-  print_title( "Estimated cost" );
-  cout << "N/A" << endl;
+  print_title( "Estimated CPU-seconds" );
+  cout << Value<double>( proto.estimated_cost() ) << endl;
 }
