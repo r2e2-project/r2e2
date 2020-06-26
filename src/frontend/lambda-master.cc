@@ -100,8 +100,6 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                              loop.add_category( "HTTPResponse read" ),
                              loop.add_category( "HTTPRequest write" ),
                              loop.add_category( "Process HTTPResponse" ) } )
-  , worker_stats_write_timer( seconds { config.worker_stats_write_interval },
-                              milliseconds { 1 } )
 {
   signals.set_as_mask();
 
@@ -231,12 +229,12 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   }
 
   /* are we logging anything? */
-  if ( config.collect_debug_logs || config.worker_stats_write_interval > 0
+  if ( config.collect_debug_logs || config.write_stat_logs
        || config.ray_log_rate > 0 || config.bag_log_rate > 0 ) {
     filesystem::create_directories( config.logs_directory );
   }
 
-  if ( config.worker_stats_write_interval > 0 ) {
+  if ( config.write_stat_logs ) {
     ws_stream.open( config.logs_directory / "workers.csv", ios::trunc );
     tl_stream.open( config.logs_directory / "treelets.csv", ios::trunc );
     alloc_stream.open( config.logs_directory / "allocations.csv", ios::trunc );
@@ -303,13 +301,11 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     },
     [] { return true; } );
 
-  if ( config.worker_stats_write_interval > 0 ) {
-    loop.add_rule( "Worker stats",
-                   Direction::In,
-                   worker_stats_write_timer,
-                   bind( &LambdaMaster::handle_worker_stats, this ),
-                   [this] { return true; } );
-  }
+  loop.add_rule( "Worker stats",
+                 Direction::In,
+                 worker_stats_write_timer,
+                 bind( &LambdaMaster::handle_worker_stats, this ),
+                 [this] { return config.write_stat_logs; } );
 
   loop.add_rule( "Worker invocation",
                  Direction::In,
@@ -325,7 +321,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                  Direction::In,
                  status_print_timer,
                  bind( &LambdaMaster::handle_status_message, this ),
-                 [this]() { return true; } );
+                 [] { return true; } );
 
   listener_socket.set_blocking( false );
   listener_socket.set_reuseaddr();
@@ -432,7 +428,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           assign_base_objects( worker );
           assign_treelet( worker, treelet );
 
-          if ( config.worker_stats_write_interval ) {
+          if ( config.write_stat_logs ) {
             alloc_stream << worker_id << ',' << treelet_id << ",add\n";
           }
 
@@ -611,9 +607,9 @@ void LambdaMaster::run()
   print_pbrt_stats();
   print_job_summary();
 
-  if ( !config.job_summary_path.empty() ) {
+  if ( not config.job_summary_path.empty() ) {
     dump_job_summary( config.job_summary_path );
-  } else if ( config.worker_stats_write_interval ) {
+  } else if ( config.write_stat_logs ) {
     dump_job_summary( config.logs_directory / "info.json" );
   }
 
@@ -756,8 +752,8 @@ int main( int argc, char* argv[] )
   string public_ip;
   string storage_backend_uri;
   string region { "us-west-2" };
-  uint64_t worker_stats_write_interval = 0;
   bool collect_debug_logs = false;
+  bool write_stat_logs = false;
   float ray_log_rate = 0.0;
   float bag_log_rate = 0.0;
   string logs_directory = "logs/";
@@ -794,7 +790,7 @@ int main( int argc, char* argv[] )
     { "scheduler", required_argument, nullptr, 'a' },
     { "scheduler-file", required_argument, nullptr, 'F' },
     { "debug-logs", no_argument, nullptr, 'g' },
-    { "worker-stats", required_argument, nullptr, 'w' },
+    { "worker-stats", no_argument, nullptr, 'w' },
     { "log-rays", required_argument, nullptr, 'L' },
     { "log-bags", required_argument, nullptr, 'B' },
     { "logs-dir", required_argument, nullptr, 'D' },
@@ -820,7 +816,7 @@ int main( int argc, char* argv[] )
     const int opt
       = getopt_long( argc,
                      argv,
-                     "p:P:i:r:b:m:G:w:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:B:A:gh",
+                     "p:P:i:r:b:m:G:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:B:A:wgh",
                      long_options,
                      nullptr );
 
@@ -840,7 +836,7 @@ int main( int argc, char* argv[] )
       case 'a': scheduler_name = optarg; break;
       case 'F': scheduler_file = optarg; break;
       case 'g': collect_debug_logs = true; break;
-      case 'w': worker_stats_write_interval = stoul(optarg); break;
+      case 'w': write_stat_logs = true; break;
       case 'D': logs_directory = optarg; break;
       case 'S': samples_per_pixel = stoi(optarg); break;
       case 'M': max_path_depth = stoi(optarg); break;
@@ -946,22 +942,14 @@ int main( int argc, char* argv[] )
   unique_ptr<LambdaMaster> master;
 
   // TODO clean this up
-  MasterConfiguration config = { samples_per_pixel,
-                                 max_path_depth,
-                                 bagging_delay,
-                                 collect_debug_logs,
-                                 worker_stats_write_interval,
-                                 ray_log_rate,
-                                 bag_log_rate,
-                                 auto_name_log_dir_tag,
-                                 logs_directory,
-                                 crop_window,
-                                 tile_size,
-                                 seconds { timeout },
-                                 job_summary_path,
-                                 new_tile_threshold,
-                                 alt_scene_file,
-                                 move( memcached_servers ),
+  MasterConfiguration config = { samples_per_pixel, max_path_depth,
+                                 bagging_delay,     collect_debug_logs,
+                                 write_stat_logs,   ray_log_rate,
+                                 bag_log_rate,      auto_name_log_dir_tag,
+                                 logs_directory,    crop_window,
+                                 tile_size,         seconds { timeout },
+                                 job_summary_path,  new_tile_threshold,
+                                 alt_scene_file,    move( memcached_servers ),
                                  move( engines ) };
 
   try {

@@ -43,7 +43,7 @@ struct MasterConfiguration
   int max_path_depth;
   std::chrono::milliseconds bagging_delay;
   bool collect_debug_logs;
-  uint64_t worker_stats_write_interval;
+  bool write_stat_logs;
   float ray_log_rate;
   float bag_log_rate;
   std::optional<std::string> auto_name_log_dir_tag;
@@ -398,7 +398,8 @@ private:
                                     std::chrono::milliseconds { 1 } };
   TimerFD reschedule_timer { RESCHEDULE_INTERVAL,
                              std::chrono::milliseconds { 500 } };
-  TimerFD worker_stats_write_timer;
+  TimerFD worker_stats_write_timer { std::chrono::seconds { 1 },
+                                     std::chrono::milliseconds { 1 } };
 
   TimerFD job_exit_timer { std::chrono::minutes { 15 } };
   TimerFD job_timeout_timer {};
