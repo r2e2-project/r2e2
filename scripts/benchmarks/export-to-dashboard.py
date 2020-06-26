@@ -45,6 +45,7 @@ def generate_data_csv(df, out):
     df['bytesPerBag'] = (df.bytesEnqueued / df.bagsEnqueued)
 
     data = df.groupby(['timestampS']).agg({
+        'workerId': ['nunique'],
         'raysEnqueued': ['sum'],
         'raysDequeued': ['sum'],
         'bytesEnqueued': ['sum'],
