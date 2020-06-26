@@ -89,9 +89,12 @@ void LambdaMaster::handle_worker_stats()
   worker_stats_write_timer.read_event();
 
   const auto t
-    = duration_cast<milliseconds>( steady_clock::now() - start_time ).count();
+    = duration_cast<milliseconds>( steady_clock::now() - start_time );
 
-  const float T = static_cast<float>( config.worker_stats_write_interval );
+  const float T
+    = static_cast<float>( ( t - last_workers_logged ).count() ) / 1e3;
+
+  last_workers_logged = t;
 
   for ( Worker& worker : workers ) {
     if ( !worker.is_logged )
@@ -108,10 +111,9 @@ void LambdaMaster::handle_worker_stats()
     bagsEnqueued,bagsAssigned,bagsDequeued,
     numSamples,bytesSamples,bagsSamples,cpuUsage */
 
-    ws_stream << t << ',' << worker.id << ',' << fixed
-              << ( stats.finishedPaths / T ) << ','
-              << ( stats.enqueued.rays / T ) << ','
-              << ( stats.assigned.rays / T ) << ','
+    ws_stream << t.count() << ',' << worker.id << ',' << fixed
+              << ( stats.finishedPaths ) << ',' << ( stats.enqueued.rays / T )
+              << ',' << ( stats.assigned.rays / T ) << ','
               << ( stats.dequeued.rays / T ) << ','
               << ( stats.enqueued.bytes / T ) << ','
               << ( stats.assigned.bytes / T ) << ','
@@ -140,7 +142,7 @@ void LambdaMaster::handle_worker_stats()
 
     /* timestamp,treeletId,raysEnqueued,raysDequeued,bytesEnqueued,
        bytesDequeued,bagsEnqueued,bagsDequeued */
-    tl_stream << t << ',' << treelet_id << ',' << fixed
+    tl_stream << t.count() << ',' << treelet_id << ',' << fixed
               << ( stats.enqueued.rays / T ) << ','
               << ( stats.dequeued.rays / T ) << ','
               << ( stats.enqueued.bytes / T ) << ','

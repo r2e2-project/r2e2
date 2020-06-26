@@ -318,6 +318,8 @@ private:
   steady_clock::time_point last_finished_ray { start_time };
   steady_clock::time_point last_action_time { start_time };
 
+  std::chrono::milliseconds last_workers_logged { 0 }; // relative to start_time
+
   ////////////////////////////////////////////////////////////////////////////
   // Scene Objects                                                          //
   ////////////////////////////////////////////////////////////////////////////
