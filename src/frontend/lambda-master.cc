@@ -246,7 +246,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                  "numSamples,bytesSamples,bagsSamples,cpuUsage\n";
 
     tl_stream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
-                 "bytesEnqueued,bytesDequeued,bagsEnqueued,bagsDequeued\n";
+                 "bytesEnqueued,bytesDequeued,bagsEnqueued,bagsDequeued,"
+                 "enqueueRate,dequeueRate\n";
 
     alloc_stream << "workerId,treeletId,action\n";
   }
@@ -305,7 +306,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                  Direction::In,
                  worker_stats_write_timer,
                  bind( &LambdaMaster::handle_worker_stats, this ),
-                 [this] { return config.write_stat_logs; } );
+                 [this] { return true; } );
 
   loop.add_rule( "Worker invocation",
                  Direction::In,

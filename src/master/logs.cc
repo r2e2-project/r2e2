@@ -91,64 +91,73 @@ void LambdaMaster::handle_worker_stats()
   const auto t
     = duration_cast<milliseconds>( steady_clock::now() - start_time );
 
-  const float T
-    = static_cast<float>( ( t - last_workers_logged ).count() ) / 1e3;
-
+  const double T = ( t - last_workers_logged ).count() / 1e3;
   last_workers_logged = t;
+
+  constexpr double ALPHA = 0.3;
+
+  for ( size_t treelet_id = 0; treelet_id < treelets.size(); treelet_id++ ) {
+    auto& treelet = treelets[treelet_id];
+    auto& stats = treelet_stats[treelet_id];
+
+    if ( !treelet.last_stats.first ) {
+      stats.enqueue_rate *= ( 1 - ALPHA );
+      stats.dequeue_rate *= ( 1 - ALPHA );
+
+      continue; /* nothing new to log */
+    }
+
+    const TreeletStats diff = stats - treelet.last_stats.second;
+
+    treelet.last_stats.second = stats;
+    treelet.last_stats.first = false;
+
+    stats.enqueue_rate
+      = ( 1 - ALPHA ) * stats.enqueue_rate + ALPHA * diff.enqueued.bytes;
+
+    stats.dequeue_rate
+      = ( 1 - ALPHA ) * stats.dequeue_rate + ALPHA * diff.dequeued.bytes;
+
+    if ( config.write_stat_logs ) {
+      /* timestamp,treeletId,raysEnqueued,raysDequeued,bytesEnqueued,
+         bytesDequeued,bagsEnqueued,bagsDequeued,enqueueRate,dequeueRate */
+      tl_stream << t.count() << ',' << treelet_id << ',' << fixed
+                << diff.enqueued.rays << ',' << diff.dequeued.rays << ','
+                << diff.enqueued.bytes << ',' << diff.dequeued.bytes << ','
+                << diff.enqueued.count << ',' << diff.dequeued.count <<  ','
+                << diff.enqueue_rate << ',' << diff.dequeue_rate << '\n';
+    }
+  }
+
+  if ( not config.write_stat_logs ) {
+    return;
+  }
 
   for ( Worker& worker : workers ) {
     if ( !worker.is_logged )
       continue;
+
     if ( worker.state == Worker::State::Terminated )
       worker.is_logged = false;
 
-    const auto stats = worker.stats - worker.last_stats;
+    const auto diff = worker.stats - worker.last_stats;
     worker.last_stats = worker.stats;
 
-    /* timestamp,workerId,pathsFinished,
-    raysEnqueued,raysAssigned,raysDequeued,
-    bytesEnqueued,bytesAssigned,bytesDequeued,
-    bagsEnqueued,bagsAssigned,bagsDequeued,
-    numSamples,bytesSamples,bagsSamples,cpuUsage */
+    /* timestamp,workerId,pathsFinished,raysEnqueued,raysAssigned,raysDequeued,
+       bytesEnqueued,bytesAssigned,bytesDequeued,bagsEnqueued,bagsAssigned,
+       bagsDequeued,numSamples,bytesSamples,bagsSamples,cpuUsage */
 
     ws_stream << t.count() << ',' << worker.id << ',' << fixed
-              << ( stats.finished_paths ) << ',' << ( stats.enqueued.rays / T )
-              << ',' << ( stats.assigned.rays / T ) << ','
-              << ( stats.dequeued.rays / T ) << ','
-              << ( stats.enqueued.bytes / T ) << ','
-              << ( stats.assigned.bytes / T ) << ','
-              << ( stats.dequeued.bytes / T ) << ','
-              << ( stats.enqueued.count / T ) << ','
-              << ( stats.assigned.count / T ) << ','
-              << ( stats.dequeued.count / T ) << ','
-              << ( stats.samples.rays / T ) << ','
-              << ( stats.samples.bytes / T ) << ','
-              << ( stats.samples.count / T ) << ',' << fixed
-              << setprecision( 2 ) << ( 100 * stats.cpu_usage ) << '\n';
+              << diff.finished_paths << ',' << diff.enqueued.rays << ','
+              << diff.assigned.rays << ',' << diff.dequeued.rays << ','
+              << diff.enqueued.bytes << ',' << diff.assigned.bytes << ','
+              << diff.dequeued.bytes << ',' << diff.enqueued.count << ','
+              << diff.assigned.count << ',' << diff.dequeued.count << ','
+              << diff.samples.rays << ',' << diff.samples.bytes << ','
+              << diff.samples.count << ',' << fixed << setprecision( 2 )
+              << ( 100 * diff.cpu_usage ) << '\n';
 
     estimated_cost += T;
-  }
-
-  for ( size_t treelet_id = 0; treelet_id < treelets.size(); treelet_id++ ) {
-    if ( !treelets[treelet_id].last_stats.first ) {
-      continue; /* nothing new to log */
-    }
-
-    const TreeletStats stats
-      = treelet_stats[treelet_id] - treelets[treelet_id].last_stats.second;
-
-    treelets[treelet_id].last_stats.second = treelet_stats[treelet_id];
-    treelets[treelet_id].last_stats.first = false;
-
-    /* timestamp,treeletId,raysEnqueued,raysDequeued,bytesEnqueued,
-       bytesDequeued,bagsEnqueued,bagsDequeued */
-    tl_stream << t.count() << ',' << treelet_id << ',' << fixed
-              << ( stats.enqueued.rays / T ) << ','
-              << ( stats.dequeued.rays / T ) << ','
-              << ( stats.enqueued.bytes / T ) << ','
-              << ( stats.dequeued.bytes / T ) << ','
-              << ( stats.enqueued.count / T ) << ','
-              << ( stats.dequeued.count / T ) << '\n';
   }
 }
 
