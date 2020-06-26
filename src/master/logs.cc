@@ -112,7 +112,7 @@ void LambdaMaster::handle_worker_stats()
     numSamples,bytesSamples,bagsSamples,cpuUsage */
 
     ws_stream << t.count() << ',' << worker.id << ',' << fixed
-              << ( stats.finishedPaths ) << ',' << ( stats.enqueued.rays / T )
+              << ( stats.finished_paths ) << ',' << ( stats.enqueued.rays / T )
               << ',' << ( stats.assigned.rays / T ) << ','
               << ( stats.dequeued.rays / T ) << ','
               << ( stats.enqueued.bytes / T ) << ','
@@ -124,7 +124,7 @@ void LambdaMaster::handle_worker_stats()
               << ( stats.samples.rays / T ) << ','
               << ( stats.samples.bytes / T ) << ','
               << ( stats.samples.count / T ) << ',' << fixed
-              << setprecision( 2 ) << ( 100 * stats.cpuUsage ) << '\n';
+              << setprecision( 2 ) << ( 100 * stats.cpu_usage ) << '\n';
 
     estimated_cost += T;
   }
@@ -213,7 +213,7 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
   proto.set_initialization_time( initialization_time );
   proto.set_tracing_time( ray_time );
   proto.set_total_paths( scene.total_paths );
-  proto.set_finished_paths( aggregated_stats.finishedPaths );
+  proto.set_finished_paths( aggregated_stats.finished_paths );
   proto.set_finished_rays( aggregated_stats.samples.rays );
   proto.set_num_enqueues( aggregated_stats.enqueued.rays );
   proto.set_ray_throughput( avg_ray_throughput );

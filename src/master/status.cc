@@ -18,7 +18,7 @@ void LambdaMaster::handle_status_message()
   if ( config.timeout.count() && now - last_action_time >= config.timeout ) {
     terminate( "Inactivity threshold has been exceeded." );
   } else if ( state_ == State::Active
-              and scene.total_paths == aggregated_stats.finishedPaths ) {
+              and scene.total_paths == aggregated_stats.finished_paths ) {
     terminate( "Job done." );
   }
 
@@ -54,8 +54,8 @@ void LambdaMaster::handle_status_message()
   oss << "\033[0m" << fixed << setprecision(2)
 
       // finished paths
-      << BG(true) << " \u21af " << s.finishedPaths
-      << " (" << percent(s.finishedPaths, scene.total_paths) << "%) "
+      << BG(true) << " \u21af " << s.finished_paths
+      << " (" << percent(s.finished_paths, scene.total_paths) << "%) "
 
       << BG() << " \u21a6 " << Worker::active_count[Worker::Role::Generator]
               << "/" << ray_generators << " "

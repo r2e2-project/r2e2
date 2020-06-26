@@ -160,10 +160,10 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
       const WorkerStats stats = from_protobuf( proto );
 
-      worker.stats.finishedPaths += stats.finishedPaths;
-      worker.stats.cpuUsage = stats.cpuUsage;
+      worker.stats.finished_paths += stats.finished_paths;
+      worker.stats.cpu_usage = stats.cpu_usage;
 
-      aggregated_stats.finishedPaths += stats.finishedPaths;
+      aggregated_stats.finished_paths += stats.finished_paths;
 
       break;
     }

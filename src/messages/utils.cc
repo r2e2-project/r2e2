@@ -35,8 +35,8 @@ protobuf::RayBagInfo to_protobuf( const RayBagInfo& info )
 protobuf::WorkerStats to_protobuf( const WorkerStats& stats )
 {
   protobuf::WorkerStats proto;
-  proto.set_finished_paths( stats.finishedPaths );
-  proto.set_cpu_usage( stats.cpuUsage );
+  proto.set_finished_paths( stats.finished_paths );
+  proto.set_cpu_usage( stats.cpu_usage );
   return proto;
 }
 

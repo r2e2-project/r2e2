@@ -27,8 +27,8 @@ WorkerStats WorkerStats::operator-( const WorkerStats& other ) const
 {
   WorkerStats res;
 
-  res.finishedPaths = finishedPaths - other.finishedPaths;
-  res.cpuUsage = cpuUsage;
+  res.finished_paths = finished_paths - other.finished_paths;
+  res.cpu_usage = cpu_usage;
   res.enqueued.rays = enqueued.rays - other.enqueued.rays;
   res.assigned.rays = assigned.rays - other.assigned.rays;
   res.dequeued.rays = dequeued.rays - other.dequeued.rays;

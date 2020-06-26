@@ -26,8 +26,8 @@ void LambdaWorker::send_worker_stats()
                        + diff.guest_nice;
 
   WorkerStats stats;
-  stats.finishedPaths = finished_path_ids.size();
-  stats.cpuUsage = 1.0 * work_jiffies / total_jiffies;
+  stats.finished_paths = finished_path_ids.size();
+  stats.cpu_usage = 1.0 * work_jiffies / total_jiffies;
 
   protobuf::WorkerStats proto = to_protobuf( stats );
   master_connection.push_request(
