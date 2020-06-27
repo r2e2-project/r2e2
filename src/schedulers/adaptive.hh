@@ -12,16 +12,16 @@ class AdaptiveScheduler : public Scheduler
 private:
   enum class Stage
   {
-    INITIAL,
-    PERCENT_0,
-    PERCENT_95,
+    ONE,
+    TWO,
+    THREE,
+    FOUR
   };
 
   std::chrono::steady_clock::time_point last_scheduled_at_ {};
   Schedule last_schedule_ {};
 
-  Stage stage_ { Stage::INITIAL };
-  size_t last_worker_count_ { 0 };
+  Stage stage_ { Stage::ONE };
   std::string path_;
 
 public:
