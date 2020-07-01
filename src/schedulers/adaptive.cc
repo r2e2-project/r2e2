@@ -7,7 +7,7 @@ using namespace std;
 using namespace chrono;
 using namespace r2t2;
 
-constexpr seconds SCHEDULING_INTERVAL { 30 };
+constexpr seconds SCHEDULING_INTERVAL { 15 };
 
 optional<Schedule> AdaptiveScheduler::schedule(
   const size_t max_workers,
@@ -37,18 +37,21 @@ optional<Schedule> AdaptiveScheduler::schedule(
       if ( steady_clock::now() - last_scheduled_at_ >= SCHEDULING_INTERVAL ) {
         last_scheduled_at_ = steady_clock::now();
 
+        bool changed = false;
+
         /* now, let's see if we're over provisioning */
         for ( size_t tid = 0; tid < treelets.size(); tid++ ) {
           auto& treelet = treelets[tid];
           auto& count = last_schedule_[tid];
 
           while ( count > 1
-                  and 4 * treelet.dequeue_rate < count * 50'000'000 ) {
+                  and 16 * treelet.dequeue_rate < count * 50'000'000 ) {
             count--;
+            changed = true;
           }
         }
 
-        return last_schedule_;
+        return changed ? make_optional( last_schedule_ ) : nullopt;
       }
 
       break;
