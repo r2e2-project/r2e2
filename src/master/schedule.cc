@@ -53,6 +53,7 @@ void LambdaMaster::invoke_workers( const size_t n_workers )
         [client_it, this]( HTTPResponse&& ) {
           finished_https_clients.push_back( client_it );
         },
+        [] {},
         [] {} );
 
       client_it->push_request( move( invocation_request ) );
