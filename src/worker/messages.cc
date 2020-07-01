@@ -130,8 +130,8 @@ void LambdaWorker::process_message( const Message& message )
           finish_up_rule->cancel();
         },
         [this]() {
-          return trace_queue.empty() && out_queue.empty() && samples.empty()
-                 && open_bags.empty() && sealed_bags.empty()
+          return trace_queue_empty && processed_queue_empty && out_queue.empty()
+                 && samples.empty() && open_bags.empty() && sealed_bags.empty()
                  && receive_queue.empty() && pending_ray_bags.empty()
                  && pending_sample_bags.empty() && sample_bags.empty();
         } );

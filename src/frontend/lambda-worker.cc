@@ -81,9 +81,11 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
   scene.max_depth = config.max_path_depth;
 
   /* trace rays */
-  loop.add_rule( "Trace queue",
-                 bind( &LambdaWorker::handle_trace_queue, this ),
-                 [this] { return !trace_queue.empty(); } );
+  loop.add_rule( "Processed queue",
+                 Direction::In,
+                 rays_ready_fd,
+                 bind( &LambdaWorker::handle_processed_queue, this ),
+                 [] { return true; } );
 
   /* create ray packets */
   loop.add_rule( "Out queue",
@@ -149,6 +151,16 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
     [this] { this->terminate(); } );
 }
 
+void LambdaWorker::terminate()
+{
+  trace_queue.enqueue( { nullptr } );
+  if ( raytracing_thread.joinable() ) {
+    raytracing_thread.join();
+  }
+
+  terminated = true;
+}
+
 struct membuf : streambuf
 {
   membuf( char* begin, char* end ) { this->setg( begin, begin, end ); }
@@ -199,6 +211,10 @@ void LambdaWorker::handle_scene_object_results()
     master_connection.push_request( { *worker_id, OpCode::GetObjects, "" } );
 
     scene_loaded = true;
+
+    /* starting the ray-tracing thread */
+    raytracing_thread
+      = thread( bind( &LambdaWorker::handle_trace_queue, this ) );
   }
 }
 

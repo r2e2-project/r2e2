@@ -14,6 +14,7 @@ void LambdaWorker::generate_rays( const Bounds2i& bounds )
 {
   /* for ray tracking */
   bernoulli_distribution bd { config.ray_log_rate };
+  trace_queue_empty = false;
 
   for ( int sample = 0; sample < scene.base.samplesPerPixel; sample++ ) {
     for ( const Point2i pixel : bounds ) {
@@ -31,7 +32,7 @@ void LambdaWorker::generate_rays( const Bounds2i& bounds )
       const TreeletId next_treelet = state_ptr->CurrentTreelet();
 
       if ( treelets.count( next_treelet ) ) {
-        trace_queue[next_treelet].push( move( state_ptr ) );
+        trace_queue.enqueue( move( state_ptr ) );
       } else {
         log_ray( RayAction::Queued, *state_ptr );
         out_queue[next_treelet].push( move( state_ptr ) );
@@ -43,109 +44,88 @@ void LambdaWorker::generate_rays( const Bounds2i& bounds )
 
 void LambdaWorker::handle_trace_queue()
 {
-  queue<RayStatePtr> processed_rays;
+  pbrt::RayStatePtr ray_ptr;
 
-  // constexpr size_t MAX_RAYS = WORKER_MAX_ACTIVE_RAYS / 2;
-  const auto trace_until = steady_clock::now() + 100ms;
-  MemoryArena arena;
+  constexpr size_t RAYS_TO_NOTIFY = 1000;
+  size_t ray_counter = 0;
 
-  while ( !trace_queue.empty() && steady_clock::now() <= trace_until ) {
-    for ( auto const& [treelet_id, treelet_ptr] : treelets ) {
-      const CloudBVH& treelet = *treelet_ptr;
+  // assuming only one treelet per worker
+  auto& treelet = *treelets.begin()->second;
 
-      auto rays_it = trace_queue.find( treelet_id );
-      if ( rays_it == trace_queue.end() ) {
-        continue;
+  while ( true ) {
+    trace_queue.wait_dequeue( ray_ptr );
+
+    /* XXX maybe we need to revisit this decision */
+    MemoryArena arena;
+
+    do {
+      if ( ray_counter++ < RAYS_TO_NOTIFY ) {
+        processed_queue_empty = false;
+        rays_ready_fd.write_event();
       }
 
-      auto& queue = rays_it->second;
+      if ( ray_ptr == nullptr ) {
+        return;
+      }
 
-      while ( !queue.empty() && steady_clock::now() <= trace_until ) {
-        RayStatePtr ray_ptr = move( queue.front() );
-        queue.pop();
+      auto& ray = *ray_ptr;
 
-        this->rays.terminated++;
+      log_ray( RayAction::Traced, ray );
+      this->rays.terminated++;
 
-        RayState& ray = *ray_ptr;
-        const uint64_t path_id = ray.PathID();
+      if ( not ray.toVisitEmpty() ) {
+        processed_queue.enqueue(
+          graphics::TraceRay( move( ray_ptr ), treelet ) );
+      } else if ( ray.hit ) {
+        log_ray( RayAction::Finished, ray );
 
-        log_ray( RayAction::Traced, ray );
+        auto [bounce_ray, shadow_ray]
+          = graphics::ShadeRay( move( ray_ptr ),
+                                treelet,
+                                scene.base.lights,
+                                scene.base.sampleExtent,
+                                scene.base.sampler,
+                                scene.max_depth,
+                                arena );
 
-        if ( !ray.toVisitEmpty() ) {
-          auto new_ray_ptr = graphics::TraceRay( move( ray_ptr ), treelet );
-          auto& new_ray = *new_ray_ptr;
-
-          const bool hit = new_ray.hit;
-          const bool empty_visit = new_ray.toVisitEmpty();
-
-          if ( new_ray.isShadowRay ) {
-            if ( hit || empty_visit ) {
-              new_ray.Ld = hit ? 0.f : new_ray.Ld;
-              samples.emplace( *new_ray_ptr );
-              this->rays.generated++;
-
-              log_ray( RayAction::Finished, new_ray );
-
-              /* was this the last shadow ray? */
-              if ( new_ray.remainingBounces == 0 ) {
-                finished_path_ids.push( path_id );
-              }
-            } else {
-              processed_rays.push( move( new_ray_ptr ) );
-            }
-          } else if ( !empty_visit || hit ) {
-            processed_rays.push( move( new_ray_ptr ) );
-          } else if ( empty_visit ) {
-            new_ray.Ld = 0.f;
-            samples.emplace( *new_ray_ptr );
-            finished_path_ids.push( path_id );
-            this->rays.generated++;
-
-            log_ray( RayAction::Finished, new_ray );
-          }
-        } else if ( ray.hit ) {
-          log_ray( RayAction::Finished, ray );
-
-          auto [bounce_ray, shadow_ray]
-            = graphics::ShadeRay( move( ray_ptr ),
-                                  treelet,
-                                  scene.base.lights,
-                                  scene.base.sampleExtent,
-                                  scene.base.sampler,
-                                  scene.max_depth,
-                                  arena );
-
-          if ( bounce_ray == nullptr && shadow_ray == nullptr ) {
-            /* this was the last ray in the path */
-            finished_path_ids.push( path_id );
-          }
-
-          if ( bounce_ray != nullptr ) {
-            log_ray( RayAction::Generated, *bounce_ray );
-            processed_rays.push( move( bounce_ray ) );
-          }
-
-          if ( shadow_ray != nullptr ) {
-            log_ray( RayAction::Generated, *shadow_ray );
-            processed_rays.push( move( shadow_ray ) );
-          }
-        } else {
-          throw runtime_error( "invalid ray in ray queue" );
+        if ( bounce_ray == nullptr and shadow_ray == nullptr ) {
+          // means that the path was terminated
+          ray.toVisitHead = numeric_limits<uint8_t>::max();
+          processed_queue.enqueue( move( ray_ptr ) );
+          continue;
         }
-      }
 
-      if ( queue.empty() ) {
-        trace_queue.erase( rays_it );
+        if ( bounce_ray != nullptr ) {
+          log_ray( RayAction::Generated, *bounce_ray );
+          processed_queue.enqueue( move( bounce_ray ) );
+        }
+
+        if ( shadow_ray != nullptr ) {
+          log_ray( RayAction::Generated, *shadow_ray );
+          processed_queue.enqueue( move( shadow_ray ) );
+        }
+      } else {
+        throw runtime_error( "invalid ray in trace queue" );
       }
-    }
+    } while ( trace_queue.try_dequeue( ray_ptr ) );
+
+    processed_queue_empty = false;
+    trace_queue_empty = true;
+    rays_ready_fd.write_event();
+  }
+}
+
+void LambdaWorker::handle_processed_queue()
+{
+  if ( not rays_ready_fd.read_event() ) {
+    return;
   }
 
-  while ( !processed_rays.empty() ) {
-    RayStatePtr& ray = processed_rays.front();
+  auto queue_ray = [this]( pbrt::RayStatePtr&& ray ) {
     const TreeletId next_treelet = ray->CurrentTreelet();
 
     if ( treelets.count( next_treelet ) ) {
-      trace_queue[next_treelet].push( move( ray ) );
+      trace_queue.enqueue( move( ray ) );
     } else {
       log_ray( RayAction::Queued, *ray );
       out_queue[next_treelet].push( move( ray ) );
@@ -153,6 +133,48 @@ void LambdaWorker::handle_trace_queue()
     }
 
     this->rays.generated++;
-    processed_rays.pop();
+  };
+
+  pbrt::RayStatePtr ray_ptr;
+
+  while ( processed_queue.try_dequeue( ray_ptr ) ) {
+    auto& ray = *ray_ptr;
+
+    /* HACK */
+    if ( ray.toVisitHead == numeric_limits<uint8_t>::max() ) {
+      finished_path_ids.push( ray.PathID() );
+      continue;
+    }
+
+    const bool hit = ray.HasHit();
+    const bool empty_visit = ray.toVisitEmpty();
+
+    if ( ray.IsShadowRay() ) {
+      if ( hit or empty_visit ) {
+        ray.Ld = hit ? 0.f : ray.Ld;
+        samples.emplace( ray );
+        this->rays.generated++;
+
+        log_ray( RayAction::Finished, ray );
+
+        /* was this the last shadow ray? */
+        if ( ray.remainingBounces == 0 ) {
+          finished_path_ids.push( ray.PathID() );
+        }
+      } else {
+        queue_ray( move( ray_ptr ) );
+      }
+    } else if ( not empty_visit or hit ) {
+      queue_ray( move( ray_ptr ) );
+    } else if ( empty_visit ) {
+      ray.Ld = 0.f;
+      samples.emplace( ray );
+      finished_path_ids.push( ray.PathID() );
+      this->rays.generated++;
+
+      log_ray( RayAction::Finished, ray );
+    }
   }
+
+  processed_queue_empty = true;
 }

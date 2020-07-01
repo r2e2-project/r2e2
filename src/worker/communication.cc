@@ -184,7 +184,6 @@ void LambdaWorker::handle_receive_queue()
     /* (1) XXX do we have this treelet? */
 
     /* (2) let's unpack this treelet and add the rays to the trace queue */
-    auto& treelet_trace_queue = trace_queue[bag.info.treelet_id];
     size_t total_size = bag.data.size();
 
     if ( COMPRESS_RAY_BAGS ) {
@@ -203,6 +202,8 @@ void LambdaWorker::handle_receive_queue()
 
     const char* data = bag.data.data();
 
+    trace_queue_empty = false;
+
     for ( size_t offset = 0; offset < total_size; ) {
       uint32_t len;
       memcpy( &len, data + offset, sizeof( uint32_t ) );
@@ -216,7 +217,7 @@ void LambdaWorker::handle_receive_queue()
 
       log_ray( RayAction::Unbagged, *ray, bag.info );
 
-      treelet_trace_queue.push( move( ray ) );
+      trace_queue.enqueue( move( ray ) );
     }
 
     log_bag( BagAction::Opened, bag.info );

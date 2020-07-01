@@ -5,6 +5,7 @@
 #include <pbrt/main.h>
 #include <pbrt/raystate.h>
 
+#include <atomic>
 #include <cstring>
 #include <fstream>
 #include <future>
@@ -25,11 +26,14 @@
 #include "net/transfer.hh"
 #include "storage/backend_s3.hh"
 #include "util/cpu.hh"
+#include "util/eventfd.hh"
 #include "util/eventloop.hh"
 #include "util/histogram.hh"
 #include "util/temp_dir.hh"
 #include "util/timerfd.hh"
 #include "util/units.hh"
+
+#include "readerwriterqueue/readerwriterqueue.h"
 
 #define TLOG( tag ) LOG( INFO ) << "[" #tag "] "
 
@@ -78,7 +82,7 @@ public:
                 const WorkerConfiguration& config );
 
   void run();
-  void terminate() { terminated = true; }
+  void terminate();
   void upload_logs();
 
 private:
@@ -118,12 +122,24 @@ private:
 
   /*** Ray Tracing **********************************************************/
 
+  /* ray-tracing thread runs this function, reads from trace_queue and writes
+     to processed_queue */
   void handle_trace_queue();
+
+  void handle_processed_queue();
 
   void generate_rays( const pbrt::Bounds2i& crop_window );
 
+  std::thread raytracing_thread {};
+  EventFD rays_ready_fd {};
+
+  moodycamel::BlockingReaderWriterQueue<pbrt::RayStatePtr> trace_queue {};
+  moodycamel::ReaderWriterQueue<pbrt::RayStatePtr> processed_queue {};
+
+  std::atomic<bool> trace_queue_empty { true };
+  std::atomic<bool> processed_queue_empty { true };
+
   std::map<TreeletId, std::shared_ptr<pbrt::CloudBVH>> treelets {};
-  std::map<TreeletId, std::queue<pbrt::RayStatePtr>> trace_queue {};
   std::map<TreeletId, std::queue<pbrt::RayStatePtr>> out_queue {};
   std::queue<pbrt::Sample> samples {};
   size_t out_queue_size { 0 };
@@ -221,7 +237,7 @@ private:
   struct
   {
     uint64_t generated { 0 };
-    uint64_t terminated { 0 };
+    std::atomic<uint64_t> terminated { 0 };
   } rays {};
 
   ////////////////////////////////////////////////////////////////////////////
