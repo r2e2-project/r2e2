@@ -133,8 +133,8 @@ private:
   std::thread raytracing_thread {};
   EventFD rays_ready_fd {};
 
-  moodycamel::BlockingReaderWriterQueue<pbrt::RayStatePtr> trace_queue {};
-  moodycamel::ReaderWriterQueue<pbrt::RayStatePtr> processed_queue {};
+  moodycamel::BlockingReaderWriterQueue<pbrt::RayStatePtr> trace_queue { 8192 };
+  moodycamel::ReaderWriterQueue<pbrt::RayStatePtr> processed_queue { 8192 };
 
   std::atomic<bool> trace_queue_empty { true };
   std::atomic<bool> processed_queue_empty { true };
