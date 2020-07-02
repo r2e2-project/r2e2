@@ -139,6 +139,9 @@ void LambdaWorker::handle_sealed_bags()
         bag.data.data(), &compressed[0], bag.info.bag_size, upper_bound );
 
       if ( compressed_size == 0 ) {
+        cerr << "bag compression failed: "
+             << bag.info.str( ray_bags_key_prefix ) << endl;
+
         throw runtime_error( "bag compression failed" );
       }
 
@@ -193,6 +196,9 @@ void LambdaWorker::handle_receive_queue()
         bag.data.data(), &decompressed[0], total_size, decompressed.size() );
 
       if ( decompressed_size < 0 ) {
+        cerr << "bag decompression failed: "
+             << bag.info.str( ray_bags_key_prefix ) << endl;
+
         throw runtime_error( "bag decompression failed" );
       }
 
