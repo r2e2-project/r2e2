@@ -40,7 +40,7 @@ public:
     , unstructured_data_( unstructured_data )
   {
     first_line_.append( CRLF );
-    if ( not unstructured_data_.empty() ) {
+    if ( not unstructured_data_.empty() or type_ == Type::SET ) {
       unstructured_data_.append( CRLF );
     }
   }
@@ -163,7 +163,7 @@ public:
           }
 
           response_.first_line_ = raw_buffer_.substr( 0, crlf_index );
-          response_.unstructured_data_ = {};
+          response_.unstructured_data_ = "";
 
           raw_buffer_.erase( 0, crlf_index + 2 );
 
@@ -178,8 +178,7 @@ public:
             const size_t length
               = stoull( response_.first_line_.substr( last_space + 1 ) );
 
-            state_
-              = ( length > 0 ) ? State::BodyPending : State::LastLinePending;
+            state_ = State::BodyPending;
             expected_body_length_ = length;
           } else {
             if ( first_word == "STORED" ) {
@@ -231,6 +230,7 @@ public:
 
         case State::LastLinePending: {
           if ( startswith( raw_buffer_, "END\r\n" ) ) {
+            requests_.pop();
             responses_.push( std::move( response_ ) );
 
             state_ = State::FirstLinePending;
