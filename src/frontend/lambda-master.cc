@@ -892,7 +892,7 @@ int main( int argc, char* argv[] )
       auto storage = StorageBackend::create_backend( storage_backend_uri );
 
       cout << "\u2198 Downloading static assignment file to "
-           << static_file.name() << "...";
+           << static_file.name() << "... ";
 
       storage->get( { { scene::GetObjectName( ObjectType::StaticAssignment, 0 ),
                         static_file.name() } } );
