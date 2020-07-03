@@ -83,18 +83,25 @@ void TransferAgent::worker_thread( const size_t )
 
       case Response::Type::OK:
       case Response::Type::STORED:
+        if ( pending_actions[i].front().task == Task::Download
+             && response.unstructured_data().empty() ) {
+          cerr << "emptry response body: " << pending_actions[i].front().key
+               << endl;
+          abort();
+        }
+
         thread_results.emplace( pending_actions[i].front().id,
                                 move( response.unstructured_data() ) );
         pending_actions[i].pop();
         break;
 
       case Response::Type::NOT_STORED:
+      case Response::Type::NOT_FOUND:
       case Response::Type::ERROR:
         throw runtime_error( "client errored" );
         break;
 
       case Response::Type::DELETED:
-      case Response::Type::NOT_FOUND:
         break;
 
       default:
