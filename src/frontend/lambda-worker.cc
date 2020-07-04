@@ -49,7 +49,7 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
   , samples_transfer_agent(
       make_unique<S3TransferAgent>( job_storage_backend, 2, true ) )
   , scene_transfer_agent(
-      make_unique<S3TransferAgent>( scene_storage_backend, 4 ) )
+      make_unique<S3TransferAgent>( scene_storage_backend, 2 ) )
   , worker_rule_categories( { loop.add_category( "Socket" ),
                               loop.add_category( "Message read" ),
                               loop.add_category( "Message write" ),
