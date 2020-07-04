@@ -61,7 +61,7 @@ void TransferAgent::worker_thread( const size_t )
 
   queue<pair<uint64_t, string>> thread_results;
 
-  std::queue<Action> actions;
+  std::deque<Action> actions;
 
   auto pending_actions = make_unique<queue<Action>[]>( _servers.size() );
   auto clients = make_unique<unique_ptr<Client>[]>( _servers.size() );
@@ -77,7 +77,8 @@ void TransferAgent::worker_thread( const size_t )
                              const size_t i, Response&& response ) {
     switch ( response.type() ) {
       case Response::Type::VALUE:
-        actions.emplace( 0, Task::Delete, pending_actions[i].front().key, "" );
+        actions.emplace_front(
+          0, Task::Delete, pending_actions[i].front().key, "" );
 
         [[fallthrough]];
 
@@ -89,12 +90,12 @@ void TransferAgent::worker_thread( const size_t )
         break;
 
       case Response::Type::NOT_STORED:
-      case Response::Type::NOT_FOUND:
       case Response::Type::ERROR:
         throw runtime_error( "client errored" );
         break;
 
       case Response::Type::DELETED:
+      case Response::Type::NOT_FOUND:
         break;
 
       default:
@@ -127,7 +128,11 @@ void TransferAgent::worker_thread( const size_t )
       }
 
       unique_lock<mutex> lock { _outstanding_mutex };
-      swap( _outstanding, actions );
+
+      while ( not _outstanding.empty()) {
+        actions.push_back( move( _outstanding.front() ) );
+        _outstanding.pop();
+      }
     },
     [] { return true; } );
 
@@ -161,7 +166,7 @@ void TransferAgent::worker_thread( const size_t )
         [f = cancel_callback, i] { f( i ); } );
 
       while ( not pending_actions[i].empty() ) {
-        actions.emplace( move( pending_actions[i].front() ) );
+        actions.emplace_back( move( pending_actions[i].front() ) );
         pending_actions[i].pop();
       }
     }
@@ -199,7 +204,7 @@ void TransferAgent::worker_thread( const size_t )
           return;
       }
 
-      actions.pop();
+      actions.pop_front();
     }
   }
 }

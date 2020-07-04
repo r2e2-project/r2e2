@@ -125,7 +125,7 @@ void Client::load()
 void Client::push_request( Request&& request )
 {
   responses_.new_request( request );
-  requests_.push( move( request ) );
+  requests_.emplace( move( request ) );
 
   if ( current_request_first_line_.empty() and current_request_data_.empty() ) {
     load();
