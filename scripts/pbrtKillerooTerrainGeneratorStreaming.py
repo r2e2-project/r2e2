@@ -12,13 +12,6 @@ from tqdm import tqdm
 import argparse
 import multiprocessing
 from joblib import Parallel,delayed
-import noise
-def divide_chunks(l, n): 
-      
-    # looping till length l 
-    for i in range(0, len(l), n):  
-        yield l[i:i + n] 
-  
 def blockshaped(arr, nrows, ncols):
     """
     Return an array of shape (n, nrows, ncols) where
@@ -429,7 +422,7 @@ def genKillerooTerrain(output_filename: str,
         # middle of terrain
         samples,step = np.linspace(subset_res_x/s,
                                   subset_res_x * (s - 1)/s,
-                                  max(2,int(num_groups_per_chunk ** 0.5)),retstep=True)
+                                  max(1,int(num_groups_per_chunk ** 0.5)),retstep=True)
         # print(step)
         # print(num_groups_per_chunk ** 0.5)
         grid = np.meshgrid(samples,
