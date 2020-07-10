@@ -423,6 +423,8 @@ def genKillerooTerrain(output_filename: str,
         samples,step = np.linspace(subset_res_x/s,
                                   subset_res_x * (s - 1)/s,
                                   max(1,int(num_groups_per_chunk ** 0.5)),retstep=True)
+        if math.isnan(step):
+            step = (subset_res_x * (s - 1)/s - subset_res_x/s) / 2
         # print(step)
         # print(num_groups_per_chunk ** 0.5)
         grid = np.meshgrid(samples,
@@ -454,7 +456,6 @@ def genKillerooTerrain(output_filename: str,
                                             instance_name = instance_name,
                                             killeroo_path = killeroo_path))
     Parallel(n_jobs=num_cores)(delayed(placeKillerooGroups)(i) for i in tqdm(range(int(num_chunks ** 2 ))))
-
     for i in range(num_chunks ** 2):
         s = open(chunks_filename + str(i) + ".pbrt",'a')
         #include killeroo file to chunk master 
