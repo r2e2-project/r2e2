@@ -66,8 +66,8 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
   google::InitGoogleLogging( log_base.c_str() );
 
   if ( track_rays ) {
-    TLOG( RAY ) << "timestamp,pathId,hop,shadowRay,remainingBounces,workerId,"
-                   "treeletId,action,bag";
+    TLOG( RAY )
+      << "pathId,hop,shadowRay,remainingBounces,workerId,treeletId,action";
   }
 
   if ( track_bags ) {
@@ -223,6 +223,10 @@ void LambdaWorker::run()
   while ( !terminated
           && loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
     continue;
+  }
+
+  if ( track_rays or track_bags ) {
+    upload_logs();
   }
 }
 

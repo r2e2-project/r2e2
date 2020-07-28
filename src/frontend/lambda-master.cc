@@ -616,7 +616,7 @@ void LambdaMaster::run()
 
   if ( !get_requests.empty() ) {
     cout << "\n\u2198 Downloading " << get_requests.size()
-         << " log file(s)... ";
+         << " log file(s)... " << flush;
     this_thread::sleep_for( 10s );
     job_storage_backend.get( get_requests );
     cout << "done." << endl;
