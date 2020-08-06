@@ -31,8 +31,10 @@ do
   aws s3 cp ${SCENE_BUCKET_BASE}/${SCENE_NAME}/${x} "${TEMP_SCENE_DIR}"
 done
 
-# 2) rename the camera
-mv "${TEMP_SCENE_DIR}"/${CAMERA} "${TEMP_SCENE_DIR}"/CAMERA
+# 2) rename the camera, if necessary
+if [[ $CAMERA != "CAMERA" ]]; then
+  mv "${TEMP_SCENE_DIR}"/${CAMERA} "${TEMP_SCENE_DIR}"/CAMERA
+fi
 
 # 3) download the samples
 aws s3 cp --recursive ${SCENE_BUCKET_BASE}/jobs/${JOB_ID}/samples/ "${SAMPLES_DIR}"
