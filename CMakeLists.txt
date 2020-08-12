@@ -100,3 +100,6 @@ target_link_libraries( camera-generator ${ALL_R2T2_LIBS} )
 
 add_executable ( path-tracer src/frontend/path-tracer.cc )
 target_link_libraries( path-tracer ${ALL_R2T2_LIBS} )
+
+add_executable ( treelet-tracer src/frontend/treelet-tracer.cc )
+target_link_libraries( treelet-tracer ${ALL_R2T2_LIBS} )
