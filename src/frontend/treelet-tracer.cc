@@ -267,7 +267,7 @@ int main( int argc, char* argv[] )
     const char* data = bag.data();
 
     if ( processed_bags % 100 == 0 ) {
-      cout << processed_bags << ".";
+      cout << ".";
     }
 
     processed_bags++;
