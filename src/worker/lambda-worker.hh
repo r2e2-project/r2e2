@@ -131,7 +131,7 @@ private:
 
   void generate_rays( const pbrt::Bounds2i& crop_window );
 
-  std::thread raytracing_thread {};
+  std::vector<std::thread> raytracing_threads {};
   EventFD rays_ready_fd {};
 
   moodycamel::BlockingConcurrentQueue<pbrt::RayStatePtr> trace_queue { 8192 };
