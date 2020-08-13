@@ -33,7 +33,8 @@
 #include "util/timerfd.hh"
 #include "util/units.hh"
 
-#include "readerwriterqueue/readerwriterqueue.h"
+#include "concurrentqueue/concurrentqueue.h"
+#include "concurrentqueue/blockingconcurrentqueue.h"
 
 #define TLOG( tag ) LOG( INFO ) << "[" #tag "] "
 
@@ -133,8 +134,8 @@ private:
   std::thread raytracing_thread {};
   EventFD rays_ready_fd {};
 
-  moodycamel::BlockingReaderWriterQueue<pbrt::RayStatePtr> trace_queue { 8192 };
-  moodycamel::ReaderWriterQueue<pbrt::RayStatePtr> processed_queue { 8192 };
+  moodycamel::BlockingConcurrentQueue<pbrt::RayStatePtr> trace_queue { 8192 };
+  moodycamel::ConcurrentQueue<pbrt::RayStatePtr> processed_queue { 8192 };
 
   std::atomic<bool> trace_queue_empty { true };
   std::atomic<bool> processed_queue_empty { true };
