@@ -121,11 +121,18 @@ void LambdaWorker::process_message( const Message& message )
         [this]() {
           send_worker_stats();
 
+          // making sure raytracing threads are done
+          shutdown_raytracing_threads();
+
+          pbrt::AccumulatedStats pbrt_stats = pbrt::stats::GetThreadStats();
+          for ( auto& thread_stats : raytracing_thread_stats ) {
+            pbrt_stats.Merge( thread_stats );
+          }
+
           master_connection.push_request(
             { *worker_id,
               OpCode::Bye,
-              protoutil::to_string(
-                to_protobuf( pbrt::stats::GetThreadStats() ) ) } );
+              protoutil::to_string( to_protobuf( pbrt_stats ) ) } );
 
           finish_up_rule->cancel();
         },

@@ -151,10 +151,12 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
     [this] { this->terminate(); } );
 }
 
-void LambdaWorker::terminate()
+void LambdaWorker::shutdown_raytracing_threads()
 {
-  for ( size_t i = 0; i < raytracing_threads.size(); i++ ) {
-    trace_queue.enqueue( { nullptr } );
+  for ( auto& t : raytracing_threads ) {
+    if ( t.joinable() ) {
+      trace_queue.enqueue( { nullptr } );
+    }
   }
 
   for ( auto& t : raytracing_threads ) {
@@ -162,7 +164,11 @@ void LambdaWorker::terminate()
       t.join();
     }
   }
+}
 
+void LambdaWorker::terminate()
+{
+  shutdown_raytracing_threads();
   terminated = true;
 }
 
@@ -219,8 +225,9 @@ void LambdaWorker::handle_scene_object_results()
 
     /* starting the ray-tracing threads */
     for ( size_t i = 0; i < 2; i++ ) {
+      raytracing_thread_stats.emplace_back();
       raytracing_threads.emplace_back(
-        bind( &LambdaWorker::handle_trace_queue, this ) );
+        bind( &LambdaWorker::handle_trace_queue, this, i ) );
     }
   }
 }

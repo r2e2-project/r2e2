@@ -42,7 +42,7 @@ void LambdaWorker::generate_rays( const Bounds2i& bounds )
   }
 }
 
-void LambdaWorker::handle_trace_queue()
+void LambdaWorker::handle_trace_queue( const size_t idx )
 {
   pbrt::RayStatePtr ray_ptr;
 
@@ -65,6 +65,7 @@ void LambdaWorker::handle_trace_queue()
       }
 
       if ( ray_ptr == nullptr ) {
+        raytracing_thread_stats[idx] = pbrt::stats::GetThreadStats();
         return;
       }
 

@@ -33,8 +33,8 @@
 #include "util/timerfd.hh"
 #include "util/units.hh"
 
-#include "concurrentqueue/concurrentqueue.h"
 #include "concurrentqueue/blockingconcurrentqueue.h"
+#include "concurrentqueue/concurrentqueue.h"
 
 #define TLOG( tag ) LOG( INFO ) << "[" #tag "] "
 
@@ -125,14 +125,18 @@ private:
 
   /* ray-tracing thread runs this function, reads from trace_queue and writes
      to processed_queue */
-  void handle_trace_queue();
+  void handle_trace_queue( const size_t idx );
 
   void handle_processed_queue();
 
   void generate_rays( const pbrt::Bounds2i& crop_window );
 
+  void shutdown_raytracing_threads();
+
   std::vector<std::thread> raytracing_threads {};
   EventFD rays_ready_fd {};
+
+  std::vector<pbrt::AccumulatedStats> raytracing_thread_stats {};
 
   moodycamel::BlockingConcurrentQueue<pbrt::RayStatePtr> trace_queue { 8192 };
   moodycamel::ConcurrentQueue<pbrt::RayStatePtr> processed_queue { 8192 };
