@@ -12,66 +12,6 @@ using namespace meow;
 
 using OpCode = Message::OpCode;
 
-void merge_pbrt_stats( pbrt::AccumulatedStats& dst,
-                       const pbrt::AccumulatedStats& other )
-{
-  for ( const auto& [k, v] : other.counters ) {
-    dst.counters[k] += v;
-  }
-
-  for ( const auto& [k, v] : other.memoryCounters ) {
-    dst.memoryCounters[k] += v;
-  }
-
-  for ( const auto& [k, v] : other.intDistributionCounts ) {
-    dst.intDistributionCounts[k] += v;
-    dst.intDistributionSums[k] += other.intDistributionSums.at( k );
-
-    if ( dst.intDistributionMins.count( k ) == 0 ) {
-      dst.intDistributionMins[k] = other.intDistributionMins.at( k );
-    } else {
-      dst.intDistributionMins[k]
-        = min( dst.intDistributionMins[k], other.intDistributionMins.at( k ) );
-    }
-
-    if ( dst.intDistributionMaxs.count( k ) == 0 ) {
-      dst.intDistributionMaxs[k] = other.intDistributionMaxs.at( k );
-    } else {
-      dst.intDistributionMaxs[k]
-        = max( dst.intDistributionMaxs[k], other.intDistributionMaxs.at( k ) );
-    }
-  }
-
-  for ( const auto& [k, v] : other.floatDistributionCounts ) {
-    dst.floatDistributionCounts[k] += v;
-    dst.floatDistributionSums[k] += other.floatDistributionSums.at( k );
-
-    if ( !dst.floatDistributionMins.count( k ) ) {
-      dst.floatDistributionMins[k] = other.floatDistributionMins.at( k );
-    } else {
-      dst.floatDistributionMins[k] = min( dst.floatDistributionMins.at( k ),
-                                          other.floatDistributionMins.at( k ) );
-    }
-
-    if ( !dst.floatDistributionMaxs.count( k ) ) {
-      dst.floatDistributionMaxs[k] = other.floatDistributionMaxs.at( k );
-    } else {
-      dst.floatDistributionMaxs[k] = max( dst.floatDistributionMaxs[k],
-                                          other.floatDistributionMaxs.at( k ) );
-    }
-  }
-
-  for ( const auto& [k, v] : other.percentages ) {
-    dst.percentages[k].first += v.first;
-    dst.percentages[k].second += v.second;
-  }
-
-  for ( const auto& [k, v] : other.ratios ) {
-    dst.ratios[k].first += v.first;
-    dst.ratios[k].second += v.second;
-  }
-}
-
 void LambdaMaster::process_message( const uint64_t worker_id,
                                     const Message& message )
 {
@@ -176,7 +116,9 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
       protobuf::AccumulatedStats proto;
       protoutil::from_string( message.payload(), proto );
-      merge_pbrt_stats( pbrt_stats, from_protobuf( proto ) );
+
+      pbrt::AccumulatedStats worker_pbrt_stats = from_protobuf( proto );
+      pbrt_stats.Merge( worker_pbrt_stats );
 
       worker.client.push_request( { 0, OpCode::Bye, "" } );
       break;
