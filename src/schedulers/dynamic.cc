@@ -1,6 +1,7 @@
 #include "dynamic.hh"
 
 #include <algorithm>
+#include <numeric>
 
 using namespace std;
 using namespace chrono;

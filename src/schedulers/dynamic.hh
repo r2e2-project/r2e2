@@ -3,7 +3,6 @@
 #include <chrono>
 #include <string>
 
-#include "allocator.hh"
 #include "scheduler.hh"
 #include "static.hh"
 

@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "allocator.hh"
 #include "scheduler.hh"
 
 namespace r2t2 {

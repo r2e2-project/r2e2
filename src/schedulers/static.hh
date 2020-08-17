@@ -1,6 +1,7 @@
 #pragma once
 
-#include "allocator.hh"
+#include <valarray>
+
 #include "scheduler.hh"
 
 namespace r2t2 {
@@ -8,13 +9,16 @@ namespace r2t2 {
 class StaticScheduler : public Scheduler
 {
 private:
-  bool scheduledOnce { false };
-  Allocator allocator {};
+  bool scheduled_once_ { false };
+
+protected:
+  std::valarray<double> weights_ {};
+  Schedule get_schedule( size_t max_workers, const size_t treelet_count ) const;
 
 public:
   StaticScheduler( const std::string& path );
 
-  std::optional<Schedule> schedule( const size_t maxWorkers,
+  std::optional<Schedule> schedule( const size_t max_workers,
                                     const std::vector<TreeletStats>&,
                                     const WorkerStats&,
                                     const size_t ) override;

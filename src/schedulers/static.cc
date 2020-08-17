@@ -1,6 +1,7 @@
 #include "static.hh"
 
 #include <fstream>
+#include <numeric>
 #include <string>
 
 #include "util/exception.hh"
@@ -16,57 +17,69 @@ StaticScheduler::StaticScheduler( const string& path )
     throw runtime_error( "static file was not found" );
   }
 
-  vector<double> probs;
-  size_t treeletCount = 0;
+  size_t treelet_count = 0;
+  fin >> treelet_count;
+  weights_.resize( treelet_count );
 
-  fin >> treeletCount;
-
-  probs.resize( treeletCount );
-
-  for ( size_t i = 0; i < treeletCount; i++ ) {
-    size_t groupSize = 0;
+  for ( size_t i = 0; i < treelet_count; i++ ) {
+    size_t group_size = 0;
     TreeletId id = 0;
     double prob = 0.f;
 
-    fin >> prob >> groupSize;
+    fin >> prob >> group_size;
 
-    if ( groupSize != 1 ) {
+    if ( group_size != 1 ) {
       throw runtime_error(
         "static scheduler doesn't support treelet grouping" );
     }
 
     fin >> id;
-    probs[id] = prob;
+    weights_[id] = prob;
   }
-
-  map<TreeletId, double> probsMap;
-
-  for ( size_t tid = 0; tid < probs.size(); tid++ ) {
-    probsMap.emplace( tid, probs[tid] );
-    allocator.addTreelet( tid );
-  }
-
-  allocator.setTargetWeights( move( probsMap ) );
 }
 
-optional<Schedule> StaticScheduler::schedule( const size_t maxWorkers,
+Schedule StaticScheduler::get_schedule( size_t max_workers,
+                                        const size_t treelet_count ) const
+{
+  if ( weights_.size() != treelet_count ) {
+    throw runtime_error( "weights_.size() != treelet_count" );
+  }
+
+  valarray<double> weights = weights_;
+
+  Schedule result;
+  result.resize( weights.size() );
+
+  vector<size_t> idx( weights.size() );
+  iota( idx.begin(), idx.end(), 0 );
+
+  stable_sort( idx.begin(), idx.end(), [&weights]( auto a, auto b ) {
+    return weights[a] < weights[b];
+  } );
+
+  for ( const auto i : idx ) {
+    auto worker_count
+      = static_cast<size_t>( ceil( weights[i] / weights.sum() * max_workers ) );
+    worker_count = ( worker_count < 1 ) ? 1 : worker_count;
+
+    result[i] = worker_count;
+
+    weights[i] = 0;
+    max_workers -= worker_count;
+  }
+
+  return result;
+}
+
+optional<Schedule> StaticScheduler::schedule( const size_t max_workers,
                                               const vector<TreeletStats>& stats,
                                               const WorkerStats&,
                                               const size_t )
 {
-  if ( scheduledOnce ) {
+  if ( scheduled_once_ ) {
     return nullopt;
   }
 
-  scheduledOnce = true;
-
-  Schedule result;
-  result.resize( stats.size(), 0 );
-
-  for ( size_t wid = 0; wid < maxWorkers; wid++ ) {
-    const auto tid = allocator.allocate( wid );
-    result[tid]++;
-  }
-
-  return { result };
+  scheduled_once_ = true;
+  return get_schedule( max_workers, stats.size() );
 }
