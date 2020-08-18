@@ -120,23 +120,20 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       pbrt::AccumulatedStats worker_pbrt_stats = from_protobuf( proto );
       pbrt_stats.Merge( worker_pbrt_stats );
 
-      /* if ( not worker.treelets.empty() ) {
+      if ( not worker.treelets.empty() ) {
         const auto treelet_id = worker.treelets.back();
-
-        vector<string> k = { "Integrator/Calls to Trace",
-                             "Integrator/Calls to Shade",
-                             "BVH/Total nodes",
-                             "BVH/Visited nodes",
-                             "BVH/Visited primitives" };
+        const string k[4] = { "Integrator/Calls to Trace",
+                              "Integrator/Calls to Shade",
+                              "BVH/Total nodes",
+                              "BVH/Visited nodes" };
 
         auto g = [&k, &worker_pbrt_stats]( const size_t i ) {
           return worker_pbrt_stats.counters[k[i]];
         };
 
-        LOG( INFO ) << "[TSTAT] " << worker.id << ',' << treelet_id << ','
-                    << g( 0 ) << ',' << g( 1 ) << ',' << g( 2 ) << ',' << g( 3 )
-                    << ',' << g( 4 );
-      } */
+        summary_stream << worker.id << ',' << treelet_id << ',' << g( 0 ) << ','
+                       << g( 1 ) << ',' << g( 2 ) << ',' << g( 3 ) << '\n';
+      }
 
       worker.client.push_request( { 0, OpCode::Bye, "" } );
       break;

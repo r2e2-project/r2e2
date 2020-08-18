@@ -303,6 +303,7 @@ private:
   std::ofstream ws_stream {};
   std::ofstream tl_stream {};
   std::ofstream alloc_stream {};
+  std::ofstream summary_stream {};
 
   /* write worker stats periodically */
   void handle_worker_stats();

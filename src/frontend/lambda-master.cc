@@ -238,6 +238,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     ws_stream.open( config.logs_directory / "workers.csv", ios::trunc );
     tl_stream.open( config.logs_directory / "treelets.csv", ios::trunc );
     alloc_stream.open( config.logs_directory / "allocations.csv", ios::trunc );
+    summary_stream.open( config.logs_directory / "summary.csv", ios::trunc );
 
     ws_stream << "timestamp,workerId,pathsFinished,"
                  "raysEnqueued,raysAssigned,raysDequeued,"
@@ -250,6 +251,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                  "enqueueRate,dequeueRate\n";
 
     alloc_stream << "workerId,treeletId,action\n";
+
+    summary_stream << "workerId,treeletId,trace,shade,nodes,visited\n";
   }
 
   auto print_info = []( const string& key, auto value ) {
@@ -585,6 +588,7 @@ void LambdaMaster::run()
   ws_stream.close();
   tl_stream.close();
   alloc_stream.close();
+  summary_stream.close();
 
   for ( auto& worker : workers ) {
     if ( worker.state != Worker::State::Terminated ) {
