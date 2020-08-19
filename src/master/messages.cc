@@ -103,6 +103,17 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       worker.stats.finished_paths += stats.finished_paths;
       worker.stats.cpu_usage = stats.cpu_usage;
 
+      if ( not worker.treelets.empty()
+           and ( initialized_workers >= max_workers + ray_generators ) ) {
+        const auto treelet_id = worker.treelets.back();
+        const double ALPHA
+          = 2.0 / ( 10 * treelets[treelet_id].workers.size() + 1 );
+
+        auto& t_stats = treelet_stats[treelet_id];
+        t_stats.cpu_usage
+          = ( 1 - ALPHA ) * t_stats.cpu_usage + ALPHA * stats.cpu_usage;
+      }
+
       aggregated_stats.finished_paths += stats.finished_paths;
 
       break;

@@ -248,7 +248,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
     tl_stream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
                  "bytesEnqueued,bytesDequeued,bagsEnqueued,bagsDequeued,"
-                 "enqueueRate,dequeueRate\n";
+                 "enqueueRate,dequeueRate,cpuUsage\n";
 
     alloc_stream << "workerId,treeletId,action\n";
 

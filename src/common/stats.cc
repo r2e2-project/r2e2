@@ -15,6 +15,7 @@ TreeletStats TreeletStats::operator-( const TreeletStats& other ) const
 
   res.enqueue_rate = enqueue_rate;
   res.dequeue_rate = dequeue_rate;
+  res.cpu_usage = cpu_usage;
 
   res.enqueued.rays = enqueued.rays - other.enqueued.rays;
   res.dequeued.rays = dequeued.rays - other.dequeued.rays;

@@ -94,7 +94,7 @@ void LambdaMaster::handle_worker_stats()
   const double T = ( t - last_workers_logged ).count() / 1e3;
   last_workers_logged = t;
 
-  constexpr double ALPHA = 0.3;
+  constexpr double ALPHA = 2.0 / ( 7 + 1 );
 
   for ( size_t treelet_id = 0; treelet_id < treelets.size(); treelet_id++ ) {
     auto& treelet = treelets[treelet_id];
@@ -120,12 +120,15 @@ void LambdaMaster::handle_worker_stats()
 
     if ( config.write_stat_logs ) {
       /* timestamp,treeletId,raysEnqueued,raysDequeued,bytesEnqueued,
-         bytesDequeued,bagsEnqueued,bagsDequeued,enqueueRate,dequeueRate */
+         bytesDequeued,bagsEnqueued,bagsDequeued,enqueueRate,dequeueRate,
+         cpuUsage */
       tl_stream << t.count() << ',' << treelet_id << ',' << fixed
                 << diff.enqueued.rays << ',' << diff.dequeued.rays << ','
                 << diff.enqueued.bytes << ',' << diff.dequeued.bytes << ','
-                << diff.enqueued.count << ',' << diff.dequeued.count <<  ','
-                << diff.enqueue_rate << ',' << diff.dequeue_rate << '\n';
+                << diff.enqueued.count << ',' << diff.dequeued.count << ','
+                << stats.enqueue_rate << ',' << stats.dequeue_rate << ','
+                << fixed << setprecision( 2 ) << ( 100 * stats.cpu_usage )
+                << '\n';
     }
   }
 

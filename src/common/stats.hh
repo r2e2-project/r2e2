@@ -27,6 +27,7 @@ struct TreeletStats
 
   uint64_t enqueue_rate { 0 }; // EWMA of bytes enqueued per second
   uint64_t dequeue_rate { 0 }; // EWMA of bytes dequeued per second
+  double cpu_usage { 0 };      // EWMA of this treelet's workers CPU usages
 
   TreeletStats operator-( const TreeletStats& other ) const;
 };
