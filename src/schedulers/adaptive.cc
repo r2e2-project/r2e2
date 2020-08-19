@@ -44,10 +44,22 @@ optional<Schedule> AdaptiveScheduler::schedule(
           auto& treelet = treelets[tid];
           auto& count = last_schedule_[tid];
 
-          while ( count > 1
-                  and 16 * treelet.dequeue_rate < count * 50'000'000 ) {
-            count--;
-            changed = true;
+          while ( count >= 2 ) {
+            // until we're neither CPU nor bandwidth bound, decrease the
+            // capacity
+            const bool cpu_bound
+              = ( count * treelet.cpu_usage ) / ( count - 1 ) > 0.8;
+
+            const bool bandwidth_bound
+              = ( treelet.dequeue_rate + treelet.enqueue_rate )
+                > ( count - 1 ) * 50'000'000;
+
+            if ( not cpu_bound and not bandwidth_bound ) {
+              count--;
+              changed = true;
+            } else {
+              break;
+            }
           }
         }
 
