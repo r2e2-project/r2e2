@@ -15,7 +15,13 @@ constexpr bool COMPRESS_RAY_BAGS = true;
 
 milliseconds LambdaWorker::current_bagging_delay() const
 {
-  return config.bagging_delay;
+  if ( current_egress_rate >= 20'000'000 ) {
+    return config.bagging_delay;
+  }
+
+  return max(
+    5ms,
+    milliseconds { current_egress_rate * config.bagging_delay / 20'000'000 } );
 }
 
 void LambdaWorker::handle_out_queue()
