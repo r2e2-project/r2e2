@@ -13,6 +13,11 @@ using OpCode = Message::OpCode;
 
 constexpr bool COMPRESS_RAY_BAGS = true;
 
+milliseconds LambdaWorker::current_bagging_delay() const
+{
+  return config.bagging_delay;
+}
+
 void LambdaWorker::handle_out_queue()
 {
   bernoulli_distribution bd { config.bag_log_rate };
@@ -26,7 +31,7 @@ void LambdaWorker::handle_out_queue()
     log_bag( BagAction::Created, bag.info );
 
     if ( !seal_bags_timer.armed() ) {
-      seal_bags_timer.set( 0s, config.bagging_delay );
+      seal_bags_timer.set( 0s, current_bagging_delay() );
     }
 
     return open_bags.insert_or_assign( treelet_id, move( bag ) ).first;
@@ -77,13 +82,14 @@ void LambdaWorker::handle_open_bags()
 
   for ( auto it = open_bags.begin(); it != open_bags.end(); ) {
     const auto time_since_creation = now - it->second.created_at;
+    const auto bagging_delay = current_bagging_delay();
 
-    if ( time_since_creation < config.bagging_delay ) {
+    if ( time_since_creation < bagging_delay ) {
       it++;
-      next_expiry = min( next_expiry,
-                         1ns
-                           + duration_cast<nanoseconds>(
-                             config.bagging_delay - time_since_creation ) );
+      next_expiry = min(
+        next_expiry,
+        1ns
+          + duration_cast<nanoseconds>( bagging_delay - time_since_creation ) );
 
       continue;
     }

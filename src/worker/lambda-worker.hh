@@ -220,6 +220,8 @@ private:
     Upload
   };
 
+  std::chrono::milliseconds current_bagging_delay() const;
+
   std::string ray_bags_key_prefix {};
   std::map<TreeletId, BagId> current_bag_id {};
   std::map<uint64_t, std::pair<Task, RayBagInfo>> pending_ray_bags {};
