@@ -262,6 +262,10 @@ void LambdaWorker::handle_transfer_results( const bool for_sample_bags )
           /* we have to tell the master that we uploaded this */
           *enqueued_proto.add_items() = to_protobuf( info );
 
+          if ( not for_sample_bags ) {
+            bytes_out_since_last_tick += info.bag_size;
+          }
+
           log_bag( BagAction::Enqueued, info );
           break;
         }

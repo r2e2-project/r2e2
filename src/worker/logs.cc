@@ -33,6 +33,16 @@ void LambdaWorker::send_worker_stats()
   master_connection.push_request(
     { *worker_id, OpCode::WorkerStats, protoutil::to_string( proto ) } );
 
+  constexpr double ALPHA = 2.0 / ( 7 + 1 );
+
+  const auto now = steady_clock::now();
+  const auto tick_len = duration_cast<milliseconds>( now - last_tick ).count();
+  const auto tick_rate = 1000 * bytes_out_since_last_tick / tick_len;
+  current_egress_rate = ( 1 - ALPHA ) * current_egress_rate + ALPHA * tick_rate;
+
+  last_tick = now;
+  bytes_out_since_last_tick = 0;
+
   finished_path_ids = {};
 }
 

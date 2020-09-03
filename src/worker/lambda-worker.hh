@@ -222,6 +222,11 @@ private:
 
   std::chrono::milliseconds current_bagging_delay() const;
 
+  // these numbers are used to calculate the bagging delay
+  uint64_t current_egress_rate { 25'000'000 }; // 25 MB/s
+  steady_clock::time_point last_tick { steady_clock::now() };
+  uint64_t bytes_out_since_last_tick { 0 };
+
   std::string ray_bags_key_prefix {};
   std::map<TreeletId, BagId> current_bag_id {};
   std::map<uint64_t, std::pair<Task, RayBagInfo>> pending_ray_bags {};
