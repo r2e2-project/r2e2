@@ -30,8 +30,8 @@ def generate_static0(num_rays, nodes_per_ray):
     cost_bw = average_ray_size / average_bandwidth
     cost_compute = 0.25e-6 # 0.5us per node visited
     
-    weights = np.maximum(cost_bw * num_rays,
-                         cost_compute * nodes_per_ray * num_rays)
+    weights = np.nan_to_num(np.maximum(cost_bw * num_rays,
+                                       cost_compute * nodes_per_ray * num_rays))
 
     print(len(weights))
 
