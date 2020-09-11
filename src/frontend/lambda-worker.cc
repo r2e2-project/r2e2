@@ -155,6 +155,7 @@ void LambdaWorker::shutdown_raytracing_threads()
 {
   for ( auto& t : raytracing_threads ) {
     if ( t.joinable() ) {
+      trace_queue_size++;
       trace_queue.enqueue( { nullptr } );
     }
   }

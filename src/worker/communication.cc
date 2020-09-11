@@ -220,8 +220,6 @@ void LambdaWorker::handle_receive_queue()
 
     const char* data = bag.data.data();
 
-    trace_queue_empty = false;
-
     for ( size_t offset = 0; offset < total_size; ) {
       uint32_t len;
       memcpy( &len, data + offset, sizeof( uint32_t ) );
@@ -235,6 +233,7 @@ void LambdaWorker::handle_receive_queue()
 
       log_ray( RayAction::Unbagged, *ray, bag.info );
 
+      trace_queue_size++;
       trace_queue.enqueue( move( ray ) );
     }
 

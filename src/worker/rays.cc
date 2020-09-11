@@ -14,7 +14,6 @@ void LambdaWorker::generate_rays( const Bounds2i& bounds )
 {
   /* for ray tracking */
   bernoulli_distribution bd { config.ray_log_rate };
-  trace_queue_empty = false;
 
   for ( int sample = 0; sample < scene.base.samplesPerPixel; sample++ ) {
     for ( const Point2i pixel : bounds ) {
@@ -32,6 +31,7 @@ void LambdaWorker::generate_rays( const Bounds2i& bounds )
       const TreeletId next_treelet = state_ptr->CurrentTreelet();
 
       if ( treelets.count( next_treelet ) ) {
+        trace_queue_size++;
         trace_queue.enqueue( move( state_ptr ) );
       } else {
         log_ray( RayAction::Queued, *state_ptr );
@@ -59,8 +59,9 @@ void LambdaWorker::handle_trace_queue( const size_t idx )
     MemoryArena arena;
 
     do {
+      trace_queue_size--;
+
       if ( ray_counter++ < RAYS_TO_NOTIFY ) {
-        processed_queue_empty = false;
         rays_ready_fd.write_event();
       }
 
@@ -75,6 +76,7 @@ void LambdaWorker::handle_trace_queue( const size_t idx )
       this->rays.terminated++;
 
       if ( not ray.toVisitEmpty() ) {
+        processed_queue_size++;
         processed_queue.enqueue(
           graphics::TraceRay( move( ray_ptr ), treelet ) );
       } else if ( ray.hit ) {
@@ -92,17 +94,20 @@ void LambdaWorker::handle_trace_queue( const size_t idx )
         if ( bounce_ray == nullptr and shadow_ray == nullptr ) {
           // means that the path was terminated
           ray.toVisitHead = numeric_limits<uint8_t>::max();
+          processed_queue_size++;
           processed_queue.enqueue( move( ray_ptr ) );
           continue;
         }
 
         if ( bounce_ray != nullptr ) {
           log_ray( RayAction::Generated, *bounce_ray );
+          processed_queue_size++;
           processed_queue.enqueue( move( bounce_ray ) );
         }
 
         if ( shadow_ray != nullptr ) {
           log_ray( RayAction::Generated, *shadow_ray );
+          processed_queue_size++;
           processed_queue.enqueue( move( shadow_ray ) );
         }
       } else {
@@ -110,8 +115,6 @@ void LambdaWorker::handle_trace_queue( const size_t idx )
       }
     } while ( trace_queue.try_dequeue( ray_ptr ) );
 
-    processed_queue_empty = false;
-    trace_queue_empty = true;
     rays_ready_fd.write_event();
   }
 }
@@ -126,6 +129,7 @@ void LambdaWorker::handle_processed_queue()
     const TreeletId next_treelet = ray->CurrentTreelet();
 
     if ( treelets.count( next_treelet ) ) {
+      trace_queue_size++;
       trace_queue.enqueue( move( ray ) );
     } else {
       log_ray( RayAction::Queued, *ray );
@@ -139,6 +143,8 @@ void LambdaWorker::handle_processed_queue()
   pbrt::RayStatePtr ray_ptr;
 
   while ( processed_queue.try_dequeue( ray_ptr ) ) {
+    processed_queue_size--;
+
     auto& ray = *ray_ptr;
 
     /* HACK */
@@ -176,6 +182,4 @@ void LambdaWorker::handle_processed_queue()
       log_ray( RayAction::Finished, ray );
     }
   }
-
-  processed_queue_empty = true;
 }

@@ -141,8 +141,8 @@ private:
   moodycamel::BlockingConcurrentQueue<pbrt::RayStatePtr> trace_queue { 8192 };
   moodycamel::ConcurrentQueue<pbrt::RayStatePtr> processed_queue { 8192 };
 
-  std::atomic<bool> trace_queue_empty { true };
-  std::atomic<bool> processed_queue_empty { true };
+  std::atomic<size_t> trace_queue_size { 0 };
+  std::atomic<size_t> processed_queue_size { 0 };
 
   std::map<TreeletId, std::shared_ptr<pbrt::CloudBVH>> treelets {};
   std::map<TreeletId, std::queue<pbrt::RayStatePtr>> out_queue {};
