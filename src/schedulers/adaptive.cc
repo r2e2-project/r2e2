@@ -7,7 +7,7 @@ using namespace std;
 using namespace chrono;
 using namespace r2t2;
 
-constexpr seconds SCHEDULING_INTERVAL { 15 };
+constexpr seconds SCHEDULING_INTERVAL { 20 };
 
 optional<Schedule> AdaptiveScheduler::schedule(
   const size_t max_workers,
@@ -48,11 +48,11 @@ optional<Schedule> AdaptiveScheduler::schedule(
             // until we're neither CPU nor bandwidth bound, decrease the
             // capacity
             const bool cpu_bound
-              = ( count * treelet.cpu_usage ) / ( count - 1 ) > 0.8;
+              = ( count * treelet.cpu_usage ) / ( count - 1 ) > 0.75;
 
             const bool bandwidth_bound
               = ( treelet.dequeue_rate + treelet.enqueue_rate )
-                > ( count - 1 ) * 50'000'000;
+                > ( count - 1 ) * 25'000'000;
 
             if ( not cpu_bound and not bandwidth_bound ) {
               count--;
