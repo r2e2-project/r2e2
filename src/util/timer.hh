@@ -38,6 +38,7 @@ public:
     DNS,
     Nonblock,
     WaitingForEvent,
+    LoadingTreelet,
     count
   };
 
@@ -45,7 +46,7 @@ public:
     = static_cast<size_t>( Category::count );
 
   constexpr static std::array<const char*, num_categories> _category_names {
-    { "DNS", "Nonblocking operations", "Waiting for event" }
+    { "DNS", "Nonblocking operations", "Waiting for event", "Loading treelet" }
   };
 
 private:

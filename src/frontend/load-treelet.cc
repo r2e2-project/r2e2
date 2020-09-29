@@ -8,6 +8,8 @@
 #include <pbrt/core/geometry.h>
 #include <pbrt/main.h>
 
+#include "util/timer.hh"
+
 using namespace std;
 
 struct membuf : streambuf
@@ -37,8 +39,15 @@ int main( int argc, char* argv[] )
   membuf buf( data.data(), data.data() + data.size() );
   istream in_stream( &buf );
 
+  auto& timer = global_timer();
+
   pbrt::PbrtOptions.nThreads = 1;
-  auto treelet = pbrt::scene::LoadTreelet( path, treelet_id, &in_stream );
+  {
+    GlobalScopeTimer<Timer::Category::LoadingTreelet> _;
+    auto treelet = pbrt::scene::LoadTreelet( path, treelet_id, &in_stream );
+  }
+
+  cout << timer.summary() << endl;
 
   return EXIT_SUCCESS;
 }
