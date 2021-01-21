@@ -66,8 +66,8 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
   google::InitGoogleLogging( log_base.c_str() );
 
   if ( track_rays ) {
-    TLOG( RAY )
-      << "pathId,hop,shadowRay,remainingBounces,workerId,treeletId,action";
+    TLOG( RAY ) << "timestamp,pathId,hop,shadowRay,remainingBounces,workerId,"
+                   "treeletId,action,bag";
   }
 
   if ( track_bags ) {

@@ -83,19 +83,22 @@ void LambdaWorker::log_ray( const RayAction action,
 
   ostringstream oss;
 
-  /* pathId,hop,shadowRay,remainingBounces,workerId,treeletId,action */
-  oss << ',' << state.sample.id << ',' << state.hop << ',' << state.isShadowRay
+  /* timestamp,pathId,hop,shadowRay,remainingBounces,workerId,treeletId,
+      action,bag */
+  oss << duration_cast<milliseconds>( system_clock::now().time_since_epoch() )
+           .count()
+      << ',' << state.sample.id << ',' << state.hop << ',' << state.isShadowRay
       << ',' << static_cast<int>( state.remainingBounces ) << ',' << *worker_id
       << ',' << state.CurrentTreelet() << ',';
 
   // clang-format off
     switch(action) {
-    case RayAction::Generated: oss << "G"; break;
-    case RayAction::Traced:    oss << "T"; break;
-    case RayAction::Queued:    oss << "Q"; break;
-    case RayAction::Bagged:    oss << "B"; break;
-    case RayAction::Unbagged:  oss << "U"; break;
-    case RayAction::Finished:  oss << "F"; break;
+    case RayAction::Generated: oss << "Generated,";                break;
+    case RayAction::Traced:    oss << "Traced,";                   break;
+    case RayAction::Queued:    oss << "Queued,";                   break;
+    case RayAction::Bagged:    oss << "Bagged," << info.str("");   break;
+    case RayAction::Unbagged:  oss << "Unbagged," << info.str(""); break;
+    case RayAction::Finished:  oss << "Finished,";                 break;
     }
   // clang-format on
 
