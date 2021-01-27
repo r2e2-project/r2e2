@@ -37,6 +37,7 @@ protobuf::WorkerStats to_protobuf( const WorkerStats& stats )
   protobuf::WorkerStats proto;
   proto.set_finished_paths( stats.finished_paths );
   proto.set_cpu_usage( stats.cpu_usage );
+  proto.set_bytes_downloaded( stats.bytes_downloaded );
   return proto;
 }
 
@@ -131,6 +132,7 @@ WorkerStats from_protobuf( const protobuf::WorkerStats& proto )
   WorkerStats res;
   res.finished_paths = proto.finished_paths();
   res.cpu_usage = proto.cpu_usage();
+  res.bytes_downloaded = proto.bytes_downloaded();
   return res;
 }
 

@@ -63,6 +63,7 @@ message WorkerStats {
     double cpu_usage = 2;
     uint64 rays_generated = 3;
     uint64 rays_terminated = 4;
+    uint64 bytes_downloaded = 5;
 }
 
 // Benchmarking

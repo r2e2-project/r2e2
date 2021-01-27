@@ -256,11 +256,12 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     alloc_stream.open( config.logs_directory / "allocations.csv", ios::trunc );
     summary_stream.open( config.logs_directory / "summary.csv", ios::trunc );
 
-    ws_stream << "timestamp,workerId,pathsFinished,"
-                 "raysEnqueued,raysAssigned,raysDequeued,"
-                 "bytesEnqueued,bytesAssigned,bytesDequeued,"
-                 "bagsEnqueued,bagsAssigned,bagsDequeued,"
-                 "numSamples,bytesSamples,bagsSamples,cpuUsage\n";
+    ws_stream
+      << "timestamp,workerId,pathsFinished,"
+         "raysEnqueued,raysAssigned,raysDequeued,"
+         "bytesEnqueued,bytesAssigned,bytesDequeued,"
+         "bagsEnqueued,bagsAssigned,bagsDequeued,"
+         "numSamples,bytesSamples,bagsSamples,cpuUsage,bytesDownloaded\n";
 
     tl_stream << "timestamp,treeletId,raysEnqueued,raysDequeued,"
                  "bytesEnqueued,bytesDequeued,bagsEnqueued,bagsDequeued,"
