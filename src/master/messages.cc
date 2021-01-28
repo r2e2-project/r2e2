@@ -126,6 +126,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
       worker.stats.finished_paths += stats.finished_paths;
       worker.stats.cpu_usage = stats.cpu_usage;
+      worker.stats.bytes_downloaded = stats.bytes_downloaded;
 
       worker.ray_counters.generated = proto.rays_generated();
       worker.ray_counters.terminated = proto.rays_terminated();
