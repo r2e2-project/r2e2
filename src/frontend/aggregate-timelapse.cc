@@ -1,6 +1,8 @@
 #include <pbrt/main.h>
 #include <pbrt/raystate.h>
 
+#include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -10,9 +12,12 @@
 
 #include "messages/utils.hh"
 #include "util/exception.hh"
+#include "util/status_bar.hh"
 
 using namespace std;
 using namespace r2t2;
+
+namespace fs = std::filesystem;
 
 void usage( const char* argv0 )
 {
@@ -26,38 +31,85 @@ int main( int argc, char const* argv[] )
       abort();
     }
 
-    if ( argc != 2 ) {
+    if ( argc != 4 ) {
       usage( argv[0] );
       return EXIT_FAILURE;
     }
 
-    pbrt::scene::Base scene_base { argv[1], 0 };
+    google::InitGoogleLogging( argv[0] );
 
-    for ( string line; getline( cin, line ); ) {
-      cerr << "Processing " << line << "... ";
-      ifstream fin { line };
-      ostringstream buffer;
-      buffer << fin.rdbuf();
-      const string data_str = buffer.str();
-      const char* data = data_str.data();
+    const string scene_dir { argv[1] };
+    const fs::path sample_dir { argv[2] };
+    const size_t interval = stoull( argv[3] );
 
-      vector<pbrt::Sample> samples;
+    vector<pair<size_t, fs::path>> filenames;
 
-      for ( size_t offset = 0; offset < data_str.size(); ) {
-        const auto len = *reinterpret_cast<const uint32_t*>( data + offset );
-        offset += 4;
-
-        samples.emplace_back();
-        samples.back().Deserialize( data + offset, len );
-        offset += len;
+    for ( auto& f : fs::directory_iterator( sample_dir ) ) {
+      if ( f.is_directory() ) {
+        continue;
       }
 
-      pbrt::graphics::AccumulateImage( scene_base.camera, samples );
-      cerr << "done." << endl;
+      const auto fname = f.path().filename();
+      const size_t ts = stoull( f.path().stem().string() );
+      filenames.emplace_back( ts, fname );
     }
 
-    /* Create the final output */
-    pbrt::graphics::WriteImage( scene_base.camera );
+    sort( filenames.begin(),
+          filenames.end(),
+          []( const auto& a, const auto& b ) { return a.first < b.first; } );
+
+    cout << "Total bags: " << filenames.size() << endl;
+    cout << "Duration: " << ( filenames.back().first - filenames.front().first )
+         << endl;
+
+    pbrt::scene::Base scene_base { argv[1], 0 };
+
+    const size_t start_time = filenames.front().first;
+
+    StatusBar::get();
+
+    for ( size_t i = 0, t = start_time; i < filenames.size(); t += interval ) {
+      vector<pbrt::Sample> samples;
+
+      while ( i < filenames.size() and filenames[i].first <= t ) {
+        ifstream fin { sample_dir / filenames[i].second };
+
+        if ( not fin.good() ) {
+          throw runtime_error( "Cannot open sample bag: "
+                               + filenames[i].second.string() );
+        }
+
+        ostringstream buffer;
+        buffer << fin.rdbuf();
+        const string data_str = buffer.str();
+        const char* data = data_str.data();
+
+        for ( size_t offset = 0; offset < data_str.size(); ) {
+          const auto len = *reinterpret_cast<const uint32_t*>( data + offset );
+          offset += 4;
+
+          samples.emplace_back();
+          samples.back().Deserialize( data + offset, len );
+          offset += len;
+        }
+
+        i++;
+
+        if ( i % 100 == 0 ) {
+          StatusBar::set_text( to_string( i ) + "/"
+                               + to_string( filenames.size() ) );
+        }
+      }
+
+      const string output_name = to_string( t - start_time ) + ".png";
+
+      cerr << "Aggregating " << samples.size() << " samples... ";
+      pbrt::graphics::AccumulateImage( scene_base.camera, samples );
+      cerr << "done." << endl;
+      cerr << "Writing output " << output_name << "...";
+      pbrt::graphics::WriteImage( scene_base.camera, output_name );
+      cerr << "done." << endl;
+    }
   } catch ( const exception& e ) {
     print_exception( argv[0], e );
     return EXIT_FAILURE;
