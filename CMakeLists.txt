@@ -86,8 +86,8 @@ endif()
 add_executable ( r2t2-lambda-worker src/frontend/lambda-worker.cc )
 target_link_libraries( r2t2-lambda-worker ${ALL_R2T2_LIBS} ${WORKER_LINK_FLAGS} )
 
-add_executable ( r2t2-lambda-aggregate src/frontend/lambda-aggregate.cc )
-target_link_libraries( r2t2-lambda-aggregate ${ALL_R2T2_LIBS} )
+add_executable ( r2t2-aggregate src/frontend/aggregate.cc )
+target_link_libraries( r2t2-aggregate ${ALL_R2T2_LIBS} )
 
 add_executable ( aggregate-timelapse src/frontend/aggregate-timelapse.cc )
 target_link_libraries( aggregate-timelapse ${ALL_R2T2_LIBS} )
