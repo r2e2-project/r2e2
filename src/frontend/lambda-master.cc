@@ -69,6 +69,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                             const uint16_t client_port,
                             const uint32_t max_workers_,
                             const uint32_t ray_generators_,
+                            const uint32_t sample_accumulators_,
                             const string& public_address_,
                             const string& storage_backend_uri_,
                             const string& aws_region_,
@@ -91,6 +92,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   , aws_address( LambdaInvocationRequest::endpoint( aws_region ), "https" )
   , max_workers( max_workers_ )
   , ray_generators( ray_generators_ )
+  , sample_accumulators( sample_accumulators_ )
   , scheduler( move( scheduler_ ) )
   , worker_rule_categories( { loop.add_category( "Socket" ),
                               loop.add_category( "Message read" ),
@@ -619,8 +621,8 @@ void LambdaMaster::run()
   }
 
   if ( !get_requests.empty() ) {
-    cout << "\n\u2198 Downloading " << get_requests.size()
-         << " log file(s)... " << flush;
+    cout << "\n\u2198 Downloading " << get_requests.size() << " log file(s)... "
+         << flush;
     this_thread::sleep_for( 10s );
     job_storage_backend.get( get_requests );
     cout << "done." << endl;
@@ -693,6 +695,7 @@ void usage( const char* argv0, int exit_code )
        << "  -b --storage-backend NAME  storage backend URI" << endl
        << "  -m --max-workers N         maximum number of workers" << endl
        << "  -G --ray-generators N      number of ray generators" << endl
+       << "  -Q --sample-accumulators   number of sample accumulators" << endl
        << "  -g --debug-logs            collect worker debug logs" << endl
        << "  -w --worker-stats N        log worker stats every N seconds"
        << endl
@@ -754,6 +757,7 @@ int main( int argc, char* argv[] )
   uint16_t client_port = 0;
   int32_t max_workers = -1;
   int32_t ray_generators = 0;
+  int32_t sample_accumulators = 0;
   string public_ip;
   string storage_backend_uri;
   string region { "us-west-2" };
@@ -792,6 +796,7 @@ int main( int argc, char* argv[] )
     { "storage-backend", required_argument, nullptr, 'b' },
     { "max-workers", required_argument, nullptr, 'm' },
     { "ray-generators", required_argument, nullptr, 'G' },
+    { "sample-accumulators", required_argument, nullptr, 'Q' },
     { "scheduler", required_argument, nullptr, 'a' },
     { "scheduler-file", required_argument, nullptr, 'F' },
     { "debug-logs", no_argument, nullptr, 'g' },
@@ -821,7 +826,7 @@ int main( int argc, char* argv[] )
     const int opt
       = getopt_long( argc,
                      argv,
-                     "p:P:i:r:b:m:G:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:B:A:wgh",
+                     "p:P:i:r:b:m:G:Q:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:B:A:wgh",
                      long_options,
                      nullptr );
 
@@ -838,6 +843,7 @@ int main( int argc, char* argv[] )
       case 'b': storage_backend_uri = optarg; break;
       case 'm': max_workers = stoi(optarg); break;
       case 'G': ray_generators = stoi(optarg); break;
+      case 'Q': sample_accumulators = stoi(optarg); break;
       case 'a': scheduler_name = optarg; break;
       case 'F': scheduler_file = optarg; break;
       case 'g': collect_debug_logs = true; break;
@@ -928,10 +934,10 @@ int main( int argc, char* argv[] )
   }
 
   if ( scheduler == nullptr || listen_port == 0 || max_workers <= 0
-       || ray_generators < 0 || samples_per_pixel < 0 || max_path_depth < 0
-       || bagging_delay <= 0s || ray_log_rate < 0 || ray_log_rate > 1.0
-       || bag_log_rate < 0 || bag_log_rate > 1.0 || public_ip.empty()
-       || storage_backend_uri.empty() || region.empty()
+       || ray_generators < 0 || sample_accumulators < 0 || samples_per_pixel < 0
+       || max_path_depth < 0 || bagging_delay <= 0s || ray_log_rate < 0
+       || ray_log_rate > 1.0 || bag_log_rate < 0 || bag_log_rate > 1.0
+       || public_ip.empty() || storage_backend_uri.empty() || region.empty()
        || new_tile_threshold == 0
        || ( crop_window.has_value() && pixels_per_tile != 0
             && pixels_per_tile
@@ -962,6 +968,7 @@ int main( int argc, char* argv[] )
                                         client_port,
                                         max_workers,
                                         ray_generators,
+                                        sample_accumulators,
                                         public_address.str(),
                                         storage_backend_uri,
                                         region,
