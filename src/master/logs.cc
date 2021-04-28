@@ -204,6 +204,7 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
   proto.set_job_id( job_id );
   proto.set_num_lambdas( max_workers );
   proto.set_num_generators( ray_generators );
+  proto.set_num_accumulators( sample_accumulators );
   proto.set_treelet_count( scene.base.GetTreeletCount() );
   proto.mutable_output_size()->set_x( scene.sample_extent.x );
   proto.mutable_output_size()->set_y( scene.sample_extent.y );

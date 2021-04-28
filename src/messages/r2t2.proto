@@ -148,6 +148,7 @@ message JobSummary {
     string job_id = 1;
     uint32 num_lambdas = 2;
     uint32 num_generators = 3;
+    uint32 num_accumulators = 27;
     uint32 treelet_count = 4;
     Point2 output_size = 5;
     uint32 spp = 6;

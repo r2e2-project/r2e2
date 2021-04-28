@@ -270,6 +270,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   print_info( "Public address", public_address );
   print_info( "Maximum workers", max_workers );
   print_info( "Ray generators", ray_generators );
+  print_info( "Accumulators", sample_accumulators );
   print_info( "Treelet count", treelet_count );
   print_info( "Tile size",
               to_string( tiles.tile_size ) + "\u00d7"
