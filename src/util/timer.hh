@@ -4,6 +4,7 @@
 #include <chrono>
 #include <optional>
 #include <string>
+#include <stdexcept>
 #include <type_traits>
 
 class Timer
