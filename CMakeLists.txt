@@ -86,9 +86,6 @@ endif()
 add_executable ( r2t2-lambda-worker src/frontend/lambda-worker.cc )
 target_link_libraries( r2t2-lambda-worker ${ALL_R2T2_LIBS} ${WORKER_LINK_FLAGS} )
 
-add_executable ( r2t2-lambda-accumulator src/frontend/lambda-accumulator.cc )
-target_link_libraries( r2t2-lambda-accumulator ${ALL_R2T2_LIBS} )
-
 add_executable ( r2t2-aggregate src/frontend/aggregate.cc )
 target_link_libraries( r2t2-aggregate ${ALL_R2T2_LIBS} )
 
