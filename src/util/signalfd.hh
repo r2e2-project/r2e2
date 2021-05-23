@@ -3,6 +3,7 @@
 #pragma once
 
 #include <initializer_list>
+#include <sys/signal.h>
 #include <sys/signalfd.h>
 
 #include "file_descriptor.hh"
