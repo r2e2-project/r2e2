@@ -509,10 +509,11 @@ void LambdaMaster::run()
 {
   StatusBar::get();
 
-  if ( !config.memcached_servers.empty() ) {
+  if ( not config.memcached_servers.empty() ) {
     cout << "\u2192 Flushing " << config.memcached_servers.size()
          << " memcached "
-         << pluralize( "server", config.memcached_servers.size() ) << "... ";
+         << pluralize( "server", config.memcached_servers.size() ) << "... "
+         << flush;
 
     vector<Address> servers;
 
@@ -547,6 +548,68 @@ void LambdaMaster::run()
     agent->flush_all();
 
     while ( memcached_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+      continue;
+    }
+
+    cout << "done." << endl;
+  }
+
+  if ( not config.accumulators.empty() ) {
+    cout << "\u2192 Initializing " << config.memcached_servers.size()
+         << pluralize( " accumulator", config.memcached_servers.size() )
+         << "... " << flush;
+
+    list<meow::Client<TCPSession>> accu_clients;
+
+    for ( const auto& server : config.accumulators ) {
+      string host;
+      uint16_t port;
+      tie( host, port ) = Address::decompose( server );
+      Address addr { host, port };
+
+      TCPSocket socket;
+      socket.set_blocking( false );
+      socket.connect( addr );
+      accu_clients.emplace_back( TCPSession { move( socket ) } );
+    }
+
+    protobuf::SetupAccumulator proto;
+    proto.set_job_id( job_id );
+    proto.set_storage_backend( storage_backend_uri );
+    proto.set_width( scene.sample_extent.x );
+    proto.set_height( scene.sample_extent.y );
+    proto.set_tile_id( 0 );
+    proto.set_tile_count( config.accumulators.size() );
+
+    for ( const auto& obj : list_base_objects() ) {
+      *proto.add_scene_objects() = to_protobuf( obj );
+    }
+
+    EventLoop accu_loop;
+    size_t response_count = 0;
+    const auto cat = accu_loop.add_category( "All" );
+
+    accu_loop.add_rule(
+      "Finish",
+      [&] { accu_clients.clear(); },
+      [&] { return response_count == accu_clients.size(); } );
+
+    for ( auto& c : accu_clients ) {
+      c.install_rules(
+        accu_loop,
+        { cat, cat, cat, cat },
+        [this, &response_count]( meow::Message&& msg ) {
+          if ( msg.opcode() == OpCode::SetupAccumulator ) {
+            response_count++;
+          }
+        },
+        [this] {} );
+
+      c.push_request(
+        { 0, OpCode::SetupAccumulator, protoutil::to_string( proto ) } );
+    }
+
+    while ( accu_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
       continue;
     }
 
