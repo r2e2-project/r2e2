@@ -10,7 +10,7 @@ using OpCode = Message::OpCode;
 
 void usage( const char* argv0 )
 {
-  cerr << "Usage: " << argv0 << " PORT STORAGE-BACKEND" << endl;
+  cerr << "Usage: " << argv0 << " PORT" << endl;
 }
 
 Accumulator::Accumulator( const uint16_t listen_port )
@@ -110,10 +110,14 @@ int main( int argc, char* argv[] )
       abort();
     }
 
-    if ( argc != 3 ) {
+    if ( argc != 2 ) {
       usage( argv[0] );
       return EXIT_FAILURE;
     }
+
+    const uint16_t port = static_cast<uint16_t>( stoi( argv[1] ) );
+    Accumulator accumulator { port };
+    accumulator.run();
   } catch ( const exception& e ) {
     print_exception( argv[0], e );
     return EXIT_FAILURE;
