@@ -58,6 +58,7 @@ struct MasterConfiguration
 
   std::vector<std::string> memcached_servers;
   std::vector<std::pair<std::string, uint32_t>> engines;
+  std::vector<std::string> accumulators;
 };
 
 class LambdaMaster

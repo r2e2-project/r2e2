@@ -619,8 +619,8 @@ void LambdaMaster::run()
   }
 
   if ( !get_requests.empty() ) {
-    cout << "\n\u2198 Downloading " << get_requests.size()
-         << " log file(s)... " << flush;
+    cout << "\n\u2198 Downloading " << get_requests.size() << " log file(s)... "
+         << flush;
     this_thread::sleep_for( 10s );
     job_storage_backend.get( get_requests );
     cout << "done." << endl;
@@ -722,6 +722,8 @@ void usage( const char* argv0, int exit_code )
        << endl
        << "  -d --memcached-server      address for memcached" << endl
        << "                             (can be repeated)" << endl
+       << "  -q --accumulator           address for accumulator" << endl
+       << "                             (can be repeated)" << endl
        << "  -h --help                  show help information" << endl;
 
   exit( exit_code );
@@ -783,6 +785,7 @@ int main( int argc, char* argv[] )
   uint32_t max_jobs_on_engine = 1;
   vector<string> memcached_servers;
   vector<pair<string, uint32_t>> engines;
+  vector<string> accumulators;
 
   struct option long_options[] = {
     { "port", required_argument, nullptr, 'p' },
@@ -812,6 +815,7 @@ int main( int argc, char* argv[] )
     { "jobs", required_argument, nullptr, 'J' },
     { "memcached-server", required_argument, nullptr, 'd' },
     { "engine", required_argument, nullptr, 'E' },
+    { "accumulator", required_argument, nullptr, 'q' },
     { "auto-name", required_argument, nullptr, 'A' },
     { "help", no_argument, nullptr, 'h' },
     { nullptr, 0, nullptr, 0 },
@@ -821,7 +825,7 @@ int main( int argc, char* argv[] )
     const int opt
       = getopt_long( argc,
                      argv,
-                     "p:P:i:r:b:m:G:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:B:A:wgh",
+                     "p:P:i:r:b:m:G:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:q:B:A:wgh",
                      long_options,
                      nullptr );
 
@@ -855,6 +859,7 @@ int main( int argc, char* argv[] )
       case 'J': max_jobs_on_engine = stoul(optarg); break;
       case 'd': memcached_servers.emplace_back(optarg); break;
       case 'E': engines.emplace_back(optarg, max_jobs_on_engine); break;
+      case 'q': accumulators.emplace_back(optarg); break;
       case 'A': auto_name_log_dir_tag = optarg; break;
       case 'h': usage(argv[0], EXIT_SUCCESS); break;
       case 'C': alt_scene_file = optarg; break;
@@ -955,7 +960,7 @@ int main( int argc, char* argv[] )
                                  tile_size,         seconds { timeout },
                                  job_summary_path,  new_tile_threshold,
                                  alt_scene_file,    move( memcached_servers ),
-                                 move( engines ) };
+                                 move( engines ),   move( accumulators ) };
 
   try {
     master = make_unique<LambdaMaster>( listen_port,
