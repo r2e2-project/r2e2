@@ -343,7 +343,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
       TCPSocket socket = listener_socket.accept();
 
       /* do we want this worker? */
-      if ( Worker::next_id >= this->ray_generators + this->sample_accumulators
+      if ( Worker::next_id >= this->ray_generators
            && treelets_to_spawn.empty() ) {
         socket.close();
         return;
@@ -419,28 +419,6 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           worker.client.push_request( { 0, OpCode::FinishUp, "" } );
           worker.state = Worker::State::FinishingUp;
         }
-      } else if ( worker_id
-                  < this->ray_generators + this->sample_accumulators ) {
-        /* this is a sample accumulator */
-        auto& worker = workers.emplace_back(
-          worker_id, Worker::Role::Accumulator, move( socket ) );
-        assign_base_objects( worker );
-
-        /* (1) saying hi, assigning id to the worker */
-        protobuf::Hey hey_proto;
-        hey_proto.set_worker_id( worker_id );
-        hey_proto.set_job_id( job_id );
-        worker.client.push_request(
-          { 0, OpCode::Hey, protoutil::to_string( hey_proto ) } );
-
-        /* (2) tell the worker to get the scene objects necessary */
-        protobuf::GetObjects objs_proto;
-        for ( const SceneObject& obj : worker.objects ) {
-          *objs_proto.add_objects() = to_protobuf( obj );
-        }
-
-        worker.client.push_request(
-          { 0, OpCode::GetObjects, protoutil::to_string( objs_proto ) } );
       } else {
         /* this is a normal worker */
         if ( !treelets_to_spawn.empty() ) {
@@ -588,16 +566,6 @@ void LambdaMaster::run()
     cout << "done." << endl;
   }
 
-  if ( sample_accumulators > 0 ) {
-    /* let's invoke the sample accumulators */
-    cout << "\u2192 Launching " << sample_accumulators << " sample "
-         << pluralize( "accumulator", sample_accumulators ) << "... ";
-
-    invoke_workers( sample_accumulators
-                    + static_cast<size_t>( 0.1 * sample_accumulators ) );
-    cout << "done." << endl;
-  }
-
   while ( state_ != State::Terminated
           && loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
     // cleaning up finished http clients
@@ -610,8 +578,7 @@ void LambdaMaster::run()
     }
 
     /* XXX What's happening here? */
-    if ( initialized_workers
-           >= max_workers + ray_generators + sample_accumulators
+    if ( initialized_workers >= max_workers + ray_generators
          && !free_workers.empty()
          && ( tiles.camera_rays_remaining() || queued_ray_bags_count > 0 ) ) {
       handle_queued_ray_bags();

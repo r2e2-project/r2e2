@@ -142,7 +142,7 @@ private:
     {
       Generator,
       Tracer,
-      Accumulator
+      Aggregator
     };
 
     Worker( const WorkerId id_, const Role role_, TCPSocket&& sock )
