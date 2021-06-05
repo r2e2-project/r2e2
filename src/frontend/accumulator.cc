@@ -81,7 +81,7 @@ void Accumulator::process_message( list<Worker>::iterator worker_it,
 
       cerr << "Downloading scene objects... ";
       scene_backend.get( get_requests );
-      cerr << "done.";
+      cerr << "done." << endl;
 
       scene_ = { working_directory_.name(), 1 };
 
@@ -114,21 +114,6 @@ int main( int argc, char* argv[] )
       usage( argv[0] );
       return EXIT_FAILURE;
     }
-
-    // (0) Initial setup
-    const Address listen_address { "0.0.0.0", argv[1] };
-    const Storage storage_backend_info { argv[2] };
-    S3StorageBackend storage_backend { {},
-                                       storage_backend_info.bucket,
-                                       storage_backend_info.path,
-                                       storage_backend_info.region };
-    S3TransferAgent transfer_agent { storage_backend };
-
-    EventLoop loop;
-
-    // (1) download primary scene objects into a temporary directory
-    TempDirectory working_directory { "/tmp/r2t2-accumulator" };
-
   } catch ( const exception& e ) {
     print_exception( argv[0], e );
     return EXIT_FAILURE;
