@@ -1,92 +1,76 @@
-#include <pbrt/main.h>
-#include <pbrt/raystate.h>
+#include "worker/accumulator.hh"
 
-#include <iostream>
-#include <string>
-
-#include "common/lambda.hh"
-#include "messages/message.hh"
-#include "net/address.hh"
-#include "net/session.hh"
-#include "net/socket.hh"
-#include "net/transfer_s3.hh"
-#include "util/eventloop.hh"
-#include "util/exception.hh"
-#include "util/temp_dir.hh"
+#include "messages/utils.hh"
 
 using namespace std;
+using namespace r2t2;
+using namespace meow;
+
+using OpCode = Message::OpCode;
 
 void usage( const char* argv0 )
 {
   cerr << "Usage: " << argv0 << " PORT STORAGE-BACKEND" << endl;
 }
 
-class Accumulator
-{
-private:
-  EventLoop loop {};
-  TempDirectory working_directory;
-  TCPSocket listener_socket {};
-
-  struct Worker
-  {
-    Worker( TCPSocket&& socket )
-      : client( move( socket ) )
-    {}
-
-    meow::Client<TCPSession> client;
-  };
-
-  std::list<Worker> workers {};
-
-  meow::Client<TCPSession>::RuleCategories rule_categories {
-    loop.add_category( "Socket" ),
-    loop.add_category( "Message read" ),
-    loop.add_category( "Message write" ),
-    loop.add_category( "Process message" )
-  };
-
-  void process_message( meow::Message&& msg );
-
-public:
-  Accumulator( const uint16_t listen_port );
-  void run();
-};
-
 Accumulator::Accumulator( const uint16_t listen_port )
-  : working_directory( "/tmp/r2t2-accumulator" )
 {
-  listener_socket.set_blocking( false );
-  listener_socket.set_reuseaddr();
-  listener_socket.bind( { "0.0.0.0", listen_port } );
-  listener_socket.listen();
+  listener_socket_.set_blocking( false );
+  listener_socket_.set_reuseaddr();
+  listener_socket_.bind( { "0.0.0.0", listen_port } );
+  listener_socket_.listen();
 
-  loop.add_rule(
+  loop_.add_rule(
     "Listener",
     Direction::In,
-    listener_socket,
+    listener_socket_,
     [this] {
-      TCPSocket socket = listener_socket.accept();
+      TCPSocket socket = listener_socket_.accept();
       cerr << "Connection accepted from " << socket.peer_address().to_string()
            << endl;
 
-      workers.emplace_back( move( socket ) );
-      auto worker_it = std::prev( workers.end(), -1 );
+      workers_.emplace_back( move( socket ) );
+      auto worker_it = std::prev( workers_.end(), -1 );
 
-      workers.back().client.install_rules(
-        loop,
+      workers_.back().client.install_rules(
+        loop_,
         rule_categories,
-        [this]( meow::Message&& msg ) { process_message( move( msg ) ); },
-        [this, worker_it] { workers.erase( worker_it ); } );
+        [this]( Message&& msg ) { process_message( move( msg ) ); },
+        [this, worker_it] { workers_.erase( worker_it ); } );
     },
     [this] { return true; } );
 }
 
-void Accumulator::process_message( meow::Message&& ) {}
+void Accumulator::process_message( Message&& msg )
+{
+  switch ( msg.opcode() ) {
+    case OpCode::SetupAccumulator: {
+      protobuf::SetupAccumulator proto;
+      protoutil::from_string( msg.payload(), proto );
+
+      job_id_ = proto.job_id();
+      
+      Storage backend_info { proto.storage_backend() };
+      scene_transfer_agent_ = make_unique<S3TransferAgent>( S3StorageBackend {
+        {}, backend_info.bucket, backend_info.region, backend_info.path } );
+      job_transfer_agent_ = make_unique<S3TransferAgent>(
+        S3StorageBackend { {}, backend_info.bucket, backend_info.region } );
+
+      dimensions_ = make_pair( proto.width(), proto.height() );
+      tile_count_ = proto.tile_count();
+      tile_id_ = proto.tile_id();
+
+      break;
+    }
+
+    default:
+      throw runtime_error( "unexcepted opcode" );
+  }
+}
 
 void Accumulator::run()
 {
-  while ( loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+  while ( loop_.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
     continue;
   }
 }

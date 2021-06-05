@@ -30,6 +30,9 @@ public:
     FinishUp,
     Bye,
 
+    // Accumulator
+    SetupAccumulator,
+
     COUNT
   };
 
@@ -45,7 +48,8 @@ public:
         "ProcessRayBag",
         "WorkerStats",
         "FinishUp",
-        "Bye" };
+        "Bye",
+        "SetupAccumulator" };
 
   constexpr static size_t HEADER_LENGTH = 13;
 

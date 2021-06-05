@@ -14,6 +14,16 @@ message InvocationPayload {
     repeated string memcached_servers = 9;
 }
 
+message SetupAccumulator
+{
+    string job_id = 1;
+    string storage_backend = 2;
+    uint32 width = 3;
+    uint32 height = 4;
+    uint32 tile_id = 5;
+    uint32 tile_count = 6;
+}
+
 message SceneObject {
     uint32 type = 1;
     uint64 id = 2;
