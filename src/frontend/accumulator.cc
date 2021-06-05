@@ -15,6 +15,8 @@ void usage( const char* argv0 )
 
 Accumulator::Accumulator( const uint16_t listen_port )
 {
+  filesystem::current_path( working_directory_.name() );
+
   listener_socket_.set_blocking( false );
   listener_socket_.set_reuseaddr();
   listener_socket_.bind( { "0.0.0.0", listen_port } );
@@ -35,13 +37,16 @@ Accumulator::Accumulator( const uint16_t listen_port )
       workers_.back().client.install_rules(
         loop_,
         rule_categories,
-        [this]( Message&& msg ) { process_message( move( msg ) ); },
+        [this, worker_it]( Message&& msg ) {
+          process_message( worker_it, move( msg ) );
+        },
         [this, worker_it] { workers_.erase( worker_it ); } );
     },
     [this] { return true; } );
 }
 
-void Accumulator::process_message( Message&& msg )
+void Accumulator::process_message( list<Worker>::iterator worker_it,
+                                   Message&& msg )
 {
   switch ( msg.opcode() ) {
     case OpCode::SetupAccumulator: {
@@ -49,16 +54,39 @@ void Accumulator::process_message( Message&& msg )
       protoutil::from_string( msg.payload(), proto );
 
       job_id_ = proto.job_id();
-      
+
       Storage backend_info { proto.storage_backend() };
-      scene_transfer_agent_ = make_unique<S3TransferAgent>( S3StorageBackend {
-        {}, backend_info.bucket, backend_info.region, backend_info.path } );
+      S3StorageBackend scene_backend {
+        {}, backend_info.bucket, backend_info.region, backend_info.path
+      };
+
       job_transfer_agent_ = make_unique<S3TransferAgent>(
         S3StorageBackend { {}, backend_info.bucket, backend_info.region } );
 
       dimensions_ = make_pair( proto.width(), proto.height() );
       tile_count_ = proto.tile_count();
       tile_id_ = proto.tile_id();
+
+      // (1) download scene objects & load the scene
+      vector<storage::GetRequest> get_requests;
+
+      for ( auto& obj_proto : proto.scene_objects() ) {
+        auto obj = from_protobuf( obj_proto );
+        get_requests.emplace_back(
+          ( obj.alt_name.empty()
+              ? pbrt::scene::GetObjectName( obj.key.type, obj.key.id )
+              : obj.alt_name ),
+          pbrt::scene::GetObjectName( obj.key.type, obj.key.id ) );
+      }
+
+      cerr << "Downloading scene objects... ";
+      scene_backend.get( get_requests );
+      cerr << "done.";
+
+      scene_ = { working_directory_.name(), 1 };
+
+      worker_it->client.push_request(
+        { 0, OpCode::SetupAccumulator, to_string( tile_id_ ) } );
 
       break;
     }

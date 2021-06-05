@@ -25,12 +25,13 @@ private:
   TCPSocket listener_socket_ {};
 
   std::string job_id_ {};
-  std::unique_ptr<S3TransferAgent> scene_transfer_agent_ { nullptr };
   std::unique_ptr<S3TransferAgent> job_transfer_agent_ { nullptr };
 
   std::pair<uint32_t, uint32_t> dimensions_ {};
   uint32_t tile_count_ {};
   uint32_t tile_id_ {};
+
+  pbrt::scene::Base scene_ {};
 
   struct Worker
   {
@@ -50,7 +51,8 @@ private:
     loop_.add_category( "Process message" )
   };
 
-  void process_message( meow::Message&& msg );
+  void process_message( std::list<Worker>::iterator worker_it,
+                        meow::Message&& msg );
 
 public:
   Accumulator( const uint16_t listen_port );
