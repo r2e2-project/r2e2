@@ -12,6 +12,7 @@ message InvocationPayload {
     float bag_log_rate = 7;
     bool directional_treelets = 8;
     repeated string memcached_servers = 9;
+    repeated string accumulators = 10;
 }
 
 message SceneObject {

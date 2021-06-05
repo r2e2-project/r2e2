@@ -193,6 +193,10 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     *invocation_proto.add_memcached_servers() = server;
   }
 
+  for ( const auto& server : config.accumulators ) {
+    *invocation_proto.add_accumulators() = server;
+  }
+
   invocation_payload = protoutil::to_json( invocation_proto );
 
   /* initializing the treelets array */

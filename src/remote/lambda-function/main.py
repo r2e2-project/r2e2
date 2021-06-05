@@ -43,6 +43,9 @@ def handler(event, context):
     for server in event.get('memcachedServers', []):
         command += ['--memcached-server', server]
 
+    for server in event.get('accumulators', []):
+        command += ['--accumulator', server]
+
     retcode = run_command(command)
     print("retcode={}".format(retcode))
 
