@@ -259,6 +259,7 @@ void usage( const char* argv0, int exitCode )
        << "  -L --log-rays RATE         log ray actions" << endl
        << "  -B --log-bags RATE         log bag actions" << endl
        << "  -d --memcached-server      address for memcached" << endl
+       << "  -q --accumulator           address for accumulator" << endl
        << "  -h --help                  show help information" << endl;
 
   exit( exitCode );
@@ -279,6 +280,7 @@ int main( int argc, char* argv[] )
   milliseconds bagging_delay = DEFAULT_BAGGING_DELAY;
 
   vector<Address> memcached_servers;
+  vector<Address> accumulators;
 
   struct option long_options[] = {
     { "port", required_argument, nullptr, 'p' },
@@ -291,13 +293,14 @@ int main( int argc, char* argv[] )
     { "log-bags", required_argument, nullptr, 'B' },
     { "directional", no_argument, nullptr, 'I' },
     { "memcached-server", required_argument, nullptr, 'd' },
+    { "accumulator", required_argument, nullptr, 'q' },
     { "help", no_argument, nullptr, 'h' },
     { nullptr, 0, nullptr, 0 },
   };
 
   while ( true ) {
     const int opt = getopt_long(
-      argc, argv, "p:i:s:S:M:L:b:B:d:hI", long_options, nullptr );
+      argc, argv, "p:i:s:S:M:L:b:B:d:q:hI", long_options, nullptr );
 
     if ( opt == -1 )
       break;
@@ -315,11 +318,13 @@ int main( int argc, char* argv[] )
     case 'I': PbrtOptions.directionalTreelets = true; break;
     case 'h': usage(argv[0], EXIT_SUCCESS); break;
 
+    case 'q':
     case 'd': {
         string host;
         uint16_t port = 11211;
         tie(host, port) = Address::decompose(optarg);
-        memcached_servers.emplace_back(host, port);
+        (opt == 'd' ? memcached_servers
+                    : accumulators).emplace_back(host, port);
         break;
     }
 
@@ -338,7 +343,8 @@ int main( int argc, char* argv[] )
   unique_ptr<LambdaWorker> worker;
   WorkerConfiguration config { samples_per_pixel, max_path_depth,
                                bagging_delay,     ray_log_rate,
-                               bag_log_rate,      move( memcached_servers ) };
+                               bag_log_rate,      move( memcached_servers ),
+                               move( accumulators ) };
 
   try {
     worker = make_unique<LambdaWorker>(

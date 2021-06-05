@@ -55,6 +55,7 @@ struct WorkerConfiguration
   float bag_log_rate;
 
   std::vector<Address> memcached_servers;
+  std::vector<Address> accumulators;
 };
 
 /* Relationship between different queues in LambdaWorker:
