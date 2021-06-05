@@ -248,6 +248,8 @@ private:
   // Worker <-> Object Assignments                                          //
   ////////////////////////////////////////////////////////////////////////////
 
+  std::vector<SceneObject> list_base_objects() const;
+
   void assign_object( Worker& worker, const SceneObject& object );
   void assign_base_objects( Worker& worker );
   void assign_treelet( Worker& worker, Treelet& treelet );

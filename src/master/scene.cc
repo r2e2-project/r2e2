@@ -34,16 +34,27 @@ void LambdaMaster::assign_treelet( Worker& worker, Treelet& treelet )
   }
 }
 
-void LambdaMaster::assign_base_objects( Worker& worker )
+vector<SceneObject> LambdaMaster::list_base_objects() const
 {
+  vector<SceneObject> res;
+  res.reserve( SceneData::base_object_types.size() );
+
   for ( const auto scene_obj : SceneData::base_object_types ) {
     if ( alternative_object_names.count( scene_obj ) ) {
-      assign_object(
-        worker,
-        { ObjectKey { scene_obj, 0 }, alternative_object_names[scene_obj] } );
+      res.emplace_back( ObjectKey { scene_obj, 0 },
+                        alternative_object_names.at( scene_obj ) );
     } else {
-      assign_object( worker, { ObjectKey { scene_obj, 0 } } );
+      res.emplace_back( ObjectKey { scene_obj, 0 } );
     }
+  }
+
+  return res;
+}
+
+void LambdaMaster::assign_base_objects( Worker& worker )
+{
+  for ( const auto& obj : list_base_objects() ) {
+    assign_object( worker, obj );
   }
 }
 
