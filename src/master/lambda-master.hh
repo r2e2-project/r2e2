@@ -67,7 +67,6 @@ public:
                 const uint16_t client_port,
                 const uint32_t max_workers,
                 const uint32_t ray_generators,
-                const uint32_t sample_accumulators,
                 const std::string& public_address,
                 const std::string& storage_backend,
                 const std::string& aws_region,
@@ -201,7 +200,6 @@ private:
   std::deque<Worker> workers {};
   const uint32_t max_workers;
   const uint32_t ray_generators;
-  const uint32_t sample_accumulators;
   uint32_t finished_ray_generators { 0 };
   uint32_t initialized_workers { 0 };
 
