@@ -17,6 +17,8 @@
 #include "util/exception.hh"
 #include "util/temp_dir.hh"
 
+namespace r2t2 {
+
 class Accumulator
 {
 private:
@@ -58,3 +60,5 @@ public:
   Accumulator( const uint16_t listen_port );
   void run();
 };
+
+}
