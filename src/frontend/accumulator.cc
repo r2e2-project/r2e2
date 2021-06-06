@@ -1,4 +1,4 @@
-#include "worker/accumulator.hh"
+#include "accumulator/accumulator.hh"
 
 #include "messages/utils.hh"
 

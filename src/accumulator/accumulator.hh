@@ -10,6 +10,7 @@
 #include "common/lambda.hh"
 #include "messages/message.hh"
 #include "net/address.hh"
+#include "net/client.hh"
 #include "net/session.hh"
 #include "net/socket.hh"
 #include "net/transfer_s3.hh"

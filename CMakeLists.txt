@@ -46,6 +46,7 @@ file ( GLOB R2T2_SOURCE
     src/storage/*
     src/util/*
     src/worker/*
+    src/accumulator/*
 )
 
 include_directories ( src )
