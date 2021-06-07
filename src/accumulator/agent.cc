@@ -35,8 +35,7 @@ uint32_t TileHelper::tile_id( const pbrt::Sample& sample ) const
 {
   const auto pixel = sample.SamplePixel(
     { static_cast<int>( extent_.x ), static_cast<int>( extent_.y ) }, spp_ );
-  return ceil( 1.0 * pixel.x / tile_size_ )
-         + ceil( 1.0 * pixel.y / tile_size_ ) * n_tiles_.x;
+  return pixel.x / tile_size_ + pixel.y / tile_size_ * n_tiles_.x;
 }
 
 pbrt::Bounds2<uint32_t> TileHelper::bounds( const uint32_t tile_id ) const
