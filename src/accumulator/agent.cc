@@ -7,6 +7,17 @@ using namespace std;
 
 namespace r2t2 {
 
+TileHelper::TileHelper()
+  : accumulators_( 0 )
+  , bounds_()
+  , extent_()
+  , spp_()
+{
+  tile_size_ = 0;
+  active_accumulators_ = 0;
+  n_tiles_ = { 1, 1 };
+}
+
 TileHelper::TileHelper( const uint32_t accumulators,
                         const pbrt::Bounds2i& sample_bounds,
                         const uint32_t spp )
@@ -33,6 +44,9 @@ TileHelper::TileHelper( const uint32_t accumulators,
 
 uint32_t TileHelper::tile_id( const pbrt::Sample& sample ) const
 {
+  if ( active_accumulators_ <= 1 )
+    return 0;
+
   const auto pixel = sample.SamplePixel(
     { static_cast<int>( extent_.x ), static_cast<int>( extent_.y ) }, spp_ );
   return pixel.x / tile_size_ + pixel.y / tile_size_ * n_tiles_.x;

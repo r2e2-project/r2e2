@@ -34,6 +34,8 @@ private:
   pbrt::Vector2<uint32_t> n_tiles_ {};
 
 public:
+  TileHelper();
+
   TileHelper( const uint32_t accumulators,
               const pbrt::Bounds2i& sample_bounds,
               const uint32_t spp );
