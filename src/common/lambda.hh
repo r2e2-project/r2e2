@@ -15,6 +15,7 @@ constexpr size_t WORKER_MAX_ACTIVE_RAYS = 100'000; /* ~120 MiB of rays */
 using WorkerId = uint64_t;
 using TreeletId = uint32_t;
 using BagId = uint64_t;
+using TileId = uint32_t;
 
 struct Storage
 {
