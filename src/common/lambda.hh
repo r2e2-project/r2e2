@@ -15,7 +15,7 @@ constexpr size_t WORKER_MAX_ACTIVE_RAYS = 100'000; /* ~120 MiB of rays */
 using WorkerId = uint64_t;
 using TreeletId = uint32_t;
 using BagId = uint64_t;
-using TileId = uint32_t;
+using TileId = TreeletId;
 
 struct Storage
 {
@@ -63,7 +63,13 @@ struct RayBagInfo
   bool tracked { false };
 
   WorkerId worker_id {};
-  TreeletId treelet_id {};
+
+  union
+  {
+    TreeletId treelet_id {};
+    TileId tile_id;
+  };
+
   BagId bag_id {};
   size_t ray_count {};
   size_t bag_size {};
@@ -76,7 +82,8 @@ struct RayBagInfo
     if ( !sample_bag ) {
       oss << prefix << "T" << treelet_id << "/W" << worker_id << "/B" << bag_id;
     } else {
-      oss << prefix << "samples/W" << worker_id << "/B" << bag_id;
+      oss << prefix << "samples/T" << tile_id << "/W" << worker_id << "/B"
+          << bag_id;
     }
 
     return oss.str();
