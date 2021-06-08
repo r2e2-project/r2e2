@@ -23,24 +23,26 @@ namespace r2t2 {
 class TileHelper
 {
 private:
-  const uint32_t accumulators_;
-  const pbrt::Bounds2<uint32_t> bounds_;
-  const pbrt::Vector2<uint32_t> extent_;
-  const uint32_t spp_;
+  uint32_t accumulators_ { 0 };
+  pbrt::Bounds2<uint32_t> bounds_ {};
+  pbrt::Vector2<uint32_t> extent_ {};
+  uint32_t spp_ {};
 
   uint32_t tile_size_ {};
   uint32_t active_accumulators_ {};
 
-  pbrt::Vector2<uint32_t> n_tiles_ {};
+  pbrt::Vector2<uint32_t> n_tiles_ { 1, 1 };
 
 public:
-  TileHelper();
+  TileHelper() = default;
+  TileHelper(const TileHelper& ) = default;
+  TileHelper& operator=(const TileHelper&) = default;
 
   TileHelper( const uint32_t accumulators,
               const pbrt::Bounds2i& sample_bounds,
               const uint32_t spp );
 
-  uint32_t tile_id( const pbrt::Sample& sample ) const;
+  TileId tile_id( const pbrt::Sample& sample ) const;
 
   uint32_t tile_size() const { return tile_size_; }
   uint32_t active_accumulators() const { return active_accumulators_; }
