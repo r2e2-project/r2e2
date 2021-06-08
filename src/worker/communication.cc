@@ -113,32 +113,6 @@ void LambdaWorker::handle_open_bags()
   }
 }
 
-void LambdaWorker::handle_samples()
-{
-  /* XXX fix this */
-  auto& out = sample_bags;
-
-  if ( out.empty() ) {
-    out.emplace( *worker_id, 0, current_sample_bag_id++, true, MAX_BAG_SIZE );
-  }
-
-  while ( !samples.empty() ) {
-    auto& sample = samples.front();
-
-    if ( out.back().info.bag_size + sample.MaxCompressedSize()
-         > MAX_BAG_SIZE ) {
-      out.emplace( *worker_id, 0, current_sample_bag_id++, true, MAX_BAG_SIZE );
-    }
-
-    auto& bag = out.back();
-    const auto len = sample.Serialize( &bag.data[0] + bag.info.bag_size );
-    bag.info.ray_count++;
-    bag.info.bag_size += len;
-
-    samples.pop();
-  }
-}
-
 void LambdaWorker::handle_sealed_bags()
 {
   while ( !sealed_bags.empty() ) {
@@ -174,19 +148,65 @@ void LambdaWorker::handle_sealed_bags()
   }
 }
 
+void LambdaWorker::handle_samples()
+{
+  while ( !samples.empty() ) {
+    auto& sample = samples.front();
+    const TileId tile_id = tile_helper.tile_id( sample );
+
+    auto [bag_it, inserted]
+      = open_sample_bags.try_emplace( tile_id,
+                                      *worker_id,
+                                      tile_id,
+                                      current_sample_bag_id[tile_id],
+                                      true,
+                                      MAX_SAMPLE_BAG_SIZE );
+
+    auto& bag = bag_it->second;
+
+    if ( inserted ) {
+      current_sample_bag_id[tile_id]++;
+    } else if ( bag.info.bag_size + sample.MaxCompressedSize()
+                > MAX_SAMPLE_BAG_SIZE ) {
+      sealed_sample_bags.emplace( move( bag ) );
+      bag = open_sample_bags.at( tile_id ) = { *worker_id,
+                                               tile_id,
+                                               current_sample_bag_id[tile_id]++,
+                                               true,
+                                               MAX_SAMPLE_BAG_SIZE };
+    }
+
+    const auto len = sample.Serialize( &bag.data[0] + bag.info.bag_size );
+    bag.info.ray_count++;
+    bag.info.bag_size += len;
+
+    samples.pop();
+  }
+}
+
 void LambdaWorker::handle_sample_bags()
 {
   sample_bags_timer.read_event();
 
-  while ( !sample_bags.empty() ) {
-    RayBag& bag = sample_bags.front();
+  auto submit_bag = [&]( RayBag&& bag ) {
     bag.data.erase( bag.info.bag_size );
+    bag.data.shrink_to_fit();
 
     const auto id = samples_transfer_agent->request_upload(
       bag.info.str( ray_bags_key_prefix ), move( bag.data ) );
 
     pending_sample_bags[id] = make_pair( Task::Upload, bag.info );
-    sample_bags.pop();
+  };
+
+  for ( auto& [tile_id, bag] : open_sample_bags ) {
+    submit_bag( move( bag ) );
+  }
+
+  open_sample_bags.clear();
+
+  while ( !sealed_sample_bags.empty() ) {
+    submit_bag( move( sealed_sample_bags.front() ) );
+    sealed_sample_bags.pop();
   }
 }
 

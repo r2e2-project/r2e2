@@ -110,7 +110,10 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                  Direction::In,
                  sample_bags_timer,
                  bind( &LambdaWorker::handle_sample_bags, this ),
-                 [this] { return !sample_bags.empty(); } );
+                 [this] {
+                   return !open_sample_bags.empty()
+                          or !sealed_sample_bags.empty();
+                 } );
 
   loop.add_rule( "Receive queue",
                  bind( &LambdaWorker::handle_receive_queue, this ),
@@ -223,6 +226,12 @@ void LambdaWorker::handle_scene_object_results()
     master_connection.push_request( { *worker_id, OpCode::GetObjects, "" } );
 
     scene_loaded = true;
+
+    if ( not config.accumulators.empty() ) {
+      tile_helper = { static_cast<uint32_t>( config.accumulators.size() ),
+                      scene.base.sampleBounds,
+                      static_cast<uint32_t>( scene.samples_per_pixel ) };
+    }
 
     /* starting the ray-tracing threads */
     for ( size_t i = 0; i < 2; i++ ) {
@@ -341,9 +350,9 @@ int main( int argc, char* argv[] )
   }
 
   unique_ptr<LambdaWorker> worker;
-  WorkerConfiguration config { samples_per_pixel, max_path_depth,
-                               bagging_delay,     ray_log_rate,
-                               bag_log_rate,      move( memcached_servers ),
+  WorkerConfiguration config { samples_per_pixel,   max_path_depth,
+                               bagging_delay,       ray_log_rate,
+                               bag_log_rate,        move( memcached_servers ),
                                move( accumulators ) };
 
   try {

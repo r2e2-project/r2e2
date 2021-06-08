@@ -141,7 +141,8 @@ void LambdaWorker::process_message( const Message& message )
                  && out_queue.empty() && samples.empty() && open_bags.empty()
                  && sealed_bags.empty() && receive_queue.empty()
                  && pending_ray_bags.empty() && pending_sample_bags.empty()
-                 && sample_bags.empty() && finished_path_ids.empty();
+                 && open_sample_bags.empty() && sealed_sample_bags.empty()
+                 && finished_path_ids.empty();
         } );
 
       break;

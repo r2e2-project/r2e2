@@ -17,6 +17,7 @@
 #include <thread>
 #include <tuple>
 
+#include "accumulator/accumulator.hh"
 #include "common/lambda.hh"
 #include "common/stats.hh"
 #include "master/lambda-master.hh"
@@ -43,7 +44,8 @@ namespace r2t2 {
 constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL { 1'000 };
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL { 1'000 };
 
-constexpr size_t MAX_BAG_SIZE { 4 * 1024 * 1024 }; // 4 MiB
+constexpr size_t MAX_BAG_SIZE { 4 * 1024 * 1024 };   // 4 MiB
+constexpr size_t MAX_SAMPLE_BAG_SIZE { 1024 * 1024 }; // 1 MiB
 
 struct WorkerConfiguration
 {
@@ -121,6 +123,8 @@ private:
 
     SceneData() {}
   } scene {};
+
+  TileHelper tile_helper {};
 
   /*** Ray Tracing **********************************************************/
 
@@ -204,8 +208,11 @@ private:
   /* bags that are sealed and ready to be sent out */
   std::queue<RayBag> sealed_bags {};
 
+  /* current sample bag for each tile */
+  std::map<TileId, RayBag> open_sample_bags {};
+
   /* sample bags ready to be sent out */
-  std::queue<RayBag> sample_bags {};
+  std::queue<RayBag> sealed_sample_bags {};
 
   /* ray bags that are received, but not yet unpacked */
   std::queue<RayBag> receive_queue {};
@@ -230,9 +237,9 @@ private:
 
   std::string ray_bags_key_prefix {};
   std::map<TreeletId, BagId> current_bag_id {};
+  std::map<TileId, BagId> current_sample_bag_id {};
   std::map<uint64_t, std::pair<Task, RayBagInfo>> pending_ray_bags {};
   std::map<uint64_t, std::pair<Task, RayBagInfo>> pending_sample_bags {};
-  BagId current_sample_bag_id { 0 };
 
   /*** Transfer Agent *******************************************************/
 
