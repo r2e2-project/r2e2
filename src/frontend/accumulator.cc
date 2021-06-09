@@ -45,6 +45,16 @@ Accumulator::Accumulator( const uint16_t listen_port )
     [this] { return true; } );
 }
 
+Accumulator::~Accumulator()
+{
+  try {
+    if ( not working_directory_.name().empty() ) {
+      filesystem::remove_all( working_directory_.name() );
+    }
+  } catch ( exception& ex ) {
+  }
+}
+
 void Accumulator::process_message( list<Worker>::iterator worker_it,
                                    Message&& msg )
 {

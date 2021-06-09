@@ -89,6 +89,8 @@ private:
 
 public:
   Accumulator( const uint16_t listen_port );
+  ~Accumulator();
+
   void run();
 };
 
