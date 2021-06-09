@@ -32,7 +32,7 @@ Accumulator::Accumulator( const uint16_t listen_port )
            << endl;
 
       workers_.emplace_back( move( socket ) );
-      auto worker_it = std::prev( workers_.end(), -1 );
+      auto worker_it = std::prev( workers_.end() );
 
       workers_.back().client.install_rules(
         loop_,
