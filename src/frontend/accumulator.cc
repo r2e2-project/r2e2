@@ -1,5 +1,7 @@
 #include "accumulator/accumulator.hh"
 
+#include <pbrt/core/camera.h>
+
 #include "messages/utils.hh"
 
 using namespace std;
@@ -34,7 +36,7 @@ Accumulator::Accumulator( const uint16_t listen_port )
       workers_.emplace_back( move( socket ) );
       auto worker_it = std::prev( workers_.end() );
 
-      workers_.back().client.install_rules(
+      workers_.back().install_rules(
         loop_,
         rule_categories,
         [this, worker_it]( Message&& msg ) {
@@ -43,11 +45,16 @@ Accumulator::Accumulator( const uint16_t listen_port )
         [this, worker_it] { workers_.erase( worker_it ); } );
     },
     [this] { return true; } );
+
+  handle_samples_thread_ = thread( &Accumulator::handle_bags_queue, this );
 }
 
 Accumulator::~Accumulator()
 {
   try {
+    bags_queue.enqueue( ""s );
+    handle_samples_thread_.join();
+
     if ( not working_directory_.name().empty() ) {
       filesystem::remove_all( working_directory_.name() );
     }
@@ -55,8 +62,9 @@ Accumulator::~Accumulator()
   }
 }
 
-void Accumulator::process_message( list<Worker>::iterator worker_it,
-                                   Message&& msg )
+void Accumulator::process_message(
+  list<meow::Client<TCPSession>>::iterator worker_it,
+  Message&& msg )
 {
   switch ( msg.opcode() ) {
     case OpCode::SetupAccumulator: {
@@ -95,24 +103,55 @@ void Accumulator::process_message( list<Worker>::iterator worker_it,
 
       scene_ = { working_directory_.name(), 1 };
 
-      worker_it->client.push_request(
+      tile_helper_ = { tile_count_,
+                       scene_.sampleBounds,
+                       static_cast<uint32_t>( scene_.samplesPerPixel ) };
+
+      scene_.camera->film->SetCroppedPixelBounds(
+        static_cast<pbrt::Bounds2i>( tile_helper_.bounds( tile_id_ ) ) );
+
+      worker_it->push_request(
         { 0, OpCode::SetupAccumulator, to_string( tile_id_ ) } );
 
       break;
     }
 
     case OpCode::ProcessSampleBag: {
-      cerr << "Sample bag from "
-           << worker_it->client.session().socket().peer_address().to_string()
-           << " (" << msg.payload().length() << ")" << endl;
-
-      worker_it->client.push_request( { 0, OpCode::SampleBagProcessed, "" } );
+      bags_queue.enqueue( move( msg.payload() ) );
+      worker_it->push_request( { 0, OpCode::SampleBagProcessed, "" } );
 
       break;
     }
 
     default:
       throw runtime_error( "unexcepted opcode" );
+  }
+}
+
+void Accumulator::handle_bags_queue()
+{
+  while ( true ) {
+    string sample_bag;
+    bags_queue.wait_dequeue( sample_bag );
+
+    if ( sample_bag.empty() ) {
+      return;
+    }
+
+    vector<pbrt::Sample> samples;
+
+    for ( size_t offset = 0; offset < sample_bag.length(); ) {
+      const auto len
+        = *reinterpret_cast<const uint32_t*>( sample_bag.data() + offset );
+      offset += 4;
+
+      samples.emplace_back();
+      samples.back().Deserialize( sample_bag.data() + offset, len );
+      offset += len;
+    }
+
+    pbrt::graphics::AccumulateImage( scene_.camera, samples );
+    pbrt::graphics::WriteImage( scene_.camera, "/tmp/output.png" );
   }
 }
 

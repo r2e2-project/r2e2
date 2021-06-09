@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include "common/lambda.hh"
 #include "messages/message.hh"
@@ -17,6 +18,8 @@
 #include "util/eventloop.hh"
 #include "util/exception.hh"
 #include "util/temp_dir.hh"
+
+#include "concurrentqueue/blockingconcurrentqueue.h"
 
 namespace r2t2 {
 
@@ -63,19 +66,13 @@ private:
   std::pair<uint32_t, uint32_t> dimensions_ {};
   uint32_t tile_count_ {};
   uint32_t tile_id_ {};
-
+  TileHelper tile_helper_ {};
   pbrt::scene::Base scene_ {};
 
-  struct Worker
-  {
-    Worker( TCPSocket&& socket )
-      : client( std::move( socket ) )
-    {}
+  std::thread handle_samples_thread_ {};
 
-    meow::Client<TCPSession> client;
-  };
-
-  std::list<Worker> workers_ {};
+  std::list<meow::Client<TCPSession>> workers_ {};
+  moodycamel::BlockingConcurrentQueue<std::string> bags_queue { 1000 };
 
   meow::Client<TCPSession>::RuleCategories rule_categories {
     loop_.add_category( "Socket" ),
@@ -84,8 +81,10 @@ private:
     loop_.add_category( "Process message" )
   };
 
-  void process_message( std::list<Worker>::iterator worker_it,
+  void process_message( std::list<meow::Client<TCPSession>>::iterator worker_it,
                         meow::Message&& msg );
+
+  void handle_bags_queue();
 
 public:
   Accumulator( const uint16_t listen_port );
