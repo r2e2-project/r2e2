@@ -32,6 +32,8 @@ public:
 
     // Accumulator
     SetupAccumulator,
+    ProcessSampleBag,
+    SampleBagProcessed,
 
     COUNT
   };
@@ -49,7 +51,9 @@ public:
         "WorkerStats",
         "FinishUp",
         "Bye",
-        "SetupAccumulator" };
+        "SetupAccumulator",
+        "ProcessSampleBag",
+        "SampleBagProcessed" };
 
   constexpr static size_t HEADER_LENGTH = 13;
 

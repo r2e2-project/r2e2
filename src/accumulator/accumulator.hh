@@ -35,8 +35,8 @@ private:
 
 public:
   TileHelper() = default;
-  TileHelper(const TileHelper& ) = default;
-  TileHelper& operator=(const TileHelper&) = default;
+  TileHelper( const TileHelper& ) = default;
+  TileHelper& operator=( const TileHelper& ) = default;
 
   TileHelper( const uint32_t accumulators,
               const pbrt::Bounds2i& sample_bounds,
@@ -93,11 +93,20 @@ public:
 };
 
 /* responsible for getting the samples to the accumulator servers */
-class SampleAgent
+class AccumulatorTransferAgent : public TransferAgent
 {
+private:
+  std::vector<Address> _accumulators;
+
+  EventLoop _loop {};
+  EventFD _action_event {};
+
+  void do_action( Action&& action ) override;
+  void worker_thread( const size_t thread_id ) override;
+
 public:
-  SampleAgent( const std::vector<Address>& accumulators );
-  ~SampleAgent();
+  AccumulatorTransferAgent( const std::vector<Address>& accumulators );
+  ~AccumulatorTransferAgent();
 
   void add_sample( pbrt::Sample&& sample );
 };
