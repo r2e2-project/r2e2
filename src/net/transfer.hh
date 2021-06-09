@@ -34,15 +34,18 @@ protected:
     Task task;
     std::string key;
     std::string data;
+    uint64_t helper_data;
 
     Action( const uint64_t id_,
             const Task task_,
             const std::string& key_,
-            std::string&& data_ )
+            std::string&& data_,
+            const uint64_t helper_data_ = 0 )
       : id( id_ )
       , task( task_ )
       , key( key_ )
       , data( move( data_ ) )
+      , helper_data( helper_data_ )
     {}
   };
 
@@ -68,8 +71,11 @@ public:
   TransferAgent() {}
   virtual ~TransferAgent();
 
-  uint64_t request_download( const std::string& key );
-  uint64_t request_upload( const std::string& key, std::string&& data );
+  uint64_t request_download( const std::string& key, uint64_t helper_data = 0 );
+
+  uint64_t request_upload( const std::string& key,
+                           std::string&& data,
+                           uint64_t helper_data = 0 );
 
   EventFD& eventfd() { return _event_fd; }
 

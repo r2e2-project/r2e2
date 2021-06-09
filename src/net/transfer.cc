@@ -18,15 +18,18 @@ void TransferAgent::do_action( Action&& action )
   return;
 }
 
-uint64_t TransferAgent::request_download( const string& key )
+uint64_t TransferAgent::request_download( const string& key,
+                                          uint64_t helper_data )
 {
-  do_action( { _next_id, Task::Download, key, string() } );
+  do_action( { _next_id, Task::Download, key, string(), helper_data } );
   return _next_id++;
 }
 
-uint64_t TransferAgent::request_upload( const string& key, string&& data )
+uint64_t TransferAgent::request_upload( const string& key,
+                                        string&& data,
+                                        uint64_t helper_data )
 {
-  do_action( { _next_id, Task::Upload, key, move( data ) } );
+  do_action( { _next_id, Task::Upload, key, move( data ), helper_data } );
   return _next_id++;
 }
 
