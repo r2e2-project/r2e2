@@ -101,6 +101,16 @@ void Accumulator::process_message( list<Worker>::iterator worker_it,
       break;
     }
 
+    case OpCode::ProcessSampleBag: {
+      cerr << "Sample bag from "
+           << worker_it->client.session().socket().peer_address().to_string()
+           << " (" << msg.payload().length() << ")" << endl;
+
+      worker_it->client.push_request( { 0, OpCode::SampleBagProcessed, "" } );
+
+      break;
+    }
+
     default:
       throw runtime_error( "unexcepted opcode" );
   }
