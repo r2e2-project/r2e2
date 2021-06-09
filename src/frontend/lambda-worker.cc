@@ -47,7 +47,10 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
     }
   }() )
   , samples_transfer_agent(
-      make_unique<S3TransferAgent>( job_storage_backend, 8, true ) )
+      config.accumulators.empty()
+        ? unique_ptr<TransferAgent>(
+          make_unique<S3TransferAgent>( job_storage_backend, 8, true ) )
+        : make_unique<AccumulatorTransferAgent>( config.accumulators ) )
   , scene_transfer_agent(
       make_unique<S3TransferAgent>( scene_storage_backend, 2 ) )
   , worker_rule_categories( { loop.add_category( "Socket" ),

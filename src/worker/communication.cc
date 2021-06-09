@@ -193,7 +193,7 @@ void LambdaWorker::handle_sample_bags()
     bag.data.shrink_to_fit();
 
     const auto id = samples_transfer_agent->request_upload(
-      bag.info.str( ray_bags_key_prefix ), move( bag.data ) );
+      bag.info.str( ray_bags_key_prefix ), move( bag.data ), bag.info.tile_id );
 
     pending_sample_bags[id] = make_pair( Task::Upload, bag.info );
   };
