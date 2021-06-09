@@ -1,5 +1,9 @@
 #include "accumulator/accumulator.hh"
 
+#include <chrono>
+#include <fstream>
+#include <sstream>
+
 #include <pbrt/core/camera.h>
 
 #include "messages/utils.hh"
@@ -44,9 +48,27 @@ Accumulator::Accumulator( const uint16_t listen_port )
         },
         [this, worker_it] { workers_.erase( worker_it ); } );
     },
-    [this] { return true; } );
+    [] { return true; } );
 
-  handle_samples_thread_ = thread( &Accumulator::handle_bags_queue, this );
+  loop_.add_rule(
+    "Upload output",
+    Direction::In,
+    upload_output_timer_,
+    [this] {
+      upload_output_timer_.read_event();
+
+      if ( not dirty_ )
+        return;
+
+      pbrt::graphics::WriteImage( scene_.camera, output_filename_ );
+      ifstream fin { output_filename_ };
+      stringstream buffer;
+      buffer << fin.rdbuf();
+
+      job_transfer_agent_->request_upload( output_key_, buffer.str() );
+      dirty_ = false;
+    },
+    [] { return true; } );
 }
 
 Accumulator::~Accumulator()
@@ -79,11 +101,33 @@ void Accumulator::process_message(
       };
 
       job_transfer_agent_ = make_unique<S3TransferAgent>(
-        S3StorageBackend { {}, backend_info.bucket, backend_info.region } );
+        S3StorageBackend { {}, backend_info.bucket, backend_info.region },
+        1,
+        true );
+
+      loop_.add_rule(
+        "Uploaded",
+        Direction::In,
+        job_transfer_agent_->eventfd(),
+        [this] {
+          if ( not job_transfer_agent_->eventfd().read_event() )
+            return;
+
+          vector<pair<uint64_t, string>> actions;
+          job_transfer_agent_->try_pop_bulk( back_inserter( actions ) );
+
+          for ( auto& action : actions ) {
+            cerr << "Upload done (" << action.first << ")." << endl;
+          }
+        },
+        [] { return true; } );
 
       dimensions_ = make_pair( proto.width(), proto.height() );
       tile_count_ = proto.tile_count();
       tile_id_ = proto.tile_id();
+
+      output_filename_ = to_string( tile_id_ ) + ".png";
+      output_key_ = "jobs/" + job_id_ + "/output/" + output_filename_;
 
       // (1) download scene objects & load the scene
       vector<storage::GetRequest> get_requests;
@@ -110,6 +154,15 @@ void Accumulator::process_message(
       scene_.camera->film->SetCroppedPixelBounds(
         static_cast<pbrt::Bounds2i>( tile_helper_.bounds( tile_id_ ) ) );
 
+      cerr << "Starting worker thread... ";
+      if ( handle_samples_thread_.joinable() ) {
+        bags_queue.enqueue( ""s );
+        handle_samples_thread_.join();
+      }
+
+      handle_samples_thread_ = thread( &Accumulator::handle_bags_queue, this );
+      cerr << "done." << endl;
+
       worker_it->push_request(
         { 0, OpCode::SetupAccumulator, to_string( tile_id_ ) } );
 
@@ -119,6 +172,7 @@ void Accumulator::process_message(
     case OpCode::ProcessSampleBag: {
       bags_queue.enqueue( move( msg.payload() ) );
       worker_it->push_request( { 0, OpCode::SampleBagProcessed, "" } );
+      dirty_ = true;
 
       break;
     }
@@ -130,28 +184,30 @@ void Accumulator::process_message(
 
 void Accumulator::handle_bags_queue()
 {
+  string sample_bag;
+
   while ( true ) {
-    string sample_bag;
     bags_queue.wait_dequeue( sample_bag );
 
-    if ( sample_bag.empty() ) {
-      return;
-    }
+    do {
+      if ( sample_bag.empty() ) {
+        return;
+      }
 
-    vector<pbrt::Sample> samples;
+      vector<pbrt::Sample> samples;
 
-    for ( size_t offset = 0; offset < sample_bag.length(); ) {
-      const auto len
-        = *reinterpret_cast<const uint32_t*>( sample_bag.data() + offset );
-      offset += 4;
+      for ( size_t offset = 0; offset < sample_bag.length(); ) {
+        const auto len
+          = *reinterpret_cast<const uint32_t*>( sample_bag.data() + offset );
+        offset += 4;
 
-      samples.emplace_back();
-      samples.back().Deserialize( sample_bag.data() + offset, len );
-      offset += len;
-    }
+        samples.emplace_back();
+        samples.back().Deserialize( sample_bag.data() + offset, len );
+        offset += len;
+      }
 
-    pbrt::graphics::AccumulateImage( scene_.camera, samples );
-    pbrt::graphics::WriteImage( scene_.camera, "/tmp/output.png" );
+      pbrt::graphics::AccumulateImage( scene_.camera, samples );
+    } while ( bags_queue.try_dequeue( sample_bag ) );
   }
 }
 
@@ -173,6 +229,8 @@ int main( int argc, char* argv[] )
       usage( argv[0] );
       return EXIT_FAILURE;
     }
+
+    FLAGS_logtostderr = false;
 
     const uint16_t port = static_cast<uint16_t>( stoi( argv[1] ) );
     Accumulator accumulator { port };

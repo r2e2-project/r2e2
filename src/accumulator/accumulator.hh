@@ -18,10 +18,13 @@
 #include "util/eventloop.hh"
 #include "util/exception.hh"
 #include "util/temp_dir.hh"
+#include "util/timerfd.hh"
 
 #include "concurrentqueue/blockingconcurrentqueue.h"
 
 namespace r2t2 {
+
+constexpr std::chrono::milliseconds UPLOAD_OUTPUT_INTERVAL { 1'000 };
 
 class TileHelper
 {
@@ -60,8 +63,11 @@ private:
   TempDirectory working_directory_ { "/tmp/r2t2-accumulator" };
   TCPSocket listener_socket_ {};
 
+  TimerFD upload_output_timer_ { UPLOAD_OUTPUT_INTERVAL };
   std::string job_id_ {};
   std::unique_ptr<S3TransferAgent> job_transfer_agent_ { nullptr };
+  std::string output_filename_ {};
+  std::string output_key_ {};
 
   std::pair<uint32_t, uint32_t> dimensions_ {};
   uint32_t tile_count_ {};
@@ -69,6 +75,7 @@ private:
   TileHelper tile_helper_ {};
   pbrt::scene::Base scene_ {};
 
+  bool dirty_ { false };
   std::thread handle_samples_thread_ {};
 
   std::list<meow::Client<TCPSession>> workers_ {};
