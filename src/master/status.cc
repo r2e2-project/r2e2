@@ -63,6 +63,8 @@ void LambdaMaster::handle_status_message()
       << BG() << " \u03bb " << Worker::active_count[Worker::Role::Tracer]
               << "/" << max_workers << " "
 
+      << BG() << " \u03a3 " << tile_helper.active_accumulators() << " "
+
       << BG() << " \u29d6 " << treelets_to_spawn.size() << " "
 
       // lagging workers
