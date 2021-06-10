@@ -251,6 +251,10 @@ void LambdaWorker::handle_scene_object_results()
 
     scene_loaded = true;
 
+    tile_helper = { static_cast<uint32_t>( config.accumulators ),
+                    scene.base.sampleBounds,
+                    static_cast<uint32_t>( scene.samples_per_pixel ) };
+
     if ( is_accumulator ) {
       loop.add_rule( "Upload output",
                      Direction::In,
@@ -259,10 +263,6 @@ void LambdaWorker::handle_scene_object_results()
                      [this] { return scene_loaded; } );
 
       samples_transfer_agent.reset();
-
-      tile_helper = { static_cast<uint32_t>( config.accumulators ),
-                      scene.base.sampleBounds,
-                      static_cast<uint32_t>( scene.samples_per_pixel ) };
 
       scene.base.camera->film->SetCroppedPixelBounds(
         static_cast<pbrt::Bounds2i>( tile_helper.bounds( *tile_id ) ) );
