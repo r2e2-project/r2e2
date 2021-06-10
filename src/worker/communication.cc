@@ -240,11 +240,12 @@ void LambdaWorker::handle_receive_queue()
     size_t total_size = bag.data.size();
 
     if ( COMPRESS_RAY_BAGS ) {
-      string decompressed( bag.info.ray_count
-                             * ( bag.info.sample_bag
-                                   ? Sample::MaxPackedSize
-                                   : RayState::MaxPackedSize ),
-                           '\0' );
+      string decompressed(
+        bag.info.ray_count
+          * ( 4
+              + ( bag.info.sample_bag ? Sample::MaxPackedSize
+                                      : RayState::MaxPackedSize ) ),
+        '\0' );
 
       int decompressed_size = LZ4_decompress_safe(
         bag.data.data(), &decompressed[0], total_size, decompressed.size() );
