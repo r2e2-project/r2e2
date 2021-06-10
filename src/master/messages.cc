@@ -52,15 +52,22 @@ void LambdaMaster::process_message( const uint64_t worker_id,
         record_enqueue( worker_id, info );
 
         if ( info.sample_bag ) {
-          sample_bags.push_back( info );
-          continue;
-        }
-
-        if ( unassigned_treelets.count( info.treelet_id ) == 0 ) {
-          queued_ray_bags[info.treelet_id].push( info );
-          queued_ray_bags_count++;
+          // sample bag
+          if ( not accumulators ) {
+            sample_bags.push_back( info );
+            continue;
+          } else {
+            queued_ray_bags[treelet_count + info.tile_id].push( info );
+            queued_ray_bags_count++;
+          }
         } else {
-          pending_ray_bags[info.treelet_id].push( info );
+          // normal ray bag
+          if ( unassigned_treelets.count( info.treelet_id ) == 0 ) {
+            queued_ray_bags[info.treelet_id].push( info );
+            queued_ray_bags_count++;
+          } else {
+            pending_ray_bags[info.treelet_id].push( info );
+          }
         }
       }
 
@@ -90,6 +97,12 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       for ( const auto& item : proto.items() ) {
         const RayBagInfo info = from_protobuf( item );
         record_dequeue( worker_id, info );
+      }
+
+      if ( worker.role == Worker::Role::Accumulator ) {
+        if ( worker.active_rays() < WORKER_MAX_ACTIVE_RAYS ) {
+          free_workers.push_back( worker_id );
+        }
       }
 
       break;

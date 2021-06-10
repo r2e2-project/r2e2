@@ -461,6 +461,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         worker.client.push_request(
           { 0, OpCode::GetObjects, protoutil::to_string( objs_proto ) } );
 
+        free_workers.push_back( worker.id );
         started_accumulators++;
       } else {
         /* this is a normal worker */
