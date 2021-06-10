@@ -606,6 +606,7 @@ void LambdaMaster::run()
       [&] { accu_clients.clear(); },
       [&] { return response_count == accu_clients.size(); } );
 
+    size_t accu_index = 0;
     for ( auto& c : accu_clients ) {
       c.install_rules(
         accu_loop,
@@ -617,6 +618,7 @@ void LambdaMaster::run()
         },
         [this] {} );
 
+      proto.set_tile_id( accu_index++ );
       c.push_request(
         { 0, OpCode::SetupAccumulator, protoutil::to_string( proto ) } );
     }
