@@ -40,6 +40,9 @@ void LambdaWorker::handle_render_output()
 {
   upload_output_timer.read_event();
 
+  if ( not new_samples_accumulated )
+    return;
+
   new_samples_accumulated = false;
 
   pbrt::graphics::WriteImage( scene.base.camera, render_output_filename );

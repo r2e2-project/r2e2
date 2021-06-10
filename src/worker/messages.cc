@@ -62,7 +62,7 @@ void LambdaWorker::process_message( const Message& message )
 
         render_output_filename = to_string( *tile_id ) + ".png";
         render_output_key
-          = ray_bags_key_prefix + "/out/" + render_output_filename;
+          = ray_bags_key_prefix + "out/" + render_output_filename;
       }
 
       cerr << protoutil::to_json( proto ) << endl;

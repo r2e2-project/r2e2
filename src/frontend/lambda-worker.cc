@@ -154,18 +154,6 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                  bind( &LambdaWorker::handle_worker_stats, this ),
                  [this] { return true; } );
 
-  if ( is_accumulator ) {
-    loop.add_rule( "Upload output",
-                   Direction::In,
-                   upload_output_timer,
-                   bind( &LambdaWorker::handle_render_output, this ),
-                   [this] { return scene_loaded && new_samples_accumulated; } );
-
-    samples_transfer_agent.reset();
-  } else {
-    output_transfer_agent.reset();
-  }
-
   master_connection.install_rules(
     loop,
     worker_rule_categories,
@@ -264,6 +252,14 @@ void LambdaWorker::handle_scene_object_results()
     scene_loaded = true;
 
     if ( is_accumulator ) {
+      loop.add_rule( "Upload output",
+                     Direction::In,
+                     upload_output_timer,
+                     bind( &LambdaWorker::handle_render_output, this ),
+                     [this] { return scene_loaded; } );
+
+      samples_transfer_agent.reset();
+
       tile_helper = { static_cast<uint32_t>( config.accumulators ),
                       scene.base.sampleBounds,
                       static_cast<uint32_t>( scene.samples_per_pixel ) };
@@ -276,6 +272,8 @@ void LambdaWorker::handle_scene_object_results()
           bind( &LambdaWorker::handle_accumulation_queue, this ) );
       }
     } else {
+      output_transfer_agent.reset();
+
       /* starting the ray-tracing threads */
       for ( size_t i = 0; i < 2; i++ ) {
         raytracing_thread_stats.emplace_back();
