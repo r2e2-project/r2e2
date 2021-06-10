@@ -21,18 +21,6 @@ message SceneObject {
     string alt_name = 3;
 };
 
-
-message SetupAccumulator
-{
-    string job_id = 1;
-    string storage_backend = 2;
-    uint32 width = 3;
-    uint32 height = 4;
-    uint32 tile_id = 5;
-    uint32 tile_count = 6;
-    repeated SceneObject scene_objects = 7;
-}
-
 message Hey {
     uint64 worker_id = 1;
     string job_id = 2;
