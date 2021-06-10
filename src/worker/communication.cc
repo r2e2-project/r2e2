@@ -152,28 +152,26 @@ void LambdaWorker::handle_samples()
 {
   while ( !samples.empty() ) {
     auto& sample = samples.front();
-    const TileId tile_id = tile_helper.tile_id( sample );
+    const TileId tid = tile_helper.tile_id( sample );
 
     auto [bag_it, inserted]
-      = open_sample_bags.try_emplace( tile_id,
+      = open_sample_bags.try_emplace( tid,
                                       *worker_id,
-                                      tile_id,
-                                      current_sample_bag_id[tile_id],
+                                      tid,
+                                      current_sample_bag_id[tid],
                                       true,
                                       MAX_SAMPLE_BAG_SIZE );
 
     auto& bag = bag_it->second;
 
     if ( inserted ) {
-      current_sample_bag_id[tile_id]++;
+      current_sample_bag_id[tid]++;
     } else if ( bag.info.bag_size + sample.MaxCompressedSize()
                 > MAX_SAMPLE_BAG_SIZE ) {
       sealed_sample_bags.emplace( move( bag ) );
-      bag = open_sample_bags.at( tile_id ) = { *worker_id,
-                                               tile_id,
-                                               current_sample_bag_id[tile_id]++,
-                                               true,
-                                               MAX_SAMPLE_BAG_SIZE };
+      bag = open_sample_bags.at( tid ) = {
+        *worker_id, tid, current_sample_bag_id[tid]++, true, MAX_SAMPLE_BAG_SIZE
+      };
     }
 
     const auto len = sample.Serialize( &bag.data[0] + bag.info.bag_size );
@@ -189,16 +187,21 @@ void LambdaWorker::handle_sample_bags()
   sample_bags_timer.read_event();
 
   auto submit_bag = [&]( RayBag&& bag ) {
+    // TODO add compression
     bag.data.erase( bag.info.bag_size );
     bag.data.shrink_to_fit();
 
-    const auto id = samples_transfer_agent->request_upload(
-      bag.info.str( ray_bags_key_prefix ), move( bag.data ), bag.info.tile_id );
+    const auto id
+      = ( config.accumulators ? transfer_agent : samples_transfer_agent )
+          ->request_upload( bag.info.str( ray_bags_key_prefix ),
+                            move( bag.data ),
+                            bag.info.tile_id );
 
-    pending_sample_bags[id] = make_pair( Task::Upload, bag.info );
+    ( config.accumulators ? pending_ray_bags : pending_sample_bags )[id]
+      = make_pair( Task::Upload, bag.info );
   };
 
-  for ( auto& [tile_id, bag] : open_sample_bags ) {
+  for ( auto& [_, bag] : open_sample_bags ) {
     submit_bag( move( bag ) );
   }
 
@@ -216,7 +219,17 @@ void LambdaWorker::handle_receive_queue()
     RayBag bag = move( receive_queue.front() );
     receive_queue.pop();
 
-    /* (1) XXX do we have this treelet? */
+    /* (1) am i a tracer or an accumulator? */
+
+    if ( is_accumulator ) {
+      if ( bag.info.tile_id != *tile_id ) {
+        throw runtime_error( "unexpected bag tile id" );
+      }
+
+      sample_queue.enqueue( move( bag.data ) );
+      sample_queue_size++;
+      continue;
+    }
 
     /* (2) let's unpack this treelet and add the rays to the trace queue */
     size_t total_size = bag.data.size();

@@ -1,5 +1,7 @@
 #include "worker/lambda-worker.hh"
 
+#include <pbrt/core/camera.h>
+
 #include <filesystem>
 #include <getopt.h>
 #include <signal.h>
@@ -47,10 +49,9 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
     }
   }() )
   , samples_transfer_agent(
-      config.accumulators.empty()
-        ? unique_ptr<TransferAgent>(
-          make_unique<S3TransferAgent>( job_storage_backend, 8, true ) )
-        : make_unique<AccumulatorTransferAgent>( config.accumulators ) )
+      make_unique<S3TransferAgent>( job_storage_backend, 8, true ) )
+  , output_transfer_agent(
+      make_unique<S3TransferAgent>( job_storage_backend, 1, true ) )
   , scene_transfer_agent(
       make_unique<S3TransferAgent>( scene_storage_backend, 2 ) )
   , worker_rule_categories( { loop.add_category( "Socket" ),
@@ -128,11 +129,14 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                  bind( &LambdaWorker::handle_transfer_results, this, false ),
                  [this] { return !pending_ray_bags.empty(); } );
 
-  loop.add_rule( "Samples agent",
-                 Direction::In,
-                 samples_transfer_agent->eventfd(),
-                 bind( &LambdaWorker::handle_transfer_results, this, true ),
-                 [this] { return !pending_sample_bags.empty(); } );
+  // we only need this is we're not accumulating samples in real-time
+  if ( not config.accumulators ) {
+    loop.add_rule( "Samples agent",
+                   Direction::In,
+                   samples_transfer_agent->eventfd(),
+                   bind( &LambdaWorker::handle_transfer_results, this, true ),
+                   [this] { return !pending_sample_bags.empty(); } );
+  }
 
   loop.add_rule( "Scene objects agent",
                  Direction::In,
@@ -149,6 +153,18 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                  worker_stats_timer,
                  bind( &LambdaWorker::handle_worker_stats, this ),
                  [this] { return true; } );
+
+  if ( is_accumulator ) {
+    loop.add_rule( "Upload output",
+                   Direction::In,
+                   upload_output_timer,
+                   bind( &LambdaWorker::handle_render_output, this ),
+                   [this] { return scene_loaded && new_samples_accumulated; } );
+
+    samples_transfer_agent.reset();
+  } else {
+    output_transfer_agent.reset();
+  }
 
   master_connection.install_rules(
     loop,
@@ -173,9 +189,26 @@ void LambdaWorker::shutdown_raytracing_threads()
   }
 }
 
+void LambdaWorker::shutdown_accumulation_threads()
+{
+  for ( auto& t : accumulation_threads ) {
+    if ( t.joinable() ) {
+      sample_queue_size++;
+      sample_queue.enqueue( ""s );
+    }
+  }
+
+  for ( auto& t : accumulation_threads ) {
+    if ( t.joinable() ) {
+      t.join();
+    }
+  }
+}
+
 void LambdaWorker::terminate()
 {
   shutdown_raytracing_threads();
+  shutdown_accumulation_threads();
   terminated = true;
 }
 
@@ -230,12 +263,20 @@ void LambdaWorker::handle_scene_object_results()
 
     scene_loaded = true;
 
-    if ( not config.accumulators.empty() ) {
-      tile_helper = { static_cast<uint32_t>( config.accumulators.size() ),
+    if ( is_accumulator ) {
+      tile_helper = { static_cast<uint32_t>( config.accumulators ),
                       scene.base.sampleBounds,
                       static_cast<uint32_t>( scene.samples_per_pixel ) };
-    }
 
+      scene.base.camera->film->SetCroppedPixelBounds(
+        static_cast<pbrt::Bounds2i>( tile_helper.bounds( *tile_id ) ) );
+
+      for ( size_t i = 0; i < 2; i++ ) {
+        accumulation_threads.emplace_back(
+          bind( &LambdaWorker::handle_accumulation_queue, this ) );
+      }
+    }
+  } else {
     /* starting the ray-tracing threads */
     for ( size_t i = 0; i < 2; i++ ) {
       raytracing_thread_stats.emplace_back();
@@ -265,13 +306,13 @@ void usage( const char* argv0, int exitCode )
        << "  -i --ip IPSTRING           ip of coordinator" << endl
        << "  -p --port PORT             port of coordinator" << endl
        << "  -s --storage-backend NAME  storage backend URI" << endl
+       << "  -q --accumulators N        number of accumulators" << endl
        << "  -S --samples N             number of samples per pixel" << endl
        << "  -M --max-depth N           maximum path depth" << endl
        << "  -b --bagging-delay N       bagging delay" << endl
        << "  -L --log-rays RATE         log ray actions" << endl
        << "  -B --log-bags RATE         log bag actions" << endl
        << "  -d --memcached-server      address for memcached" << endl
-       << "  -q --accumulator           address for accumulator" << endl
        << "  -h --help                  show help information" << endl;
 
   exit( exitCode );
@@ -285,6 +326,8 @@ int main( int argc, char* argv[] )
   string public_ip;
   string storage_uri;
 
+  int32_t accumulators = 0;
+
   int samples_per_pixel = 0;
   int max_path_depth = 0;
   float ray_log_rate = 0.0;
@@ -292,12 +335,12 @@ int main( int argc, char* argv[] )
   milliseconds bagging_delay = DEFAULT_BAGGING_DELAY;
 
   vector<Address> memcached_servers;
-  vector<Address> accumulators;
 
   struct option long_options[] = {
     { "port", required_argument, nullptr, 'p' },
     { "ip", required_argument, nullptr, 'i' },
     { "storage-backend", required_argument, nullptr, 's' },
+    { "accumulators", required_argument, nullptr, 'q' },
     { "samples", required_argument, nullptr, 'S' },
     { "max-depth", required_argument, nullptr, 'M' },
     { "bagging-delay", required_argument, nullptr, 'b' },
@@ -305,7 +348,6 @@ int main( int argc, char* argv[] )
     { "log-bags", required_argument, nullptr, 'B' },
     { "directional", no_argument, nullptr, 'I' },
     { "memcached-server", required_argument, nullptr, 'd' },
-    { "accumulator", required_argument, nullptr, 'q' },
     { "help", no_argument, nullptr, 'h' },
     { nullptr, 0, nullptr, 0 },
   };
@@ -322,6 +364,7 @@ int main( int argc, char* argv[] )
     case 'p': listen_port = stoi(optarg); break;
     case 'i': public_ip = optarg; break;
     case 's': storage_uri = optarg; break;
+    case 'q': accumulators = stoi(optarg); break;
     case 'S': samples_per_pixel = stoi(optarg); break;
     case 'M': max_path_depth = stoi(optarg); break;
     case 'b': bagging_delay = milliseconds{stoul(optarg)}; break;
@@ -329,14 +372,11 @@ int main( int argc, char* argv[] )
     case 'B': bag_log_rate = stof(optarg); break;
     case 'I': PbrtOptions.directionalTreelets = true; break;
     case 'h': usage(argv[0], EXIT_SUCCESS); break;
-
-    case 'q':
     case 'd': {
         string host;
         uint16_t port = 11211;
         tie(host, port) = Address::decompose(optarg);
-        (opt == 'd' ? memcached_servers
-                    : accumulators).emplace_back(host, port);
+        memcached_servers.emplace_back(host, port);
         break;
     }
 
@@ -345,18 +385,18 @@ int main( int argc, char* argv[] )
     // clang-format on
   }
 
-  if ( listen_port == 0 || samples_per_pixel < 0 || max_path_depth < 0
-       || bagging_delay <= 0s || ray_log_rate < 0 || ray_log_rate > 1.0
-       || bag_log_rate < 0 || bag_log_rate > 1.0 || public_ip.empty()
-       || storage_uri.empty() ) {
+  if ( listen_port == 0 || accumulators < 0 || samples_per_pixel < 0
+       || max_path_depth < 0 || bagging_delay <= 0s || ray_log_rate < 0
+       || ray_log_rate > 1.0 || bag_log_rate < 0 || bag_log_rate > 1.0
+       || public_ip.empty() || storage_uri.empty() ) {
     usage( argv[0], EXIT_FAILURE );
   }
 
   unique_ptr<LambdaWorker> worker;
-  WorkerConfiguration config { samples_per_pixel,   max_path_depth,
-                               bagging_delay,       ray_log_rate,
-                               bag_log_rate,        move( memcached_servers ),
-                               move( accumulators ) };
+  WorkerConfiguration config { samples_per_pixel, max_path_depth,
+                               bagging_delay,     ray_log_rate,
+                               bag_log_rate,      move( memcached_servers ),
+                               accumulators };
 
   try {
     worker = make_unique<LambdaWorker>(

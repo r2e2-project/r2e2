@@ -20,7 +20,6 @@
 #include <thread>
 #include <vector>
 
-#include "accumulator/accumulator.hh"
 #include "messages/message.hh"
 #include "messages/utils.hh"
 #include "net/lambda.hh"

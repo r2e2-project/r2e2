@@ -56,6 +56,15 @@ void LambdaWorker::process_message( const Message& message )
       log_prefix = "jobs/" + ( *job_id ) + "/logs/";
       ray_bags_key_prefix = "jobs/" + ( *job_id ) + "/";
 
+      if ( proto.is_accumulator() ) {
+        is_accumulator = true;
+        tile_id = proto.tile_id();
+
+        render_output_filename = to_string( *tile_id ) + ".png";
+        render_output_key
+          = ray_bags_key_prefix + "/out/" + render_output_filename;
+      }
+
       cerr << protoutil::to_json( proto ) << endl;
 
       master_connection.push_request(
@@ -123,6 +132,7 @@ void LambdaWorker::process_message( const Message& message )
 
           // making sure raytracing threads are done
           shutdown_raytracing_threads();
+          shutdown_accumulation_threads();
 
           pbrt::AccumulatedStats pbrt_stats = pbrt::stats::GetThreadStats();
           for ( auto& thread_stats : raytracing_thread_stats ) {
@@ -137,12 +147,12 @@ void LambdaWorker::process_message( const Message& message )
           finish_up_rule->cancel();
         },
         [this]() {
-          return trace_queue_size == 0 && processed_queue_size == 0
-                 && out_queue.empty() && samples.empty() && open_bags.empty()
-                 && sealed_bags.empty() && receive_queue.empty()
-                 && pending_ray_bags.empty() && pending_sample_bags.empty()
-                 && open_sample_bags.empty() && sealed_sample_bags.empty()
-                 && finished_path_ids.empty();
+          return trace_queue_size == 0 && sample_queue_size == 0
+                 && processed_queue_size == 0 && out_queue.empty()
+                 && samples.empty() && open_bags.empty() && sealed_bags.empty()
+                 && receive_queue.empty() && pending_ray_bags.empty()
+                 && pending_sample_bags.empty() && open_sample_bags.empty()
+                 && sealed_sample_bags.empty() && finished_path_ids.empty();
         } );
 
       break;

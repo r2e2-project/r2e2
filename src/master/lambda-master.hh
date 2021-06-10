@@ -11,9 +11,9 @@
 #include <string>
 #include <vector>
 
-#include "accumulator/accumulator.hh"
 #include "common/lambda.hh"
 #include "common/stats.hh"
+#include "common/tile_helper.hh"
 #include "messages/message.hh"
 #include "net/address.hh"
 #include "net/aws.hh"

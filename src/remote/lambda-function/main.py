@@ -40,11 +40,11 @@ def handler(event, context):
     if event['directionalTreelets']:
         command += ['--directional']
 
+    if event.get('accumulators'):
+        command += ['--accumulators', str(event['accumulators'])]
+
     for server in event.get('memcachedServers', []):
         command += ['--memcached-server', server]
-
-    for server in event.get('accumulators', []):
-        command += ['--accumulator', server]
 
     retcode = run_command(command)
     print("retcode={}".format(retcode))

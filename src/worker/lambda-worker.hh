@@ -17,9 +17,9 @@
 #include <thread>
 #include <tuple>
 
-#include "accumulator/accumulator.hh"
 #include "common/lambda.hh"
 #include "common/stats.hh"
+#include "common/tile_helper.hh"
 #include "master/lambda-master.hh"
 #include "messages/message.hh"
 #include "net/address.hh"
@@ -43,9 +43,10 @@ namespace r2t2 {
 
 constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL { 1'000 };
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL { 1'000 };
+constexpr std::chrono::milliseconds UPLOAD_OUTPUT_INTERVAL { 2'000 };
 
-constexpr size_t MAX_BAG_SIZE { 4 * 1024 * 1024 };   // 4 MiB
-constexpr size_t MAX_SAMPLE_BAG_SIZE { 1024 * 1024 }; // 1 MiB
+constexpr size_t MAX_BAG_SIZE { 4 * 1024 * 1024 };        // 4 MiB
+constexpr size_t MAX_SAMPLE_BAG_SIZE { 4 * 1024 * 1024 }; // 4 MiB
 
 struct WorkerConfiguration
 {
@@ -57,7 +58,7 @@ struct WorkerConfiguration
   float bag_log_rate;
 
   std::vector<Address> memcached_servers;
-  std::vector<Address> accumulators;
+  int accumulators;
 };
 
 /* Relationship between different queues in LambdaWorker:
@@ -101,7 +102,10 @@ private:
   const UniqueDirectory working_directory;
   std::optional<WorkerId> worker_id {};
   std::optional<std::string> job_id {};
+  std::optional<TileId> tile_id {};
   bool terminated { false };
+
+  bool is_accumulator { false };
 
   ////////////////////////////////////////////////////////////////////////////
   // Graphics                                                               //
@@ -153,6 +157,23 @@ private:
   std::map<TreeletId, std::queue<pbrt::RayStatePtr>> out_queue {};
   std::queue<pbrt::Sample> samples {};
   size_t out_queue_size { 0 };
+
+  /*** Accumulation *********************************************************/
+
+  void handle_accumulation_queue();
+
+  void handle_render_output();
+
+  void shutdown_accumulation_threads();
+
+  std::vector<std::thread> accumulation_threads {};
+  moodycamel::BlockingConcurrentQueue<std::string> sample_queue { 1024 };
+  std::atomic<size_t> sample_queue_size { 0 };
+
+  std::string render_output_filename {};
+  std::string render_output_key {};
+
+  std::atomic<bool> new_samples_accumulated { false };
 
   ////////////////////////////////////////////////////////////////////////////
   // Communication                                                          //
@@ -245,6 +266,7 @@ private:
 
   std::unique_ptr<TransferAgent> transfer_agent;
   std::unique_ptr<TransferAgent> samples_transfer_agent;
+  std::unique_ptr<TransferAgent> output_transfer_agent;
   std::unique_ptr<TransferAgent> scene_transfer_agent;
 
   ////////////////////////////////////////////////////////////////////////////
@@ -314,6 +336,7 @@ private:
   TimerFD seal_bags_timer {};
   TimerFD sample_bags_timer { SAMPLE_BAGS_INTERVAL };
   TimerFD worker_stats_timer { WORKER_STATS_INTERVAL };
+  TimerFD upload_output_timer { UPLOAD_OUTPUT_INTERVAL };
 
   ////////////////////////////////////////////////////////////////////////////
   // Local Stats                                                            //
