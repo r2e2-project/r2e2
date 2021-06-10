@@ -18,6 +18,32 @@ pair<bool, bool> LambdaMaster::assign_work( Worker& worker )
   if ( worker.active_rays() >= WORKER_MAX_ACTIVE_RAYS )
     return { false, false };
 
+  /* if the worker's role is accumulator */
+  if ( worker.role == Worker::Role::Accumulator ) {
+    /* Q1: do we have any sample for this guy? */
+    const TileId tile_id = worker.tile_id;
+    auto& bag_queue = queued_ray_bags[treelet_count + tile_id];
+
+    bool work_to_do = ( bag_queue.size() > 0 );
+
+    if ( not work_to_do ) {
+      return { true, false };
+    }
+
+    if ( worker.active_rays() < WORKER_MAX_ACTIVE_RAYS ) {
+      *worker.to_be_assigned.add_items() = to_protobuf( bag_queue.front() );
+      record_assign( worker.id, bag_queue.front() );
+      bag_queue.pop();
+      queued_ray_bags_count--;
+
+      return { worker.active_rays() < WORKER_MAX_ACTIVE_RAYS, true };
+    } else {
+      return { false, false };
+    }
+  }
+
+  // at this point, we know the worker is not an accumulator
+
   /* return, if the worker doesn't have any treelets */
   if ( worker.treelets.empty() )
     return { false, false };

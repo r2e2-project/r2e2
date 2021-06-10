@@ -70,6 +70,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                             const uint16_t client_port,
                             const uint32_t max_workers_,
                             const uint32_t ray_generators_,
+                            const uint32_t accumulators_,
                             const string& public_address_,
                             const string& storage_backend_uri_,
                             const string& aws_region_,
@@ -92,6 +93,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   , aws_address( LambdaInvocationRequest::endpoint( aws_region ), "https" )
   , max_workers( max_workers_ )
   , ray_generators( ray_generators_ )
+  , accumulators( accumulators_ )
   , scheduler( move( scheduler_ ) )
   , worker_rule_categories( { loop.add_category( "Socket" ),
                               loop.add_category( "Message read" ),
@@ -179,6 +181,19 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   /* now we can initialize the scene */
   scene = { scene_path, config.samples_per_pixel, config.crop_window };
 
+  /* initializing tile helper used for *accumulation* */
+  tile_helper = { static_cast<uint32_t>( accumulators ),
+                  scene.base.sampleBounds,
+                  static_cast<uint32_t>( scene.base.samplesPerPixel ) };
+
+  accumulators = tile_helper.active_accumulators();
+
+  /* initializing tile helper used for *ray generation* */
+  tiles = Tiles { config.tile_size,
+                  scene.sample_bounds,
+                  scene.base.samplesPerPixel,
+                  ray_generators ? ray_generators : max_workers };
+
   /* create the invocation payload */
   protobuf::InvocationPayload invocation_proto;
   invocation_proto.set_storage_backend( storage_backend_uri );
@@ -189,19 +204,16 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   invocation_proto.set_ray_log_rate( config.ray_log_rate );
   invocation_proto.set_bag_log_rate( config.bag_log_rate );
   invocation_proto.set_directional_treelets( PbrtOptions.directionalTreelets );
+  invocation_proto.set_accumulators( accumulators );
 
   for ( const auto& server : config.memcached_servers ) {
     *invocation_proto.add_memcached_servers() = server;
   }
 
-  for ( const auto& server : config.accumulators ) {
-    *invocation_proto.add_accumulators() = server;
-  }
-
   invocation_payload = protoutil::to_json( invocation_proto );
 
   /* initializing the treelets array */
-  const size_t treelet_count = scene.base.GetTreeletCount();
+  treelet_count = scene.base.GetTreeletCount();
   treelets.reserve( treelet_count );
   treelet_stats.reserve( treelet_count );
 
@@ -211,13 +223,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     unassigned_treelets.insert( i );
   }
 
-  queued_ray_bags.resize( treelet_count );
-  pending_ray_bags.resize( treelet_count );
-
-  tiles = Tiles { config.tile_size,
-                  scene.sample_bounds,
-                  scene.base.samplesPerPixel,
-                  ray_generators ? ray_generators : max_workers };
+  queued_ray_bags.resize( treelet_count + tile_helper.active_accumulators() );
+  pending_ray_bags.resize( treelet_count + tile_helper.active_accumulators() );
 
   if ( config.auto_name_log_dir_tag ) {
     // setting the directory name based on job info
@@ -267,19 +274,13 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
          << "\x1B[0m" << endl;
   };
 
-  tile_helper = { static_cast<uint32_t>( config.accumulators.size() ),
-                  scene.base.sampleBounds,
-                  static_cast<uint32_t>( scene.base.samplesPerPixel ) };
-
   cout << endl << "Job info:" << endl;
   print_info( "Job ID", job_id );
   print_info( "Working directory", scene_path );
   print_info( "Public address", public_address );
   print_info( "Maximum workers", max_workers );
   print_info( "Ray generators", ray_generators );
-  print_info( "Accumulators",
-              to_string( config.accumulators.size() ) + " ("
-                + to_string( tile_helper.active_accumulators() ) + ")" );
+  print_info( "Accumulators", accumulators );
   print_info( "Treelet count", treelet_count );
   print_info( "Tile size",
               to_string( tiles.tile_size ) + "\u00d7"
@@ -300,12 +301,14 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     [&] { handle_signal( signal_fd.read_signal() ); },
     [] { return true; } );
 
-  loop.add_rule(
-    "Reschedule",
-    Direction::In,
-    reschedule_timer,
-    bind( &LambdaMaster::handle_reschedule, this ),
-    [this] { return finished_ray_generators == this->ray_generators; } );
+  loop.add_rule( "Reschedule",
+                 Direction::In,
+                 reschedule_timer,
+                 bind( &LambdaMaster::handle_reschedule, this ),
+                 [this] {
+                   return ( finished_ray_generators == this->ray_generators )
+                          and ( started_accumulators == this->accumulators );
+                 } );
 
   loop.add_rule(
     "Job exit",
@@ -352,7 +355,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
       TCPSocket socket = listener_socket.accept();
 
       /* do we want this worker? */
-      if ( Worker::next_id >= this->ray_generators
+      if ( Worker::next_id >= this->ray_generators + this->accumulators
            && treelets_to_spawn.empty() ) {
         socket.close();
         return;
@@ -428,6 +431,38 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           worker.client.push_request( { 0, OpCode::FinishUp, "" } );
           worker.state = Worker::State::FinishingUp;
         }
+      } else if ( worker_id < this->ray_generators + this->accumulators ) {
+        /* This worker is an accumulator
+           Let's (1) say hi, (2) tell the worker to fetch the scene,
+           (3) assign a tile to the worker */
+
+        /* (0) create the entry for the worker */
+        auto& worker = workers.emplace_back(
+          worker_id, Worker::Role::Accumulator, move( socket ) );
+
+        assign_base_objects( worker );
+
+        worker.tile_id = worker_id - this->ray_generators;
+
+        /* (1) saying hi, assigning id to the worker */
+        protobuf::Hey hey_proto;
+        hey_proto.set_worker_id( worker_id );
+        hey_proto.set_job_id( job_id );
+        hey_proto.set_is_accumulator( true );
+        hey_proto.set_tile_id( worker.tile_id );
+        worker.client.push_request(
+          { 0, OpCode::Hey, protoutil::to_string( hey_proto ) } );
+
+        /* (2) tell the worker to get the necessary scene objects */
+        protobuf::GetObjects objs_proto;
+        for ( const SceneObject& obj : worker.objects ) {
+          *objs_proto.add_objects() = to_protobuf( obj );
+        }
+
+        worker.client.push_request(
+          { 0, OpCode::GetObjects, protoutil::to_string( objs_proto ) } );
+
+        started_accumulators++;
       } else {
         /* this is a normal worker */
         if ( !treelets_to_spawn.empty() ) {
@@ -566,77 +601,22 @@ void LambdaMaster::run()
     cout << "done." << endl;
   }
 
-  if ( not config.accumulators.empty() ) {
-    cout << "\u2192 Initializing " << config.memcached_servers.size()
-         << pluralize( " accumulator", config.memcached_servers.size() )
-         << "... " << flush;
-
-    list<meow::Client<TCPSession>> accu_clients;
-
-    for ( const auto& server : config.accumulators ) {
-      string host;
-      uint16_t port;
-      tie( host, port ) = Address::decompose( server );
-      Address addr { host, port };
-
-      TCPSocket socket;
-      socket.set_blocking( false );
-      socket.connect( addr );
-      accu_clients.emplace_back( TCPSession { move( socket ) } );
-    }
-
-    protobuf::SetupAccumulator proto;
-    proto.set_job_id( job_id );
-    proto.set_storage_backend( storage_backend_uri );
-    proto.set_width( scene.sample_extent.x );
-    proto.set_height( scene.sample_extent.y );
-    proto.set_tile_id( 0 );
-    proto.set_tile_count( tile_helper.active_accumulators() );
-
-    for ( const auto& obj : list_base_objects() ) {
-      *proto.add_scene_objects() = to_protobuf( obj );
-    }
-
-    EventLoop accu_loop;
-    size_t response_count = 0;
-    const auto cat = accu_loop.add_category( "All" );
-
-    accu_loop.add_rule(
-      "Finish",
-      [&] { accu_clients.clear(); },
-      [&] { return response_count == accu_clients.size(); } );
-
-    size_t accu_index = 0;
-    for ( auto& c : accu_clients ) {
-      c.install_rules(
-        accu_loop,
-        { cat, cat, cat, cat },
-        [this, &response_count]( meow::Message&& msg ) {
-          if ( msg.opcode() == OpCode::SetupAccumulator ) {
-            response_count++;
-          }
-        },
-        [this] {} );
-
-      proto.set_tile_id( accu_index++ );
-      c.push_request(
-        { 0, OpCode::SetupAccumulator, protoutil::to_string( proto ) } );
-    }
-
-    while ( accu_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
-      continue;
-    }
-
-    cout << "done." << endl;
-  }
-
   if ( ray_generators > 0 ) {
     /* let's invoke the ray generators */
     cout << "\u2192 Launching " << ray_generators << " ray "
          << pluralize( "generator", ray_generators ) << "... ";
 
     invoke_workers( ray_generators
-                    + static_cast<size_t>( 0.1 * ray_generators ) );
+                    + static_cast<size_t>( 0.2 * ray_generators ) );
+    cout << "done." << endl;
+  }
+
+  if ( accumulators > 0 ) {
+    /* let's invoke the accumulators */
+    cout << "\u2192 Launching " << accumulators << " sample "
+         << pluralize( "accumulator", accumulators ) << "... ";
+
+    invoke_workers( accumulators + static_cast<size_t>( 0.2 * accumulators ) );
     cout << "done." << endl;
   }
 
@@ -652,7 +632,7 @@ void LambdaMaster::run()
     }
 
     /* XXX What's happening here? */
-    if ( initialized_workers >= max_workers + ray_generators
+    if ( initialized_workers >= max_workers + ray_generators + accumulators
          && !free_workers.empty()
          && ( tiles.camera_rays_remaining() || queued_ray_bags_count > 0 ) ) {
       handle_queued_ray_bags();
@@ -770,6 +750,7 @@ void usage( const char* argv0, int exit_code )
        << "  -b --storage-backend NAME  storage backend URI" << endl
        << "  -m --max-workers N         maximum number of workers" << endl
        << "  -G --ray-generators N      number of ray generators" << endl
+       << "  -q --accumulators N        number of accumulators" << endl
        << "  -g --debug-logs            collect worker debug logs" << endl
        << "  -w --worker-stats N        log worker stats every N seconds"
        << endl
@@ -798,8 +779,6 @@ void usage( const char* argv0, int exit_code )
        << "  -A --auto-name             set log directory name automatically"
        << endl
        << "  -d --memcached-server      address for memcached" << endl
-       << "                             (can be repeated)" << endl
-       << "  -q --accumulator           address for accumulator" << endl
        << "                             (can be repeated)" << endl
        << "  -h --help                  show help information" << endl;
 
@@ -833,6 +812,7 @@ int main( int argc, char* argv[] )
   uint16_t client_port = 0;
   int32_t max_workers = -1;
   int32_t ray_generators = 0;
+  int32_t accumulators = 0;
   string public_ip;
   string storage_backend_uri;
   string region { "us-west-2" };
@@ -862,7 +842,6 @@ int main( int argc, char* argv[] )
   uint32_t max_jobs_on_engine = 1;
   vector<string> memcached_servers;
   vector<pair<string, uint32_t>> engines;
-  vector<string> accumulators;
 
   struct option long_options[] = {
     { "port", required_argument, nullptr, 'p' },
@@ -872,6 +851,7 @@ int main( int argc, char* argv[] )
     { "storage-backend", required_argument, nullptr, 'b' },
     { "max-workers", required_argument, nullptr, 'm' },
     { "ray-generators", required_argument, nullptr, 'G' },
+    { "accumulators", required_argument, nullptr, 'q' },
     { "scheduler", required_argument, nullptr, 'a' },
     { "scheduler-file", required_argument, nullptr, 'F' },
     { "debug-logs", no_argument, nullptr, 'g' },
@@ -892,7 +872,6 @@ int main( int argc, char* argv[] )
     { "jobs", required_argument, nullptr, 'J' },
     { "memcached-server", required_argument, nullptr, 'd' },
     { "engine", required_argument, nullptr, 'E' },
-    { "accumulator", required_argument, nullptr, 'q' },
     { "auto-name", required_argument, nullptr, 'A' },
     { "help", no_argument, nullptr, 'h' },
     { nullptr, 0, nullptr, 0 },
@@ -919,6 +898,7 @@ int main( int argc, char* argv[] )
       case 'b': storage_backend_uri = optarg; break;
       case 'm': max_workers = stoi(optarg); break;
       case 'G': ray_generators = stoi(optarg); break;
+      case 'q': accumulators = stoi(optarg); break;
       case 'a': scheduler_name = optarg; break;
       case 'F': scheduler_file = optarg; break;
       case 'g': collect_debug_logs = true; break;
@@ -936,7 +916,6 @@ int main( int argc, char* argv[] )
       case 'J': max_jobs_on_engine = stoul(optarg); break;
       case 'd': memcached_servers.emplace_back(optarg); break;
       case 'E': engines.emplace_back(optarg, max_jobs_on_engine); break;
-      case 'q': accumulators.emplace_back(optarg); break;
       case 'A': auto_name_log_dir_tag = optarg; break;
       case 'h': usage(argv[0], EXIT_SUCCESS); break;
       case 'C': alt_scene_file = optarg; break;
@@ -1010,10 +989,10 @@ int main( int argc, char* argv[] )
   }
 
   if ( scheduler == nullptr || listen_port == 0 || max_workers <= 0
-       || ray_generators < 0 || samples_per_pixel < 0 || max_path_depth < 0
-       || bagging_delay <= 0s || ray_log_rate < 0 || ray_log_rate > 1.0
-       || bag_log_rate < 0 || bag_log_rate > 1.0 || public_ip.empty()
-       || storage_backend_uri.empty() || region.empty()
+       || ray_generators < 0 || accumulators < 0 || samples_per_pixel < 0
+       || max_path_depth < 0 || bagging_delay <= 0s || ray_log_rate < 0
+       || ray_log_rate > 1.0 || bag_log_rate < 0 || bag_log_rate > 1.0
+       || public_ip.empty() || storage_backend_uri.empty() || region.empty()
        || new_tile_threshold == 0
        || ( crop_window.has_value() && pixels_per_tile != 0
             && pixels_per_tile
@@ -1037,13 +1016,14 @@ int main( int argc, char* argv[] )
                                  tile_size,         seconds { timeout },
                                  job_summary_path,  new_tile_threshold,
                                  alt_scene_file,    move( memcached_servers ),
-                                 move( engines ),   move( accumulators ) };
+                                 move( engines ) };
 
   try {
     master = make_unique<LambdaMaster>( listen_port,
                                         client_port,
                                         max_workers,
                                         ray_generators,
+                                        accumulators,
                                         public_address.str(),
                                         storage_backend_uri,
                                         region,

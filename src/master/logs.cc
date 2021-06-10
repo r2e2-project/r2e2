@@ -69,15 +69,18 @@ void LambdaMaster::record_dequeue( const WorkerId worker_id,
   worker.outstanding_ray_bags.erase( info );
   worker.outstanding_bytes -= info.bag_size;
 
-  treelets[info.treelet_id].last_stats.first = true;
+  if ( info.sample_bag ) {
+    worker.rays.accumulated += info.ray_count;
+  } else {
+    treelets[info.treelet_id].last_stats.first = true;
+    treelet_stats[info.treelet_id].dequeued.rays += info.ray_count;
+    treelet_stats[info.treelet_id].dequeued.bytes += info.bag_size;
+    treelet_stats[info.treelet_id].dequeued.count++;
+  }
 
   worker.stats.dequeued.rays += info.ray_count;
   worker.stats.dequeued.bytes += info.bag_size;
   worker.stats.dequeued.count++;
-
-  treelet_stats[info.treelet_id].dequeued.rays += info.ray_count;
-  treelet_stats[info.treelet_id].dequeued.bytes += info.bag_size;
-  treelet_stats[info.treelet_id].dequeued.count++;
 
   aggregated_stats.dequeued.rays += info.ray_count;
   aggregated_stats.dequeued.bytes += info.bag_size;
@@ -236,8 +239,7 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
 
   *proto.mutable_pbrt_stats() = to_protobuf( pbrt_stats );
 
-  proto.set_num_accumulators( config.accumulators.size() );
-  proto.set_num_active_accumulators( tile_helper.active_accumulators() );
+  proto.set_num_accumulators( accumulators );
 
   return proto;
 }

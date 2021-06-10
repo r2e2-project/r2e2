@@ -59,7 +59,6 @@ struct MasterConfiguration
 
   std::vector<std::string> memcached_servers;
   std::vector<std::pair<std::string, uint32_t>> engines;
-  std::vector<std::string> accumulators;
 };
 
 class LambdaMaster
@@ -69,6 +68,7 @@ public:
                 const uint16_t client_port,
                 const uint32_t max_workers,
                 const uint32_t ray_generators,
+                const uint32_t accumulators,
                 const std::string& public_address,
                 const std::string& storage_backend,
                 const std::string& aws_region,
@@ -143,7 +143,7 @@ private:
     {
       Generator,
       Tracer,
-      Aggregator
+      Accumulator
     };
 
     Worker( const WorkerId id_, const Role role_, TCPSocket&& sock )
@@ -166,6 +166,8 @@ private:
     std::vector<TreeletId> treelets {};
     std::set<SceneObject> objects {};
 
+    TileId tile_id {};
+
     std::set<RayBagInfo> outstanding_ray_bags {};
     size_t outstanding_bytes { 0 };
 
@@ -177,12 +179,13 @@ private:
 
       uint64_t terminated { 0 };
       uint64_t enqueued { 0 };
+      uint64_t accumulated { 0 };
     } rays {};
 
     uint64_t active_rays() const
     {
       return rays.camera + rays.generated + rays.dequeued - rays.terminated
-             - rays.enqueued;
+             - rays.enqueued - rays.accumulated;
     }
 
     // Statistics
@@ -203,6 +206,8 @@ private:
   const uint32_t max_workers;
   const uint32_t ray_generators;
   uint32_t finished_ray_generators { 0 };
+  uint32_t accumulators;
+  uint32_t started_accumulators { 0 };
   uint32_t initialized_workers { 0 };
 
   TileHelper tile_helper {};
@@ -225,6 +230,7 @@ private:
     {}
   };
 
+  size_t treelet_count {};
   std::vector<Treelet> treelets {};
   std::vector<TreeletStats> treelet_stats {};
 
@@ -275,6 +281,9 @@ private:
   std::pair<bool, bool> assign_work( Worker& worker );
 
   void handle_queued_ray_bags();
+
+  /* NOTE: in the following group of queues, the first N queues are for
+  treelets, and the next M are for tiles (for accumulation) */
 
   /* ray bags that are going to be assigned to workers */
   std::vector<std::queue<RayBagInfo>> queued_ray_bags {};

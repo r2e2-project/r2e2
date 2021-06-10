@@ -12,7 +12,7 @@ message InvocationPayload {
     float bag_log_rate = 7;
     bool directional_treelets = 8;
     repeated string memcached_servers = 9;
-    repeated string accumulators = 10;
+    uint32 accumulators = 10;
 }
 
 message SceneObject {
@@ -36,6 +36,8 @@ message SetupAccumulator
 message Hey {
     uint64 worker_id = 1;
     string job_id = 2;
+    bool is_accumulator = 3;
+    uint32 tile_id = 4;
 }
 
 message GetObjects {
@@ -161,6 +163,7 @@ message JobSummary {
     string job_id = 1;
     uint32 num_lambdas = 2;
     uint32 num_generators = 3;
+    uint32 num_accumulators = 27;
     uint32 treelet_count = 4;
     Point2 output_size = 5;
     uint32 spp = 6;
@@ -186,7 +189,4 @@ message JobSummary {
     double estimated_cost = 24;
 
     AccumulatedStats pbrt_stats = 26;
-
-    uint32 num_accumulators = 27;
-    uint32 num_active_accumulators = 28;
 }

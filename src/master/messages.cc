@@ -33,7 +33,8 @@ void LambdaMaster::process_message( const uint64_t worker_id,
     case OpCode::GetObjects:
       initialized_workers++;
 
-      if ( initialized_workers == max_workers + ray_generators ) {
+      if ( initialized_workers
+           == max_workers + ray_generators + accumulators ) {
         scene_initialization_done = steady_clock::now();
       }
 
@@ -104,7 +105,8 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       worker.stats.cpu_usage = stats.cpu_usage;
 
       if ( not worker.treelets.empty()
-           and ( initialized_workers >= max_workers + ray_generators ) ) {
+           and ( initialized_workers
+                 >= max_workers + ray_generators + accumulators ) ) {
         const auto treelet_id = worker.treelets.back();
         const double ALPHA
           = 2.0 / ( 10 * treelets[treelet_id].workers.size() + 1 );
