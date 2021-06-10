@@ -16,6 +16,10 @@ TileHelper::TileHelper( const uint32_t accumulators,
   , extent_( bounds_.Diagonal() )
   , spp_( spp )
 {
+  if ( accumulators_ == 0 ) {
+    return;
+  }
+
   tile_size_ = ceil( sqrt( extent_.x * extent_.y / accumulators_ ) );
 
   while ( ceil( 1.0 * extent_.x / tile_size_ )
