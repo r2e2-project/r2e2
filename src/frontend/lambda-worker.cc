@@ -275,13 +275,13 @@ void LambdaWorker::handle_scene_object_results()
         accumulation_threads.emplace_back(
           bind( &LambdaWorker::handle_accumulation_queue, this ) );
       }
-    }
-  } else {
-    /* starting the ray-tracing threads */
-    for ( size_t i = 0; i < 2; i++ ) {
-      raytracing_thread_stats.emplace_back();
-      raytracing_threads.emplace_back(
-        bind( &LambdaWorker::handle_trace_queue, this, i ) );
+    } else {
+      /* starting the ray-tracing threads */
+      for ( size_t i = 0; i < 2; i++ ) {
+        raytracing_thread_stats.emplace_back();
+        raytracing_threads.emplace_back(
+          bind( &LambdaWorker::handle_trace_queue, this, i ) );
+      }
     }
   }
 }
