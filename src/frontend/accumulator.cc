@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 
 #include <pbrt/core/camera.h>
@@ -65,8 +66,35 @@ Accumulator::Accumulator( const uint16_t listen_port )
       stringstream buffer;
       buffer << fin.rdbuf();
 
+      stats_.bytes_uploaded += fin.tellg();
       job_transfer_agent_->request_upload( output_key_, buffer.str() );
       dirty_ = false;
+    },
+    [] { return true; } );
+
+  loop_.add_rule(
+    "Print status",
+    Direction::In,
+    print_status_timer_,
+    [this] {
+      print_status_timer_.read_event();
+
+      using clock = chrono::steady_clock;
+      static const clock::time_point start = clock::now();
+
+      const auto t
+        = chrono::duration_cast<chrono::seconds>( clock::now() - start )
+            .count();
+
+      cerr << "[" << setfill( '0' ) << setw( 2 ) << ( t / 60 ) << ":"
+           << setw( 2 ) << ( t % 60 );
+
+      cerr << "] peers=" << workers_.size()
+           << ", samples_received=" << stats_.samples_received
+           << ", bags_received=" << stats_.bags_received
+           << ", bytes_received=" << stats_.bytes_received
+           << ", images_uploaded=" << stats_.images_uploaded
+           << ", bytes_uploaded=" << stats_.bytes_uploaded << endl;
     },
     [] { return true; } );
 }
@@ -115,10 +143,7 @@ void Accumulator::process_message(
 
           vector<pair<uint64_t, string>> actions;
           job_transfer_agent_->try_pop_bulk( back_inserter( actions ) );
-
-          for ( auto& action : actions ) {
-            cerr << "Upload done (" << action.first << ")." << endl;
-          }
+          stats_.images_uploaded += actions.size();
         },
         [] { return true; } );
 
@@ -170,6 +195,8 @@ void Accumulator::process_message(
     }
 
     case OpCode::ProcessSampleBag: {
+      stats_.bytes_received += msg.payload().length();
+      stats_.bags_received++;
       bags_queue.enqueue( move( msg.payload() ) );
       worker_it->push_request( { 0, OpCode::SampleBagProcessed, "" } );
       dirty_ = true;
@@ -204,6 +231,8 @@ void Accumulator::handle_bags_queue()
         samples.emplace_back();
         samples.back().Deserialize( sample_bag.data() + offset, len );
         offset += len;
+
+        stats_.samples_received++;
       }
 
       pbrt::graphics::AccumulateImage( scene_.camera, samples );
@@ -231,6 +260,7 @@ int main( int argc, char* argv[] )
     }
 
     FLAGS_logtostderr = false;
+    FLAGS_minloglevel = 2;
 
     const uint16_t port = static_cast<uint16_t>( stoi( argv[1] ) );
     Accumulator accumulator { port };

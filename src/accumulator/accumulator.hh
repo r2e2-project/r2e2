@@ -25,6 +25,7 @@
 namespace r2t2 {
 
 constexpr std::chrono::milliseconds UPLOAD_OUTPUT_INTERVAL { 1'000 };
+constexpr std::chrono::milliseconds PRINT_STATUS_INTERVAL { 5'000 };
 
 class TileHelper
 {
@@ -59,11 +60,20 @@ public:
 class Accumulator
 {
 private:
+  struct {
+    uint64_t bytes_received { 0 };
+    uint64_t bags_received { 0 };
+    uint64_t samples_received { 0 };
+    uint64_t bytes_uploaded { 0 };
+    uint64_t images_uploaded { 0 };
+  } stats_ {};
+
   EventLoop loop_ {};
   TempDirectory working_directory_ { "/tmp/r2t2-accumulator" };
   TCPSocket listener_socket_ {};
 
   TimerFD upload_output_timer_ { UPLOAD_OUTPUT_INTERVAL };
+  TimerFD print_status_timer_ { PRINT_STATUS_INTERVAL };
   std::string job_id_ {};
   std::unique_ptr<S3TransferAgent> job_transfer_agent_ { nullptr };
   std::string output_filename_ {};
