@@ -16,8 +16,6 @@ void LambdaMaster::record_enqueue( const WorkerId worker_id,
   auto& worker = workers.at( worker_id );
   worker.rays.enqueued += info.ray_count;
 
-  treelets[info.treelet_id].last_stats.first = true;
-
   if ( info.sample_bag ) {
     worker.stats.samples.rays += info.ray_count;
     worker.stats.samples.bytes += info.bag_size;
@@ -33,6 +31,7 @@ void LambdaMaster::record_enqueue( const WorkerId worker_id,
     worker.stats.enqueued.bytes += info.bag_size;
     worker.stats.enqueued.count++;
 
+    treelets[info.treelet_id].last_stats.first = true;
     treelet_stats[info.treelet_id].enqueued.rays += info.ray_count;
     treelet_stats[info.treelet_id].enqueued.bytes += info.bag_size;
     treelet_stats[info.treelet_id].enqueued.count++;

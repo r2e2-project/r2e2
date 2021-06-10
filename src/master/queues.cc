@@ -109,7 +109,7 @@ void LambdaMaster::handle_queued_ray_bags()
           OpCode::ProcessRayBag,
           protoutil::to_string( worker.to_be_assigned ) } );
 
-      worker.to_be_assigned = {};
+      worker.to_be_assigned.Clear();
     }
 
     if ( worker.marked_free ) {
