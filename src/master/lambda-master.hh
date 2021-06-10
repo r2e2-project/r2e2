@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "accumulator/accumulator.hh"
 #include "common/lambda.hh"
 #include "common/stats.hh"
 #include "messages/message.hh"
@@ -203,6 +204,8 @@ private:
   const uint32_t ray_generators;
   uint32_t finished_ray_generators { 0 };
   uint32_t initialized_workers { 0 };
+
+  TileHelper tile_helper {};
 
   std::vector<WorkerId> free_workers {};
 

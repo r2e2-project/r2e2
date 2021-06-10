@@ -236,6 +236,9 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
 
   *proto.mutable_pbrt_stats() = to_protobuf( pbrt_stats );
 
+  proto.set_num_accumulators( config.accumulators.size() );
+  proto.set_num_active_accumulators( tile_helper.active_accumulators() );
+
   return proto;
 }
 

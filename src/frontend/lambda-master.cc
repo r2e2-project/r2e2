@@ -20,6 +20,7 @@
 #include <thread>
 #include <vector>
 
+#include "accumulator/accumulator.hh"
 #include "messages/message.hh"
 #include "messages/utils.hh"
 #include "net/lambda.hh"
@@ -266,12 +267,19 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
          << "\x1B[0m" << endl;
   };
 
+  tile_helper = { static_cast<uint32_t>( config.accumulators.size() ),
+                  scene.base.sampleBounds,
+                  static_cast<uint32_t>( scene.base.samplesPerPixel ) };
+
   cout << endl << "Job info:" << endl;
   print_info( "Job ID", job_id );
   print_info( "Working directory", scene_path );
   print_info( "Public address", public_address );
   print_info( "Maximum workers", max_workers );
   print_info( "Ray generators", ray_generators );
+  print_info( "Accumulators",
+              to_string( config.accumulators.size() ) + " ("
+                + to_string( tile_helper.active_accumulators() ) + ")" );
   print_info( "Treelet count", treelet_count );
   print_info( "Tile size",
               to_string( tiles.tile_size ) + "\u00d7"
@@ -583,7 +591,7 @@ void LambdaMaster::run()
     proto.set_width( scene.sample_extent.x );
     proto.set_height( scene.sample_extent.y );
     proto.set_tile_id( 0 );
-    proto.set_tile_count( config.accumulators.size() );
+    proto.set_tile_count( tile_helper.active_accumulators() );
 
     for ( const auto& obj : list_base_objects() ) {
       *proto.add_scene_objects() = to_protobuf( obj );

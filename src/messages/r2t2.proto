@@ -186,4 +186,7 @@ message JobSummary {
     double estimated_cost = 24;
 
     AccumulatedStats pbrt_stats = 26;
+
+    uint32 num_accumulators = 27;
+    uint32 num_active_accumulators = 28;
 }
