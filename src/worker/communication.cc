@@ -187,7 +187,23 @@ void LambdaWorker::handle_sample_bags()
   sample_bags_timer.read_event();
 
   auto submit_bag = [&]( RayBag&& bag ) {
-    // TODO add compression
+    if ( COMPRESS_RAY_BAGS ) {
+      const size_t upper_bound = LZ4_COMPRESSBOUND( bag.info.bag_size );
+      string compressed( upper_bound, '\0' );
+      const size_t compressed_size = LZ4_compress_default(
+        bag.data.data(), &compressed[0], bag.info.bag_size, upper_bound );
+
+      if ( compressed_size == 0 ) {
+        cerr << "bag compression failed: "
+             << bag.info.str( ray_bags_key_prefix ) << endl;
+
+        throw runtime_error( "bag compression failed" );
+      }
+
+      bag.info.bag_size = compressed_size;
+      bag.data = move( compressed );
+    }
+
     bag.data.erase( bag.info.bag_size );
     bag.data.shrink_to_fit();
 
@@ -219,23 +235,16 @@ void LambdaWorker::handle_receive_queue()
     RayBag bag = move( receive_queue.front() );
     receive_queue.pop();
 
-    /* (1) am i a tracer or an accumulator? */
-
-    if ( is_accumulator ) {
-      if ( bag.info.tile_id != *tile_id ) {
-        throw runtime_error( "unexpected bag tile id" );
-      }
-
-      sample_queue.enqueue( move( bag.data ) );
-      sample_queue_size++;
-      continue;
-    }
-
-    /* (2) let's unpack this treelet and add the rays to the trace queue */
+    /* let's unpack this treelet and add the rays to the trace or accumulation
+     * queue */
     size_t total_size = bag.data.size();
 
     if ( COMPRESS_RAY_BAGS ) {
-      string decompressed( bag.info.ray_count * RayState::MaxPackedSize, '\0' );
+      string decompressed( bag.info.ray_count
+                             * ( bag.info.sample_bag
+                                   ? Sample::MaxPackedSize
+                                   : RayState::MaxPackedSize ),
+                           '\0' );
 
       int decompressed_size = LZ4_decompress_safe(
         bag.data.data(), &decompressed[0], total_size, decompressed.size() );
@@ -251,23 +260,32 @@ void LambdaWorker::handle_receive_queue()
       bag.data = move( decompressed );
     }
 
-    const char* data = bag.data.data();
+    if ( is_accumulator ) {
+      if ( bag.info.tile_id != *tile_id ) {
+        throw runtime_error( "unexpected bag tile id" );
+      }
 
-    for ( size_t offset = 0; offset < total_size; ) {
-      uint32_t len;
-      memcpy( &len, data + offset, sizeof( uint32_t ) );
-      offset += 4;
+      sample_queue_size++;
+      sample_queue.enqueue( move( bag.data ) );
+    } else {
+      const char* data = bag.data.data();
 
-      RayStatePtr ray = RayState::Create();
-      ray->Deserialize( data + offset, len );
-      ray->hop++;
-      ray->pathHop++;
-      offset += len;
+      for ( size_t offset = 0; offset < total_size; ) {
+        uint32_t len;
+        memcpy( &len, data + offset, sizeof( uint32_t ) );
+        offset += 4;
 
-      log_ray( RayAction::Unbagged, *ray, bag.info );
+        RayStatePtr ray = RayState::Create();
+        ray->Deserialize( data + offset, len );
+        ray->hop++;
+        ray->pathHop++;
+        offset += len;
 
-      trace_queue_size++;
-      trace_queue.enqueue( move( ray ) );
+        log_ray( RayAction::Unbagged, *ray, bag.info );
+
+        trace_queue_size++;
+        trace_queue.enqueue( move( ray ) );
+      }
     }
 
     log_bag( BagAction::Opened, bag.info );
