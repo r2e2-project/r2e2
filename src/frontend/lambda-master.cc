@@ -307,7 +307,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   if ( accumulators ) {
     cout << "\u2192 Real-time preview is available at\n"
-         << "  \x1B[1m" << preview_url() << "\x1B[0m" << endl;
+         << "  \x1B[1m" << preview_url() << "\x1B[0m\n" << endl;
   }
 
   loop.add_rule(

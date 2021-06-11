@@ -10,7 +10,8 @@
 #include "util/uri.hh"
 
 constexpr std::chrono::milliseconds DEFAULT_BAGGING_DELAY { 50 };
-constexpr size_t WORKER_MAX_ACTIVE_RAYS = 100'000; /* ~120 MiB of rays */
+constexpr size_t WORKER_MAX_ACTIVE_RAYS = 100'000;       /* ~120 MiB of rays */
+constexpr size_t WORKER_MAX_ACTIVE_SAMPLES = 10'000'000; /* 320 MB of samples */
 
 using WorkerId = uint64_t;
 using TreeletId = uint32_t;
