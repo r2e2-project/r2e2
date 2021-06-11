@@ -273,6 +273,18 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
          << "\x1B[0m" << endl;
   };
 
+  // clang-format off
+  auto preview_url = [&] {
+    return "https://r2t2-project.github.io/r2t2/preview/"s
+      + "?job_id="s + job_id 
+      + "&bucket="s + storage_backend_info.bucket 
+      + "&region="s + storage_backend_info.region
+      + "&width="s + to_string( scene.sample_extent.x )
+      + "&height="s + to_string( scene.sample_extent.y )
+      + "&tiles="s + to_string( accumulators );
+  };
+  // clang-format on
+
   cout << endl << "Job info:" << endl;
   print_info( "Job ID", job_id );
   print_info( "Working directory", scene_path );
@@ -292,6 +304,11 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   print_info( "Logs directory", config.logs_directory.c_str() );
 
   cout << endl;
+
+  if ( accumulators ) {
+    cout << "\u2192 Real-time preview is available at\n"
+         << "  \x1B[1m" << preview_url() << "\x1B[0m" << endl;
+  }
 
   loop.add_rule(
     "Signals",
