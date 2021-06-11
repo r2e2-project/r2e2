@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <random>
 #include <sstream>
 #include <string>
 
@@ -147,3 +148,14 @@ struct RayBag
     , data( std::move( data_ ) )
   {}
 };
+
+template<class T1, class T2>
+std::chrono::milliseconds random_initial(
+  const std::chrono::duration<T1, T2>& t )
+{
+  static thread_local std::random_device rd;
+  static thread_local std::mt19937 gen( rd() );
+  std::uniform_int_distribution<> dis(
+    0, std::chrono::duration_cast<std::chrono::milliseconds>( t ).count() );
+  return std::chrono::milliseconds { dis( gen ) };
+}

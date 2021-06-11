@@ -334,9 +334,15 @@ private:
 
   /* Timers */
   TimerFD seal_bags_timer {};
-  TimerFD sample_bags_timer { SAMPLE_BAGS_INTERVAL };
-  TimerFD worker_stats_timer { WORKER_STATS_INTERVAL };
-  TimerFD upload_output_timer { UPLOAD_OUTPUT_INTERVAL };
+
+  TimerFD sample_bags_timer { SAMPLE_BAGS_INTERVAL,
+                              random_initial( SAMPLE_BAGS_INTERVAL ) };
+
+  TimerFD worker_stats_timer { WORKER_STATS_INTERVAL,
+                               random_initial( WORKER_STATS_INTERVAL ) };
+
+  TimerFD upload_output_timer { UPLOAD_OUTPUT_INTERVAL,
+                                random_initial( UPLOAD_OUTPUT_INTERVAL ) };
 
   ////////////////////////////////////////////////////////////////////////////
   // Local Stats                                                            //
