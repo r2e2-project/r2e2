@@ -31,12 +31,18 @@ int main( int argc, char* argv[] )
     = path + "/"
       + pbrt::scene::GetObjectName( pbrt::ObjectType::Treelet, treelet_id );
 
-  ifstream fin { treelet_path };
-  stringstream ss;
-  ss << fin.rdbuf();
-  string data = ss.str();
+  vector<char> buffer;
+  {
+    GlobalScopeTimer<Timer::Category::WaitingForEvent> _;
 
-  membuf buf( data.data(), data.data() + data.size() );
+    ifstream fin { treelet_path, ios::binary | ios::ate };
+    streamsize size = fin.tellg();
+    fin.seekg( 0, ios::beg );
+    buffer.resize( size );
+    fin.read( buffer.data(), size );
+  }
+
+  membuf buf( buffer.data(), buffer.data() + buffer.size() );
   istream in_stream( &buf );
 
   auto& timer = global_timer();
