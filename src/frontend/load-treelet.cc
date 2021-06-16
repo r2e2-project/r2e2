@@ -42,15 +42,13 @@ int main( int argc, char* argv[] )
     fin.read( buffer.data(), size );
   }
 
-  membuf buf( buffer.data(), buffer.data() + buffer.size() );
-  istream in_stream( &buf );
-
   auto& timer = global_timer();
 
   pbrt::PbrtOptions.nThreads = 1;
   {
     GlobalScopeTimer<Timer::Category::LoadingTreelet> _;
-    auto treelet = pbrt::scene::LoadTreelet( path, treelet_id, &in_stream );
+    auto treelet = pbrt::scene::LoadTreelet(
+      path, treelet_id, buffer.data(), buffer.size() );
   }
 
   cout << timer.summary() << endl;

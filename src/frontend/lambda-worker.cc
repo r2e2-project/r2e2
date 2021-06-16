@@ -241,8 +241,8 @@ void LambdaWorker::handle_scene_object_results()
 
     for ( auto& [id, data] : downloaded_treelets ) {
       membuf buf( data.data(), data.data() + data.size() );
-      istream in( &buf );
-      treelets.emplace( id, scene::LoadTreelet( ".", id, &in ) );
+      treelets.emplace(
+        id, scene::LoadTreelet( ".", id, data.data(), data.size() ) );
     }
 
     downloaded_treelets.clear();
