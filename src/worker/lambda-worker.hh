@@ -171,7 +171,7 @@ private:
   std::atomic<size_t> sample_queue_size { 0 };
 
   std::string render_output_filename {};
-  std::string render_output_key {};
+  size_t render_output_id {0};
 
   std::atomic<bool> new_samples_accumulated { false };
 

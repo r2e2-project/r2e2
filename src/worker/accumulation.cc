@@ -44,13 +44,24 @@ void LambdaWorker::handle_render_output()
     return;
 
   new_samples_accumulated = false;
-
   pbrt::graphics::WriteImage( scene.base.camera, render_output_filename );
-  ifstream fin { render_output_filename };
-  stringstream buffer;
-  buffer << fin.rdbuf();
 
-  output_transfer_agent->request_upload( render_output_key, buffer.str() );
+  string buffer;
+  ifstream fin { render_output_filename, ios::binary | ios::ate };
+  streamsize size = fin.tellg();
+  fin.seekg( 0, ios::beg );
+  buffer.resize( size );
+  fin.read( buffer.data(), size );
+
+  const string key_base = ray_bags_key_prefix + "out/" + to_string( *tile_id );
+
+  output_transfer_agent->request_upload(
+    key_base + '-' + to_string( render_output_id ) + ".png", move( buffer ) );
+
+  output_transfer_agent->request_upload( key_base,
+                                         to_string( render_output_id ) );
+
+  render_output_id++;
 }
 
 }
