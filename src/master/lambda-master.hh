@@ -348,6 +348,7 @@ private:
       pbrt::ObjectType::Scene,
       pbrt::ObjectType::Camera,
       pbrt::ObjectType::Lights,
+      pbrt::ObjectType::AreaLights,
       pbrt::ObjectType::Sampler
     };
     pbrt::scene::Base base {};
