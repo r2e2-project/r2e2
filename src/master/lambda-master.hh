@@ -393,6 +393,8 @@ private:
 
   void terminate( const std::string& why );
 
+  std::optional<EventLoop::RuleHandle> terminate_rule_handle {};
+
   EventLoop loop {};
   meow::Client<TCPSession>::RuleCategories worker_rule_categories;
 

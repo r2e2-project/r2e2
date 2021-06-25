@@ -307,7 +307,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   if ( accumulators ) {
     cout << "\u2192 Real-time preview is available at\n"
-         << "  \x1B[1m" << preview_url() << "\x1B[0m\n" << endl;
+         << "  \x1B[1m" << preview_url() << "\x1B[0m\n"
+         << endl;
   }
 
   loop.add_rule(
@@ -736,9 +737,37 @@ void LambdaMaster::terminate( const string& why )
 
   job_timeout_timer.set( 0s, EXIT_GRACE_PERIOD );
 
-  loop.add_rule(
-    "Graceful termination",
-    [this] { state_ = State::Terminated; },
+  terminate_rule_handle = loop.add_rule(
+    "Tracers termination",
+    [this] {
+      /* all the tracers are down, it's time to shutdown the accumulators */
+      for ( auto& worker : workers ) {
+        if ( worker.role == Worker::Role::Accumulator ) {
+          worker.state = Worker::State::FinishingUp;
+          worker.client.push_request( { 0, OpCode::FinishUp, "" } );
+        }
+      }
+
+      if ( Worker::active_count[Worker::Role::Accumulator] ) {
+        cout << "\u2192 All tracers are shut down. Winding down accumulators..."
+             << endl;
+
+        terminate_rule_handle->cancel();
+
+        terminate_rule_handle = loop.add_rule(
+          "Accumulators termination",
+          [this] {
+            terminate_rule_handle->cancel();
+            state_ = State::Terminated;
+          },
+          [this] {
+            return state_ == State::WindingDown
+                   && Worker::active_count[Worker::Role::Accumulator] == 0;
+          } );
+      } else {
+        state_ = State::Terminated;
+      }
+    },
     [this] {
       return state_ == State::WindingDown
              && Worker::active_count[Worker::Role::Tracer] == 0;
