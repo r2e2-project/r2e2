@@ -22,11 +22,27 @@ void LambdaMaster::handle_status_message()
     terminate( "Job done." );
   }
 
-  const auto lagging_workers
+  const auto lagging_rt_workers
     = count_if( workers.begin(), workers.end(), [&now]( const auto& worker ) {
-        return ( worker.state != Worker::State::Terminated )
+        return ( worker.role == Worker::Role::Tracer )
+               && ( worker.state != Worker::State::Terminated )
                && ( now - worker.last_seen >= seconds { 4 } );
       } );
+
+  const auto lagging_acc_workers
+    = count_if( workers.begin(), workers.end(), [&now]( const auto& worker ) {
+        return ( worker.role == Worker::Role::Accumulator )
+               && ( worker.state != Worker::State::Terminated )
+               && ( now - worker.last_seen >= seconds { 4 } );
+      } );
+
+  auto print_lagging_workers = []( const auto count ) {
+    if ( count == 0 ) {
+      return string {};
+    } else {
+      return " \u203c "s + to_string( count ) + " "s;
+    }
+  };
 
   const auto elapsed_seconds
     = duration_cast<seconds>( now - start_time ).count();
@@ -47,6 +63,8 @@ void LambdaMaster::handle_status_message()
     return alternate ? BG_B : BG_A;
   };
 
+  constexpr char const * BG_ALERT = "\033[48;5;88m";
+
   auto& s = aggregated_stats;
 
   // clang-format off
@@ -61,15 +79,17 @@ void LambdaMaster::handle_status_message()
               << "/" << ray_generators << " "
 
       << BG() << " \u03bb " << Worker::active_count[Worker::Role::Tracer]
-              << "/" << max_workers << " "
+              << "/" << max_workers
+              << " "
+
+      << BG_ALERT << print_lagging_workers(lagging_rt_workers)
 
       << BG() << " \u03a3 " << Worker::active_count[Worker::Role::Accumulator]
               << "/" << accumulators << " "
-
+              
+      << BG_ALERT << print_lagging_workers(lagging_acc_workers)
+              
       << BG() << " \u29d6 " << treelets_to_spawn.size() << " "
-
-      // lagging workers
-      << BG() << " \u203c " << lagging_workers << " "
 
       // initialized workers
       << BG() << " \u2713 " << initialized_workers << " "
