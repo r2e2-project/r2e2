@@ -175,6 +175,16 @@ void LambdaWorker::handle_processed_queue()
       queue_ray( move( ray_ptr ) );
     } else if ( empty_visit ) {
       ray.Ld = 0.f;
+
+      // XXX Ideally, this must not be done in the program logic and must be
+      // hidden behind the API, maybe in the Shade() function... However, at the
+      // time this was the quickest way to get it done.
+      if (ray.remainingBounces == config.max_path_depth - 1) {
+        for (const auto& light : scene.base.infiniteLights) {
+          ray.Ld += light->Le(ray.ray);
+        }
+      }
+
       samples.emplace( ray );
       finished_path_ids.push( ray.PathID() );
       this->rays.generated++;
