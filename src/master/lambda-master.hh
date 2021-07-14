@@ -381,9 +381,10 @@ private:
     int tile_size { 0 };
 
   private:
+    std::vector<size_t> tiles_to_render {};
     pbrt::Bounds2i sample_bounds {};
     pbrt::Point2i n_tiles {};
-    size_t cur_tile { 0 };
+    size_t cur_tile_idx { 0 };
     size_t tile_spp {};
   } tiles {};
 

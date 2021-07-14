@@ -109,24 +109,31 @@ LambdaMaster::Tiles::Tiles( const int size,
 
   n_tiles = Point2i( ( bounds.Diagonal().x + tile_size - 1 ) / tile_size,
                      ( bounds.Diagonal().y + tile_size - 1 ) / tile_size );
+
+  tiles_to_render.resize( n_tiles.x * n_tiles.y );
+  iota( tiles_to_render.begin(), tiles_to_render.end(), 0 );
+  shuffle( tiles_to_render.begin(),
+           tiles_to_render.end(),
+           mt19937 { random_device {}() } );
 }
 
 bool LambdaMaster::Tiles::camera_rays_remaining() const
 {
-  return cur_tile < ( static_cast<size_t>( n_tiles.x )
-                      * static_cast<size_t>( n_tiles.y ) );
+  return cur_tile_idx < ( static_cast<size_t>( n_tiles.x )
+                          * static_cast<size_t>( n_tiles.y ) );
 }
 
 Bounds2i LambdaMaster::Tiles::next_camera_tile()
 {
-  const int tile_x = cur_tile % n_tiles.x;
-  const int tile_y = cur_tile / n_tiles.x;
+  const auto t = tiles_to_render[cur_tile_idx++];
+  
+  const int tile_x = t % n_tiles.x;
+  const int tile_y = t / n_tiles.x;
   const int x0 = sample_bounds.pMin.x + tile_x * tile_size;
   const int x1 = min( x0 + tile_size, sample_bounds.pMax.x );
   const int y0 = sample_bounds.pMin.y + tile_y * tile_size;
   const int y1 = min( y0 + tile_size, sample_bounds.pMax.y );
 
-  cur_tile++;
   return Bounds2i( Point2i { x0, y0 }, Point2i { x1, y1 } );
 }
 
