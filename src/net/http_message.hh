@@ -53,6 +53,10 @@ public:
   HTTPMessage() {}
   virtual ~HTTPMessage() {}
 
+  HTTPMessage( const HTTPMessage& ) = delete;
+  HTTPMessage( HTTPMessage&& ) = default;
+  HTTPMessage& operator=( HTTPMessage&& ) = default;
+
   /* convenience constructor */
   HTTPMessage( std::string&& first_line,
                std::vector<HTTPHeader>&& headers,
