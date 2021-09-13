@@ -240,7 +240,6 @@ void LambdaWorker::handle_scene_object_results()
     scene.base = { working_directory.name(), scene.samples_per_pixel };
 
     for ( auto& [id, data] : downloaded_treelets ) {
-      membuf buf( data.data(), data.data() + data.size() );
       treelets.emplace(
         id, scene::LoadTreelet( ".", id, data.data(), data.size() ) );
     }
