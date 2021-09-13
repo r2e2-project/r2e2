@@ -48,6 +48,10 @@ size_t HTTPMessage::read_in_body( const string_view str )
   if ( body_size_is_known() ) {
     /* body size known in advance */
 
+    if ( body_.empty() ) {
+      body_.reserve( expected_body_size() );
+    }
+
     assert( body_.size() <= expected_body_size() );
     const size_t amount_to_append
       = min( expected_body_size() - body_.size(), str.size() );
