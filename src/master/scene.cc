@@ -20,6 +20,7 @@ void LambdaMaster::assign_object( Worker& worker, const SceneObject& object )
 void LambdaMaster::assign_treelet( Worker& worker, Treelet& treelet )
 {
   assign_object( worker, { { ObjectType::Treelet, treelet.id } } );
+  assign_object( worker, { { ObjectType::Material, 0 } } );
 
   unassigned_treelets.erase( treelet.id );
   move_from_pending_to_queued( treelet.id );
@@ -126,7 +127,7 @@ bool LambdaMaster::Tiles::camera_rays_remaining() const
 Bounds2i LambdaMaster::Tiles::next_camera_tile()
 {
   const auto t = tiles_to_render[cur_tile_idx++];
-  
+
   const int tile_x = t % n_tiles.x;
   const int tile_y = t / n_tiles.x;
   const int x0 = sample_bounds.pMin.x + tile_x * tile_size;
