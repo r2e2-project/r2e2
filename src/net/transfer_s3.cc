@@ -163,13 +163,13 @@ void S3TransferAgent::worker_thread( const size_t thread_id )
 
         while ( !parser->empty() ) {
           const string_view status = parser->front().status_code();
-          const string data = move( parser->front().body() );
 
           switch ( status[0] ) {
             case '2': // successful
             {
               unique_lock<mutex> lock { _results_mutex };
-              _results.emplace( actions.front().id, move( data ) );
+              _results.emplace( actions.front().id,
+                                move( parser->front().body() ) );
             }
 
               try_count = 0;
