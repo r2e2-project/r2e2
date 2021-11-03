@@ -3,6 +3,7 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -71,7 +72,7 @@ private:
   std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> input_stream_;
   google::protobuf::io::CodedInputStream coded_input_;
 
-  google::protobuf::uint32 next_size_{ 0 };
+  google::protobuf::uint32 next_size_ { 0 };
   bool eof_ { false };
 };
 
