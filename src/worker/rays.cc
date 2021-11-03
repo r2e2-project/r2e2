@@ -2,6 +2,8 @@
 #include "messages/utils.hh"
 #include "net/util.hh"
 
+#include "scene.h"
+
 using namespace std;
 using namespace chrono;
 using namespace r2t2;
@@ -82,10 +84,10 @@ void LambdaWorker::handle_trace_queue( const size_t idx )
       } else if ( ray.hit ) {
         log_ray( RayAction::Finished, ray );
 
-        auto [bounce_ray, shadow_ray]
+        auto [bounce_ray, shadow_ray, light_ray]
           = graphics::ShadeRay( move( ray_ptr ),
                                 treelet,
-                                scene.base.lights,
+                                *scene.base.fakeScene,
                                 scene.base.sampleExtent,
                                 scene.base.sampler,
                                 scene.max_depth,
@@ -109,6 +111,12 @@ void LambdaWorker::handle_trace_queue( const size_t idx )
           log_ray( RayAction::Generated, *shadow_ray );
           processed_queue_size++;
           processed_queue.enqueue( move( shadow_ray ) );
+        }
+
+        if ( light_ray != nullptr ) {
+          log_ray( RayAction::Generated, *light_ray );
+          processed_queue_size++;
+          processed_queue.enqueue( move( light_ray ) );
         }
       } else {
         throw runtime_error( "invalid ray in trace queue" );
@@ -171,6 +179,31 @@ void LambdaWorker::handle_processed_queue()
       } else {
         queue_ray( move( ray_ptr ) );
       }
+    } else if ( ray.IsLightRay() ) {
+      Spectrum Li { 0.f };
+
+      if ( empty_visit and hit ) {
+        const auto a_light = ray.hitInfo.arealight;
+        const auto s_light = ray.lightRayInfo.sampledLightId;
+
+        if ( a_light == s_light ) {
+          Li = dynamic_cast<AreaLight*>(
+                 scene.base.fakeScene->lights[a_light - 1].get() )
+                 ->L( ray.hitInfo.isect, -ray.lightRayInfo.sampledDirection );
+        }
+      } else if ( empty_visit ) {
+        const auto s_light = ray.lightRayInfo.sampledLightId;
+        Li = scene.base.fakeScene->lights[s_light - 1]->Le( ray.ray );
+      } else {
+        queue_ray( move( ray_ptr ) );
+      }
+
+      if ( empty_visit and not Li.IsBlack() ) {
+        ray.Ld *= Li;
+        samples.emplace( ray );
+        this->rays.generated++;
+        log_ray( RayAction::Finished, ray );
+      }
     } else if ( not empty_visit or hit ) {
       queue_ray( move( ray_ptr ) );
     } else if ( empty_visit ) {
@@ -179,9 +212,9 @@ void LambdaWorker::handle_processed_queue()
       // XXX Ideally, this must not be done in the program logic and must be
       // hidden behind the API, maybe in the Shade() function... However, at the
       // time this was the quickest way to get it done.
-      if (ray.remainingBounces == config.max_path_depth - 1) {
-        for (const auto& light : scene.base.infiniteLights) {
-          ray.Ld += light->Le(ray.ray);
+      if ( ray.remainingBounces == config.max_path_depth - 1 ) {
+        for ( const auto& light : scene.base.fakeScene->infiniteLights ) {
+          ray.Ld += light->Le( ray.ray );
         }
       }
 
