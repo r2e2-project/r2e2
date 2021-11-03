@@ -34,15 +34,12 @@ add_definitions ( -D PBRT_CONSTEXPR=constexpr )
 add_definitions ( -D PBRT_THREAD_LOCAL=thread_local )
 
 file ( GLOB R2T2_SOURCE
-    #src/benchmark/*
     src/common/*
     src/master/*
     src/messages/*
     src/net/*
     src/remote/*
     src/schedulers/*
-    #src/server/*
-    src/simulator/*
     src/storage/*
     src/util/*
     src/worker/*
@@ -92,17 +89,8 @@ target_link_libraries( r2t2-aggregate ${ALL_R2T2_LIBS} )
 add_executable ( aggregate-timelapse src/frontend/aggregate-timelapse.cc )
 target_link_libraries( aggregate-timelapse ${ALL_R2T2_LIBS} )
 
-add_executable ( r2t2-simulator src/frontend/simulator.cc )
-target_link_libraries( r2t2-simulator ${ALL_R2T2_LIBS} )
-
 add_executable ( load-treelet src/frontend/load-treelet.cc )
 target_link_libraries( load-treelet ${ALL_R2T2_LIBS} )
 
 add_executable ( camera-generator src/frontend/camera-generator.cc )
 target_link_libraries( camera-generator ${ALL_R2T2_LIBS} )
-
-add_executable ( path-tracer src/frontend/path-tracer.cc )
-target_link_libraries( path-tracer ${ALL_R2T2_LIBS} )
-
-add_executable ( treelet-tracer src/frontend/treelet-tracer.cc )
-target_link_libraries( treelet-tracer ${ALL_R2T2_LIBS} )
