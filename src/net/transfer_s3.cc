@@ -1,5 +1,7 @@
 #include "transfer_s3.hh"
 
+#include <thread>
+
 #include "net/http_response_parser.hh"
 
 using namespace std;
@@ -183,7 +185,8 @@ void S3TransferAgent::worker_thread( const size_t thread_id )
               break;
 
             default: // unexpected response, like 404 or something
-              throw runtime_error( "s3 transfer failed: "
+              throw runtime_error( "s3 transfer failed: " + actions.front().key
+                                   + " "
                                    + string( parser->front().status_code() ) );
           }
 

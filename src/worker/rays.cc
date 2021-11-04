@@ -93,7 +93,8 @@ void LambdaWorker::handle_trace_queue( const size_t idx )
                                 scene.max_depth,
                                 arena );
 
-        if ( bounce_ray == nullptr and shadow_ray == nullptr ) {
+        if ( bounce_ray == nullptr and shadow_ray == nullptr
+             and light_ray == nullptr ) {
           // means that the path was terminated
           ray.toVisitHead = numeric_limits<uint8_t>::max();
           processed_queue_size++;
