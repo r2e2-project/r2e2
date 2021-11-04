@@ -76,7 +76,8 @@ set ( WORKER_LINK_FLAGS dl z unwind lzma -static -Wl,-allow-multiple-definition
                         -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
                         -s )
 
-if ( CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES ASan )
+if ( CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES ASan
+     OR CMAKE_BUILD_TYPE MATCHES RelWithDebInfo )
   set( WORKER_LINK_FLAGS "" )
 endif()
 
