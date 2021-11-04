@@ -15,10 +15,17 @@ void LambdaMaster::handle_status_message()
 
   const auto now = steady_clock::now();
 
+  size_t active_rays_total = 0;
+  for ( auto& w : workers ) {
+    active_rays_total += w.active_rays();
+  }
+
   if ( config.timeout.count() && now - last_action_time >= config.timeout ) {
     terminate( "Inactivity threshold has been exceeded." );
   } else if ( state_ == State::Active
-              and scene.total_paths == aggregated_stats.finished_paths ) {
+              and scene.total_paths == aggregated_stats.finished_paths
+              and not tiles.camera_rays_remaining()
+              and active_rays_total == 0 ) {
     terminate( "Job done." );
   }
 
@@ -63,7 +70,7 @@ void LambdaMaster::handle_status_message()
     return alternate ? BG_B : BG_A;
   };
 
-  constexpr char const * BG_ALERT = "\033[48;5;88m";
+  constexpr char const* BG_ALERT = "\033[48;5;88m";
 
   auto& s = aggregated_stats;
 
