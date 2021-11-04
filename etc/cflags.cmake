@@ -1,9 +1,7 @@
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set (CMAKE_BASE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -g -pedantic -pedantic-errors -Werror -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-qual -Wformat=2 -Weffc++ -Wold-style-cast")
-
-#set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+set (CMAKE_CXX_EXTENSIONS ON)
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -pedantic-errors -Werror -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-qual -Wformat=2 -Weffc++ -Wold-style-cast")
 
 # check for supported compiler versions
 set (IS_GNU_COMPILER ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU"))
@@ -18,6 +16,7 @@ if (${IS_CLANG_COMPILER})
 endif ()
 
 # add some flags for the Release, Debug, and DebugSan modes
+set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE_INIT} ${CMAKE_CXX_FLAGS_RELEASE}")
 set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb3 -Og")
 set (CMAKE_CXX_FLAGS_DEBUGASAN "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined -fsanitize=address")
 set (CMAKE_CXX_FLAGS_RELASAN "${CMAKE_CXX_FLAGS_RELEASE} -fsanitize=undefined -fsanitize=address")
