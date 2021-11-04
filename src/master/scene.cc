@@ -20,7 +20,6 @@ void LambdaMaster::assign_object( Worker& worker, const SceneObject& object )
 void LambdaMaster::assign_treelet( Worker& worker, Treelet& treelet )
 {
   assign_object( worker, { { ObjectType::Treelet, treelet.id } } );
-  assign_object( worker, { { ObjectType::Material, 0 } } );
 
   unassigned_treelets.erase( treelet.id );
   move_from_pending_to_queued( treelet.id );
