@@ -15,18 +15,19 @@ void LambdaMaster::handle_status_message()
 
   const auto now = steady_clock::now();
 
-  size_t active_rays_total = 0;
-  for ( auto& w : workers ) {
-    active_rays_total += w.active_rays();
-  }
-
   if ( config.timeout.count() && now - last_action_time >= config.timeout ) {
     terminate( "Inactivity threshold has been exceeded." );
   } else if ( state_ == State::Active
               and scene.total_paths == aggregated_stats.finished_paths
-              and not tiles.camera_rays_remaining()
-              and active_rays_total == 0 ) {
-    terminate( "Job done." );
+              and not tiles.camera_rays_remaining() ) {
+    size_t active_rays_total = 0;
+    for ( auto& w : workers ) {
+      active_rays_total += w.active_rays();
+    }
+
+    if ( active_rays_total == 0 ) {
+      terminate( "Job done." );
+    }
   }
 
   const auto lagging_rt_workers
@@ -74,51 +75,52 @@ void LambdaMaster::handle_status_message()
 
   auto& s = aggregated_stats;
 
-  // clang-format off
   ostringstream oss;
-  oss << "\033[0m" << fixed << setprecision(2)
+  oss << "\033[0m" << fixed << setprecision( 2 )
 
-      // finished paths
-      << BG(true) << " \u21af " << s.finished_paths
-      << " (" << percent(s.finished_paths, scene.total_paths) << "%) "
+      << BG( true ) << " \u21af " << s.finished_paths << " ("
+      << percent( s.finished_paths, scene.total_paths ) << "%) ";
 
-      << BG() << " \u21a6 " << Worker::active_count[Worker::Role::Generator]
-              << "/" << ray_generators << " "
+  if ( Worker::active_count[Worker::Role::Generator] ) {
 
-      << BG() << " \u03bb " << Worker::active_count[Worker::Role::Tracer]
-              << "/" << max_workers
-              << " "
+    oss << BG() << " \u21a6 " << Worker::active_count[Worker::Role::Generator]
+        << "/" << ray_generators << " ";
+  }
 
-      << BG_ALERT << print_lagging_workers(lagging_rt_workers)
+  oss << BG() << " \u03bb " << Worker::active_count[Worker::Role::Tracer] << "/"
+      << max_workers << " "
+
+      << BG_ALERT << print_lagging_workers( lagging_rt_workers )
 
       << BG() << " \u03a3 " << Worker::active_count[Worker::Role::Accumulator]
-              << "/" << accumulators << " "
-              
-      << BG_ALERT << print_lagging_workers(lagging_acc_workers)
-              
-      << BG() << " \u29d6 " << treelets_to_spawn.size() << " "
+      << "/" << accumulators << " "
+
+      << BG_ALERT
+      << print_lagging_workers( lagging_acc_workers )
+
+      // << BG() << " \u29d6 " << treelets_to_spawn.size() << " "
 
       // initialized workers
-      << BG() << " \u2713 " << initialized_workers << " "
+      << BG() << " \u2713 " << initialized_workers
+      << " "
 
       // enqueued bytes
-      << BG() << " \u2191 " << format_bytes(s.enqueued.bytes) << " "
+      << BG() << " \u2191 " << format_bytes( s.enqueued.bytes )
+      << " "
 
       // assigned bytes
-      << BG() << " \u21ba " << percent(s.assigned.bytes - s.dequeued.bytes,
-                                        s.enqueued.bytes) << "% "
+      // << BG() << " \u21ba " << percent(s.assigned.bytes - s.dequeued.bytes,
+      //                                   s.enqueued.bytes) << "% "
 
       // dequeued bytes
-      << BG() << " \u2193 " << percent(s.dequeued.bytes, s.enqueued.bytes)
-              << "% "
+      << BG() << " \u2193 " << percent( s.dequeued.bytes, s.enqueued.bytes )
+      << "% "
 
       // elapsed time
-      << BG() << " " << setfill('0')
-              << setw(2) << (elapsed_seconds / 60) << ":" << setw(2)
-              << (elapsed_seconds % 60) << " "
+      << BG() << " " << setfill( '0' ) << setw( 2 ) << ( elapsed_seconds / 60 )
+      << ":" << setw( 2 ) << ( elapsed_seconds % 60 ) << " "
 
       << BG();
-  // clang-format on
 
   StatusBar::set_text( oss.str() );
 }
