@@ -148,6 +148,11 @@ void LambdaWorker::handle_processed_queue()
     ray_counters.generated++;
   };
 
+  auto queue_sample = [this]( pbrt::RayStatePtr&& ray ) {
+    samples.emplace( *ray );
+    ray_counters.generated++;
+  };
+
   pbrt::RayStatePtr ray_ptr;
 
   while ( processed_queue.try_dequeue( ray_ptr ) ) {
@@ -166,16 +171,15 @@ void LambdaWorker::handle_processed_queue()
 
     if ( ray.IsShadowRay() ) {
       if ( hit or empty_visit ) {
-        ray.Ld = hit ? 0.f : ray.Ld;
-        samples.emplace( ray );
-        ray_counters.generated++;
-
         log_ray( RayAction::Finished, ray );
 
         /* was this the last shadow ray? */
         if ( ray.remainingBounces == 0 ) {
           finished_path_ids.push( ray.PathID() );
         }
+
+        ray.Ld = hit ? 0.f : ray.Ld;
+        queue_sample( move( ray_ptr ) );
       } else {
         queue_ray( move( ray_ptr ) );
       }
@@ -199,14 +203,15 @@ void LambdaWorker::handle_processed_queue()
       }
 
       if ( empty_visit and not Li.IsBlack() ) {
-        ray.Ld *= Li;
-        samples.emplace( ray );
-        ray_counters.generated++;
         log_ray( RayAction::Finished, ray );
+        ray.Ld *= Li;
+        queue_sample( move( ray_ptr ) );
       }
     } else if ( not empty_visit or hit ) {
       queue_ray( move( ray_ptr ) );
     } else if ( empty_visit ) {
+      log_ray( RayAction::Finished, ray );
+
       ray.Ld = 0.f;
 
       // XXX Ideally, this must not be done in the program logic and must be
@@ -218,11 +223,8 @@ void LambdaWorker::handle_processed_queue()
         }
       }
 
-      samples.emplace( ray );
       finished_path_ids.push( ray.PathID() );
-      ray_counters.generated++;
-
-      log_ray( RayAction::Finished, ray );
+      queue_sample( move( ray_ptr ) );
     }
   }
 }
