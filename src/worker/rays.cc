@@ -184,28 +184,29 @@ void LambdaWorker::handle_processed_queue()
         queue_ray( move( ray_ptr ) );
       }
     } else if ( ray.IsLightRay() ) {
-      Spectrum Li { 0.f };
-
-      if ( empty_visit and hit ) {
-        const auto a_light = ray.hitInfo.arealight;
+      if ( empty_visit ) {
+        Spectrum Li { 0.f };
         const auto s_light = ray.lightRayInfo.sampledLightId;
 
-        if ( a_light == s_light ) {
-          Li = dynamic_cast<AreaLight*>(
-                 scene.base.fakeScene->lights[a_light - 1].get() )
-                 ->L( ray.hitInfo.isect, -ray.lightRayInfo.sampledDirection );
+        if ( hit ) {
+          const auto a_light = ray.hitInfo.arealight;
+
+          if ( a_light == s_light ) {
+            Li = dynamic_cast<AreaLight*>(
+                   scene.base.fakeScene->lights[a_light - 1].get() )
+                   ->L( ray.hitInfo.isect, -ray.lightRayInfo.sampledDirection );
+          }
+        } else {
+          Li = scene.base.fakeScene->lights[s_light - 1]->Le( ray.ray );
         }
-      } else if ( empty_visit ) {
-        const auto s_light = ray.lightRayInfo.sampledLightId;
-        Li = scene.base.fakeScene->lights[s_light - 1]->Le( ray.ray );
+
+        if ( not Li.IsBlack() ) {
+          log_ray( RayAction::Finished, ray );
+          ray.Ld *= Li;
+          queue_sample( move( ray_ptr ) );
+        }
       } else {
         queue_ray( move( ray_ptr ) );
-      }
-
-      if ( empty_visit and not Li.IsBlack() ) {
-        log_ray( RayAction::Finished, ray );
-        ray.Ld *= Li;
-        queue_sample( move( ray_ptr ) );
       }
     } else if ( not empty_visit or hit ) {
       queue_ray( move( ray_ptr ) );

@@ -119,6 +119,9 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       worker.stats.finished_paths += stats.finished_paths;
       worker.stats.cpu_usage = stats.cpu_usage;
 
+      worker.ray_counters.generated = proto.rays_generated();
+      worker.ray_counters.terminated = proto.rays_terminated();
+
       if ( not worker.treelets.empty()
            and ( initialized_workers
                  >= max_workers + ray_generators + accumulators ) ) {

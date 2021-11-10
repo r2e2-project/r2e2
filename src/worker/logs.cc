@@ -30,6 +30,10 @@ void LambdaWorker::send_worker_stats()
   stats.cpu_usage = 1.0 * work_jiffies / total_jiffies;
 
   protobuf::WorkerStats proto = to_protobuf( stats );
+
+  proto.set_rays_generated( ray_counters.generated );
+  proto.set_rays_terminated( ray_counters.terminated );
+
   master_connection.push_request(
     { *worker_id, OpCode::WorkerStats, protoutil::to_string( proto ) } );
 
