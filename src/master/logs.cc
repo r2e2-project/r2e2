@@ -14,7 +14,7 @@ void LambdaMaster::record_enqueue( const WorkerId worker_id,
                                    const RayBagInfo& info )
 {
   auto& worker = workers.at( worker_id );
-  worker.rays.enqueued += info.ray_count;
+  worker.ray_counters.enqueued += info.ray_count;
 
   if ( info.sample_bag ) {
     worker.stats.samples.rays += info.ray_count;
@@ -46,7 +46,7 @@ void LambdaMaster::record_assign( const WorkerId worker_id,
                                   const RayBagInfo& info )
 {
   auto& worker = workers.at( worker_id );
-  worker.rays.dequeued += info.ray_count;
+  worker.ray_counters.dequeued += info.ray_count;
 
   worker.outstanding_ray_bags.insert( info );
   worker.outstanding_bytes += info.bag_size;
@@ -69,7 +69,7 @@ void LambdaMaster::record_dequeue( const WorkerId worker_id,
   worker.outstanding_bytes -= info.bag_size;
 
   if ( info.sample_bag ) {
-    worker.rays.accumulated += info.ray_count;
+    worker.ray_counters.accumulated += info.ray_count;
   } else {
     treelets[info.treelet_id].last_stats.first = true;
     treelet_stats[info.treelet_id].dequeued.rays += info.ray_count;

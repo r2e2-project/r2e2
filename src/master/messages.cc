@@ -44,8 +44,8 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       protobuf::RayBags proto;
       protoutil::from_string( message.payload(), proto );
 
-      worker.rays.generated = proto.rays_generated();
-      worker.rays.terminated = proto.rays_terminated();
+      worker.ray_counters.generated = proto.rays_generated();
+      worker.ray_counters.terminated = proto.rays_terminated();
 
       for ( const auto& item : proto.items() ) {
         const RayBagInfo info = from_protobuf( item );
@@ -93,8 +93,8 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       protobuf::RayBags proto;
       protoutil::from_string( message.payload(), proto );
 
-      worker.rays.generated = proto.rays_generated();
-      worker.rays.terminated = proto.rays_terminated();
+      worker.ray_counters.generated = proto.rays_generated();
+      worker.ray_counters.terminated = proto.rays_terminated();
 
       for ( const auto& item : proto.items() ) {
         const RayBagInfo info = from_protobuf( item );

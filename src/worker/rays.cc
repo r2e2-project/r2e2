@@ -75,7 +75,7 @@ void LambdaWorker::handle_trace_queue( const size_t idx )
       auto& ray = *ray_ptr;
 
       log_ray( RayAction::Traced, ray );
-      this->rays.terminated++;
+      ray_counters.terminated++;
 
       if ( not ray.toVisitEmpty() ) {
         processed_queue_size++;
@@ -145,7 +145,7 @@ void LambdaWorker::handle_processed_queue()
       out_queue_size++;
     }
 
-    this->rays.generated++;
+    ray_counters.generated++;
   };
 
   pbrt::RayStatePtr ray_ptr;
@@ -168,7 +168,7 @@ void LambdaWorker::handle_processed_queue()
       if ( hit or empty_visit ) {
         ray.Ld = hit ? 0.f : ray.Ld;
         samples.emplace( ray );
-        this->rays.generated++;
+        ray_counters.generated++;
 
         log_ray( RayAction::Finished, ray );
 
@@ -201,7 +201,7 @@ void LambdaWorker::handle_processed_queue()
       if ( empty_visit and not Li.IsBlack() ) {
         ray.Ld *= Li;
         samples.emplace( ray );
-        this->rays.generated++;
+        ray_counters.generated++;
         log_ray( RayAction::Finished, ray );
       }
     } else if ( not empty_visit or hit ) {
@@ -220,7 +220,7 @@ void LambdaWorker::handle_processed_queue()
 
       samples.emplace( ray );
       finished_path_ids.push( ray.PathID() );
-      this->rays.generated++;
+      ray_counters.generated++;
 
       log_ray( RayAction::Finished, ray );
     }

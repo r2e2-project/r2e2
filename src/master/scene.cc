@@ -147,7 +147,7 @@ void LambdaMaster::Tiles::send_worker_tile( Worker& worker )
   proto.set_x1( next_tile.pMax.x );
   proto.set_y1( next_tile.pMax.y );
 
-  worker.rays.camera += next_tile.Area() * tile_spp;
+  worker.ray_counters.camera += next_tile.Area() * tile_spp;
 
   worker.client.push_request(
     { 0, OpCode::GenerateRays, protoutil::to_string( proto ) } );

@@ -171,7 +171,7 @@ private:
   std::atomic<size_t> sample_queue_size { 0 };
 
   std::string render_output_filename {};
-  size_t render_output_id {0};
+  size_t render_output_id { 0 };
 
   std::atomic<bool> new_samples_accumulated { false };
 
@@ -280,7 +280,7 @@ private:
   {
     uint64_t generated { 0 };
     std::atomic<uint64_t> terminated { 0 };
-  } rays {};
+  } ray_counters {};
 
   ////////////////////////////////////////////////////////////////////////////
   // Logging                                                                //

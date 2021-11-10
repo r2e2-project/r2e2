@@ -547,9 +547,30 @@ string LambdaMaster::Worker::to_string() const
   for ( const auto& bag : outstanding_ray_bags )
     oustanding_size += bag.bag_size;
 
-  oss << "id=" << id << ",state=" << static_cast<int>( state )
-      << ",role=" << static_cast<int>( role ) << ",awslog=" << aws_log_stream
-      << ",treelets=";
+  // clang-format off
+  auto state_string = []( const State s ) -> string {
+    switch ( s ) {
+      case State::Active: return "active";
+      case State::FinishingUp: return "finishing-up";
+      case State::Terminated: return "terminated";
+      case State::Terminating: return "terminating";
+      default: throw runtime_error( "unknown state" );
+    }
+  };
+
+  auto role_string = []( const Role r ) -> string {
+    switch ( r ) {
+      case Role::Accumulator: return "accumulator";
+      case Role::Generator: return "generator";
+      case Role::Tracer: return "tracer";
+      default: throw runtime_error( "unknown role" );
+    }
+  };
+  // clang-format on
+
+  oss << "id=" << id << ",state=" << state_string( state )
+      << ",role=" << role_string( role ) << ",awslog=" << aws_log_stream
+      << ",treelets=[";
 
   for ( auto it = treelets.begin(); it != treelets.end(); it++ ) {
     if ( it != treelets.begin() )
@@ -557,11 +578,14 @@ string LambdaMaster::Worker::to_string() const
     oss << *it;
   }
 
-  oss << ",outstanding-bags=" << outstanding_ray_bags.size()
+  oss << "],outstanding-bags=" << outstanding_ray_bags.size()
       << ",outstanding-bytes=" << oustanding_size
-      << ",rays={.camera:" << rays.camera << ",.generated:" << rays.generated
-      << ",.dequeued:" << rays.dequeued << ",.terminated:" << rays.terminated
-      << ",.enqueued:" << rays.enqueued << "},active-rays=" << active_rays()
+      << ",ray-counters={.camera:" << ray_counters.camera
+      << ",.generated:" << ray_counters.generated
+      << ",.dequeued:" << ray_counters.dequeued
+      << ",.terminated:" << ray_counters.terminated
+      << ",.enqueued:" << ray_counters.enqueued
+      << "},active-rays=" << active_rays()
       << ",enqueued=" << stats.enqueued.rays
       << ",assigned=" << stats.assigned.rays
       << ",dequeued=" << stats.dequeued.rays

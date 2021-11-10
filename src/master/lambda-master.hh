@@ -180,12 +180,13 @@ private:
       uint64_t terminated { 0 };
       uint64_t enqueued { 0 };
       uint64_t accumulated { 0 };
-    } rays {};
+    } ray_counters {};
 
     uint64_t active_rays() const
     {
-      return rays.camera + rays.generated + rays.dequeued - rays.terminated
-             - rays.enqueued - rays.accumulated;
+      return ray_counters.camera + ray_counters.generated
+             + ray_counters.dequeued - ray_counters.terminated
+             - ray_counters.enqueued - ray_counters.accumulated;
     }
 
     // Statistics
@@ -344,12 +345,9 @@ private:
   {
   public:
     static inline const std::vector<pbrt::ObjectType> base_object_types {
-      pbrt::ObjectType::Manifest,
-      pbrt::ObjectType::Scene,
-      pbrt::ObjectType::Camera,
-      pbrt::ObjectType::Lights,
-      pbrt::ObjectType::AreaLights,
-      pbrt::ObjectType::Sampler
+      pbrt::ObjectType::Manifest,   pbrt::ObjectType::Scene,
+      pbrt::ObjectType::Camera,     pbrt::ObjectType::Lights,
+      pbrt::ObjectType::AreaLights, pbrt::ObjectType::Sampler
     };
     pbrt::scene::Base base {};
 

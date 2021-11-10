@@ -342,8 +342,8 @@ void LambdaWorker::handle_transfer_results( const bool for_sample_bags )
   }
 
   if ( enqueued_proto.items_size() > 0 ) {
-    enqueued_proto.set_rays_generated( rays.generated );
-    enqueued_proto.set_rays_terminated( rays.terminated );
+    enqueued_proto.set_rays_generated( ray_counters.generated );
+    enqueued_proto.set_rays_terminated( ray_counters.terminated );
 
     master_connection.push_request(
       { *worker_id,
@@ -352,8 +352,8 @@ void LambdaWorker::handle_transfer_results( const bool for_sample_bags )
   }
 
   if ( dequeued_proto.items_size() > 0 ) {
-    dequeued_proto.set_rays_generated( rays.generated );
-    dequeued_proto.set_rays_terminated( rays.terminated );
+    dequeued_proto.set_rays_generated( ray_counters.generated );
+    dequeued_proto.set_rays_terminated( ray_counters.terminated );
 
     master_connection.push_request(
       { *worker_id,
