@@ -20,7 +20,7 @@ def get_data(path):
                       .agg({'trace': 'sum',
                             'visited': 'sum'}))
     
-    nodes_per_ray = (nodes_per_ray.visited / nodes_per_ray.trace).to_numpy()
+    nodes_per_ray = np.nan_to_num((nodes_per_ray.visited / nodes_per_ray.trace).to_numpy())
     return num_rays, nodes_per_ray
 
 def generate_static0(num_rays, nodes_per_ray):
