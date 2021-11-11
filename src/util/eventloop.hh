@@ -42,7 +42,11 @@ private:
   struct RuleCategory
   {
     std::string name;
-    Timer::Record timer;
+    std::unique_ptr<Timer::Record> timer { std::make_unique<Timer::Record>() };
+
+    RuleCategory( const std::string& n )
+      : name( n )
+    {}
   };
 
   struct BasicRule
@@ -142,7 +146,7 @@ public:
       : rule_weak_ptr_( x )
     {}
 
-    void cancel();
+    void cancel() const;
   };
 
   RuleHandle add_rule(

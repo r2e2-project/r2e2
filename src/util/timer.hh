@@ -2,9 +2,10 @@
 
 #include <array>
 #include <chrono>
+#include <memory>
 #include <optional>
-#include <string>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 
 class Timer
@@ -105,8 +106,8 @@ class RecordScopeTimer
   uint64_t _start_time;
 
 public:
-  RecordScopeTimer( Timer::Record& timer )
-    : _timer( &timer )
+  RecordScopeTimer( std::unique_ptr<Timer::Record>& timer )
+    : _timer( timer.get() )
     , _start_time( Timer::timestamp_ns() )
   {
     global_timer().start<category>( _start_time );
