@@ -55,8 +55,6 @@ const url_params = new URLSearchParams(window.location.search);
 
 const _replay = (url_params.get('replay') === "1");
 
-console.log(_replay);
-
 const _job = new JobInfo(url_params.get('job_id'),
   url_params.get('bucket'),
   url_params.get('region'));
@@ -67,11 +65,30 @@ const _tiles = new TileHelper(parseInt(url_params.get('width')),
 
 let ctx = document.getElementById("output").getContext('2d');
 
+let canvas = document.getElementById("output");
+output.width = _tiles.width;
+output.height = _tiles.height;
+
+// should we resize?
+let actual_width = window.innerWidth;
+var scale_factor = 1.0;
+
+if (actual_width < _tiles.width) {
+  scale_factor = actual_width / _tiles.width;
+  output.width = actual_width;
+  output.height *= scale_factor;
+}
+
 let _tile_versions = new Array(_tiles.n_tiles.x * _tiles.n_tiles.y).fill(-1);
 
-let load_image = (url, x, y, w, h) => {
+let load_image = (url, ox, oy, ow, oh) => {
   let img = new Image();
   img.crossOrigin = "anonymous";
+
+  let x = ox * scale_factor;
+  let y = oy * scale_factor;
+  let w = ow * scale_factor;
+  let h = oh * scale_factor;
 
   img.onload = () => {
     W = Math.min(w / 4, 15);
