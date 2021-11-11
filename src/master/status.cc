@@ -30,27 +30,18 @@ void LambdaMaster::handle_status_message()
     }
   }
 
-  const auto lagging_rt_workers
-    = count_if( workers.begin(), workers.end(), [&now]( const auto& worker ) {
-        return ( worker.role == Worker::Role::Tracer )
-               && ( worker.state != Worker::State::Terminated )
-               && ( now - worker.last_seen >= seconds { 4 } );
-      } );
-
-  const auto lagging_acc_workers
-    = count_if( workers.begin(), workers.end(), [&now]( const auto& worker ) {
-        return ( worker.role == Worker::Role::Accumulator )
-               && ( worker.state != Worker::State::Terminated )
-               && ( now - worker.last_seen >= seconds { 4 } );
-      } );
-
-  auto print_lagging_workers = []( const auto count ) {
-    if ( count == 0 ) {
-      return string {};
-    } else {
-      return " \u203c "s + to_string( count ) + " "s;
+  /* count and report lagging workers */
+  size_t lagging_worker_count = 0;
+  for ( auto& w : workers ) {
+    if ( w.state != Worker::State::Terminated
+         and now - w.last_seen >= seconds { 5 } ) {
+      if ( not w.lagging_worker_logged ) {
+        w.lagging_worker_logged = true;
+        LOG( INFO ) << w.to_string();
+      }
+      lagging_worker_count++;
     }
-  };
+  }
 
   const auto elapsed_seconds
     = duration_cast<seconds>( now - start_time ).count();
@@ -90,18 +81,16 @@ void LambdaMaster::handle_status_message()
   oss << BG() << " \u03bb " << Worker::active_count[Worker::Role::Tracer] << "/"
       << max_workers << " "
 
-      << BG_ALERT << print_lagging_workers( lagging_rt_workers )
-
       << BG() << " \u03a3 " << Worker::active_count[Worker::Role::Accumulator]
-      << "/" << accumulators << " "
+      << "/" << accumulators << " ";
 
-      << BG_ALERT
-      << print_lagging_workers( lagging_acc_workers )
+  if ( lagging_worker_count ) {
+    oss << BG_ALERT << " \u203c " << lagging_worker_count << " "s;
+  }
+  // << BG() << " \u29d6 " << treelets_to_spawn.size() << " "
 
-      // << BG() << " \u29d6 " << treelets_to_spawn.size() << " "
-
-      // initialized workers
-      << BG() << " \u2713 " << initialized_workers
+  // initialized workers
+  oss << BG() << " \u2713 " << initialized_workers
       << " "
 
       // enqueued bytes

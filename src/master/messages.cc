@@ -24,6 +24,11 @@ void LambdaMaster::process_message( const uint64_t worker_id,
   auto& worker = workers.at( worker_id );
   worker.last_seen = last_action_time;
 
+  if ( worker.lagging_worker_logged ) {
+    LOG( INFO ) << "heard from worker " << worker.id;
+    worker.lagging_worker_logged = false;
+  }
+
   switch ( message.opcode() ) {
     case OpCode::Hey: {
       worker.aws_log_stream = message.payload();

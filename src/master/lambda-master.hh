@@ -162,6 +162,7 @@ private:
 
     steady_clock::time_point last_seen {};
     std::string aws_log_stream {};
+    bool lagging_worker_logged { false };
 
     std::vector<TreeletId> treelets {};
     std::set<SceneObject> objects {};
