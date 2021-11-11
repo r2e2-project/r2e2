@@ -25,6 +25,16 @@ void LambdaMaster::record_enqueue( const WorkerId worker_id,
     aggregated_stats.samples.bytes += info.bag_size;
     aggregated_stats.samples.count++;
 
+    if ( started_accumulators ) {
+      worker.stats.enqueued.rays += info.ray_count;
+      worker.stats.enqueued.bytes += info.bag_size;
+      worker.stats.enqueued.count++;
+
+      aggregated_stats.enqueued.rays += info.ray_count;
+      aggregated_stats.enqueued.bytes += info.bag_size;
+      aggregated_stats.enqueued.count++;
+    }
+
     last_finished_ray = steady_clock::now();
   } else {
     worker.stats.enqueued.rays += info.ray_count;
