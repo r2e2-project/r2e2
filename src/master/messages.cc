@@ -141,6 +141,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
       aggregated_stats.finished_paths += stats.finished_paths;
 
+      worker.client.push_request( { 0, OpCode::Ping, "" } );
       break;
     }
 

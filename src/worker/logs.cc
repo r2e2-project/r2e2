@@ -60,6 +60,11 @@ void LambdaWorker::handle_worker_stats()
   if ( !worker_id )
     return;
 
+  if ( scene_loaded
+       and last_heard_from_master - steady_clock::now() > seconds { 15 } ) {
+    return terminate();
+  }
+
   send_worker_stats();
 }
 

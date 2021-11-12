@@ -46,6 +46,8 @@ void LambdaWorker::process_message( const Message& message )
     }
   }
 
+  last_heard_from_master = steady_clock::now();
+
   switch ( message.opcode() ) {
     case OpCode::Hey: {
       protobuf::Hey proto;

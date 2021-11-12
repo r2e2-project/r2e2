@@ -323,6 +323,7 @@ private:
   std::mt19937 rand_engine { std::random_device {}() };
 
   const steady_clock::time_point work_start { steady_clock::now() };
+  steady_clock::time_point last_heard_from_master { steady_clock::now() };
 
   ////////////////////////////////////////////////////////////////////////////
   // Other ℭ𝔯𝔞𝔭
