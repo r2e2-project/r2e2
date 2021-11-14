@@ -26,6 +26,7 @@
 #include "net/s3.hh"
 #include "net/transfer.hh"
 #include "storage/backend_s3.hh"
+#include "util/child_process.hh"
 #include "util/cpu.hh"
 #include "util/eventfd.hh"
 #include "util/eventloop.hh"
@@ -329,7 +330,15 @@ private:
   steady_clock::time_point last_heard_from_master { steady_clock::now() };
 
   ////////////////////////////////////////////////////////////////////////////
-  // Other ℭ𝔯𝔞𝔭
+  // LamCloud                                                               //
+  ////////////////////////////////////////////////////////////////////////////
+
+  void start_storage_server();
+
+  std::unique_ptr<ChildProcess> storage_server_process { nullptr };
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Other ℭ𝔯𝔞𝔭                                                             //
   ////////////////////////////////////////////////////////////////////////////
 
   EventLoop loop {};
