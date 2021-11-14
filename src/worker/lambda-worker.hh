@@ -59,6 +59,9 @@ struct WorkerConfiguration
 
   std::vector<Address> memcached_servers;
   int accumulators;
+
+  std::string storage_server_path;
+  uint16_t storage_server_port;
 };
 
 /* Relationship between different queues in LambdaWorker:

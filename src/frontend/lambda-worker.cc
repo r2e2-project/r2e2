@@ -331,6 +331,9 @@ int main( int argc, char* argv[] )
   float bag_log_rate = 0.0;
   milliseconds bagging_delay = DEFAULT_BAGGING_DELAY;
 
+  string storage_server_path;
+  uint16_t storage_server_port = 8080;
+
   vector<Address> memcached_servers;
 
   struct option long_options[] = {
@@ -345,6 +348,8 @@ int main( int argc, char* argv[] )
     { "log-bags", required_argument, nullptr, 'B' },
     { "directional", no_argument, nullptr, 'I' },
     { "memcached-server", required_argument, nullptr, 'd' },
+    { "storage-server-path", required_argument, nullptr, 'X' },
+    { "storage-server-port", required_argument, nullptr, 'Y' },
     { "help", no_argument, nullptr, 'h' },
     { nullptr, 0, nullptr, 0 },
   };
@@ -369,6 +374,8 @@ int main( int argc, char* argv[] )
     case 'B': bag_log_rate = stof(optarg); break;
     case 'I': PbrtOptions.directionalTreelets = true; break;
     case 'h': usage(argv[0], EXIT_SUCCESS); break;
+    case 'X': storage_server_path = optarg; break;
+    case 'Y': storage_server_port = stoi(optarg); break;
     case 'd': {
         string host;
         uint16_t port = 11211;
@@ -390,10 +397,11 @@ int main( int argc, char* argv[] )
   }
 
   unique_ptr<LambdaWorker> worker;
-  WorkerConfiguration config { samples_per_pixel, max_path_depth,
-                               bagging_delay,     ray_log_rate,
-                               bag_log_rate,      move( memcached_servers ),
-                               accumulators };
+  WorkerConfiguration config { samples_per_pixel,  max_path_depth,
+                               bagging_delay,      ray_log_rate,
+                               bag_log_rate,       move( memcached_servers ),
+                               accumulators,       storage_server_path,
+                               storage_server_port };
 
   try {
     worker = make_unique<LambdaWorker>(
