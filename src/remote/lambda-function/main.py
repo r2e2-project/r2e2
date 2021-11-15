@@ -23,7 +23,9 @@ def handler(event, context):
                "--ip", coordinator_host,
                "--port", coordinator_port,
                "--storage-backend", storage_backend,
-               "--max-depth", str(event['maxPathDepth'])]
+               "--max-depth", str(event['maxPathDepth']),
+               "--storage-server-path", "storageserver",
+               "--storage-server-port", "9876"]
 
     if event['samplesPerPixel']:
         command += ['--samples', str(event['samplesPerPixel'])]

@@ -28,7 +28,7 @@ void LambdaWorker::start_storage_server()
                                    args.push_back( to_string( port ) );
                                    args.push_back( to_string( tid ) );
                                    args.push_back( "1" );
-                                   return ezexec( path, args, {}, true, false );
+                                   return ezexec( path, args, {}, true, true );
                                  } );
 
   // wait until the storage server is up and running
