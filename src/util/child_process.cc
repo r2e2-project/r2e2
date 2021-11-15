@@ -25,7 +25,7 @@ void zero( T& x )
 int do_fork()
 {
   /* Verify that process is single-threaded before forking */
-  {
+  /* {
     struct stat my_stat;
     SystemCall( "stat", stat( "/proc/self/task", &my_stat ) );
 
@@ -33,7 +33,7 @@ int do_fork()
       throw runtime_error(
         "ChildProcess constructed in multi-threaded program" );
     }
-  }
+  } */
 
   return SystemCall( "fork", fork() );
 }

@@ -20,6 +20,11 @@ using namespace meow;
 
 using OpCode = Message::OpCode;
 
+extern "C" void sigchild( int )
+{
+  abort();
+}
+
 LambdaWorker::LambdaWorker( const string& coordinator_ip,
                             const uint16_t coordinator_port,
                             const string& storage_uri,
@@ -61,6 +66,9 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
 {
   // let the program handle SIGPIPE
   signal( SIGPIPE, SIG_IGN );
+
+  // die on sigchild
+  signal( SIGCHLD, sigchild );
 
   cerr << "* starting worker in " << working_directory.name() << endl;
   filesystem::current_path( working_directory.name() );
@@ -253,6 +261,12 @@ void LambdaWorker::handle_scene_object_results()
     tile_helper = { static_cast<uint32_t>( config.accumulators ),
                     scene.base.sampleBounds,
                     static_cast<uint32_t>( scene.samples_per_pixel ) };
+
+    if ( not config.storage_server_path.empty() ) {
+      cout << "starting storage server... ";
+      start_storage_server();
+      cout << "done." << endl;
+    }
 
     if ( is_accumulator ) {
       loop.add_rule( "Upload output",
