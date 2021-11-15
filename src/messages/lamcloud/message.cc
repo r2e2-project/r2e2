@@ -4,9 +4,10 @@
 #include <map>
 #include <stdexcept>
 
+using namespace std;
 using namespace lamcloud;
 
-static std::map<std::pair<OpCode, MessageField>, size_t> field_indices
+static map<pair<OpCode, MessageField>, size_t> field_indices
   = { { { OpCode::LocalLookup, MessageField::Name }, 0 },
       { { OpCode::LocalStore, MessageField::Name }, 0 },
       { { OpCode::LocalStore, MessageField::Object }, 1 },
@@ -34,7 +35,7 @@ size_t get_field_count( const OpCode opcode )
       return 2;
 
     default:
-      throw std::runtime_error( "invalid opcode" );
+      throw runtime_error( "invalid opcode" );
   }
 }
 
@@ -46,17 +47,22 @@ Message::Message( const OpCode opcode, const int32_t tag )
   fields_.resize( field_count_ );
 }
 
-Message::Message( const std::string& str )
+Message::Message( const string& str )
   : field_count_( 0 )
 {
-  const size_t min_length = sizeof( uint8_t );
+  const size_t min_length = sizeof( length_ ) + sizeof( uint8_t );
 
   if ( str.length() < min_length ) {
-    throw std::runtime_error( "str too short" );
+    throw runtime_error( "str too short" );
   }
 
-  length_ = sizeof( length_ ) + str.size();
-  size_t index = 0;
+  length_ = *reinterpret_cast<const int*>( str.c_str() );
+
+  if ( length_ != str.length() ) {
+    throw runtime_error( "length error" );
+  }
+
+  size_t index = sizeof( length_ );
 
   opcode_ = static_cast<OpCode>( str[index] - '0' );
   index += sizeof( uint8_t );
@@ -72,7 +78,7 @@ Message::Message( const std::string& str )
   for ( size_t i = 0; i < field_count_; i++ ) {
     if ( i != field_count_ - 1 ) {
       if ( index + 4 > length_ ) {
-        throw std::runtime_error( "str too short" );
+        throw runtime_error( "str too short" );
       }
 
       const uint32_t field_length
@@ -80,7 +86,7 @@ Message::Message( const std::string& str )
       index += sizeof( uint32_t );
 
       if ( index + field_length > length_ ) {
-        throw std::runtime_error( "str too short" );
+        throw runtime_error( "str too short" );
       }
 
       fields_[i] = str.substr( index, field_length );
@@ -103,20 +109,20 @@ void Message::calculate_length()
   }
 }
 
-std::string Message::to_string()
+string Message::to_string()
 {
-  std::string result;
+  string result;
 
   // copying the header
   size_t index = 0;
   calculate_length();
   result.resize( length_ );
 
-  std::memcpy( &result[index], &length_, sizeof( length_ ) );
+  memcpy( &result[index], &length_, sizeof( length_ ) );
   index += sizeof( length_ );
 
   const uint8_t opcode = '0' + ( to_underlying( opcode_ ) & 0xf );
-  std::memcpy( &result[index], &opcode, sizeof( opcode ) );
+  memcpy( &result[index], &opcode, sizeof( opcode ) );
   index += sizeof( opcode );
 
   // making the payload
@@ -126,19 +132,76 @@ std::string Message::to_string()
         = static_cast<uint32_t>( fields_[i].length() );
       index += sizeof( uint32_t );
     }
-    std::memcpy( &result[index], fields_[i].data(), fields_[i].length() );
+    memcpy( &result[index], fields_[i].data(), fields_[i].length() );
   }
 
   return result;
 }
 
-void Message::set_field( const MessageField f, std::string&& s )
+void Message::set_field( const MessageField f, string&& s )
 {
-  fields_.at( field_indices.at( std::make_pair( opcode_, f ) ) )
-    = std::move( s );
+  fields_.at( field_indices.at( make_pair( opcode_, f ) ) ) = move( s );
 }
 
-std::string& Message::get_field( const MessageField f )
+string& Message::get_field( const MessageField f )
 {
-  return fields_.at( field_indices.at( std::make_pair( opcode_, f ) ) );
+  return fields_.at( field_indices.at( make_pair( opcode_, f ) ) );
+}
+
+void lamcloud::Client::load()
+{
+  if ( not current_request_unsent_.empty() or requests_.empty() ) {
+    throw std::runtime_error( "meow::Client cannot load new request" );
+  }
+
+  current_request_ = requests_.front().to_string();
+  current_request_unsent_ = current_request_;
+}
+
+bool lamcloud::Client::requests_empty() const
+{
+  return current_request_unsent_.empty() and requests_.empty();
+}
+
+void lamcloud::Client::write( RingBuffer& out )
+{
+  if ( requests_empty() ) {
+    throw runtime_error( "no more requests" );
+  }
+
+  if ( not current_request_unsent_.empty() ) {
+    out.read_from( current_request_unsent_ );
+  } else {
+    requests_.pop();
+    if ( not requests_.empty() ) {
+      load();
+    }
+  }
+}
+
+void lamcloud::Client::read( RingBuffer& in )
+{
+  incomplete_message_.append( in.readable_region() );
+
+  while ( incomplete_message_.length() >= expected_length_ ) {
+    expected_length_
+      = *reinterpret_cast<const int*>( incomplete_message_.data() );
+
+    if ( incomplete_message_.length() < expected_length_ ) {
+      return;
+    } else {
+      responses_.emplace( incomplete_message_.substr( 0, expected_length_ ) );
+      incomplete_message_.erase( 0, expected_length_ );
+      expected_length_ = 4; // moving on to the next message
+    }
+  }
+}
+
+void lamcloud::Client::push_request( Message&& message )
+{
+  requests_.push( move( message ) );
+
+  if ( current_request_unsent_.empty() ) {
+    load();
+  }
 }

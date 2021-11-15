@@ -3,10 +3,13 @@
 #include "assert.h"
 
 #include <iostream>
+#include <queue>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
+#include "net/client.hh"
+#include "net/session.hh"
 #include "util/util.hh"
 
 namespace lamcloud {
@@ -59,6 +62,34 @@ public:
 
   OpCode opcode() const { return opcode_; }
   int32_t tag() const { return tag_; }
+};
+
+class Client : public ::Client<TCPSession, Message, Message>
+{
+private:
+  std::queue<Message> requests_ {};
+  std::queue<Message> responses_ {};
+
+  std::string current_request_ {};
+  std::string_view current_request_unsent_ {};
+
+  size_t expected_length_ { 4 };
+  std::string incomplete_message_ {};
+
+  void load();
+
+  bool requests_empty() const override;
+  bool responses_empty() const override { return responses_.empty(); }
+  Message& responses_front() override { return responses_.front(); }
+  void responses_pop() override { responses_.pop(); }
+
+  void write( RingBuffer& out ) override;
+  void read( RingBuffer& in ) override;
+
+public:
+  using ::Client<TCPSession, Message, Message>::Client;
+
+  void push_request( Message&& msg ) override;
 };
 
 } // namespace lamcloud
