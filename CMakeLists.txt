@@ -37,6 +37,7 @@ file ( GLOB R2T2_SOURCE
     src/common/*
     src/master/*
     src/messages/*
+    src/messages/lamcloud/*
     src/net/*
     src/remote/*
     src/schedulers/*
