@@ -13,6 +13,7 @@ static map<pair<OpCode, MessageField>, size_t> field_indices
       { { OpCode::LocalStore, MessageField::Object }, 1 },
       { { OpCode::LocalDelete, MessageField::Name }, 0 },
       { { OpCode::LocalRemoteLookup, MessageField::Name }, 0 },
+      { { OpCode::LocalRemoteLookup, MessageField::RemoteNode }, 1 },
       { { OpCode::LocalRemoteStore, MessageField::Name }, 0 },
       { { OpCode::LocalRemoteStore, MessageField::Object }, 1 },
       { { OpCode::LocalRemoteDelete, MessageField::Name }, 0 },
