@@ -336,6 +336,7 @@ private:
   void start_storage_server();
 
   std::unique_ptr<ChildProcess> storage_server_process { nullptr };
+  bool is_storage_server_ready { false };
 
   ////////////////////////////////////////////////////////////////////////////
   // Other ℭ𝔯𝔞𝔭                                                             //

@@ -1,5 +1,6 @@
 #include "lambda-worker.hh"
 
+#include "net/transfer_lamcloud.hh"
 #include "util/system_runner.hh"
 
 using namespace std;
@@ -66,6 +67,8 @@ void LambdaWorker::start_storage_server()
   if ( not connected ) {
     throw runtime_error( "could not connect to the storage server" );
   }
+
+  is_storage_server_ready = true;
 
   cerr << "storageserver up and running" << endl;
 }

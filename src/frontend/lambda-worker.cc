@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 
 #include "messages/utils.hh"
+#include "net/transfer_lamcloud.hh"
 #include "net/transfer_mcd.hh"
 #include "net/transfer_s3.hh"
 
@@ -46,13 +47,9 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
   , job_storage_backend( {},
                          storage_backend_info.bucket,
                          storage_backend_info.region )
-  , transfer_agent( [this]() -> unique_ptr<TransferAgent> {
-    if ( not config.memcached_servers.empty() ) {
-      return make_unique<memcached::TransferAgent>( config.memcached_servers );
-    } else {
-      return make_unique<S3TransferAgent>( job_storage_backend );
-    }
-  }() )
+  , transfer_agent( make_unique<LamCloudTransferAgent>(
+      config.storage_server_port,
+      [this] { return this->is_storage_server_ready; } ) )
   , samples_transfer_agent(
       make_unique<S3TransferAgent>( job_storage_backend, 8, true ) )
   , output_transfer_agent(

@@ -10,9 +10,11 @@ using namespace std;
 using namespace chrono;
 using namespace lamcloud;
 
-LamCloudTransferAgent::LamCloudTransferAgent( const uint16_t port )
+LamCloudTransferAgent::LamCloudTransferAgent( const uint16_t port,
+                                              function<bool( void )>&& ready )
   : TransferAgent()
   , _port( port )
+  , _ready_func( move( ready ) )
 {
   _thread_count = 1;
 
@@ -106,6 +108,10 @@ void LamCloudTransferAgent::worker_thread( const size_t )
 {
   using namespace std::placeholders;
 
+  while ( not _ready_func() ) {
+    this_thread::sleep_for( seconds( 1 ) );
+  }
+
   auto make_client = []( const Address& addr ) {
     TCPSocket socket;
     socket.set_blocking( false );
@@ -154,7 +160,7 @@ void LamCloudTransferAgent::worker_thread( const size_t )
         }
       };
 
-  client = make_client( { "", _port } );
+  client = make_client( { "0.0.0.0", _port } );
   client->install_rules(
     _loop,
     rule_categories,
