@@ -46,7 +46,7 @@ uint32_t get_remote_id( const string& key )
   vector<string_view> tokens;
   split( key, '/', tokens );
   string_view target_token = tokens.at( tokens.size() - 2 );
-  target_token.remove_prefix( 2 );
+  target_token.remove_prefix( 1 );
 
   uint32_t id;
   if ( from_chars( target_token.begin(), target_token.end(), id ).ec
@@ -142,10 +142,12 @@ void LamCloudTransferAgent::worker_thread( const size_t )
             [[fallthrough]];
 
           case OpCode::LocalSuccess:
-            if ( pending_actions.front().task != Task::Delete ) {
+            if ( pending_actions.front().task == Task::Download ) {
               thread_results.emplace(
                 pending_actions.front().id,
                 move( response.get_field( MessageField::Object ) ) );
+            } else if ( pending_actions.front().task == Task::Upload ) {
+              thread_results.emplace( pending_actions.front().id, "" );
             }
 
             pending_actions.pop();
@@ -160,7 +162,7 @@ void LamCloudTransferAgent::worker_thread( const size_t )
         }
       };
 
-  client = make_client( { "0.0.0.0", _port } );
+  client = make_client( { "127.0.0.1", _port } );
   client->install_rules(
     _loop,
     rule_categories,

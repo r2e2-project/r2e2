@@ -33,42 +33,33 @@ void LambdaWorker::start_storage_server()
                                  } );
 
   // wait until the storage server is up and running
-  size_t retry_count = 0;
-  bool connected = false;
+  // size_t retry_count = 0;
+  bool connected = true;
 
-  while ( retry_count < 5 ) {
-    string message;
-    try {
-      TCPSocket ready_sock;
-      ready_sock.set_read_timeout( chrono::seconds { 5 } );
-      ready_sock.connect(
-        { "0.0.0.0",
-          static_cast<uint16_t>( config.storage_server_port - 1 ) } );
+  this_thread::sleep_for( chrono::seconds { 10 } );
 
-      while ( message.length() < 5 ) {
-        string buffer( 5, '\0' );
-        ready_sock.read( { buffer } );
-        message += buffer;
-      }
-
-      if ( message == "ready" ) {
-        connected = true;
-        break;
-      } else {
-        throw exception();
-      }
-    } catch ( exception& ex ) {
-      cerr << "Waiting for storageserver..." << endl;
-      retry_count++;
-      this_thread::sleep_for( 1s );
-    }
-  }
+  // while ( retry_count < 20 ) {
+  //   string message;
+  //   try {
+  //     string buffer( 100, '\0' );
+  //     TCPSocket ready_sock;
+  //     ready_sock.connect(
+  //       { "127.0.0.1",
+  //         static_cast<uint16_t>( config.storage_server_port - 1 ) } );
+  //     ready_sock.read( { buffer } );
+  //     connected = true;
+  //   } catch ( exception& ex ) {
+  //     cerr << "Waiting for storageserver (" << ex.what() << ")..." << endl;
+  //     retry_count++;
+  //     this_thread::sleep_for( 1s );
+  //   }
+  // }
 
   if ( not connected ) {
     throw runtime_error( "could not connect to the storage server" );
   }
 
-  is_storage_server_ready = true;
+  is_storage_server_ready.store( true );
 
   cerr << "storageserver up and running" << endl;
 }

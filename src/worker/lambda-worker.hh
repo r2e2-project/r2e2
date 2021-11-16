@@ -112,6 +112,15 @@ private:
   bool is_accumulator { false };
 
   ////////////////////////////////////////////////////////////////////////////
+  // LamCloud                                                               //
+  ////////////////////////////////////////////////////////////////////////////
+
+  void start_storage_server();
+
+  std::unique_ptr<ChildProcess> storage_server_process { nullptr };
+  std::atomic<bool> is_storage_server_ready { false };
+
+  ////////////////////////////////////////////////////////////////////////////
   // Graphics                                                               //
   ////////////////////////////////////////////////////////////////////////////
 
@@ -328,15 +337,6 @@ private:
 
   const steady_clock::time_point work_start { steady_clock::now() };
   steady_clock::time_point last_heard_from_master { steady_clock::now() };
-
-  ////////////////////////////////////////////////////////////////////////////
-  // LamCloud                                                               //
-  ////////////////////////////////////////////////////////////////////////////
-
-  void start_storage_server();
-
-  std::unique_ptr<ChildProcess> storage_server_process { nullptr };
-  bool is_storage_server_ready { false };
 
   ////////////////////////////////////////////////////////////////////////////
   // Other ℭ𝔯𝔞𝔭                                                             //

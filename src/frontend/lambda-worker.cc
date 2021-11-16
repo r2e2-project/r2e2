@@ -49,7 +49,7 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                          storage_backend_info.region )
   , transfer_agent( make_unique<LamCloudTransferAgent>(
       config.storage_server_port,
-      [this] { return this->is_storage_server_ready; } ) )
+      [this] { return this->is_storage_server_ready.load(); } ) )
   , samples_transfer_agent(
       make_unique<S3TransferAgent>( job_storage_backend, 8, true ) )
   , output_transfer_agent(
