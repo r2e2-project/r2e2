@@ -326,6 +326,13 @@ void usage( const char* argv0, int exitCode )
   exit( exitCode );
 }
 
+LambdaWorker::~LambdaWorker()
+{
+  if ( storage_server_process && not storage_server_process->terminated() ) {
+    storage_server_process->signal( SIGKILL );
+  }
+}
+
 int main( int argc, char* argv[] )
 {
   int exit_status = EXIT_SUCCESS;

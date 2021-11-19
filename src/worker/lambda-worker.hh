@@ -90,6 +90,8 @@ public:
                 const std::string& storage_backend_uri,
                 const WorkerConfiguration& config );
 
+  ~LambdaWorker();
+
   void run();
   void terminate();
   void upload_logs();
