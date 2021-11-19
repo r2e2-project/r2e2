@@ -9,7 +9,9 @@
 
 #include "net/session.hh"
 #include "net/util.hh"
+#include "r2t2.pb.h"
 #include "util/util.hh"
+#include "utils.hh"
 
 using namespace std;
 using namespace meow;
@@ -56,6 +58,23 @@ string Message::info() const
   ostringstream oss;
   oss << "[msg:" << Message::OPCODE_NAMES[to_underlying( opcode() )]
       << ",len=" << payload_length() << "]";
+
+  switch ( opcode() ) {
+    case OpCode::RayBagDequeued:
+    case OpCode::RayBagEnqueued:
+    case OpCode::ProcessRayBag: {
+      r2t2::protobuf::RayBags proto;
+      protoutil::from_string( payload(), proto );
+      for ( const r2t2::protobuf::RayBagInfo& item : proto.items() ) {
+        RayBagInfo info { r2t2::from_protobuf( item ) };
+        oss << " " << info.str( "" );
+      }
+      break;
+    }
+
+    default:
+      break;
+  }
 
   return oss.str();
 }
