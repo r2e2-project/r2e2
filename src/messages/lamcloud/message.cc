@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <map>
+#include <sstream>
 #include <stdexcept>
 
 using namespace std;
@@ -16,7 +17,9 @@ static map<pair<OpCode, MessageField>, size_t> field_indices
       { { OpCode::LocalRemoteLookup, MessageField::RemoteNode }, 1 },
       { { OpCode::LocalRemoteStore, MessageField::Name }, 0 },
       { { OpCode::LocalRemoteStore, MessageField::Object }, 1 },
+      { { OpCode::LocalRemoteStore, MessageField::RemoteNode }, 2 },
       { { OpCode::LocalRemoteDelete, MessageField::Name }, 0 },
+      { { OpCode::LocalRemoteDelete, MessageField::RemoteNode }, 1 },
       { { OpCode::LocalSuccess, MessageField::Message }, 0 },
       { { OpCode::LocalError, MessageField::Message }, 0 } };
 
@@ -25,15 +28,17 @@ size_t get_field_count( const OpCode opcode )
   switch ( opcode ) {
     case OpCode::LocalLookup:
     case OpCode::LocalDelete:
-    case OpCode::LocalRemoteLookup:
-    case OpCode::LocalRemoteDelete:
     case OpCode::LocalSuccess:
     case OpCode::LocalError:
       return 1;
 
     case OpCode::LocalStore:
-    case OpCode::LocalRemoteStore:
+    case OpCode::LocalRemoteDelete:
+    case OpCode::LocalRemoteLookup:
       return 2;
+
+    case OpCode::LocalRemoteStore:
+      return 3;
 
     default:
       throw runtime_error( "invalid opcode" );
@@ -98,6 +103,57 @@ Message::Message( const string& str )
   }
 }
 
+string Message::info()
+{
+  ostringstream oss;
+
+  switch ( opcode_ ) {
+    case OpCode::LocalLookup:
+      oss << "LocalLookup " << get_field( MessageField::Name );
+      break;
+
+    case OpCode::LocalDelete:
+      oss << "LocalDelete " << get_field( MessageField::Name );
+      break;
+
+    case OpCode::LocalSuccess:
+      oss << "LocalSuccess " << get_field( MessageField::Message );
+      break;
+
+    case OpCode::LocalError:
+      oss << "LocalError " << get_field( MessageField::Message );
+      break;
+
+    case OpCode::LocalStore:
+      oss << "LocalStore " << get_field( MessageField::Name )
+          << " (len=" << get_field( MessageField::Object ).length() << ")";
+      break;
+
+    case OpCode::LocalRemoteDelete:
+      oss << "LocalRemoteDelete " << get_field( MessageField::Name ) << " @"
+          << *reinterpret_cast<uint32_t*>(
+               get_field( MessageField::RemoteNode ).data() );
+      break;
+
+    case OpCode::LocalRemoteLookup:
+      oss << "LocalRemoteLookup " << get_field( MessageField::Name ) << " @"
+          << *reinterpret_cast<uint32_t*>(
+               get_field( MessageField::RemoteNode ).data() );
+      break;
+
+    case OpCode::LocalRemoteStore:
+      oss << "LocalRemoteStore " << get_field( MessageField::Name ) << " @"
+          << *reinterpret_cast<uint32_t*>(
+               get_field( MessageField::RemoteNode ).data() );
+      break;
+
+    default:
+      throw runtime_error( "unkown opcode" );
+  }
+
+  return oss.str();
+}
+
 void Message::calculate_length()
 {
   length_ = sizeof( length_ ) + sizeof( uint8_t );
@@ -134,6 +190,7 @@ string Message::to_string()
       index += sizeof( uint32_t );
     }
     memcpy( &result[index], fields_[i].data(), fields_[i].length() );
+    index += fields_[i].length();
   }
 
   return result;
@@ -157,6 +214,7 @@ void lamcloud::Client::load()
 
   current_request_ = requests_.front().to_string();
   current_request_unsent_ = current_request_;
+  requests_.pop();
 }
 
 bool lamcloud::Client::requests_empty() const
@@ -170,19 +228,17 @@ void lamcloud::Client::write( RingBuffer& out )
     throw runtime_error( "no more requests" );
   }
 
-  if ( not current_request_unsent_.empty() ) {
-    out.read_from( current_request_unsent_ );
-  } else {
-    requests_.pop();
-    if ( not requests_.empty() ) {
-      load();
-    }
+  if ( current_request_unsent_.empty() ) {
+    load();
   }
+
+  out.read_from( current_request_unsent_ );
 }
 
 void lamcloud::Client::read( RingBuffer& in )
 {
   incomplete_message_.append( in.readable_region() );
+  in.pop( in.readable_region().length() );
 
   while ( incomplete_message_.length() >= expected_length_ ) {
     expected_length_

@@ -62,6 +62,8 @@ public:
 
   OpCode opcode() const { return opcode_; }
   int32_t tag() const { return tag_; }
+
+  std::string info();
 };
 
 class Client : public ::Client<TCPSession, Message, Message>
