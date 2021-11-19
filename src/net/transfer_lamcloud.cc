@@ -122,7 +122,9 @@ void LamCloudTransferAgent::worker_thread( const size_t )
   queue<pair<uint64_t, string>> thread_results;
   std::deque<Action> actions;
 
-  queue<Action> pending_actions;
+  queue<Action> pending_local_actions;
+  queue<Action> pending_remote_actions;
+
   unique_ptr<lamcloud::Client> client;
 
   lamcloud::Client::RuleCategories rule_categories {
@@ -132,35 +134,39 @@ void LamCloudTransferAgent::worker_thread( const size_t )
     _loop.add_category( "Response" )
   };
 
-  auto response_callback
-    = [&actions, &pending_actions, &thread_results]( Message&& response ) {
-        switch ( response.opcode() ) {
-          case OpCode::LocalStore:
-            actions.emplace_front(
-              0, Task::Delete, pending_actions.front().key, "" );
+  auto response_callback = [&actions,
+                            &pending_local_actions,
+                            &pending_remote_actions,
+                            &thread_results]( Message&& response ) {
+    switch ( response.opcode() ) {
+      case OpCode::LocalStore:
+        /* actions.emplace_front(
+          0, Task::Delete, pending_remote_actions.front().key, "" ); */
 
-            [[fallthrough]];
+        thread_results.emplace(
+          pending_remote_actions.front().id,
+          move( response.get_field( MessageField::Object ) ) );
 
-          case OpCode::LocalSuccess:
-            if ( pending_actions.front().task == Task::Download ) {
-              thread_results.emplace(
-                pending_actions.front().id,
-                move( response.get_field( MessageField::Object ) ) );
-            } else if ( pending_actions.front().task == Task::Upload ) {
-              thread_results.emplace( pending_actions.front().id, "" );
-            }
+        pending_remote_actions.pop();
 
-            pending_actions.pop();
-            break;
+        break;
 
-          case OpCode::LocalError:
-            throw runtime_error( "client errored" );
-            break;
-
-          default:
-            throw runtime_error( "invalid response" );
+      case OpCode::LocalSuccess:
+        if ( pending_local_actions.front().task == Task::Upload ) {
+          thread_results.emplace( pending_local_actions.front().id, "" );
         }
-      };
+
+        pending_local_actions.pop();
+        break;
+
+      case OpCode::LocalError:
+        throw runtime_error( "client errored" );
+        break;
+
+      default:
+        throw runtime_error( "invalid response" );
+    }
+  };
 
   client = make_client( { "127.0.0.1", _port } );
   client->install_rules(
@@ -209,11 +215,15 @@ void LamCloudTransferAgent::worker_thread( const size_t )
       auto& action = actions.front();
 
       switch ( action.task ) {
-        case Task::Download:
-        case Task::Upload:
-        case Task::Delete:
+        case Task::Download: // LocalRemoteLookup
           client->push_request( get_request( action ) );
-          pending_actions.push( move( action ) );
+          pending_remote_actions.push( move( action ) );
+          break;
+
+        case Task::Upload: // LocalStore
+        case Task::Delete: // LocalDelete
+          client->push_request( get_request( action ) );
+          pending_local_actions.push( move( action ) );
           break;
 
         case Task::Terminate:
