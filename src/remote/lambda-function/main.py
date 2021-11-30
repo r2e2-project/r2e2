@@ -1,6 +1,7 @@
 import os
 import sys
 import shutil
+import random
 import subprocess as sub
 
 curdir = os.path.dirname(__file__)
@@ -25,7 +26,7 @@ def handler(event, context):
                "--storage-backend", storage_backend,
                "--max-depth", str(event['maxPathDepth']),
                "--storage-server-path", "storageserver",
-               "--storage-server-port", "9876"]
+               "--storage-server-port", str(9876 + random.randint(0, 1000))]
 
     if event['samplesPerPixel']:
         command += ['--samples', str(event['samplesPerPixel'])]
