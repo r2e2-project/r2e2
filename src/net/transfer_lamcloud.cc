@@ -84,9 +84,13 @@ lamcloud::Message LamCloudTransferAgent::get_request( const Action& action )
 
     case Task::Delete: {
       string key = action.key;
+      string rid( 4, '\0' );
+      const uint32_t remote_id = get_remote_id( action.key );
+      memcpy( rid.data(), &remote_id, sizeof( remote_id ) );
 
-      Message msg { OpCode::LocalDelete };
+      Message msg { OpCode::LocalRemoteDelete };
       msg.set_field( MessageField::Name, move( key ) );
+      msg.set_field( MessageField::RemoteNode, move( rid ) );
       return msg;
     }
 
@@ -216,12 +220,12 @@ void LamCloudTransferAgent::worker_thread( const size_t )
 
       switch ( action.task ) {
         case Task::Download: // LocalRemoteLookup
+        case Task::Delete:   // LocalRemoteDelete
           client->push_request( get_request( action ) );
           pending_remote_actions.push( move( action ) );
           break;
 
         case Task::Upload: // LocalStore
-        case Task::Delete: // LocalDelete
           client->push_request( get_request( action ) );
           pending_local_actions.push( move( action ) );
           break;
