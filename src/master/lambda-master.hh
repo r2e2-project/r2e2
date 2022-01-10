@@ -346,9 +346,10 @@ private:
   {
   public:
     static inline const std::vector<pbrt::ObjectType> base_object_types {
-      pbrt::ObjectType::Manifest,   pbrt::ObjectType::Scene,
-      pbrt::ObjectType::Camera,     pbrt::ObjectType::Lights,
-      pbrt::ObjectType::AreaLights, pbrt::ObjectType::Sampler
+      pbrt::ObjectType::Manifest,      pbrt::ObjectType::Scene,
+      pbrt::ObjectType::Camera,        pbrt::ObjectType::Lights,
+      pbrt::ObjectType::AreaLights,    pbrt::ObjectType::Sampler,
+      pbrt::ObjectType::InfiniteLights
     };
     pbrt::scene::Base base {};
 

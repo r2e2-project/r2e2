@@ -148,7 +148,8 @@ private:
   std::vector<pbrt::AccumulatedStats> raytracing_thread_stats {};
 
   moodycamel::BlockingConcurrentQueue<pbrt::RayStatePtr> trace_queue { 8192 };
-  moodycamel::ConcurrentQueue<pbrt::RayStatePtr> processed_queue { 8192 };
+  moodycamel::ConcurrentQueue<pbrt::graphics::ProcessRayOutput>
+    processed_queue { 8192 };
 
   std::atomic<size_t> trace_queue_size { 0 };
   std::atomic<size_t> processed_queue_size { 0 };

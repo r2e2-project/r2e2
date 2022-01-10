@@ -238,6 +238,7 @@ void LambdaWorker::handle_scene_object_results()
 
   if ( pending_scene_objects.empty() ) { /* everything is loaded */
     scene.base = { working_directory.name(), scene.samples_per_pixel };
+    scene.base.maxPathDepth = scene.max_depth;
 
     for ( auto& [id, data] : downloaded_treelets ) {
       treelets.emplace(
