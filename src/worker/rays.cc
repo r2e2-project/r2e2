@@ -69,6 +69,8 @@ void LambdaWorker::handle_trace_queue( const size_t idx )
         return;
       }
 
+      ray_counters.terminated++;
+
       pbrt::graphics::ProcessRayOutput out;
       graphics::ProcessRay( move( ray_ptr ), treelet, scene.base, arena, out );
       processed_queue_size++;
