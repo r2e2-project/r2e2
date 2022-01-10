@@ -252,7 +252,10 @@ void LambdaWorker::handle_receive_queue()
 
       if ( decompressed_size < 0 ) {
         cerr << "bag decompression failed: "
-             << bag.info.str( ray_bags_key_prefix ) << endl;
+             << bag.info.info( ray_bags_key_prefix )
+             << " (allocated=" << decompressed.size()
+             << ",inputlen=" << total_size << ",retcode=" << decompressed_size
+             << ")" << endl;
 
         throw runtime_error( "bag decompression failed" );
       }

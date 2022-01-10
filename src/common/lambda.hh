@@ -91,6 +91,16 @@ struct RayBagInfo
     return oss.str();
   }
 
+  std::string info( const std::string& prefix ) const
+  {
+    std::ostringstream oss;
+
+    oss << "name=" << str( prefix ) << ",ray_count=" << ray_count
+        << ",bag_size=" << bag_size << ",samples=" << sample_bag;
+
+    return oss.str();
+  }
+
   RayBagInfo( const WorkerId worker_id_,
               const TreeletId treelet_id_,
               const BagId bag_id_,
