@@ -58,6 +58,7 @@ public:
     VALUE,
     DELETED,
     ERROR,
+    SERVER_ERROR,
     OK
   };
 

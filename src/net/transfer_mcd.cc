@@ -91,8 +91,10 @@ void TransferAgent::worker_thread( const size_t )
 
       case Response::Type::NOT_STORED:
       case Response::Type::ERROR:
-        throw runtime_error( "client errored" );
-        break;
+        throw runtime_error( "memcached client errored" );
+
+      case Response::Type::SERVER_ERROR:
+        throw runtime_error( "memcached server errored" );
 
       case Response::Type::DELETED:
       case Response::Type::NOT_FOUND:
@@ -129,7 +131,7 @@ void TransferAgent::worker_thread( const size_t )
 
       unique_lock<mutex> lock { _outstanding_mutex };
 
-      while ( not _outstanding.empty()) {
+      while ( not _outstanding.empty() ) {
         actions.push_back( move( _outstanding.front() ) );
         _outstanding.pop();
       }
