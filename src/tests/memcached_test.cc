@@ -105,6 +105,7 @@ int main( int argc, char* argv[] )
     action_timer,
     [&] {
       static mt19937 gen { random_device {}() };
+      static uniform_int_distribution<size_t> count_distrib { 1, 25 };
 
       action_timer.read_event();
 
@@ -117,32 +118,39 @@ int main( int argc, char* argv[] )
       // more puts in the beginning, and then more gets at the end
       bernoulli_distribution coin { 1 - 1.f * seconds_passed / total_time };
 
-      if ( coin( gen ) or active_objects.empty() ) {
-        put_count++;
+      const auto action_count = count_distrib( gen );
+      const auto action_get = not coin( gen );
 
-        // let's PUT
-        const string key = get_random_key( 30 ) + to_string( object_id++ );
-        string random_blob = get_random_blob( 500, 1024 * 1024 );
-        const auto blob_hash = get_hash( random_blob );
+      for ( size_t i = 0; i < action_count
+                          and not( action_get and not active_objects.empty() );
+            i++ ) {
+        if ( not action_get ) {
+          put_count++;
 
-        const auto action_id
-          = transfer_agent.request_upload( key, move( random_blob ) );
+          // let's PUT
+          const string key = get_random_key( 30 ) + to_string( object_id++ );
+          string random_blob = get_random_blob( 500, 1024 * 1024 );
+          const auto blob_hash = get_hash( random_blob );
 
-        objects[key] = blob_hash;
-        active_objects.insert( key );
-        pending_actions[action_id] = make_pair( PUT, key );
-      } else {
-        get_count++;
+          const auto action_id
+            = transfer_agent.request_upload( key, move( random_blob ) );
 
-        // let's GET a random object
-        auto it = active_objects.begin();
-        advance( it,
-                 uniform_int_distribution<size_t> {
-                   0u, active_objects.size() - 1 }( gen ) );
+          objects[key] = blob_hash;
+          active_objects.insert( key );
+          pending_actions[action_id] = make_pair( PUT, key );
+        } else {
+          get_count++;
 
-        const auto action_id = transfer_agent.request_download( *it );
-        pending_actions[action_id] = make_pair( GET, *it );
-        active_objects.erase( it );
+          // let's GET a random object
+          auto it = active_objects.begin();
+          advance( it,
+                   uniform_int_distribution<size_t> {
+                     0u, active_objects.size() - 1 }( gen ) );
+
+          const auto action_id = transfer_agent.request_download( *it );
+          pending_actions[action_id] = make_pair( GET, *it );
+          active_objects.erase( it );
+        }
       }
     },
     [&] { return true; } );
