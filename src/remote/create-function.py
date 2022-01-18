@@ -41,7 +41,7 @@ def install_lambda_package(package_file, function_name, role, region, delete=Fal
             'ZipFile': package_data
         },
         Timeout=300,
-        MemorySize=3008
+        MemorySize=4096
     )
 
     print("Created function '{}' ({}).".format(function_name, response['FunctionArn']))
