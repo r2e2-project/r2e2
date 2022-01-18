@@ -275,7 +275,7 @@ void LambdaWorker::handle_scene_object_results()
       output_transfer_agent.reset();
 
       /* starting the ray-tracing threads */
-      for ( size_t i = 0; i < 2; i++ ) {
+      for ( size_t i = 0; i < thread::hardware_concurrency(); i++ ) {
         raytracing_thread_stats.emplace_back();
         raytracing_threads.emplace_back(
           bind( &LambdaWorker::handle_trace_queue, this, i ) );
