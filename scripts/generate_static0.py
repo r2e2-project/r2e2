@@ -5,43 +5,70 @@ import sys
 import numpy as np
 import pandas as pd
 
-def get_data(path):   
-    treelets = pd.read_csv(os.path.join(path, "treelets.csv"))
+AVERAGE_BANDWIDTH = 50_000_000  # 50 MB/s
+SHADE_CUTOFF = 100
+
+
+def calculate_compute_time(d, mean_shade_time):
+    if d.trace > 0:
+        return d.traceTime / 2
+    elif d.shade > SHADE_CUTOFF:
+        return d.shadeTime / 1.5
+    elif d.shade > 0:
+        return (mean_shade_time * d.shade) / 1.5
+    else:
+        return 0
+
+
+def get_data(path):
+    workers = pd.read_csv(os.path.join(path, "workers.csv"))
     summary = pd.read_csv(os.path.join(path, "summary.csv"))
 
-    num_rays = (treelets.sort_values('treeletId')
-                        .groupby('treeletId')
-                        .agg({'raysDequeued': 'sum'})
-                        .raysDequeued
-                        .to_numpy())
+    workers = (
+        workers.sort_values("workerId")
+        .groupby("workerId")
+        .agg(
+            {
+                "workerId": "max",
+                "raysEnqueued": "sum",
+                "raysDequeued": "sum",
+                "bytesEnqueued": "sum",
+                "bytesDequeued": "sum",
+            }
+        )
+        .reset_index(drop=True)
+    )
 
-    nodes_per_ray = (summary.sort_values('treeletId')
-                      .groupby('treeletId')
-                      .agg({'trace': 'sum',
-                            'visited': 'sum'}))
-    
-    nodes_per_ray = np.nan_to_num((nodes_per_ray.visited / nodes_per_ray.trace).to_numpy())
-    return num_rays, nodes_per_ray
+    return pd.merge(workers, summary, how="left", on="workerId", validate="1:1")
 
-def generate_static0(num_rays, nodes_per_ray):
-    average_ray_size = 250         # 500 bytes
-    average_bandwidth = 50_000_000 # 25 MB/s receive
 
-    cost_bw = average_ray_size / average_bandwidth
-    cost_compute = 0.25e-6 # 0.5us per node visited
-    
-    weights = np.nan_to_num(np.maximum(cost_bw * num_rays,
-                                       cost_compute * nodes_per_ray * num_rays))
+def generate_static0(data):
+    mean_shade_time = np.mean(
+        data[data.shade > SHADE_CUTOFF].shadeTime
+        / data[data.shade > SHADE_CUTOFF].shade
+    )
 
-    print(len(weights))
+    data["transfer"] = (
+        100 * (data.bytesEnqueued + data.bytesDequeued) / AVERAGE_BANDWIDTH
+    )
+
+    data["compute"] = (
+        data.apply(lambda x: calculate_compute_time(x, mean_shade_time), axis=1) / 1e7
+    )
+
+    data["weights"] = np.maximum(data.transfer, data.compute)
+    data = data.sort_values("treeletId")
+    weights = data.weights.values
+
+    print(len(data))
 
     for i in range(len(weights)):
         print(f"{weights[i]:.8f} {1} {i}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print(f"{sys.argv[0]} logs-dir")
         sys.exit(1)
 
-    num_rays, nodes_per_ray = get_data(sys.argv[1])
-    generate_static0(num_rays, nodes_per_ray)
+    generate_static0(get_data(sys.argv[1]))
