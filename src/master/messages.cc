@@ -159,12 +159,10 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
       if ( not worker.treelets.empty() ) {
         const auto treelet_id = worker.treelets.back();
-        const string k[6] = { "Integrator/Calls to Trace",
-                              "Integrator/Calls to Shade",
-                              "BVH/Total nodes",
-                              "BVH/Visited nodes",
-                              "Integrator/Total Trace time",
-                              "Integrator/Total Shade time" };
+        const string k[6]
+          = { "Integrator/Calls to Process", "Integrator/Calls to Trace",
+              "Integrator/Calls to Shade",   "BVH/Total nodes",
+              "BVH/Visited nodes",           "Integrator/Total Process time" };
 
         auto g = [&k, &worker_pbrt_stats]( const size_t i ) {
           return worker_pbrt_stats.counters[k[i]];

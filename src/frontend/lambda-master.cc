@@ -264,7 +264,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     alloc_stream << "workerId,treeletId,action\n";
 
     summary_stream
-      << "workerId,treeletId,trace,shade,nodes,visited,traceTime,shadeTime\n";
+      << "workerId,treeletId,process,trace,shade,nodes,visited,processTime\n";
   }
 
   auto print_info = []( const string& key, auto value ) {
