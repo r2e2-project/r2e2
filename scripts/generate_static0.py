@@ -34,6 +34,7 @@ def get_data(path):
                 "raysDequeued": "sum",
                 "bytesEnqueued": "sum",
                 "bytesDequeued": "sum",
+                "bytesSamples": "sum",
             }
         )
         .reset_index(drop=True)
@@ -49,7 +50,9 @@ def generate_static0(data):
     )
 
     data["transfer"] = (
-        100 * (data.bytesEnqueued + data.bytesDequeued) / AVERAGE_BANDWIDTH
+        100
+        * (data.bytesEnqueued + data.bytesDequeued + data.bytesSamples)
+        / AVERAGE_BANDWIDTH
     )
 
     data["compute"] = (
