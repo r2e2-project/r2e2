@@ -11,13 +11,13 @@ SHADE_CUTOFF = 100
 
 def calculate_compute_time(d, mean_shade_time):
     if d.trace > 0:
-        return d.traceTime / 2
+        return d.processTime / 2
     elif d.shade > SHADE_CUTOFF:
-        return d.shadeTime / 1.5
+        return d.processTime / 1.5
     elif d.shade > 0:
         return (mean_shade_time * d.shade) / 1.5
     else:
-        return 0
+        return d.processTime
 
 
 def get_data(path):
@@ -45,7 +45,7 @@ def get_data(path):
 
 def generate_static0(data):
     mean_shade_time = np.mean(
-        data[data.shade > SHADE_CUTOFF].shadeTime
+        data[data.shade > SHADE_CUTOFF].processTime
         / data[data.shade > SHADE_CUTOFF].shade
     )
 
