@@ -59,9 +59,13 @@ def generate_static0(data):
         data.apply(lambda x: calculate_compute_time(x, mean_shade_time), axis=1) / 1e7
     )
 
-    data["weights"] = np.maximum(data.transfer, data.compute)
+    data["weight"] = np.maximum(data.transfer, data.compute)
+    t0_weight = data[data.treeletId == 0].weight.values[0]
+    envmap_filter = (data.trace == 0) & (data.shade == 0) & (data.process > 0)
+    data.loc[envmap_filter, 'weight'] = t0_weight
+
     data = data.sort_values("treeletId")
-    weights = data.weights.values
+    weights = data.weight.values
 
     print(len(data))
 
