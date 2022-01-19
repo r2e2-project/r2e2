@@ -61,7 +61,7 @@ void LambdaWorker::handle_worker_stats()
     return;
 
   if ( scene_loaded
-       and last_heard_from_master - steady_clock::now() > seconds { 15 } ) {
+       and last_heard_from_master - steady_clock::now() > seconds { 30 } ) {
     return terminate();
   }
 

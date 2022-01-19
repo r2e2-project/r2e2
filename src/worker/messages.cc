@@ -25,6 +25,8 @@ void LambdaWorker::process_message( const Message& message )
   cerr << "\u2190 " << message.info() << endl;
 #endif
 
+  last_heard_from_master = steady_clock::now();
+
   if ( not scene_loaded ) {
     bool allowed = false;
 
@@ -45,8 +47,6 @@ void LambdaWorker::process_message( const Message& message )
       return;
     }
   }
-
-  last_heard_from_master = steady_clock::now();
 
   switch ( message.opcode() ) {
     case OpCode::Hey: {
