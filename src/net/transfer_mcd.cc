@@ -103,7 +103,10 @@ void TransferAgent::worker_thread( const size_t )
         }
       }
 
-        [[fallthrough]];
+        thread_results.emplace( pending_actions[i].front().id,
+                                move( response.unstructured_data() ) );
+        pending_actions[i].pop();
+        break;
 
       case Response::Type::STORED:
         if ( pending_actions[i].front().task != Task::Upload ) {
