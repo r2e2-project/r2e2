@@ -112,6 +112,9 @@ void S3TransferAgent::worker_thread( const size_t thread_id )
 
     TRY_OPERATION( s3.connect( s3_address ), continue );
 
+    s3.set_read_timeout( 4s );
+    s3.set_write_timeout( 4s );
+
     while ( connection_okay ) {
       /* make sure we have an action to perfom */
       if ( actions.empty() ) {
