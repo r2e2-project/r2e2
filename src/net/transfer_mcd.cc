@@ -3,6 +3,8 @@
 #include <functional>
 #include <list>
 
+#include "util/split.hh"
+
 using namespace std;
 
 namespace memcached {
@@ -65,6 +67,7 @@ void TransferAgent::worker_thread( const size_t )
 
   auto pending_actions = make_unique<queue<Action>[]>( _servers.size() );
   auto clients = make_unique<unique_ptr<Client>[]>( _servers.size() );
+  auto client_dead = make_unique<bool[]>( _servers.size() );
 
   queue<size_t> dead_clients {};
 
@@ -73,17 +76,49 @@ void TransferAgent::worker_thread( const size_t )
                                            _loop.add_category( "Client Write" ),
                                            _loop.add_category( "Response" ) };
 
-  auto response_callback = [&actions, &pending_actions, &thread_results](
-                             const size_t i, Response&& response ) {
+  auto response_callback = [&]( const size_t i, Response&& response ) {
+    if ( client_dead[i] ) {
+      return;
+    }
+
     switch ( response.type() ) {
-      case Response::Type::VALUE:
-        actions.emplace_front(
-          0, Task::Delete, pending_actions[i].front().key, "" );
+      case Response::Type::VALUE: {
+        // is this what we are actually expecting?
+        vector<string_view> tokens;
+        split( response.first_line(), ' ', tokens );
+
+        if ( pending_actions[i].front().task != Task::Download
+             or tokens.size() < 2
+             or tokens[1] != pending_actions[i].front().key ) {
+          cerr << "didn't get the expected response for GET "
+               << pending_actions[i].front().key << endl;
+
+          // this client is not good anymore...
+          dead_clients.push( i );
+          client_dead[i] = true;
+          return;
+        } else {
+          actions.emplace_front(
+            0, Task::Delete, pending_actions[i].front().key, "" );
+        }
+      }
+
+        [[fallthrough]];
+
+      case Response::Type::STORED:
+        if ( pending_actions[i].front().task != Task::Upload ) {
+          cerr << "didn't get the expected response for PUT "
+               << pending_actions[i].front().key << endl;
+
+          // this client is not good anymore...
+          dead_clients.push( i );
+          client_dead[i] = true;
+          return;
+        }
 
         [[fallthrough]];
 
       case Response::Type::OK:
-      case Response::Type::STORED:
         thread_results.emplace( pending_actions[i].front().id,
                                 move( response.unstructured_data() ) );
         pending_actions[i].pop();
@@ -105,8 +140,10 @@ void TransferAgent::worker_thread( const size_t )
     }
   };
 
-  auto cancel_callback
-    = [&dead_clients]( const size_t i ) { dead_clients.push( i ); };
+  auto cancel_callback = [&dead_clients, &client_dead]( const size_t i ) {
+    dead_clients.push( i );
+    client_dead[i] = true;
+  };
 
   for ( size_t i = 0; i < _servers.size(); i++ ) {
     const auto& server = _servers[i];
@@ -118,6 +155,8 @@ void TransferAgent::worker_thread( const size_t )
       [f = response_callback, i]( Response&& res ) { f( i, move( res ) ); },
       [f = cancel_callback, i] { f( i ); },
       [f = cancel_callback, i] { f( i ); } );
+
+    client_dead[i] = false;
   }
 
   _loop.add_rule(
@@ -166,6 +205,8 @@ void TransferAgent::worker_thread( const size_t )
         [f = response_callback, i]( Response&& res ) { f( i, move( res ) ); },
         [f = cancel_callback, i] { f( i ); },
         [f = cancel_callback, i] { f( i ); } );
+
+      client_dead[i] = false;
 
       while ( not pending_actions[i].empty() ) {
         actions.emplace_back( move( pending_actions[i].front() ) );
