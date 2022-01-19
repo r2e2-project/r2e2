@@ -267,7 +267,7 @@ void LambdaWorker::handle_scene_object_results()
       scene.base.camera->film->SetCroppedPixelBounds(
         static_cast<pbrt::Bounds2i>( tile_helper.bounds( *tile_id ) ) );
 
-      for ( size_t i = 0; i < 2; i++ ) {
+      for ( size_t i = 0; i < thread::hardware_concurrency(); i++ ) {
         accumulation_threads.emplace_back(
           bind( &LambdaWorker::handle_accumulation_queue, this ) );
       }
