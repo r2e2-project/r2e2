@@ -186,12 +186,15 @@ void LambdaWorker::handle_sample_bags()
 {
   sample_bags_timer.read_event();
 
+  char compression_buffer[MAX_SAMPLE_BAG_SIZE];
+
   auto submit_bag = [&]( RayBag&& bag ) {
     if ( COMPRESS_RAY_BAGS ) {
-      const size_t upper_bound = LZ4_COMPRESSBOUND( bag.info.bag_size );
-      string compressed( upper_bound, '\0' );
-      const size_t compressed_size = LZ4_compress_default(
-        bag.data.data(), &compressed[0], bag.info.bag_size, upper_bound );
+      const size_t compressed_size
+        = LZ4_compress_default( bag.data.data(),
+                                compression_buffer,
+                                bag.info.bag_size,
+                                MAX_SAMPLE_BAG_SIZE );
 
       if ( compressed_size == 0 ) {
         cerr << "bag compression failed: "
@@ -201,11 +204,11 @@ void LambdaWorker::handle_sample_bags()
       }
 
       bag.info.bag_size = compressed_size;
-      bag.data = move( compressed );
+      bag.data = { compression_buffer, compressed_size };
+    } else {
+      bag.data.erase( bag.info.bag_size );
+      bag.data.shrink_to_fit();
     }
-
-    bag.data.erase( bag.info.bag_size );
-    bag.data.shrink_to_fit();
 
     const auto id
       = ( config.accumulators ? transfer_agent : samples_transfer_agent )
