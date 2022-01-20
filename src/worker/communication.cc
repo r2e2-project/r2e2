@@ -231,37 +231,33 @@ void LambdaWorker::handle_sample_bags()
 
 void LambdaWorker::handle_receive_queue()
 {
+  char decompression_buffer[MAX_BAG_SIZE];
+  string_view bag_data;
+
   while ( !receive_queue.empty() ) {
     RayBag bag = move( receive_queue.front() );
     receive_queue.pop();
 
     /* let's unpack this treelet and add the rays to the trace or accumulation
      * queue */
-    size_t total_size = bag.data.size();
-
     if ( COMPRESS_RAY_BAGS ) {
-      string decompressed(
-        bag.info.ray_count
-          * ( 4
-              + ( bag.info.sample_bag ? Sample::MaxPackedSize
-                                      : RayState::MaxPackedSize ) ),
-        '\0' );
-
       int decompressed_size = LZ4_decompress_safe(
-        bag.data.data(), &decompressed[0], total_size, decompressed.size() );
+        bag.data.data(), decompression_buffer, bag.data.size(), MAX_BAG_SIZE );
 
       if ( decompressed_size < 0 ) {
         cerr << "bag decompression failed: "
              << bag.info.info( ray_bags_key_prefix )
-             << " (allocated=" << decompressed.size()
-             << ",inputlen=" << total_size << ",retcode=" << decompressed_size
-             << ")" << endl;
+             << " (allocated=" << MAX_BAG_SIZE
+             << ",inputlen=" << bag.data.size()
+             << ",retcode=" << decompressed_size << ")" << endl;
 
         throw runtime_error( "bag decompression failed" );
       }
 
-      total_size = decompressed_size;
-      bag.data = move( decompressed );
+      bag_data
+        = { decompression_buffer, static_cast<size_t>( decompressed_size ) };
+    } else {
+      bag_data = bag.data;
     }
 
     if ( is_accumulator ) {
@@ -269,12 +265,17 @@ void LambdaWorker::handle_receive_queue()
         throw runtime_error( "unexpected bag tile id" );
       }
 
+      if ( COMPRESS_RAY_BAGS ) {
+        bag.data = string { bag_data };
+      }
+
       sample_queue_size++;
       sample_queue.enqueue( move( bag.data ) );
     } else {
-      const char* data = bag.data.data();
+      const char* data = bag_data.data();
+      const size_t data_size = bag_data.length();
 
-      for ( size_t offset = 0; offset < total_size; ) {
+      for ( size_t offset = 0; offset < data_size; ) {
         uint32_t len;
         memcpy( &len, data + offset, sizeof( uint32_t ) );
         offset += 4;

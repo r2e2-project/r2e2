@@ -23,7 +23,7 @@ void LambdaWorker::generate_rays( const Bounds2i& bounds )
         = graphics::GenerateCameraRay( scene.base.camera,
                                        pixel,
                                        sample,
-                                       scene.max_depth,
+                                       scene.base.maxPathDepth,
                                        scene.base.sampleExtent,
                                        scene.base.sampler );
 
