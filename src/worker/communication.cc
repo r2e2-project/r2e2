@@ -115,14 +115,14 @@ void LambdaWorker::handle_open_bags()
 
 void LambdaWorker::handle_sealed_bags()
 {
+  char compression_buffer[MAX_BAG_SIZE];
+
   while ( !sealed_bags.empty() ) {
     auto& bag = sealed_bags.front();
 
     if ( COMPRESS_RAY_BAGS ) {
-      const size_t upper_bound = LZ4_COMPRESSBOUND( bag.info.bag_size );
-      string compressed( upper_bound, '\0' );
       const size_t compressed_size = LZ4_compress_default(
-        bag.data.data(), &compressed[0], bag.info.bag_size, upper_bound );
+        bag.data.data(), compression_buffer, bag.info.bag_size, MAX_BAG_SIZE );
 
       if ( compressed_size == 0 ) {
         cerr << "bag compression failed: "
@@ -132,11 +132,11 @@ void LambdaWorker::handle_sealed_bags()
       }
 
       bag.info.bag_size = compressed_size;
-      bag.data = move( compressed );
+      bag.data = string { compression_buffer, compressed_size };
+    } else {
+      bag.data.erase( bag.info.bag_size );
+      bag.data.shrink_to_fit();
     }
-
-    bag.data.erase( bag.info.bag_size );
-    bag.data.shrink_to_fit();
 
     log_bag( BagAction::Submitted, bag.info );
 
