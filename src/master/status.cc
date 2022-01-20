@@ -15,16 +15,16 @@ void LambdaMaster::handle_status_message()
 
   const auto now = steady_clock::now();
 
+  size_t active_rays_total = 0;
+  for ( auto& w : workers ) {
+    active_rays_total += w.active_rays();
+  }
+
   if ( config.timeout.count() && now - last_action_time >= config.timeout ) {
     terminate( "Inactivity threshold has been exceeded." );
   } else if ( state_ == State::Active
               and scene.total_paths == aggregated_stats.finished_paths
               and not tiles.camera_rays_remaining() ) {
-    size_t active_rays_total = 0;
-    for ( auto& w : workers ) {
-      active_rays_total += w.active_rays();
-    }
-
     if ( active_rays_total == 0 ) {
       terminate( "Job done." );
     }
@@ -104,6 +104,10 @@ void LambdaMaster::handle_status_message()
       // dequeued bytes
       << BG() << " \u2193 " << percent( s.dequeued.bytes, s.enqueued.bytes )
       << "% "
+
+      // active rays
+      << BG() << " \u21a6 " << format_num( active_rays_total )
+      << " "
 
       // elapsed time
       << BG() << " " << setfill( '0' ) << setw( 2 ) << ( elapsed_seconds / 60 )
