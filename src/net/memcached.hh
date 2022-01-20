@@ -131,7 +131,7 @@ class DeleteRequest : public Request
 {
 public:
   DeleteRequest( const std::string& key )
-    : Request( Request::Type::DELETE, "delete " + key, "" )
+    : Request( Request::Type::DELETE, "delete " + key + " noreply", "" )
   {}
 };
 
