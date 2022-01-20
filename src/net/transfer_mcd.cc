@@ -91,7 +91,8 @@ void TransferAgent::worker_thread( const size_t )
              or tokens.size() < 2
              or tokens[1] != pending_actions[i].front().key ) {
           cerr << "didn't get the expected response for GET "
-               << pending_actions[i].front().key << endl;
+               << pending_actions[i].front().key << " (got '"
+               << response.first_line() << "')" << endl;
 
           // this client is not good anymore...
           dead_clients.push( i );
@@ -116,7 +117,8 @@ void TransferAgent::worker_thread( const size_t )
              or tokens.size() < 2 or tokens[1][0] != 'k'
              or tokens[1].substr( 1 ) != pending_actions[i].front().key ) {
           cerr << "didn't get the expected response for PUT "
-               << pending_actions[i].front().key << endl;
+               << pending_actions[i].front().key << " (got '"
+               << response.first_line() << "')" << endl;
 
           // this client is not good anymore...
           dead_clients.push( i );
