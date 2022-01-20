@@ -137,7 +137,8 @@ Bounds2i LambdaMaster::Tiles::next_camera_tile()
   return Bounds2i( Point2i { x0, y0 }, Point2i { x1, y1 } );
 }
 
-void LambdaMaster::Tiles::send_worker_tile( Worker& worker )
+void LambdaMaster::Tiles::send_worker_tile( Worker& worker,
+                                            WorkerStats& aggregated_stats )
 {
   protobuf::GenerateRays proto;
 
@@ -148,6 +149,7 @@ void LambdaMaster::Tiles::send_worker_tile( Worker& worker )
   proto.set_y1( next_tile.pMax.y );
 
   worker.ray_counters.camera += next_tile.Area() * tile_spp;
+  aggregated_stats.generated_paths += next_tile.Area() * tile_spp;
 
   worker.client.push_request(
     { 0, OpCode::GenerateRays, protoutil::to_string( proto ) } );

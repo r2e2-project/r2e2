@@ -79,7 +79,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       if ( worker.role == Worker::Role::Generator ) {
         if ( tiles.camera_rays_remaining() ) {
           /* Tell the worker to generate rays */
-          tiles.send_worker_tile( worker );
+          tiles.send_worker_tile( worker, aggregated_stats );
         } else if ( worker.active_rays() == 0 ) {
           /* Generator is done, tell worker to finish up */
           worker.client.push_request( { 0, OpCode::FinishUp, "" } );

@@ -442,7 +442,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
         /* (3) Tell the worker to generate rays */
         if ( tiles.camera_rays_remaining() ) {
-          tiles.send_worker_tile( worker );
+          tiles.send_worker_tile( worker, aggregated_stats );
         } else {
           /* Too many ray launchers for tile size,
            * so just finish immediately */

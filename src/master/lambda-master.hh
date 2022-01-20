@@ -370,7 +370,7 @@ private:
   public:
     pbrt::Bounds2i next_camera_tile();
     bool camera_rays_remaining() const;
-    void send_worker_tile( Worker& worker );
+    void send_worker_tile( Worker& worker, WorkerStats& aggregated_stats );
 
     Tiles() = default;
     Tiles( const int tile_size,

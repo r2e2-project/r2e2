@@ -67,10 +67,12 @@ void LambdaMaster::handle_status_message()
   auto& s = aggregated_stats;
 
   ostringstream oss;
-  oss << "\033[0m" << fixed << setprecision( 2 )
+  oss << "\033[0m" << fixed << setprecision( 1 )
 
-      << BG( true ) << " \u21af " << s.finished_paths << " ("
-      << percent( s.finished_paths, scene.total_paths ) << "%) ";
+      << BG( true ) << " \u21af " << s.finished_paths << " ["
+      << percent( s.generated_paths, scene.total_paths ) << "%] ("
+      << setprecision( 2 ) << percent( s.finished_paths, scene.total_paths )
+      << "%) ";
 
   if ( Worker::active_count[Worker::Role::Generator] ) {
 
@@ -94,8 +96,8 @@ void LambdaMaster::handle_status_message()
       << " "
 
       // enqueued bytes
-      << BG() << " \u2191 " << format_bytes( s.enqueued.bytes )
-      << " "
+      // << BG() << " \u2191 " << format_bytes( s.enqueued.bytes )
+      // << " "
 
       // assigned bytes
       // << BG() << " \u21ba " << percent(s.assigned.bytes - s.dequeued.bytes,

@@ -67,7 +67,7 @@ pair<bool, bool> LambdaMaster::assign_work( Worker& worker )
   if ( ( rays_to_generate || work_to_do )
        && worker.active_rays() < WORKER_MAX_ACTIVE_RAYS ) {
     if ( rays_to_generate && !work_to_do ) {
-      tiles.send_worker_tile( worker );
+      tiles.send_worker_tile( worker, aggregated_stats );
       rays_to_generate = tiles.camera_rays_remaining();
     } else {
       /* only if work_to_do or the coin flip returned false */
