@@ -165,6 +165,6 @@ std::chrono::milliseconds random_initial(
   static thread_local std::random_device rd;
   static thread_local std::mt19937 gen( rd() );
   std::uniform_int_distribution<> dis(
-    0, std::chrono::duration_cast<std::chrono::milliseconds>( t ).count() );
+    1, std::chrono::duration_cast<std::chrono::milliseconds>( t ).count() );
   return std::chrono::milliseconds { dis( gen ) };
 }
