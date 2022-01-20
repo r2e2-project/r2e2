@@ -82,10 +82,9 @@ struct RayBagInfo
     std::ostringstream oss;
 
     if ( !sample_bag ) {
-      oss << prefix << "T" << treelet_id << "/W" << worker_id << "/B" << bag_id;
+      oss << prefix << treelet_id << "/" << worker_id << "/" << bag_id;
     } else {
-      oss << prefix << "samples/T" << tile_id << "/W" << worker_id << "/B"
-          << bag_id;
+      oss << prefix << "s/" << tile_id << "/" << worker_id << "/" << bag_id;
     }
 
     return oss.str();
