@@ -108,8 +108,13 @@ void TransferAgent::worker_thread( const size_t )
         pending_actions[i].pop();
         break;
 
-      case Response::Type::STORED:
-        if ( pending_actions[i].front().task != Task::Upload ) {
+      case Response::Type::STORED: {
+        vector<string_view> tokens;
+        split( response.first_line(), ' ', tokens );
+
+        if ( pending_actions[i].front().task != Task::Upload
+             or tokens.size() < 2 or tokens[1][0] != 'k'
+             or tokens[1].substr( 1 ) != pending_actions[i].front().key ) {
           cerr << "didn't get the expected response for PUT "
                << pending_actions[i].front().key << endl;
 
@@ -118,6 +123,7 @@ void TransferAgent::worker_thread( const size_t )
           client_dead[i] = true;
           return;
         }
+      }
 
         [[fallthrough]];
 

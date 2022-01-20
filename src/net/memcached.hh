@@ -19,7 +19,8 @@ public:
     SET,
     GET,
     DELETE,
-    FLUSH
+    FLUSH,
+    META_SET
   };
 
 private:
@@ -112,8 +113,8 @@ class SetRequest : public Request
 {
 public:
   SetRequest( const std::string& key, const std::string& data )
-    : Request( Request::Type::SET,
-               "set " + key + " 0 0 " + std::to_string( data.length() ),
+    : Request( Request::Type::META_SET,
+               "ms " + key + " " + std::to_string( data.length() ) + " k",
                data )
   {}
 };

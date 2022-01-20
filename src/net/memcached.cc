@@ -45,9 +45,9 @@ size_t ResponseParser::parse( const string_view data )
           state_ = State::BodyPending;
           expected_body_length_ = length;
         } else {
-          if ( first_word == "STORED" ) {
+          if ( first_word == "HD" ) {
             response_.type_ = Response::Type::STORED;
-          } else if ( first_word == "NOT_STORED" ) {
+          } else if ( first_word == "NS" ) {
             response_.type_ = Response::Type::NOT_STORED;
           } else if ( first_word == "DELETED" ) {
             response_.type_ = Response::Type::DELETED;
