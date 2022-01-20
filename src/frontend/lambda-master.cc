@@ -312,6 +312,15 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
          << endl;
   }
 
+  loop.set_fd_failure_callback( [&] {
+    if ( state_ != State::Active ) {
+      // we can be a little generous here and ignore the socket errors...
+      return;
+    }
+
+    throw runtime_error( "error on polled file descriptor" );
+  } );
+
   loop.add_rule(
     "Signals",
     Direction::In,
