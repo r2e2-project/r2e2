@@ -52,33 +52,37 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
   if ( exception_handler ) {
     auto handler = *exception_handler;
 
-    socket_read_handler = [f = move( socket_read_handler ), h = handler] {
+    socket_read_handler = [this, h = handler] {
       try {
-        f();
+        session_.do_read();
       } catch ( exception& ) {
         h();
       }
     };
 
-    socket_write_handler = [f = move( socket_write_handler ), h = handler] {
+    socket_write_handler = [this, h = handler] {
       try {
-        f();
+        session_.do_write();
       } catch ( exception& ) {
         h();
       }
     };
 
-    endpoint_read_handler = [f = move( endpoint_read_handler ), h = handler] {
+    endpoint_read_handler = [this, h = handler] {
       try {
-        f();
+        read( session_.inbound_plaintext() );
       } catch ( exception& ) {
         h();
       }
     };
 
-    endpoint_write_handler = [f = move( endpoint_write_handler ), h = handler] {
+    endpoint_write_handler = [this, h = handler] {
       try {
-        f();
+        do {
+          write( session_.outbound_plaintext() );
+        } while (
+          ( not session_.outbound_plaintext().writable_region().empty() )
+          and ( not requests_empty() ) );
       } catch ( exception& ) {
         h();
       }

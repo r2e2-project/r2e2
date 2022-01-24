@@ -76,7 +76,6 @@ void TransferAgent::worker_thread( const size_t )
 
   auto cancel_callback = [&clients, &is_client_dead]( const size_t i ) {
     is_client_dead[i] = true;
-    clients[i]->uninstall_rules();
   };
 
   auto response_callback
@@ -153,8 +152,20 @@ void TransferAgent::worker_thread( const size_t )
         return false;
 
       case Response::Type::DELETED:
-      case Response::Type::NOT_FOUND:
         break;
+
+      case Response::Type::NOT_FOUND:
+        if ( not pending_actions[i].empty() ) {
+          if ( pending_actions[i].front().task != Task::Download ) {
+            cerr << "got NOT_FOUND for an unexpected task ("
+                 << pending_actions[i].front().key << endl;
+          } else {
+            cerr << "got NOT_FOUND for object "
+                 << pending_actions[i].front().key << endl;
+          }
+        }
+
+        throw runtime_error( "object not found" );
 
       default:
         cerr << "invalid response: " << response.first_line() << endl;
@@ -212,6 +223,7 @@ void TransferAgent::worker_thread( const size_t )
         [&response_callback, i]( auto&& r ) {
           return response_callback( i, move( r ) );
         },
+        [&cancel_callback, i] { cancel_callback( i ); },
         [&cancel_callback, i] { cancel_callback( i ); } );
 
       while ( not pending_actions[i].empty() ) {
