@@ -20,7 +20,8 @@ public:
     GET,
     DELETE,
     FLUSH,
-    META_SET
+    META_SET,
+    CHECK
   };
 
 private:
@@ -146,6 +147,14 @@ class FlushRequest : public Request
 public:
   FlushRequest()
     : Request( Request::Type::FLUSH, "flush_all", "" )
+  {}
+};
+
+class CheckRequest : public Request
+{
+public:
+  CheckRequest( const std::string& key )
+    : Request( Request::Type::CHECK, "mg " + key + " k", "" )
   {}
 };
 

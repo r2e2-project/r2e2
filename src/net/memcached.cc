@@ -49,6 +49,8 @@ size_t ResponseParser::parse( const string_view data )
             response_.type_ = Response::Type::STORED;
           } else if ( first_word == "NS" ) {
             response_.type_ = Response::Type::NOT_STORED;
+          } else if ( first_word == "EN" ) {
+            response_.type_ = Response::Type::NOT_FOUND;
           } else if ( first_word == "DELETED" ) {
             response_.type_ = Response::Type::DELETED;
           } else if ( first_word == "ERROR" ) {
