@@ -100,6 +100,8 @@ public:
   //! Set blocking(true) or non-blocking(false)
   void set_blocking( const bool blocking );
 
+  bool is_blocking() const { return not _internal_fd->_non_blocking; }
+
   //! \name FDWrapper accessors
   //!@{
   int fd_num() const

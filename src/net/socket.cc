@@ -79,7 +79,16 @@ void Socket::bind( const Address& address )
 //! \param[in] address is the peer's Address
 void Socket::connect( const Address& address )
 {
-  CheckSystemCall( "connect", ::connect( fd_num(), address, address.size() ) );
+  const int ret = ::connect( fd_num(), address, address.size() );
+  register_read();
+
+  if ( ret < 0 ) {
+    if ( not is_blocking() and ( errno == EAGAIN or errno == EINPROGRESS ) ) {
+      return;
+    } else {
+      throw unix_error( "connect" );
+    }
+  }
 }
 
 // shut down a socket in the specified way
