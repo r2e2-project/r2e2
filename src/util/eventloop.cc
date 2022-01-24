@@ -266,6 +266,11 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
     auto& this_rule = *reinterpret_cast<FDRule*>( this_epoll_event.data.ptr );
     const uint32_t this_events = this_epoll_event.events;
 
+    if ( this_rule.cancel_requested ) {
+      // we will remove this rule in the next iteration of the event loop
+      continue;
+    }
+
     // check if we have an error
     if ( this_events & EPOLLERR ) {
       /* see if fd is a socket */
