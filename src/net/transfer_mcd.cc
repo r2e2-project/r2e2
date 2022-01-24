@@ -96,6 +96,7 @@ void TransferAgent::worker_thread( const size_t )
 
           // this client is not good anymore...
           dead_clients.push( i );
+          clients[i] = nullptr;
           client_dead[i] = true;
           return;
         } else {
@@ -122,6 +123,7 @@ void TransferAgent::worker_thread( const size_t )
 
           // this client is not good anymore...
           dead_clients.push( i );
+          clients[i] = nullptr;
           client_dead[i] = true;
           return;
         }
