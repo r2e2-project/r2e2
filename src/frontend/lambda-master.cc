@@ -286,6 +286,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   };
   // clang-format on
 
+  output_preview_url = preview_url();
+
   cout << endl << "Job info:" << endl;
   print_info( "Job ID", job_id );
   print_info( "Working directory", scene_path );
@@ -308,7 +310,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   if ( accumulators ) {
     cout << "\u2192 Real-time preview is available at\n"
-         << "  \x1B[1m" << preview_url() << "\x1B[0m\n"
+         << "  \x1B[1m" << output_preview_url << "\x1B[0m\n"
          << endl;
   }
 

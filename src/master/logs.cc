@@ -494,4 +494,14 @@ void LambdaMaster::print_job_summary() const
 
   print_title( "Estimated CPU-seconds" );
   cout << Value<double>( proto.estimated_cost() ) << endl;
+
+  cout << endl;
+
+  if ( not output_preview_url.empty() ) {
+    cout << "\u2192 Output is available at\n"
+         << "  \x1B[1m" << output_preview_url << "\x1B[0m\n"
+         << endl;
+  }
+
+  cout << endl;
 }
