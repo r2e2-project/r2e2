@@ -63,9 +63,7 @@ size_t ResponseParser::parse( const string_view data )
           } else if ( first_word == "SERVER_ERROR" ) {
             response_.type_ = Response::Type::SERVER_ERROR;
           } else {
-            throw runtime_error(
-              "invalid response: " + response_.first_line_ + " (request: "
-              + to_string( static_cast<int>( requests_.front() ) ) + ")" );
+            response_.type_ = Response::Type::SERVER_ERROR;
           }
 
           requests_.pop();
