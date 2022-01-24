@@ -75,7 +75,7 @@ void TransferAgent::worker_thread( const size_t )
 
   auto response_callback = [&]( const size_t i, Response&& response ) {
     if ( not clients[i] ) {
-      return;
+      return false;
     }
 
     vector<string_view> tokens;
@@ -95,7 +95,7 @@ void TransferAgent::worker_thread( const size_t )
 
           // this client is not good anymore...
           cancel_callback( i );
-          return;
+          return false;
         }
 
         actions.emplace_front(
@@ -119,7 +119,7 @@ void TransferAgent::worker_thread( const size_t )
 
           // this client is not good anymore...
           cancel_callback( i );
-          return;
+          return false;
         }
 
         [[fallthrough]];
@@ -134,12 +134,12 @@ void TransferAgent::worker_thread( const size_t )
       case Response::Type::ERROR:
         cerr << "memcached client errored" << endl;
         cancel_callback( i );
-        return;
+        return false;
 
       case Response::Type::SERVER_ERROR:
         cerr << "memcached server errored" << endl;
         cancel_callback( i );
-        return;
+        return false;
 
       case Response::Type::DELETED:
       case Response::Type::NOT_FOUND:
@@ -148,8 +148,10 @@ void TransferAgent::worker_thread( const size_t )
       default:
         cerr << "invalid response: " << response.first_line() << endl;
         cancel_callback( i );
-        return;
+        return false;
     }
+
+    return true;
   };
 
   _loop.add_rule(
@@ -196,7 +198,7 @@ void TransferAgent::worker_thread( const size_t )
       clients[i]->install_rules(
         _loop,
         rule_categories,
-        [f = response_callback, i]( Response&& res ) { f( i, move( res ) ); },
+        [f = response_callback, i]( auto&& r ) { return f( i, move( r ) ); },
         [f = cancel_callback, i] { f( i ); } );
 
       while ( not pending_actions[i].empty() ) {

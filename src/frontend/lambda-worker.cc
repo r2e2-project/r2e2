@@ -157,7 +157,10 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
   master_connection.install_rules(
     loop,
     worker_rule_categories,
-    [this]( meow::Message&& msg ) { this->process_message( msg ); },
+    [this]( meow::Message&& msg ) {
+      this->process_message( msg );
+      return true;
+    },
     [this] { this->terminate(); } );
 }
 

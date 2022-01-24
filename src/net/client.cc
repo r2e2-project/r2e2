@@ -26,7 +26,7 @@ template<class SessionType, class RequestType, class ResponseType>
 void Client<SessionType, RequestType, ResponseType>::install_rules(
   EventLoop& loop,
   const RuleCategories& rule_categories,
-  const function<void( ResponseType&& )>& response_callback,
+  const function<bool( ResponseType&& )>& response_callback,
   const function<void( void )>& close_callback,
   const optional<function<void()>>& exception_handler )
 {
@@ -109,8 +109,12 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
     rule_categories.response,
     [this, response_callback] {
       while ( not responses_empty() ) {
-        response_callback( move( responses_front() ) );
+        auto response = move( responses_front() );
         responses_pop();
+
+        if ( not response_callback( move( response ) ) ) {
+          return;
+        }
       }
     },
     [&] { return not responses_empty(); } ) );

@@ -41,7 +41,7 @@ public:
   void install_rules(
     EventLoop& loop,
     const RuleCategories& rule_categories,
-    const std::function<void( ResponseType&& )>& response_callback,
+    const std::function<bool( ResponseType&& )>& response_callback,
     const std::function<void( void )>& close_callback,
     const std::optional<std::function<void()>>& exception_handler = {} );
 

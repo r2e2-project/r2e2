@@ -539,6 +539,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         worker_rule_categories,
         [worker_id, this]( Message&& msg ) {
           process_message( worker_id, move( msg ) );
+          return true;
         },
         connection_close_handler );
     },

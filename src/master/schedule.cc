@@ -52,6 +52,7 @@ void LambdaMaster::invoke_workers( const size_t n_workers )
         https_rule_categories,
         [client_it, this]( HTTPResponse&& ) {
           finished_https_clients.push_back( client_it );
+          return true;
         },
         [] {},
         [] {} );
