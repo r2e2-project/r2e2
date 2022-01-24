@@ -13,8 +13,6 @@ class TransferAgent : public ::TransferAgent
 {
 private:
   std::vector<Address> _servers {};
-
-  EventLoop _loop {};
   EventFD _action_event {};
 
   void do_action( Action&& action ) override;

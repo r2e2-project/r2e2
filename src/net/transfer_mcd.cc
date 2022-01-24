@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <list>
+#include <set>
 
 #include "util/split.hh"
 
@@ -19,9 +20,6 @@ TransferAgent::TransferAgent( const vector<Address>& servers )
 
   _thread_count = 1;
   _threads.emplace_back( &TransferAgent::worker_thread, this, 0 );
-
-  // do nothing, cancel will take care of it
-  _loop.set_fd_failure_callback( [] {} );
 }
 
 TransferAgent::~TransferAgent()
@@ -52,7 +50,15 @@ size_t get_hash( const string& key )
 
 void TransferAgent::worker_thread( const size_t )
 {
-  using namespace std::placeholders;
+  EventLoop _loop {};
+  _loop.set_fd_failure_callback( [] {} );
+
+  Client::RuleCategories rule_categories {
+    _loop.add_category( "TCP Session" ),
+    _loop.add_category( "Client Read" ),
+    _loop.add_category( "Client Write" ),
+    _loop.add_category( "Response" ),
+  };
 
   auto make_client = []( const Address& addr ) {
     TCPSocket socket;
@@ -62,19 +68,24 @@ void TransferAgent::worker_thread( const size_t )
   };
 
   queue<pair<uint64_t, string>> thread_results;
+
   deque<Action> actions;
   vector<queue<Action>> pending_actions( _servers.size() );
   vector<unique_ptr<Client>> clients( _servers.size() );
+  vector<bool> is_client_dead( _servers.size(), true );
 
-  auto cancel_callback = [&clients]( const size_t i ) { clients[i].reset(); };
+  auto cancel_callback = [&clients, &is_client_dead]( const size_t i ) {
+    is_client_dead[i] = true;
+    clients[i]->uninstall_rules();
+  };
 
-  Client::RuleCategories rule_categories { _loop.add_category( "TCP Session" ),
-                                           _loop.add_category( "Client Read" ),
-                                           _loop.add_category( "Client Write" ),
-                                           _loop.add_category( "Response" ) };
-
-  auto response_callback = [&]( const size_t i, Response&& response ) {
-    if ( not clients[i] ) {
+  auto response_callback
+    = [&pending_actions,
+       &is_client_dead,
+       &cancel_callback,
+       &thread_results,
+       &actions]( const size_t i, Response&& response ) -> bool {
+    if ( is_client_dead[i] ) {
       return false;
     }
 
@@ -190,7 +201,7 @@ void TransferAgent::worker_thread( const size_t )
   do {
     // reconnect dead clients
     for ( size_t i = 0; i < _servers.size(); i++ ) {
-      if ( clients[i] ) {
+      if ( clients[i] and not is_client_dead[i] ) {
         continue;
       }
 
@@ -198,13 +209,17 @@ void TransferAgent::worker_thread( const size_t )
       clients[i]->install_rules(
         _loop,
         rule_categories,
-        [f = response_callback, i]( auto&& r ) { return f( i, move( r ) ); },
-        [f = cancel_callback, i] { f( i ); } );
+        [&response_callback, i]( auto&& r ) {
+          return response_callback( i, move( r ) );
+        },
+        [&cancel_callback, i] { cancel_callback( i ); } );
 
       while ( not pending_actions[i].empty() ) {
         actions.emplace_back( move( pending_actions[i].front() ) );
         pending_actions[i].pop();
       }
+
+      is_client_dead[i] = false;
     }
 
     // handle actions

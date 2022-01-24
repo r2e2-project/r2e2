@@ -113,6 +113,11 @@ void Client<SessionType, RequestType, ResponseType>::install_rules(
         responses_pop();
 
         if ( not response_callback( move( response ) ) ) {
+          // pop all response
+          while ( not responses_empty() ) {
+            responses_pop();
+          }
+
           return;
         }
       }
