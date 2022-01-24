@@ -81,6 +81,13 @@ void TransferAgent::worker_thread( const size_t )
       return;
     }
 
+    auto kill_client = [&]( const size_t u ) {
+      cerr << "killing memcached client " << u << endl;
+      dead_clients.push( u );
+      clients[u] = nullptr;
+      client_dead[u] = true;
+    };
+
     switch ( response.type() ) {
       case Response::Type::VALUE: {
         // is this what we are actually expecting?
@@ -95,9 +102,7 @@ void TransferAgent::worker_thread( const size_t )
                << response.first_line() << "')" << endl;
 
           // this client is not good anymore...
-          dead_clients.push( i );
-          clients[i] = nullptr;
-          client_dead[i] = true;
+          kill_client( i );
           return;
         } else {
           actions.emplace_front(
@@ -122,9 +127,7 @@ void TransferAgent::worker_thread( const size_t )
                << response.first_line() << "')" << endl;
 
           // this client is not good anymore...
-          dead_clients.push( i );
-          clients[i] = nullptr;
-          client_dead[i] = true;
+          kill_client( i );
           return;
         }
       }
@@ -139,17 +142,23 @@ void TransferAgent::worker_thread( const size_t )
 
       case Response::Type::NOT_STORED:
       case Response::Type::ERROR:
-        throw runtime_error( "memcached client errored" );
+        cerr << "memcached client errored" << endl;
+        kill_client( i );
+        return;
 
       case Response::Type::SERVER_ERROR:
-        throw runtime_error( "memcached server errored" );
+        cerr << "memcached server errored" << endl;
+        kill_client( i );
+        return;
 
       case Response::Type::DELETED:
       case Response::Type::NOT_FOUND:
         break;
 
       default:
-        throw runtime_error( "invalid response: " + response.first_line() );
+        cerr << "invalid response: " << response.first_line() << endl;
+        kill_client( i );
+        return;
     }
   };
 
