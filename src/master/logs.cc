@@ -502,6 +502,4 @@ void LambdaMaster::print_job_summary() const
          << "  \x1B[1m" << output_preview_url << "\x1B[0m\n"
          << endl;
   }
-
-  cout << endl;
 }
