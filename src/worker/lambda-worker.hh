@@ -45,8 +45,8 @@ constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL { 1'000 };
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL { 1'000 };
 constexpr std::chrono::milliseconds UPLOAD_OUTPUT_INTERVAL { 2'000 };
 
-constexpr size_t MAX_BAG_SIZE { 4 * 1024 * 1024 };        // 4 MiB
-constexpr size_t MAX_SAMPLE_BAG_SIZE { 4 * 1024 * 1024 }; // 4 MiB
+constexpr size_t MAX_BAG_SIZE { 1 * 1024 * 1024 };        // 4 MiB
+constexpr size_t MAX_SAMPLE_BAG_SIZE { 1 * 1024 * 1024 }; // 4 MiB
 
 struct WorkerConfiguration
 {
