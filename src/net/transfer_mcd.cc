@@ -62,14 +62,11 @@ void TransferAgent::worker_thread( const size_t )
   };
 
   queue<pair<uint64_t, string>> thread_results;
+  deque<Action> actions;
+  vector<queue<Action>> pending_actions( _servers.size() );
+  vector<unique_ptr<Client>> clients( _servers.size() );
 
-  std::deque<Action> actions;
-
-  auto pending_actions = make_unique<queue<Action>[]>( _servers.size() );
-  auto clients = make_unique<unique_ptr<Client>[]>( _servers.size() );
-  auto client_dead = make_unique<bool[]>( _servers.size() );
-
-  queue<size_t> dead_clients {};
+  auto cancel_callback = [&clients]( const size_t i ) { clients[i].reset(); };
 
   Client::RuleCategories rule_categories { _loop.add_category( "TCP Session" ),
                                            _loop.add_category( "Client Read" ),
@@ -77,24 +74,19 @@ void TransferAgent::worker_thread( const size_t )
                                            _loop.add_category( "Response" ) };
 
   auto response_callback = [&]( const size_t i, Response&& response ) {
-    if ( client_dead[i] ) {
+    if ( not clients[i] ) {
       return;
     }
 
-    auto kill_client = [&]( const size_t u ) {
-      cerr << "killing memcached client " << u << endl;
-      dead_clients.push( u );
-      clients[u] = nullptr;
-      client_dead[u] = true;
-    };
+    vector<string_view> tokens;
 
     switch ( response.type() ) {
-      case Response::Type::VALUE: {
+      case Response::Type::VALUE:
         // is this what we are actually expecting?
-        vector<string_view> tokens;
         split( response.first_line(), ' ', tokens );
 
-        if ( pending_actions[i].front().task != Task::Download
+        if ( pending_actions[i].empty()
+             or pending_actions[i].front().task != Task::Download
              or tokens.size() < 2
              or tokens[1] != pending_actions[i].front().key ) {
           cerr << "didn't get the expected response for GET "
@@ -102,24 +94,23 @@ void TransferAgent::worker_thread( const size_t )
                << response.first_line() << "')" << endl;
 
           // this client is not good anymore...
-          kill_client( i );
+          cancel_callback( i );
           return;
-        } else {
-          actions.emplace_front(
-            0, Task::Delete, pending_actions[i].front().key, "" );
         }
-      }
+
+        actions.emplace_front(
+          0, Task::Delete, pending_actions[i].front().key, "" );
 
         thread_results.emplace( pending_actions[i].front().id,
                                 move( response.unstructured_data() ) );
         pending_actions[i].pop();
         break;
 
-      case Response::Type::STORED: {
-        vector<string_view> tokens;
+      case Response::Type::STORED:
         split( response.first_line(), ' ', tokens );
 
-        if ( pending_actions[i].front().task != Task::Upload
+        if ( pending_actions[i].empty()
+             or pending_actions[i].front().task != Task::Upload
              or tokens.size() < 2 or tokens[1][0] != 'k'
              or tokens[1].substr( 1 ) != pending_actions[i].front().key ) {
           cerr << "didn't get the expected response for PUT "
@@ -127,10 +118,9 @@ void TransferAgent::worker_thread( const size_t )
                << response.first_line() << "')" << endl;
 
           // this client is not good anymore...
-          kill_client( i );
+          cancel_callback( i );
           return;
         }
-      }
 
         [[fallthrough]];
 
@@ -143,12 +133,12 @@ void TransferAgent::worker_thread( const size_t )
       case Response::Type::NOT_STORED:
       case Response::Type::ERROR:
         cerr << "memcached client errored" << endl;
-        kill_client( i );
+        cancel_callback( i );
         return;
 
       case Response::Type::SERVER_ERROR:
         cerr << "memcached server errored" << endl;
-        kill_client( i );
+        cancel_callback( i );
         return;
 
       case Response::Type::DELETED:
@@ -157,29 +147,10 @@ void TransferAgent::worker_thread( const size_t )
 
       default:
         cerr << "invalid response: " << response.first_line() << endl;
-        kill_client( i );
+        cancel_callback( i );
         return;
     }
   };
-
-  auto cancel_callback = [&dead_clients, &client_dead]( const size_t i ) {
-    dead_clients.push( i );
-    client_dead[i] = true;
-  };
-
-  for ( size_t i = 0; i < _servers.size(); i++ ) {
-    const auto& server = _servers[i];
-
-    clients[i] = make_client( server );
-    clients[i]->install_rules(
-      _loop,
-      rule_categories,
-      [f = response_callback, i]( Response&& res ) { f( i, move( res ) ); },
-      [f = cancel_callback, i] { f( i ); },
-      [f = cancel_callback, i] { f( i ); } );
-
-    client_dead[i] = false;
-  }
 
   _loop.add_rule(
     "New actions",
@@ -214,21 +185,19 @@ void TransferAgent::worker_thread( const size_t )
     },
     [&thread_results] { return !thread_results.empty(); } );
 
-  while ( _loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+  do {
     // reconnect dead clients
-    while ( not dead_clients.empty() ) {
-      const auto i = dead_clients.front();
-      dead_clients.pop();
+    for ( size_t i = 0; i < _servers.size(); i++ ) {
+      if ( clients[i] ) {
+        continue;
+      }
 
       clients[i] = make_client( _servers[i] );
       clients[i]->install_rules(
         _loop,
         rule_categories,
         [f = response_callback, i]( Response&& res ) { f( i, move( res ) ); },
-        [f = cancel_callback, i] { f( i ); },
         [f = cancel_callback, i] { f( i ); } );
-
-      client_dead[i] = false;
 
       while ( not pending_actions[i].empty() ) {
         actions.emplace_back( move( pending_actions[i].front() ) );
@@ -271,7 +240,7 @@ void TransferAgent::worker_thread( const size_t )
 
       actions.pop_front();
     }
-  }
+  } while ( _loop.wait_next_event( -1 ) != EventLoop::Result::Exit );
 }
 
 void TransferAgent::flush_all()
