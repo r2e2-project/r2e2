@@ -6,6 +6,8 @@ variable "instance_type" {}
 variable "servers_per_instance" {}
 variable "threads_per_server" {}
 variable "memory_per_server" {}
+variable "max_object_size" {}
+variable "additional_flags" {}
 
 provider "aws" {
     profile = "default"
@@ -39,6 +41,8 @@ resource "aws_instance" "memcached" {
         echo "N=${var.servers_per_instance}" >/home/ubuntu/memcached-servers.env
         echo "THREADS=${var.threads_per_server}" >>/home/ubuntu/memcached-servers.env
         echo "MEMORY=${var.memory_per_server}" >>/home/ubuntu/memcached-servers.env
+        echo "MAXOBJ=${var.max_object_size}" >>/home/ubuntu/memcached-servers.env
+        echo "FLAGS=${var.additional_flags}" >>/home/ubuntu/memcached-servers.env
         chmod 644 /home/ubuntu/memcached-servers.env
         systemctl restart r2t2-memcached.service
         EOT
