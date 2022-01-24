@@ -101,7 +101,13 @@ private:
   Response response_ {};
 
 public:
-  void new_request( const Request& req ) { requests_.push( req.type() ); }
+  void new_request( const Request& req )
+  {
+    if ( req.type() == Request::Type::DELETE )
+      return;
+
+    requests_.push( req.type() );
+  }
 
   size_t parse( const std::string_view data );
   bool empty() const { return responses_.empty(); }
