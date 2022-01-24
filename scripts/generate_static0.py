@@ -5,7 +5,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-AVERAGE_BANDWIDTH = 50_000_000  # 50 MB/s
+AVERAGE_BANDWIDTH = 40_000_000  # 40 MB/s
 SHADE_CUTOFF = 100
 
 
@@ -13,9 +13,9 @@ def calculate_compute_time(d, mean_shade_time):
     if d.trace > 0:
         return d.processTime / 2
     elif d.shade > SHADE_CUTOFF:
-        return d.processTime / 1.5
+        return d.processTime / 2
     elif d.shade > 0:
-        return (mean_shade_time * d.shade) / 1.5
+        return (mean_shade_time * d.shade) / 2
     else:
         return d.processTime
 
