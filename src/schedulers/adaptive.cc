@@ -26,7 +26,7 @@ optional<Schedule> AdaptiveScheduler::schedule(
     }
 
     case Stage::TWO:
-      if ( 1.0 * stats.finished_paths / n_paths >= 0.30 ) {
+      if ( 1.0 * stats.finished_paths / n_paths >= 0.50 ) {
         stage_ = Stage::THREE;
         last_scheduled_at_ = steady_clock::now();
       }
@@ -48,11 +48,11 @@ optional<Schedule> AdaptiveScheduler::schedule(
             // until we're neither CPU nor bandwidth bound, decrease the
             // capacity
             const bool cpu_bound
-              = ( count * treelet.cpu_usage ) / ( count - 1 ) > 0.75;
+              = ( count * treelet.cpu_usage ) / ( count - 1 ) > 0.55;
 
             const bool bandwidth_bound
               = ( treelet.dequeue_rate + treelet.enqueue_rate )
-                > ( count - 1 ) * 25'000'000;
+                > ( count - 1 ) * 30'000'000;
 
             if ( not cpu_bound and not bandwidth_bound ) {
               count--;
