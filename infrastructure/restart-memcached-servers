@@ -1,0 +1,16 @@
+#!/bin/bash
+
+cd "${0%/*}"
+
+terraform output -json  | python3 -c '
+import sys
+import json
+import os
+
+data = json.loads(sys.stdin.read())
+
+servers = data["ip_addresses"]["value"]
+count = data["servers_per_instance"]["value"]
+
+for server in servers:
+  print(server)' | xargs -I{} -P$(nproc) -- ssh -o "StrictHostKeyChecking no" ubuntu@{} sudo systemctl restart r2t2-memcached.service
