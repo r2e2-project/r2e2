@@ -5,8 +5,8 @@ import sys
 import numpy as np
 import pandas as pd
 
-AVERAGE_BANDWIDTH = 40_000_000  # 40 MB/s
-SHADE_CUTOFF = 100
+AVERAGE_BANDWIDTH = 30_000_000  # 30 MB/s
+SHADE_CUTOFF = 50_000
 
 
 def calculate_compute_time(d, mean_shade_time):
@@ -17,7 +17,7 @@ def calculate_compute_time(d, mean_shade_time):
     elif d.shade > 0:
         return (mean_shade_time * d.shade) / 2
     else:
-        return d.processTime
+        return d.processTime / 2
 
 
 def get_data(path):
@@ -60,9 +60,8 @@ def generate_static0(data):
     )
 
     data["weight"] = np.maximum(data.transfer, data.compute)
-    t0_weight = data[data.treeletId == 0].weight.values[0]
     envmap_filter = (data.trace == 0) & (data.shade == 0) & (data.process > 0)
-    data.loc[envmap_filter, "weight"] = t0_weight
+    data.loc[envmap_filter, "weight"] *= 4
 
     data = data.sort_values("treeletId")
     weights = data.weight.values
