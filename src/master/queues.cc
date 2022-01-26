@@ -30,8 +30,9 @@ pair<bool, bool> LambdaMaster::assign_work( Worker& worker )
     }
 
     if ( worker.active_rays() < WORKER_MAX_ACTIVE_SAMPLES ) {
-      *worker.to_be_assigned.add_items() = to_protobuf( bag_queue.front() );
+      worker.to_be_assigned.push_back( bag_queue.front() );
       record_assign( worker, bag_queue.front() );
+
       bag_queue.pop();
       queued_ray_bags_count--;
 
@@ -55,7 +56,7 @@ pair<bool, bool> LambdaMaster::assign_work( Worker& worker )
   auto& bag_queue = queued_ray_bags[treelet_id];
 
   /* Q1: do we have any rays to generate? */
-  bool rays_to_generate = tiles.camera_rays_remaining() && ( treelet_id == 0 );
+  bool rays_to_generate = ( treelet_id == 0 ) && tiles.camera_rays_remaining();
 
   /* Q2: do we have any work for this worker? */
   bool work_to_do = ( bag_queue.size() > 0 );
@@ -69,9 +70,8 @@ pair<bool, bool> LambdaMaster::assign_work( Worker& worker )
     if ( rays_to_generate && !work_to_do ) {
       tiles.send_worker_tile( worker, aggregated_stats );
       rays_to_generate = tiles.camera_rays_remaining();
-    } else {
-      /* only if work_to_do or the coin flip returned false */
-      *worker.to_be_assigned.add_items() = to_protobuf( bag_queue.front() );
+    } else { /* !rays_to_generate && work_to_do */
+      worker.to_be_assigned.push_back( bag_queue.front() );
       record_assign( worker, bag_queue.front() );
 
       bag_queue.pop();
@@ -105,14 +105,19 @@ void LambdaMaster::handle_queued_ray_bags()
   vector<WorkerId> new_free_workers;
   new_free_workers.reserve( free_workers.size() );
 
-  for ( auto& worker : workers ) {
-    if ( worker.to_be_assigned.items_size() ) {
-      worker.client.push_request(
-        { 0,
-          OpCode::ProcessRayBag,
-          protoutil::to_string( worker.to_be_assigned ) } );
+  for ( const auto worker_id : free_workers ) {
+    auto& worker = workers.at( worker_id );
 
-      worker.to_be_assigned.Clear();
+    if ( not worker.to_be_assigned.empty() ) {
+      protobuf::RayBags proto_bags;
+      for ( auto& bag_info : worker.to_be_assigned ) {
+        *proto_bags.add_items() = to_protobuf( bag_info );
+      }
+
+      worker.client.push_request(
+        { 0, OpCode::ProcessRayBag, protoutil::to_string( proto_bags ) } );
+
+      worker.to_be_assigned.clear();
     }
 
     if ( worker.marked_free ) {

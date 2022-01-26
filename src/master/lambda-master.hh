@@ -197,7 +197,7 @@ private:
     WorkerStats stats {};
     WorkerStats last_stats {};
 
-    protobuf::RayBags to_be_assigned {};
+    std::vector<RayBagInfo> to_be_assigned {};
     bool marked_free { false };
 
     std::string to_string() const;
