@@ -62,6 +62,7 @@ private:
 };
 
 // Parallel Local Definitions
+static int threadCount = 0;
 static vector<thread> threads;
 static bool shutdownThreads = false;
 class ParallelForLoop;
@@ -215,7 +216,7 @@ thread_local int ThreadIndex;
 
 int MaxThreadIndex()
 {
-  return NumSystemCores();
+  return ( threadCount == 0 ) ? NumSystemCores() : threadCount;
 }
 
 int NumSystemCores()
@@ -226,7 +227,8 @@ int NumSystemCores()
 void Init( const int n_threads )
 {
   CHECK_EQ( threads.size(), 0 );
-  int nThreads = ( n_threads == 0 ) ? MaxThreadIndex() : n_threads;
+  threadCount = n_threads;
+  int nThreads = MaxThreadIndex();
   ThreadIndex = 0;
 
   // Create a barrier so that we can be sure all worker threads get past
