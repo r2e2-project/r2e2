@@ -58,7 +58,7 @@ void LambdaMaster::record_assign( const WorkerId worker_id,
   auto& worker = workers.at( worker_id );
   worker.ray_counters.dequeued += info.ray_count;
 
-  worker.outstanding_ray_bags.insert( info );
+  worker.outstanding_ray_bag_count++;
   worker.outstanding_bytes += info.bag_size;
 
   worker.stats.assigned.rays += info.ray_count;
@@ -75,7 +75,7 @@ void LambdaMaster::record_dequeue( const WorkerId worker_id,
 {
   auto& worker = workers.at( worker_id );
 
-  worker.outstanding_ray_bags.erase( info );
+  worker.outstanding_ray_bag_count--;
   worker.outstanding_bytes -= info.bag_size;
 
   if ( info.sample_bag ) {

@@ -406,7 +406,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           worker.state = Worker::State::Terminated;
           Worker::active_count[worker.role]--;
 
-          if ( !worker.outstanding_ray_bags.empty() ) {
+          if ( worker.outstanding_ray_bag_count ) {
             throw runtime_error( "worker died without finishing its work: "
                                  + to_string( worker_id ) );
           }
@@ -555,10 +555,6 @@ string LambdaMaster::Worker::to_string() const
 {
   ostringstream oss;
 
-  size_t oustanding_size = 0;
-  for ( const auto& bag : outstanding_ray_bags )
-    oustanding_size += bag.bag_size;
-
   // clang-format off
   auto state_string = []( const State s ) -> string {
     switch ( s ) {
@@ -590,8 +586,8 @@ string LambdaMaster::Worker::to_string() const
     oss << *it;
   }
 
-  oss << "],outstanding-bags=" << outstanding_ray_bags.size()
-      << ",outstanding-bytes=" << oustanding_size
+  oss << "],outstanding-bags=" << outstanding_ray_bag_count
+      << ",outstanding-bytes=" << outstanding_bytes
       << ",ray-counters={.camera:" << ray_counters.camera
       << ",.generated:" << ray_counters.generated
       << ",.dequeued:" << ray_counters.dequeued

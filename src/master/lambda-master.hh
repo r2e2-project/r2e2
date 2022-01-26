@@ -125,7 +125,7 @@ private:
     safe_getenv_or( "R2T2_LAMBDA_FUNCTION", "r2t2-lambda-function" )
   };
 
-  std::string output_preview_url{};
+  std::string output_preview_url {};
 
   ////////////////////////////////////////////////////////////////////////////
   // Workers                                                                //
@@ -171,7 +171,7 @@ private:
 
     TileId tile_id {};
 
-    std::set<RayBagInfo> outstanding_ray_bags {};
+    size_t outstanding_ray_bag_count { 0 };
     size_t outstanding_bytes { 0 };
 
     struct
