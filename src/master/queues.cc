@@ -86,6 +86,8 @@ pair<bool, bool> LambdaMaster::assign_work( Worker& worker )
 
 void LambdaMaster::handle_queued_ray_bags()
 {
+  GlobalScopeTimer<Timer::Category::AssigningWork> _;
+
   shuffle( free_workers.begin(), free_workers.end(), rand_engine );
   bool should_continue;
 

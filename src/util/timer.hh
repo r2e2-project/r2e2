@@ -41,15 +41,20 @@ public:
     Nonblock,
     WaitingForEvent,
     LoadingTreelet,
-    count
+    AssigningWork,
+    COUNT,
   };
 
   constexpr static size_t num_categories
-    = static_cast<size_t>( Category::count );
+    = static_cast<size_t>( Category::COUNT );
 
-  constexpr static std::array<const char*, num_categories> _category_names {
-    { "DNS", "Nonblocking operations", "Waiting for event", "Loading treelet" }
-  };
+  constexpr static std::array<const char*, num_categories> _category_names { {
+    "DNS",
+    "Nonblocking operations",
+    "Waiting for event",
+    "Loading treelet",
+    "Assigning work",
+  } };
 
 private:
   uint64_t _beginning_timestamp = timestamp_ns();
