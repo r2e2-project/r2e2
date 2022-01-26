@@ -2,8 +2,6 @@
 #include "messages/utils.hh"
 #include "util/random.hh"
 
-#include "parallel.h"
-
 using namespace std;
 using namespace r2t2;
 using namespace meow;
@@ -90,70 +88,59 @@ void LambdaMaster::handle_queued_ray_bags()
 {
   GlobalScopeTimer<Timer::Category::AssigningWork> _;
 
-  auto assign_work_to_workers = [&]( vector<WorkerId>& free_workers ) {
-    shuffle( free_workers.begin(), free_workers.end(), rand_engine );
+  /* we only loop over treelets that have work to do, and have free workers */
+  for ( size_t i = 0; i < treelet_count; i++ ) {
+    auto& treelet = treelets[i];
+    auto& treelet_queue = queued_ray_bags[i];
 
-    bool should_continue = false;
+    if ( not treelet.free_workers.empty()
+         and ( not treelet_queue.empty()
+               or ( treelet.id == 0 and tiles.camera_rays_remaining() ) ) ) {
+      auto& free_workers = treelet.free_workers;
+      shuffle( free_workers.begin(), free_workers.end(), rand_engine );
 
-    do {
-      should_continue = false;
+      bool should_continue = false;
 
-      for ( const WorkerId worker_id : free_workers ) {
-        auto& worker = workers[worker_id];
+      do {
+        should_continue = false;
 
-        auto [worker_free, work_assigned] = assign_work( worker );
-        should_continue = should_continue || work_assigned;
+        for ( const WorkerId worker_id : free_workers ) {
+          auto& worker = workers[worker_id];
 
-        worker.marked_free = worker_free;
-      }
-    } while ( should_continue );
+          auto [worker_free, work_assigned] = assign_work( worker );
+          should_continue = should_continue || work_assigned;
 
-    vector<WorkerId> new_free_workers;
-    new_free_workers.reserve( free_workers.size() );
+          worker.marked_free = worker_free;
+        }
+      } while ( should_continue );
 
-    for ( const auto worker_id : free_workers ) {
-      auto& worker = workers.at( worker_id );
+      vector<WorkerId> new_free_workers;
+      new_free_workers.reserve( free_workers.size() );
 
-      if ( not worker.to_be_assigned.empty() ) {
-        protobuf::RayBags proto_bags;
-        for ( auto& bag_info : worker.to_be_assigned ) {
-          *proto_bags.add_items() = to_protobuf( bag_info );
+      for ( const auto worker_id : free_workers ) {
+        auto& worker = workers.at( worker_id );
+
+        if ( not worker.to_be_assigned.empty() ) {
+          protobuf::RayBags proto_bags;
+          for ( auto& bag_info : worker.to_be_assigned ) {
+            *proto_bags.add_items() = to_protobuf( bag_info );
+          }
+
+          worker.client.push_request(
+            { 0, OpCode::ProcessRayBag, protoutil::to_string( proto_bags ) } );
+
+          worker.to_be_assigned.clear();
         }
 
-        worker.client.push_request(
-          { 0, OpCode::ProcessRayBag, protoutil::to_string( proto_bags ) } );
-
-        worker.to_be_assigned.clear();
+        if ( worker.marked_free ) {
+          worker.marked_free = false;
+          new_free_workers.push_back( worker.id );
+        }
       }
 
-      if ( worker.marked_free ) {
-        worker.marked_free = false;
-        new_free_workers.push_back( worker.id );
-      }
+      swap( free_workers, new_free_workers );
     }
-
-    swap( free_workers, new_free_workers );
-  };
-
-  /* we only loop over treelets that have work to do, and have free workers */
-  pbrt::ParallelFor(
-    [&]( const uint64_t i ) {
-      if ( i >= treelet_count and not free_accumulators.empty() ) {
-        assign_work_to_workers( free_accumulators );
-        return;
-      }
-
-      auto& treelet = treelets[i];
-      auto& treelet_queue = queued_ray_bags[i];
-
-      if ( not treelet.free_workers.empty()
-           and ( not treelet_queue.empty()
-                 or ( treelet.id == 0 and tiles.camera_rays_remaining() ) ) ) {
-        assign_work_to_workers( treelet.free_workers );
-      }
-    },
-    treelet_count + 1 /* +1 is for accumulator */,
-    32 );
+  }
 }
 
 template<class T, class C>
