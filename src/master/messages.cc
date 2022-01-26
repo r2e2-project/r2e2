@@ -54,7 +54,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
       for ( const auto& item : proto.items() ) {
         const RayBagInfo info = from_protobuf( item );
-        record_enqueue( worker_id, info );
+        record_enqueue( worker, info );
 
         if ( info.sample_bag ) {
           // sample bag
@@ -103,7 +103,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
       for ( const auto& item : proto.items() ) {
         const RayBagInfo info = from_protobuf( item );
-        record_dequeue( worker_id, info );
+        record_dequeue( worker, info );
       }
 
       if ( worker.role == Worker::Role::Accumulator ) {

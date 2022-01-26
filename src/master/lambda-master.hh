@@ -312,9 +312,9 @@ private:
 
   /*** Outputting stats *****************************************************/
 
-  void record_enqueue( const WorkerId worker_id, const RayBagInfo& info );
-  void record_assign( const WorkerId worker_id, const RayBagInfo& info );
-  void record_dequeue( const WorkerId worker_id, const RayBagInfo& info );
+  void record_enqueue( Worker& worker, const RayBagInfo& info );
+  void record_assign( Worker& worker, const RayBagInfo& info );
+  void record_dequeue( Worker& worker, const RayBagInfo& info );
 
   /* object for writing worker & treelet stats, and allocations */
   std::ofstream ws_stream {};

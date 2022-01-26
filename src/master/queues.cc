@@ -31,7 +31,7 @@ pair<bool, bool> LambdaMaster::assign_work( Worker& worker )
 
     if ( worker.active_rays() < WORKER_MAX_ACTIVE_SAMPLES ) {
       *worker.to_be_assigned.add_items() = to_protobuf( bag_queue.front() );
-      record_assign( worker.id, bag_queue.front() );
+      record_assign( worker, bag_queue.front() );
       bag_queue.pop();
       queued_ray_bags_count--;
 
@@ -72,7 +72,7 @@ pair<bool, bool> LambdaMaster::assign_work( Worker& worker )
     } else {
       /* only if work_to_do or the coin flip returned false */
       *worker.to_be_assigned.add_items() = to_protobuf( bag_queue.front() );
-      record_assign( worker.id, bag_queue.front() );
+      record_assign( worker, bag_queue.front() );
 
       bag_queue.pop();
       queued_ray_bags_count--;

@@ -10,10 +10,8 @@ using namespace r2t2;
 
 static const bool R2T2_POWERLINE = ( getenv( "R2T2_POWERLINE" ) != nullptr );
 
-void LambdaMaster::record_enqueue( const WorkerId worker_id,
-                                   const RayBagInfo& info )
+void LambdaMaster::record_enqueue( Worker& worker, const RayBagInfo& info )
 {
-  auto& worker = workers.at( worker_id );
   worker.ray_counters.enqueued += info.ray_count;
 
   if ( info.sample_bag ) {
@@ -52,10 +50,8 @@ void LambdaMaster::record_enqueue( const WorkerId worker_id,
   }
 }
 
-void LambdaMaster::record_assign( const WorkerId worker_id,
-                                  const RayBagInfo& info )
+void LambdaMaster::record_assign( Worker& worker, const RayBagInfo& info )
 {
-  auto& worker = workers.at( worker_id );
   worker.ray_counters.dequeued += info.ray_count;
 
   worker.outstanding_ray_bag_count++;
@@ -70,11 +66,8 @@ void LambdaMaster::record_assign( const WorkerId worker_id,
   aggregated_stats.assigned.count++;
 }
 
-void LambdaMaster::record_dequeue( const WorkerId worker_id,
-                                   const RayBagInfo& info )
+void LambdaMaster::record_dequeue( Worker& worker, const RayBagInfo& info )
 {
-  auto& worker = workers.at( worker_id );
-
   worker.outstanding_ray_bag_count--;
   worker.outstanding_bytes -= info.bag_size;
 
