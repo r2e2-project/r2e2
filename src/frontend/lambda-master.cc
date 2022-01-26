@@ -490,7 +490,6 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         worker.client.push_request(
           { 0, OpCode::GetObjects, protoutil::to_string( objs_proto ) } );
 
-        worker.marked_free = true;
         started_accumulators++;
       } else {
         /* this is a normal worker */
@@ -527,8 +526,6 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
           worker.client.push_request(
             { 0, OpCode::GetObjects, protoutil::to_string( objs_proto ) } );
-
-          worker.marked_free = true;
         } else {
           throw runtime_error( "we accepted a useless worker" );
         }
