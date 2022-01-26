@@ -207,6 +207,7 @@ private:
   };
 
   std::deque<Worker> workers {};
+  std::vector<WorkerId> workers_order {};
   const uint32_t max_workers;
   const uint32_t ray_generators;
   uint32_t finished_ray_generators { 0 };
@@ -215,8 +216,6 @@ private:
   uint32_t initialized_workers { 0 };
 
   TileHelper tile_helper {};
-
-  std::vector<WorkerId> free_workers {};
 
   ////////////////////////////////////////////////////////////////////////////
   // Treelets                                                               //

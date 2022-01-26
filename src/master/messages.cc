@@ -88,7 +88,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       } else if ( worker.active_rays() < ( worker.role == Worker::Role::Tracer
                                              ? WORKER_MAX_ACTIVE_RAYS
                                              : WORKER_MAX_ACTIVE_SAMPLES ) ) {
-        free_workers.push_back( worker_id );
+        worker.marked_free = true;
       }
 
       break;
@@ -108,7 +108,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
 
       if ( worker.role == Worker::Role::Accumulator ) {
         if ( worker.active_rays() < WORKER_MAX_ACTIVE_SAMPLES ) {
-          free_workers.push_back( worker_id );
+          worker.marked_free = true;
         }
       }
 

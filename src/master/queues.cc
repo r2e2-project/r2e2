@@ -88,14 +88,16 @@ void LambdaMaster::handle_queued_ray_bags()
 {
   GlobalScopeTimer<Timer::Category::AssigningWork> _;
 
-  shuffle( free_workers.begin(), free_workers.end(), rand_engine );
   bool should_continue;
 
   do {
     should_continue = false;
 
-    for ( const WorkerId worker_id : free_workers ) {
+    for ( const WorkerId worker_id : workers_order ) {
       auto& worker = workers[worker_id];
+
+      if ( not worker.marked_free )
+        continue;
 
       auto [worker_free, work_assigned] = assign_work( worker );
       should_continue = should_continue || work_assigned;
@@ -104,12 +106,7 @@ void LambdaMaster::handle_queued_ray_bags()
     }
   } while ( should_continue );
 
-  vector<WorkerId> new_free_workers;
-  new_free_workers.reserve( free_workers.size() );
-
-  for ( const auto worker_id : free_workers ) {
-    auto& worker = workers.at( worker_id );
-
+  for ( auto& worker : workers ) {
     if ( not worker.to_be_assigned.empty() ) {
       protobuf::RayBags proto_bags;
       for ( auto& bag_info : worker.to_be_assigned ) {
@@ -121,14 +118,7 @@ void LambdaMaster::handle_queued_ray_bags()
 
       worker.to_be_assigned.clear();
     }
-
-    if ( worker.marked_free ) {
-      worker.marked_free = false;
-      new_free_workers.push_back( worker.id );
-    }
   }
-
-  swap( free_workers, new_free_workers );
 }
 
 template<class T, class C>

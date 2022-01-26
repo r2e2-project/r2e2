@@ -13,6 +13,8 @@ void LambdaMaster::handle_status_message()
 {
   status_print_timer.read_event();
 
+  shuffle( workers_order.begin(), workers_order.end(), rand_engine );
+
   const auto now = steady_clock::now();
 
   size_t active_rays_total = 0;
