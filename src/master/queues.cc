@@ -132,8 +132,9 @@ void LambdaMaster::handle_queued_ray_bags()
     [&]( const uint64_t idx ) {
       if ( idx >= treelet_count ) {
         /* special case for accumulators */
-        vector<WorkerId> workers_list( accumulators );
-        iota( workers_list.begin(), workers_list.end(), 0 );
+        vector<WorkerId> workers_list(
+          min( workers.size(), static_cast<size_t>( accumulators ) ) );
+        iota( workers_list.begin(), workers_list.end(), ray_generators );
         process_worker_list( workers_list );
         return;
       }
