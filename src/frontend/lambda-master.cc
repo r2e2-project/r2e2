@@ -682,12 +682,6 @@ void LambdaMaster::run()
     /* XXX What's happening here? */
     if ( initialized_workers >= max_workers + ray_generators + accumulators
          && ( queued_ray_bags_count > 0 or tiles.camera_rays_remaining() ) ) {
-      if ( workers_order.empty() ) {
-        workers_order.resize( workers.size() );
-        iota( workers_order.begin(), workers_order.end(), 0 );
-        shuffle( workers_order.begin(), workers_order.end(), rand_engine );
-      }
-
       handle_queued_ray_bags();
     }
   }
