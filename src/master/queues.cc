@@ -49,10 +49,10 @@ pair<bool, bool> LambdaMaster::assign_work( Worker& worker )
     return { false, false };
 
   /* return, if the worker doesn't have any treelets */
-  if ( worker.treelets.empty() )
+  if ( not worker.treelet )
     return { false, false };
 
-  const TreeletId treelet_id = worker.treelets[0];
+  const TreeletId treelet_id = *worker.treelet;
   auto& bag_queue = queued_ray_bags[treelet_id];
 
   /* Q1: do we have any rays to generate? */

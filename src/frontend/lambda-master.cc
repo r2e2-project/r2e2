@@ -578,12 +578,10 @@ string LambdaMaster::Worker::to_string() const
 
   oss << "id=" << id << ",state=" << state_string( state )
       << ",role=" << role_string( role ) << ",awslog=" << aws_log_stream
-      << ",treelets=[";
+      << ",treelet=[";
 
-  for ( auto it = treelets.begin(); it != treelets.end(); it++ ) {
-    if ( it != treelets.begin() )
-      oss << ",";
-    oss << *it;
+  if ( treelet ) {
+    oss << ( *treelet );
   }
 
   oss << "],outstanding-bags=" << outstanding_ray_bag_count

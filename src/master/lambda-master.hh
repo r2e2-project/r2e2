@@ -166,7 +166,7 @@ private:
     std::string aws_log_stream {};
     bool lagging_worker_logged { false };
 
-    std::vector<TreeletId> treelets {};
+    std::optional<TreeletId> treelet {};
     std::set<SceneObject> objects {};
 
     TileId tile_id {};

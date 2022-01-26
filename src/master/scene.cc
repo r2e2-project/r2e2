@@ -24,7 +24,7 @@ void LambdaMaster::assign_treelet( Worker& worker, Treelet& treelet )
   unassigned_treelets.erase( treelet.id );
   move_from_pending_to_queued( treelet.id );
 
-  worker.treelets.push_back( treelet.id );
+  worker.treelet = treelet.id;
   treelet.workers.insert( worker.id );
 
   auto& dependencies = scene.base.GetTreeletDependencies( treelet.id );

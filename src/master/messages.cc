@@ -127,10 +127,10 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       worker.ray_counters.generated = proto.rays_generated();
       worker.ray_counters.terminated = proto.rays_terminated();
 
-      if ( not worker.treelets.empty()
+      if ( worker.treelet
            and ( initialized_workers
                  >= max_workers + ray_generators + accumulators ) ) {
-        const auto treelet_id = worker.treelets.back();
+        const auto treelet_id = *worker.treelet;
         const double ALPHA
           = 2.0 / ( 10 * treelets[treelet_id].workers.size() + 1 );
 
@@ -157,8 +157,8 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       pbrt::AccumulatedStats worker_pbrt_stats = from_protobuf( proto );
       pbrt_stats.Merge( worker_pbrt_stats );
 
-      if ( not worker.treelets.empty() ) {
-        const auto treelet_id = worker.treelets.back();
+      if ( worker.treelet ) {
+        const auto treelet_id = *worker.treelet;
         const string k[6]
           = { "Integrator/Calls to Process", "Integrator/Calls to Trace",
               "Integrator/Calls to Shade",   "BVH/Total nodes",
