@@ -490,7 +490,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
         worker.client.push_request(
           { 0, OpCode::GetObjects, protoutil::to_string( objs_proto ) } );
 
-        free_workers.push_back( worker.id );
+        free_accumulators.push_back( worker.id );
         started_accumulators++;
       } else {
         /* this is a normal worker */
@@ -528,7 +528,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
           worker.client.push_request(
             { 0, OpCode::GetObjects, protoutil::to_string( objs_proto ) } );
 
-          free_workers.push_back( worker.id );
+          treelet.free_workers.push_back( worker.id );
         } else {
           throw runtime_error( "we accepted a useless worker" );
         }
@@ -681,7 +681,6 @@ void LambdaMaster::run()
 
     /* XXX What's happening here? */
     if ( initialized_workers >= max_workers + ray_generators + accumulators
-         && !free_workers.empty()
          && ( tiles.camera_rays_remaining() || queued_ray_bags_count > 0 ) ) {
       handle_queued_ray_bags();
     }

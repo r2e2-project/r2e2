@@ -107,6 +107,7 @@ private:
   MasterConfiguration config;
   const UniqueDirectory scene_dir { "/tmp/r2t2-lambda-master" };
   const std::string job_id;
+  std::string output_preview_url {};
 
   ////////////////////////////////////////////////////////////////////////////
   // Cloud                                                                  //
@@ -124,8 +125,6 @@ private:
   const std::string lambda_function_name {
     safe_getenv_or( "R2T2_LAMBDA_FUNCTION", "r2t2-lambda-function" )
   };
-
-  std::string output_preview_url {};
 
   ////////////////////////////////////////////////////////////////////////////
   // Workers                                                                //
@@ -216,7 +215,7 @@ private:
 
   TileHelper tile_helper {};
 
-  std::vector<WorkerId> free_workers {};
+  std::vector<WorkerId> free_accumulators {};
 
   ////////////////////////////////////////////////////////////////////////////
   // Treelets                                                               //
@@ -232,6 +231,9 @@ private:
     Treelet( const TreeletId treelet_id )
       : id( treelet_id )
     {}
+
+    // workers with spare capacity to service this treelet
+    std::vector<WorkerId> free_workers {};
   };
 
   size_t treelet_count {};
