@@ -108,7 +108,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 {
   signals.set_as_mask();
 
-  parallel::Init();
+  parallel::Init( 1 );
   cout << "Using " << parallel::MaxThreadIndex() << " threads." << endl;
 
   const string scene_path = scene_dir.name();
