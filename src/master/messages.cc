@@ -39,6 +39,7 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       initialized_workers++;
 
       worker.state = Worker::State::Active;
+      worker.marked_free = true;
 
       if ( initialized_workers
            == max_workers + ray_generators + accumulators ) {

@@ -681,8 +681,7 @@ void LambdaMaster::run()
     }
 
     /* XXX What's happening here? */
-    if ( initialized_workers >= max_workers + ray_generators + accumulators
-         && ( queued_ray_bags_count > 0 or tiles.camera_rays_remaining() ) ) {
+    if ( ( queued_ray_bags_count > 0 or tiles.camera_rays_remaining() ) ) {
       handle_queued_ray_bags();
     }
   }
