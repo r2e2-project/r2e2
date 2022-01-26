@@ -2,6 +2,8 @@
 #include "messages/utils.hh"
 #include "util/random.hh"
 
+#include "parallel.h"
+
 using namespace std;
 using namespace r2t2;
 using namespace meow;
@@ -88,37 +90,67 @@ void LambdaMaster::handle_queued_ray_bags()
 {
   GlobalScopeTimer<Timer::Category::AssigningWork> _;
 
-  bool should_continue;
+  auto process_worker_list = [&]( vector<WorkerId>& workers_list ) {
+    shuffle( workers_list.begin(), workers_list.end(), rand_engine );
 
-  do {
-    should_continue = false;
+    bool should_continue;
 
-    for ( const WorkerId worker_id : workers_order ) {
+    do {
+      should_continue = false;
+
+      for ( const auto worker_id : workers_list ) {
+        auto& worker = workers[worker_id];
+
+        if ( not worker.marked_free )
+          continue;
+
+        auto [worker_free, work_assigned] = assign_work( worker );
+        should_continue = should_continue || work_assigned;
+
+        worker.marked_free = worker_free;
+      }
+    } while ( should_continue );
+
+    for ( const auto worker_id : workers_list ) {
       auto& worker = workers[worker_id];
 
-      if ( not worker.marked_free )
-        continue;
+      if ( not worker.to_be_assigned.empty() ) {
+        protobuf::RayBags proto_bags;
+        for ( auto& bag_info : worker.to_be_assigned ) {
+          *proto_bags.add_items() = to_protobuf( bag_info );
+        }
 
-      auto [worker_free, work_assigned] = assign_work( worker );
-      should_continue = should_continue || work_assigned;
+        worker.client.push_request(
+          { 0, OpCode::ProcessRayBag, protoutil::to_string( proto_bags ) } );
 
-      worker.marked_free = worker_free;
+        worker.to_be_assigned.clear();
+      }
     }
-  } while ( should_continue );
+  };
 
-  for ( auto& worker : workers ) {
-    if ( not worker.to_be_assigned.empty() ) {
-      protobuf::RayBags proto_bags;
-      for ( auto& bag_info : worker.to_be_assigned ) {
-        *proto_bags.add_items() = to_protobuf( bag_info );
+  pbrt::ParallelFor(
+    [&]( const uint64_t idx ) {
+      if ( idx >= treelet_count ) {
+        /* special case for accumulators */
+        vector<WorkerId> workers_list( accumulators );
+        iota( workers_list.begin(), workers_list.end(), 0 );
+        process_worker_list( workers_list );
+        return;
       }
 
-      worker.client.push_request(
-        { 0, OpCode::ProcessRayBag, protoutil::to_string( proto_bags ) } );
+      auto& treelet = treelets[idx];
+      auto& treelet_queue = queued_ray_bags[idx];
 
-      worker.to_be_assigned.clear();
-    }
-  }
+      if ( treelet_queue.empty()
+           and not( treelet.id == 0 and tiles.camera_rays_remaining() ) )
+        return;
+
+      vector<WorkerId> workers_list { treelet.workers.begin(),
+                                      treelet.workers.end() };
+      process_worker_list( workers_list );
+    },
+    treelet_count + ( ( accumulators > 0 ) ? 1 : 0 ),
+    64 );
 }
 
 template<class T, class C>
