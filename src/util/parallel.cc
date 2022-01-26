@@ -223,10 +223,10 @@ int NumSystemCores()
   return max( 1u, thread::hardware_concurrency() );
 }
 
-void Init()
+void Init( const int n_threads )
 {
   CHECK_EQ( threads.size(), 0 );
-  int nThreads = MaxThreadIndex();
+  int nThreads = ( n_threads == 0 ) ? MaxThreadIndex() : n_threads;
   ThreadIndex = 0;
 
   // Create a barrier so that we can be sure all worker threads get past

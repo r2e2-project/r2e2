@@ -47,7 +47,7 @@ void For( std::function<void( int64_t )> func,
 int MaxThreadIndex();
 int NumSystemCores();
 
-void Init();
+void Init( const int n_threads = 0 );
 void Cleanup();
 
 }
