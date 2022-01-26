@@ -1,8 +1,7 @@
 #include "lambda-master.hh"
 #include "messages/utils.hh"
+#include "util/parallel.hh"
 #include "util/random.hh"
-
-#include "parallel.h"
 
 using namespace std;
 using namespace r2t2;
@@ -128,7 +127,7 @@ void LambdaMaster::handle_queued_ray_bags()
     }
   };
 
-  pbrt::ParallelFor(
+  parallel::For(
     [&]( const uint64_t idx ) {
       if ( idx >= treelet_count ) {
         /* special case for accumulators */

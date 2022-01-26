@@ -35,6 +35,7 @@
 #include "schedulers/uniform.hh"
 #include "util/digest.hh"
 #include "util/exception.hh"
+#include "util/parallel.hh"
 #include "util/random.hh"
 #include "util/status_bar.hh"
 #include "util/temp_file.hh"
@@ -57,6 +58,8 @@ WorkerId LambdaMaster::Worker::next_id = 0;
 
 LambdaMaster::~LambdaMaster()
 {
+  parallel::Cleanup();
+
   try {
     if ( not scene_dir.name().empty() ) {
       filesystem::remove_all( scene_dir.name() );
@@ -104,6 +107,9 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                              loop.add_category( "Process HTTPResponse" ) } )
 {
   signals.set_as_mask();
+
+  parallel::Init();
+  cout << "Using " << parallel::MaxThreadIndex() << " threads." << endl;
 
   const string scene_path = scene_dir.name();
   filesystem::create_directories( scene_path );
