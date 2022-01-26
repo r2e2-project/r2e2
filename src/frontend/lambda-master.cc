@@ -558,6 +558,7 @@ string LambdaMaster::Worker::to_string() const
   // clang-format off
   auto state_string = []( const State s ) -> string {
     switch ( s ) {
+      case State::Initializing: return "initializing";
       case State::Active: return "active";
       case State::FinishingUp: return "finishing-up";
       case State::Terminated: return "terminated";

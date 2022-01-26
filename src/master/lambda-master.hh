@@ -135,6 +135,7 @@ private:
   {
     enum class State
     {
+      Initializing,
       Active,
       FinishingUp,
       Terminating,
@@ -157,7 +158,7 @@ private:
     }
 
     WorkerId id;
-    State state { State::Active };
+    State state { State::Initializing };
     Role role;
 
     meow::Client<TCPSession> client;

@@ -38,6 +38,8 @@ void LambdaMaster::process_message( const uint64_t worker_id,
     case OpCode::GetObjects:
       initialized_workers++;
 
+      worker.state = Worker::State::Active;
+
       if ( initialized_workers
            == max_workers + ray_generators + accumulators ) {
         scene_initialization_done = steady_clock::now();
