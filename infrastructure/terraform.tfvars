@@ -9,7 +9,7 @@ amis = {
 servers_per_instance = 1
 threads_per_server = 2
 memory_per_server = 5120
-max_object_size = "1m"
+max_object_size = "4m"
 additional_flags = "--disable-cas"
 
 instance_type = "c5n.large"
