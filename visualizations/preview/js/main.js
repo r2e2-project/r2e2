@@ -65,18 +65,27 @@ const _tiles = new TileHelper(parseInt(url_params.get('width')),
 
 let ctx = document.getElementById("output").getContext('2d');
 
+let sidebar = document.getElementById("sidebar");
 let canvas = document.getElementById("output");
-output.width = _tiles.width;
-output.height = _tiles.height;
+canvas.width = _tiles.width;
+canvas.height = _tiles.height;
 
 // should we resize?
+const MARGIN = 100;
+let ideal_width = _tiles.width + MARGIN + sidebar.offsetWidth;
+let ideal_height = _tiles.height + MARGIN;
 let actual_width = window.innerWidth;
+let actual_height = window.innerHeight;
 var scale_factor = 1.0;
 
-if (actual_width < _tiles.width) {
-  scale_factor = actual_width / _tiles.width;
-  output.width = actual_width;
-  output.height *= scale_factor;
+if (actual_width < ideal_width) {
+  scale_factor = (actual_width - MARGIN - sidebar.offsetWidth) / _tiles.width;
+  canvas.width = actual_width - MARGIN - sidebar.offsetWidth;
+  canvas.height *= scale_factor;
+} else if (actual_height < ideal_height) {
+  scale_factor = (actual_height - MARGIN) / _tiles.height;
+  canvas.height = actual_height - MARGIN;
+  canvas.width *= scale_factor;
 }
 
 let _tile_versions = new Array(_tiles.n_tiles.x * _tiles.n_tiles.y).fill(-1);
