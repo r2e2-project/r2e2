@@ -392,9 +392,9 @@ let load_status = (url) => {
           nFormatter(8 * json_data['throughputsPeak'], 1);
 
         _status.traced.innerHTML = 
-          nFormatter(json_data['pathsFinishedY'][json_data['pathsFinishedY'].length - 1], 1);
+          nFormatter(json_data['pathsFinishedY'][json_data['pathsFinishedY'].length - 1], 0);
         _status.peak_traced.innerHTML =
-          nFormatter(json_data['pathsFinishedPeak'], 1)
+          nFormatter(json_data['pathsFinishedPeak'], 0)
 
         finishedChart.data.labels = json_data['pathsFinishedX'].map((x) => parseInt(x));
         finishedChart.data.datasets[0].data = json_data['pathsFinishedY'].map((x) => parseInt(x));

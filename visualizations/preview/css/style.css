@@ -116,4 +116,5 @@ body {
 #info img {
   float:right;
   height:32px;
+  border:0;
 }
