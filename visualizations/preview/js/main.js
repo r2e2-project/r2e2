@@ -12,6 +12,14 @@ class JobInfo {
   tile_url(tile_id, version) {
     return `https://${this.bucket}.s3.${this.region}.amazonaws.com/jobs/${this.job_id}/out/${tile_id}-${version}.png`;
   }
+
+  status_version_url() {
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/jobs/${this.job_id}/out/status`
+  }
+
+  status_url(version) {
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/jobs/${this.job_id}/out/status-${version}.json`;
+  }
 }
 
 class TileHelper {
@@ -89,6 +97,40 @@ if (actual_width < ideal_width) {
 }
 
 let _tile_versions = new Array(_tiles.n_tiles.x * _tiles.n_tiles.y).fill(-1);
+let _status_version = -1;
+
+let _status = {
+  'progress': document.getElementById("data-progress"),
+  'workers': document.getElementById("data-workers"),
+  'elapsed_time': document.getElementById("data-elapsed-time")
+};
+
+let load_status = (url) => {
+  let xhr = new XMLHttpRequest();
+
+  xhr.onreadystatechange = () => {
+    if (xhr.readyState == XMLHttpRequest.DONE) {
+      if (xhr.status == 200) {
+        json_data = JSON.parse(xhr.responseText);
+        const time = parseInt(json_data['timeElapsed']);
+
+        _status.elapsed_time.innerHTML =
+          `${String(Math.floor(time / 60))
+            .padStart(2, '0')}:${String(time % 60).padStart(2, '0')}`;
+
+        _status.progress.innerHTML =
+          parseFloat(json_data['completion'])
+            .toFixed(1)
+            .replace(/[.,]0$/, "");
+
+        _status.workers.innerHTML = json_data['workers'];
+      }
+    }
+  };
+
+  xhr.open('GET', url);
+  xhr.send(null);
+};
 
 let load_image = (url, ox, oy, ow, oh) => {
   let img = new Image();
@@ -177,6 +219,28 @@ let get_version = (tile_id, url) => {
   xhr.send(null);
 }
 
+let get_status_version = (url) => {
+  let xhr = new XMLHttpRequest();
+
+  xhr.onreadystatechange = () => {
+    if (xhr.readyState == XMLHttpRequest.DONE) {
+      if (xhr.status == 200) {
+        const new_ver = parseInt(xhr.responseText);
+        if (new_ver > _status_version) {
+          _status_version = new_ver;
+          const status_url = _job.status_url(_status_version);
+          load_status(status_url);
+        }
+      }
+
+      setTimeout(() => get_status_version(url), 1000);
+    }
+  };
+
+  xhr.open('GET', url + "?d=" + new Date().getTime());
+  xhr.send(null);
+}
+
 for (let i = 0; i < _tiles.n_tiles.x * _tiles.n_tiles.y; i++) {
   const bounds = _tiles.bounds(i);
   const tile_url = _job.tile_url(i);
@@ -184,6 +248,8 @@ for (let i = 0; i < _tiles.n_tiles.x * _tiles.n_tiles.y; i++) {
 
   get_version(i, tile_ver_url);
 }
+
+get_status_version(_job.status_version_url());
 
 let save_btn = document.getElementById("save-button");
 save_btn.onclick = () => {
@@ -248,16 +314,20 @@ const bandwidthChartCtx = document.getElementById("bandwidth-chart");
 const bandwidthChart = new Chart(bandwidthChartCtx, {
   type: 'line',
   options: {
-    responsive:true,
+    responsive: true,
     maintainAspectRatio: false,
     animation: { duration: 250 },
     color: 'rgb(0,191,255)',
     borderColor: 'rgb(0,191,255)',
-    plugins: { legend: { display: false },
-               tooltip: { enabled: false } },
-    scales: { grid: { display: false },
-              x: { ticks: { color: 'rgb(0,191,255)' }, display: false },
-              y: { ticks: { color: 'rgb(0,191,255)' }, display: false } },
+    plugins: {
+      legend: { display: false },
+      tooltip: { enabled: false }
+    },
+    scales: {
+      grid: { display: false },
+      x: { ticks: { color: 'rgb(0,191,255)' }, display: false },
+      y: { ticks: { color: 'rgb(0,191,255)' }, display: false }
+    },
   },
   data: {
     labels: [0],
@@ -273,16 +343,20 @@ const finishedChartCtx = document.getElementById("finished-chart");
 const finishedChart = new Chart(finishedChartCtx, {
   type: 'line',
   options: {
-    responsive:true,
+    responsive: true,
     maintainAspectRatio: false,
     animation: { duration: 250 },
     color: 'rgb(255,56,0)',
     borderColor: 'rgb(255,56,0)',
-    plugins: { legend: { display: false },
-               tooltip: { enabled: false } },
-    scales: { grid: { display: false },
-              x: { ticks: { color: 'rgb(255,56,0)' }, display: false },
-              y: { ticks: { color: 'rgb(255,56,0)' }, display: false } },
+    plugins: {
+      legend: { display: false },
+      tooltip: { enabled: false }
+    },
+    scales: {
+      grid: { display: false },
+      x: { ticks: { color: 'rgb(255,56,0)' }, display: false },
+      y: { ticks: { color: 'rgb(255,56,0)' }, display: false }
+    },
   },
   data: {
     labels: [0],
