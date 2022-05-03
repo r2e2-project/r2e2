@@ -130,7 +130,7 @@ void LambdaMaster::handle_progress_report()
                  : 0.0;
   };
 
-  constexpr double ALPHA = 2.0 / ( 4 + 1 );
+  constexpr double ALPHA = 2.0 / ( 7 + 1 );
 
   const auto& s1 = aggregated_stats;
   const auto& s0 = last_reported_stats;
