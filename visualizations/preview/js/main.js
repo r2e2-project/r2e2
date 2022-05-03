@@ -97,40 +97,23 @@ if (actual_width < ideal_width) {
 }
 
 let _tile_versions = new Array(_tiles.n_tiles.x * _tiles.n_tiles.y).fill(-1);
-let _status_version = -1;
 
-let _status = {
-  'progress': document.getElementById("data-progress"),
-  'workers': document.getElementById("data-workers"),
-  'elapsed_time': document.getElementById("data-elapsed-time")
-};
-
-let load_status = (url) => {
-  let xhr = new XMLHttpRequest();
-
-  xhr.onreadystatechange = () => {
-    if (xhr.readyState == XMLHttpRequest.DONE) {
-      if (xhr.status == 200) {
-        json_data = JSON.parse(xhr.responseText);
-        const time = parseInt(json_data['timeElapsed']);
-
-        _status.elapsed_time.innerHTML =
-          `${String(Math.floor(time / 60))
-            .padStart(2, '0')}:${String(time % 60).padStart(2, '0')}`;
-
-        _status.progress.innerHTML =
-          parseFloat(json_data['completion'])
-            .toFixed(1)
-            .replace(/[.,]0$/, "");
-
-        _status.workers.innerHTML = json_data['workers'];
-      }
-    }
-  };
-
-  xhr.open('GET', url);
-  xhr.send(null);
-};
+function nFormatter(num, digits) {
+  const lookup = [
+    { value: 1, symbol: " " },
+    { value: 1e3, symbol: " k" },
+    { value: 1e6, symbol: " M" },
+    { value: 1e9, symbol: " G" },
+    { value: 1e12, symbol: " T" },
+    { value: 1e15, symbol: " P" },
+    { value: 1e18, symbol: " E" }
+  ];
+  const rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
+  var item = lookup.slice().reverse().find(function (item) {
+    return num >= item.value;
+  });
+  return item ? (num / item.value).toFixed(digits).replace(rx, "$1") + item.symbol : "0 ";
+}
 
 let load_image = (url, ox, oy, ow, oh) => {
   let img = new Image();
@@ -219,28 +202,6 @@ let get_version = (tile_id, url) => {
   xhr.send(null);
 }
 
-let get_status_version = (url) => {
-  let xhr = new XMLHttpRequest();
-
-  xhr.onreadystatechange = () => {
-    if (xhr.readyState == XMLHttpRequest.DONE) {
-      if (xhr.status == 200) {
-        const new_ver = parseInt(xhr.responseText);
-        if (new_ver > _status_version) {
-          _status_version = new_ver;
-          const status_url = _job.status_url(_status_version);
-          load_status(status_url);
-        }
-      }
-
-      setTimeout(() => get_status_version(url), 1000);
-    }
-  };
-
-  xhr.open('GET', url + "?d=" + new Date().getTime());
-  xhr.send(null);
-}
-
 for (let i = 0; i < _tiles.n_tiles.x * _tiles.n_tiles.y; i++) {
   const bounds = _tiles.bounds(i);
   const tile_url = _job.tile_url(i);
@@ -248,8 +209,6 @@ for (let i = 0; i < _tiles.n_tiles.x * _tiles.n_tiles.y; i++) {
 
   get_version(i, tile_ver_url);
 }
-
-get_status_version(_job.status_version_url());
 
 let save_btn = document.getElementById("save-button");
 save_btn.onclick = () => {
@@ -316,7 +275,7 @@ const bandwidthChart = new Chart(bandwidthChartCtx, {
   options: {
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 250 },
+    animation: { duration: 0 },
     color: 'rgb(0,191,255)',
     borderColor: 'rgb(0,191,255)',
     plugins: {
@@ -326,15 +285,19 @@ const bandwidthChart = new Chart(bandwidthChartCtx, {
     scales: {
       grid: { display: false },
       x: { ticks: { color: 'rgb(0,191,255)' }, display: false },
-      y: { ticks: { color: 'rgb(0,191,255)' }, display: false }
+      y: { position:'right',
+           ticks: { font: { family: 'Work Sans', weight: 600 },
+                    color: 'rgb(0,191,255)',
+                    callback: (label, index, labels) => nFormatter(8 * label, 1) + "bps" } }
     },
   },
   data: {
     labels: [0],
     datasets: [{
-      data: [10],
+      data: [],
       fill: false,
       tension: 0.15,
+      pointRadius: 0
     }]
   }
 });
@@ -345,7 +308,7 @@ const finishedChart = new Chart(finishedChartCtx, {
   options: {
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 250 },
+    animation: { duration: 0 },
     color: 'rgb(255,56,0)',
     borderColor: 'rgb(255,56,0)',
     plugins: {
@@ -355,41 +318,124 @@ const finishedChart = new Chart(finishedChartCtx, {
     scales: {
       grid: { display: false },
       x: { ticks: { color: 'rgb(255,56,0)' }, display: false },
-      y: { ticks: { color: 'rgb(255,56,0)' }, display: false }
+      y: { position:'right',
+           ticks: { font: { family: 'Work Sans', weight: 600 },
+                    color: 'rgb(255,56,0)',
+                    callback: (label, index, labels) => nFormatter(label, 1) } }
     },
   },
   data: {
     labels: [0],
     datasets: [{
-      data: [10],
+      data: [0],
       fill: false,
       tension: 0.15,
+      pointRadius: 0
     }]
   }
 });
 
-var i = 0;
+let _status_version = -1;
 
-setInterval(() => {
-  i += 1;
+let _status = {
+  'progress': document.getElementById("data-progress"),
+  'workers': document.getElementById("data-workers"),
+  'workers_max': document.getElementById("data-workers-max"),
+  'downloaded': document.getElementById("data-downloaded"),
+  'uploaded': document.getElementById("data-uploaded"),
+  'elapsed_time': document.getElementById("data-elapsed-time"),
+  'throughput': document.getElementById("data-throughput"),
+  'peak_throughput': document.getElementById("data-peak-throughput"),
+  'traced': document.getElementById("data-traced"),
+  'peak_traced': document.getElementById("data-peak-traced"),
+};
 
-  if (bandwidthChart.data.datasets[0].data.length > 20) {
-    bandwidthChart.data.labels.shift();
-    bandwidthChart.data.datasets[0].data.shift();
-  }
+let load_status = (url) => {
+  let xhr = new XMLHttpRequest();
 
-  bandwidthChart.data.labels.push(i);
-  bandwidthChart.data.datasets[0].data.push(Math.floor(Math.random() * 20));
+  xhr.onreadystatechange = () => {
+    if (xhr.readyState == XMLHttpRequest.DONE) {
+      if (xhr.status == 200) {
+        json_data = JSON.parse(xhr.responseText);
+        const time = parseInt(json_data['timeElapsed']);
 
-  bandwidthChart.update();
+        _status.elapsed_time.innerHTML =
+          `${String(Math.floor(time / 60))
+            .padStart(2, '0')}:${String(time % 60).padStart(2, '0')}`;
 
-  if (finishedChart.data.datasets[0].data.length > 20) {
-    finishedChart.data.labels.shift();
-    finishedChart.data.datasets[0].data.shift();
-  }
+        _status.progress.innerHTML =
+          parseFloat(json_data['completion'])
+            .toFixed(1)
+            .replace(/[.,]0$/, "");
 
-  finishedChart.data.labels.push(i);
-  finishedChart.data.datasets[0].data.push(Math.floor(Math.random() * 20));
+        _status.workers.innerHTML = json_data['workers'];
+        _status.workers_max.innerHTML = json_data['workersMax'];
+        _status.downloaded.innerHTML =
+          nFormatter(parseInt(json_data['bytesDownloaded'])
+                   + parseInt(json_data['bytesUploaded']), 1);
 
-  finishedChart.update();
-}, 500);
+        bandwidthChart.data.labels = json_data['throughputsX'].map((x) => parseInt(x));
+        bandwidthChart.data.datasets[0].data = json_data['throughputsY'].map((x) => parseInt(x));
+
+        while (bandwidthChart.data.labels.length > 0 &&
+          bandwidthChart.data.labels.length < 30) {
+          bandwidthChart.data.labels.push(
+            bandwidthChart.data.labels[bandwidthChart.data.labels.length - 1] + 1);
+          bandwidthChart.data.datasets[0].data.push(null);
+        }
+
+        bandwidthChart.update();
+
+        _status.throughput.innerHTML = 
+          nFormatter(8 * json_data['throughputsY'][json_data['throughputsY'].length - 1], 1);
+        _status.peak_throughput.innerHTML =
+          nFormatter(8 * json_data['throughputsPeak'], 1);
+
+        _status.traced.innerHTML = 
+          nFormatter(json_data['pathsFinishedY'][json_data['pathsFinishedY'].length - 1], 1);
+        _status.peak_traced.innerHTML =
+          nFormatter(json_data['pathsFinishedPeak'], 1)
+
+        finishedChart.data.labels = json_data['pathsFinishedX'].map((x) => parseInt(x));
+        finishedChart.data.datasets[0].data = json_data['pathsFinishedY'].map((x) => parseInt(x));
+
+        while (finishedChart.data.labels.length > 0 &&
+               finishedChart.data.labels.length < 30) {
+          finishedChart.data.labels.push(
+            finishedChart.data.labels[finishedChart.data.labels.length - 1] + 1);
+          finishedChart.data.datasets[0].data.push(null);
+        }
+
+        finishedChart.update();
+      }
+    }
+  };
+
+  xhr.open('GET', url);
+  xhr.send(null);
+};
+
+
+let get_status_version = (url) => {
+  let xhr = new XMLHttpRequest();
+
+  xhr.onreadystatechange = () => {
+    if (xhr.readyState == XMLHttpRequest.DONE) {
+      if (xhr.status == 200) {
+        const new_ver = parseInt(xhr.responseText);
+        if (new_ver > _status_version) {
+          _status_version = _replay ? (_status_version + 1) : new_ver;
+          const status_url = _job.status_url(_status_version);
+          load_status(status_url);
+        }
+      }
+
+      setTimeout(() => get_status_version(url), 1000);
+    }
+  };
+
+  xhr.open('GET', url + "?d=" + new Date().getTime());
+  xhr.send(null);
+}
+
+get_status_version(_job.status_version_url());
