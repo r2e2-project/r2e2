@@ -151,8 +151,9 @@ void LambdaMaster::handle_progress_report()
   progress_report_proto.set_total_paths( scene.total_paths );
   progress_report_proto.set_rays_traced( s1.samples.rays );
 
-  const auto current_throughput = ( s1.enqueued.bytes + s1.dequeued.bytes )
-                                  - ( s0.dequeued.bytes + s0.enqueued.bytes );
+  const auto current_throughput
+    = ( s1.enqueued.bytes + s1.dequeued.bytes + s1.bytes_downloaded )
+      - ( s0.dequeued.bytes + s0.enqueued.bytes - s0.bytes_downloaded );
   const auto current_paths_finished = s1.finished_paths - s0.finished_paths;
 
   const auto last_throughput
