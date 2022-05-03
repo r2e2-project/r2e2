@@ -130,16 +130,68 @@ void LambdaMaster::handle_progress_report()
                  : 0.0;
   };
 
-  const auto& s = aggregated_stats;
+  constexpr double ALPHA = 2.0 / ( 4 + 1 );
+
+  const auto& s1 = aggregated_stats;
+  const auto& s0 = last_reported_stats;
+
   const auto now = steady_clock::now();
   const auto elapsed_seconds
     = duration_cast<seconds>( now - start_time ).count();
 
   progress_report_proto.set_completion(
-    percent( s.finished_paths, scene.total_paths ) );
+    percent( s1.finished_paths, scene.total_paths ) );
   progress_report_proto.set_time_elapsed( elapsed_seconds );
   progress_report_proto.set_workers(
     Worker::active_count[Worker::Role::Tracer] );
+  progress_report_proto.set_workers_max( max_workers );
+  progress_report_proto.set_bytes_downloaded( aggregated_stats.dequeued.bytes );
+  progress_report_proto.set_bytes_uploaded( aggregated_stats.enqueued.bytes );
+
+  const auto current_throughput = ( s1.enqueued.bytes + s1.dequeued.bytes )
+                                  - ( s0.dequeued.bytes + s0.enqueued.bytes );
+  const auto current_paths_finished = s1.finished_paths - s0.finished_paths;
+
+  const auto last_throughput
+    = progress_report_proto.throughputs_y_size()
+        ? *progress_report_proto.throughputs_y().rbegin()
+        : 0;
+
+  const auto last_paths_finished
+    = progress_report_proto.paths_finished_y_size()
+        ? *progress_report_proto.paths_finished_y().rbegin()
+        : 0;
+
+  const auto ewma_throughput = static_cast<uint64_t>(
+    ( 1 - ALPHA ) * last_throughput + ALPHA * current_throughput );
+
+  const auto ewma_paths_finished = static_cast<uint64_t>(
+    ( 1 - ALPHA ) * last_paths_finished + ALPHA * current_paths_finished );
+
+  progress_report_proto.set_throughputs_peak(
+    max( ewma_throughput, progress_report_proto.throughputs_peak() ) );
+  progress_report_proto.set_paths_finished_peak(
+    max( ewma_paths_finished, progress_report_proto.paths_finished_peak() ) );
+
+  progress_report_proto.add_throughputs_x( elapsed_seconds );
+  progress_report_proto.add_throughputs_y( ewma_throughput );
+
+  progress_report_proto.add_paths_finished_x( elapsed_seconds );
+  progress_report_proto.add_paths_finished_y( ewma_paths_finished );
+
+  if ( progress_report_proto.throughputs_x_size() > 30 ) {
+    auto x = progress_report_proto.mutable_throughputs_x();
+    auto y = progress_report_proto.mutable_throughputs_y();
+    x->erase( x->begin() );
+    y->erase( y->begin() );
+  }
+
+  if ( progress_report_proto.paths_finished_x_size() > 30 ) {
+    auto x = progress_report_proto.mutable_paths_finished_x();
+    auto y = progress_report_proto.mutable_paths_finished_y();
+    x->erase( x->begin() );
+    y->erase( y->begin() );
+  }
 
   const string key_base = "jobs/" + job_id + "/out/status";
 
@@ -150,5 +202,6 @@ void LambdaMaster::handle_progress_report()
   progress_report_transfer_agent->request_upload(
     key_base, to_string( current_report_id ) );
 
+  last_reported_stats = aggregated_stats;
   current_report_id++;
 }

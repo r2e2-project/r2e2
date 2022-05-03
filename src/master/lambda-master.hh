@@ -334,6 +334,7 @@ private:
   std::unique_ptr<TransferAgent> progress_report_transfer_agent {};
   protobuf::ProgressReport progress_report_proto {};
   size_t current_report_id {0};
+  WorkerStats last_reported_stats {};
 
   /*** Timepoints ***********************************************************/
 
@@ -342,6 +343,7 @@ private:
   steady_clock::time_point scene_initialization_done { start_time };
   steady_clock::time_point last_finished_ray { start_time };
   steady_clock::time_point last_action_time { start_time };
+  steady_clock::time_point last_report_time { start_time };
 
   std::chrono::milliseconds last_workers_logged { 0 }; // relative to start_time
 
