@@ -23,15 +23,20 @@
 
       <div id="stats">
 
-        <div id="progress" class="green">
-          <div><label><i class="fas fa-percentage"></i></label> 95</div>
-          <div>&lambda;  95</div>
-          <div><label><i class="fas fa-clock"></i></label> 01:23</div>
+        <div class="green flexrow">
+          <div><label><i class="fas fa-percentage"></i></label><br> 
+            <span id="data-progress">95</span></div>
+          <div>&lambda; <br>
+            <span id="data-workers">2000</span></div>
+          <div><label><i class="fas fa-clock"></i></label> <br>
+            <span id="data-elapsed-time">01:23</span></div>
         </div>
 
         <p class="blue">
-          <label>Throughput:</label> 825 Gbps<br>
-          <label>Peak:</label> 1510 Gbps
+          <label>Throughput:</label>
+            <span id="data-throughput">825 Gbps</span><br>
+          <label>Peak:</label> 
+            <span id="data-peak-throughput">1510 Gbps</span>
         </p>
 
         <div class="chart">
@@ -39,8 +44,10 @@
         </div>
 
         <p class="red">
-          <label>Paths traced:</label> 1.5 K/s<br>
-          <label>Peak:</label> 29.3 K/s
+          <label>Paths traced:</label>
+            <span id="data-traced">1.8 K/s</span><br>
+          <label>Peak:</label>
+          <span id="data-peak-traced">29.4 K/s</span>
         </p>
 
         <div class="chart">
