@@ -119,3 +119,36 @@ void LambdaMaster::handle_status_message()
 
   StatusBar::set_text( oss.str() );
 }
+
+void LambdaMaster::handle_progress_report()
+{
+  progress_report_timer.read_event();
+
+  auto percent = []( const uint64_t n, const uint64_t total ) -> double {
+    return total ? ( ( static_cast<uint64_t>( 100 * ( 100.0 * n / total ) ) )
+                     / 100.0 )
+                 : 0.0;
+  };
+
+  const auto& s = aggregated_stats;
+  const auto now = steady_clock::now();
+  const auto elapsed_seconds
+    = duration_cast<seconds>( now - start_time ).count();
+
+  progress_report_proto.set_completion(
+    percent( s.finished_paths, scene.total_paths ) );
+  progress_report_proto.set_time_elapsed( elapsed_seconds );
+  progress_report_proto.set_workers(
+    Worker::active_count[Worker::Role::Tracer] );
+
+  const string key_base = "jobs/" + job_id + "/out/status";
+
+  progress_report_transfer_agent->request_upload(
+    key_base + '-' + to_string( current_report_id ) + ".json",
+    protoutil::to_json( progress_report_proto ) );
+
+  progress_report_transfer_agent->request_upload(
+    key_base, to_string( current_report_id ) );
+
+  current_report_id++;
+}

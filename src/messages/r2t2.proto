@@ -180,3 +180,17 @@ message JobSummary {
 
     AccumulatedStats pbrt_stats = 26;
 }
+
+message ProgressReport {
+    double completion = 1;
+    uint64 workers = 2;
+    uint64 time_elapsed = 3;
+    
+    uint64 throughputs_peak = 4;
+    repeated uint64 throughputs_x = 5;
+    repeated uint64 throughputs_y = 6;
+    
+    uint64 paths_finished_peak = 7;
+    repeated uint64 paths_finished_x = 8;
+    repeated uint64 paths_finished_y = 9;
+}

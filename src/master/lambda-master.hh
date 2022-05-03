@@ -327,6 +327,14 @@ private:
   /* prints the status message every second */
   void handle_status_message();
 
+  /*** Uploading progress ***************************************************/
+
+  void handle_progress_report();
+
+  std::unique_ptr<TransferAgent> progress_report_transfer_agent {};
+  protobuf::ProgressReport progress_report_proto {};
+  size_t current_report_id {0};
+
   /*** Timepoints ***********************************************************/
 
   const steady_clock::time_point start_time { steady_clock::now() };
@@ -422,6 +430,8 @@ private:
 
   TimerFD job_exit_timer { std::chrono::minutes { 15 } };
   TimerFD job_timeout_timer {};
+
+  TimerFD progress_report_timer {};
 
   std::mt19937 rand_engine { std::random_device {}() };
 };

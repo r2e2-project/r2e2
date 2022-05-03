@@ -317,6 +317,18 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     cout << "\u2192 Real-time preview is available at\n"
          << "  \x1B[1m" << output_preview_url << "\x1B[0m\n"
          << endl;
+
+    // we also need to setup job progress reports...
+    progress_report_transfer_agent
+      = make_unique<S3TransferAgent>( job_storage_backend, 1, true );
+
+    progress_report_timer.set( STATUS_PRINT_INTERVAL, STATUS_PRINT_INTERVAL );
+
+    loop.add_rule( "Progress report",
+                   Direction::In,
+                   progress_report_timer,
+                   bind( &LambdaMaster::handle_progress_report, this ),
+                   [] { return true; } );
   }
 
   loop.set_fd_failure_callback( [&] {
