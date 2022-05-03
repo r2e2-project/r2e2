@@ -9,9 +9,8 @@
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
-  <script src="https://kit.fontawesome.com/b7a4352193.js" crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/style.css" />
 
 </head>
 
@@ -21,18 +20,48 @@
     <canvas id="output" width="1024" height="600"></canvas>
 
     <div id="sidebar">
-      <div id="stats"></div>
+
+      <div id="stats">
+
+        <div id="progress" class="green">
+          <div><label><i class="fas fa-percentage"></i></label> 95</div>
+          <div>&lambda;  95</div>
+          <div><label><i class="fas fa-clock"></i></label> 01:23</div>
+        </div>
+
+        <p class="blue">
+          <label>Throughput:</label> 825 Gbps<br>
+          <label>Peak:</label> 1510 Gbps
+        </p>
+
+        <div class="chart">
+          <canvas id="bandwidth-chart"></canvas>
+        </div>
+
+        <p class="red">
+          <label>Paths traced:</label> 1.5 K/s<br>
+          <label>Peak:</label> 29.3 K/s
+        </p>
+
+        <div class="chart">
+          <canvas id="finished-chart"></canvas>
+        </div>
+
+      </div>
+
       <div id="info">
         <button id="save-button" title="Save the current output"><i class="fas fa-save"></i></button>
         <button id="replay-button" class="active" title="Replay the render process (approximate)"><i class="fas fa-redo"></i></button>
-        <span class="text">
-        </span>
+        <img src="img/r2e2.svg">
       </div>
+
     </div>
 
 
   </div>
 
+  <script src="https://kit.fontawesome.com/b7a4352193.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
   <script src="js/main.js"></script>
 
 </body>

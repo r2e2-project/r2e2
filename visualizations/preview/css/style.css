@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;700&display=swap');
+
 body {
   margin: 0;
   padding: 0;
@@ -18,9 +20,8 @@ body {
 }
 
 #sidebar {
-  border:1px solid #999;
   border-radius: 5px;
-  width: 200px;
+  width: 250px;
   margin-left:1em;
   display: flex;
   flex-direction: column;
@@ -28,11 +29,56 @@ body {
 
 #stats {
   flex: 1 auto;
+  line-height: 100%;
+  font-size:120%;
+}
+
+#stats .chart {
+  position:relative;
+  width:100%;
+  height:50px;
+  margin-bottom:30px;
+}
+
+.green {
+  color:rgb(50,205,50);
+}
+
+.blue {
+  color:rgb(0,191,255);
+}
+
+.red {
+  color:rgb(255,56,0);
+}
+
+#stats p, #stats div#progress {
+  font-family: 'Work Sans', sans-serif;
+  font-weight:bold;
+  margin-bottom:12px;
+}
+
+#stats div#progress {
+  display:flex;
+}
+
+#stats div#progress div {
+  flex: 1;
+  text-align:left;
+}
+
+#stats div#progress div:last-child {
+  flex: 1;
+  text-align:left;
+}
+
+#stats p label {
+  text-transform:uppercase;
+  font-weight:normal;
 }
 
 #info {
   flex: 0 auto;
-  padding:10px 8px;
 }
 
 #info .text {
@@ -42,7 +88,7 @@ body {
 }
 
 #info button {
-  float:right;
+  float:left;
   border-radius:5px;
   border:1px solid #333;
   padding:3px 8px;
@@ -60,4 +106,9 @@ body {
   color:#fff;
   background: #3BB143;
   border:1px solid #3BB143;
+}
+
+#info img {
+  float:right;
+  height:32px;
 }

@@ -208,3 +208,114 @@ replay_btn.onclick = () => {
   url_params.set("replay", _replay ? "0" : "1");
   window.location.search = url_params.toString();
 };
+
+
+// const bandwidthChartCtx = document.getElementById("bandwidth-chart");
+// const bandwidthChart = new uPlot({
+//   id: "bandwidth-uplot",
+//   width:250,
+//   height:100,
+//   series: [
+//     {},
+//     {
+//       show:true,
+//       stroke: "red",
+//     }
+//   ],
+//   axes: [
+//     {},
+//     {
+//       grid: {show: false}
+//     }
+//   ],
+//   scales: {
+//     x: { time: false }
+//   }
+// }, [],
+// bandwidthChartCtx);
+
+// var data = [ [0], [0] ];
+// var i = 0;
+
+// setInterval(()=> {
+//   i += 1;
+//   data[0].push(i);
+//   data[1].push(Math.floor(Math.random() * 50));
+//   bandwidthChart.setData(data);
+// }, 1000);
+
+const bandwidthChartCtx = document.getElementById("bandwidth-chart");
+const bandwidthChart = new Chart(bandwidthChartCtx, {
+  type: 'line',
+  options: {
+    responsive:true,
+    maintainAspectRatio: false,
+    animation: { duration: 250 },
+    color: 'rgb(0,191,255)',
+    borderColor: 'rgb(0,191,255)',
+    plugins: { legend: { display: false },
+               tooltip: { enabled: false } },
+    scales: { grid: { display: false },
+              x: { ticks: { color: 'rgb(0,191,255)' }, display: false },
+              y: { ticks: { color: 'rgb(0,191,255)' }, display: false } },
+  },
+  data: {
+    labels: [0],
+    datasets: [{
+      data: [10],
+      fill: false,
+      tension: 0.15,
+    }]
+  }
+});
+
+const finishedChartCtx = document.getElementById("finished-chart");
+const finishedChart = new Chart(finishedChartCtx, {
+  type: 'line',
+  options: {
+    responsive:true,
+    maintainAspectRatio: false,
+    animation: { duration: 250 },
+    color: 'rgb(255,56,0)',
+    borderColor: 'rgb(255,56,0)',
+    plugins: { legend: { display: false },
+               tooltip: { enabled: false } },
+    scales: { grid: { display: false },
+              x: { ticks: { color: 'rgb(255,56,0)' }, display: false },
+              y: { ticks: { color: 'rgb(255,56,0)' }, display: false } },
+  },
+  data: {
+    labels: [0],
+    datasets: [{
+      data: [10],
+      fill: false,
+      tension: 0.15,
+    }]
+  }
+});
+
+var i = 0;
+
+setInterval(() => {
+  i += 1;
+
+  if (bandwidthChart.data.datasets[0].data.length > 20) {
+    bandwidthChart.data.labels.shift();
+    bandwidthChart.data.datasets[0].data.shift();
+  }
+
+  bandwidthChart.data.labels.push(i);
+  bandwidthChart.data.datasets[0].data.push(Math.floor(Math.random() * 20));
+
+  bandwidthChart.update();
+
+  if (finishedChart.data.datasets[0].data.length > 20) {
+    finishedChart.data.labels.shift();
+    finishedChart.data.datasets[0].data.shift();
+  }
+
+  finishedChart.data.labels.push(i);
+  finishedChart.data.datasets[0].data.push(Math.floor(Math.random() * 20));
+
+  finishedChart.update();
+}, 500);
