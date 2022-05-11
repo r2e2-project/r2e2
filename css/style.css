@@ -24,18 +24,17 @@ a:hover {
 
   background: url(../img/moana.jpg) bottom center;
   background-size: cover;
-  color: white;
   padding-top: 80px;
 }
 
 #header h1 {
   /* backdrop-filter: saturate(50%) brightness(60%) blur(4px); */
-  background: black;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 #header #summary {
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: brightness(80%);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: brightness(80%) blur(25px);
 }
 
 #header #summary,
@@ -102,7 +101,7 @@ a:hover {
   display: inline-block;
   color: rgb(199, 158, 36);
   padding: 8px 12px;
-  padding-left:0;
+  padding-left: 0;
   border-radius: 6px;
 }
 
