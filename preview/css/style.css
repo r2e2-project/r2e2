@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;600;700&display=swap');
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #000000;
+}
+
+#container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display:flex;
+}
+
+#output {
+  border:1px solid #999;
+  border-radius: 5px;
+}
+
+#sidebar {
+  border-radius: 5px;
+  width: 250px;
+  margin-left:1em;
+  display: flex;
+  flex-direction: column;
+}
+
+#stats {
+  flex: 1 auto;
+  line-height: 105%;
+  font-size:120%;
+}
+
+#stats .chart {
+  position:relative;
+  width:100%;
+  height:50px;
+  margin-bottom:35px;
+}
+
+.green {
+  color:rgb(50,205,50);
+}
+
+.blue {
+  color:rgb(0,191,255);
+}
+
+.red {
+  color:rgb(255,56,0);
+}
+
+#stats p, #stats div.flexrow {
+  font-family: 'Work Sans', sans-serif;
+  font-weight:bold;
+  margin-bottom:8px;
+}
+
+#stats div.flexrow {
+  display:flex;
+}
+
+#stats div.flexrow div {
+  flex: 1;
+  text-align:left;
+}
+
+#stats div.flexrow div:first-child {
+  flex: 1;
+  text-align:left;
+}
+
+#stats div.flexrow div:last-child{
+  flex: 1.1;
+  text-align:left;
+}
+
+#stats label {
+  text-transform:capitalize;
+  font-weight:normal;
+}
+
+#info {
+  flex: 0 auto;
+}
+
+#info .text {
+  color: #999;
+  font-family: monospace;
+  font-size:13px;
+}
+
+#info button {
+  float:left;
+  border-radius:5px;
+  border:1px solid #333;
+  padding:3px 8px;
+  background: #000000;
+  color:#333;
+  margin-right:8px;
+}
+
+#info button:hover {
+  color:#fff;
+  border:1px solid #fff;
+}
+
+#info button.active {
+  color:#fff;
+  background: #3BB143;
+  border:1px solid #3BB143;
+}
+
+#info img {
+  float:right;
+  height:32px;
+  border:0;
+}
