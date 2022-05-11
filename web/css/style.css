@@ -21,7 +21,7 @@ body {
 }
 
 #header h1 {
-  backdrop-filter: saturate(0%) brightness(50%) blur(4px);
+  backdrop-filter: saturate(50%) brightness(60%) blur(4px);
 }
 
 #header #summary {
@@ -46,6 +46,7 @@ body {
 
 .nav-menu {
   background: rgb(255, 195, 18);
+  box-shadow: 0px 3px 16px 4px rgba(255, 195, 18, 0.5);
 }
 
 .navbar-logo img {
