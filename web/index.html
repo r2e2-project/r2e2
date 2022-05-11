@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="icon" type="image/png" href="img/favicon-compact.png" />
+
+    <script type="text/javascript" src="https://livejs.com/live.js"></script>
+
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
+      crossorigin="anonymous" />
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" />
+
+    <link href="css/style.css" rel="stylesheet" />
+
+    <title>R2E2</title>
+  </head>
+
+  <body
+    data-bs-spy="scroll"
+    data-bs-target="main-navbar"
+    data-bs-offset="160"
+    tabindex="0">
+    <div class="nav-menu fixed-top">
+      <div class="container">
+        <div class="row">
+          <div class="col-md-12">
+            <nav id="main-navbar" class="navbar navbar-light navbar-expand-lg">
+              <a class="navbar-logo" href="index.html">
+                <img src="img/logo-horizontal.svg" />
+              </a>
+              <button
+                class="navbar-toggler"
+                type="button"
+                data-toggle="collapse"
+                data-target="#navbar"
+                aria-controls="navbar"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+              </button>
+              <div class="collapse navbar-collapse" id="navbar">
+                <ul class="navbar-nav ms-auto">
+                  <li class="nav-item">
+                    <a class="nav-link active" href="#home">Home</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#in-action">Demo Video</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#paper">Paper</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#tech-video">Tech Video</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#faq">FAQ</a>
+                  </li>
+                  <li class="nav-item">
+                    <a
+                      class="nav-link"
+                      href="https://github.com/r2t2-project/r2t2">
+                      <i class="bi-github"></i>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="header">
+      <div class="container">
+        <div class="row" id="home">
+          <div class="col-lg-12 p-0">
+            <h1 class="p-4">
+              Low-Latency Path Tracing of Terabyte-Scale Scenes using Thousands
+              of Cloud CPUs
+            </h1>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-lg-6 p-4" id="summary">
+            <p class="h4">
+              R2E2 explores the viability of path tracing massive scenes using a
+              &OpenCurlyDoubleQuote;supercomputer&CloseCurlyDoubleQuote;
+              constructed on-the-fly from thousands of small, serverless cloud
+              computing nodes.
+            </p>
+
+            <p class="lead">
+              R2E2 is a scene decomposition-based parallel renderer that rapidly
+              acquires thousands of cloud CPU cores, loads scene geometry from a
+              pre-built scene BVH into the aggregate memory of these nodes in
+              parallel, and performs full path traced global illumination.
+            </p>
+
+            <p class="lead">
+              Scenes with up to a terabyte of geometry and texture data can be
+              path traced in tens of seconds using thousands of tiny serverless
+              nodes on the AWS Lambda platform.
+            </p>
+
+            <p class="lead">
+              R2E2 is a research project at
+              <a href="https://www.stanford.edu">Stanford University</a>. The
+              research paper and raw data are open-access, and the
+              implementation is open-source.
+            </p>
+          </div>
+
+          <div class="col-lg-6"></div>
+        </div>
+      </div>
+
+      <div id="moana-image-copyright" class="text-end pe-2 pb-2">
+        <a
+          href="https://www.disneyanimation.com/resources/moana-island-scene/">
+          <i class="bi-info-circle"></i> Moana Island Scene. &copy;2017-2022
+          Disney Enterprises, Inc. All rights reserved.
+        </a>
+      </div>
+    </div>
+
+    <div id="content">
+      <div class="section pt-5 pb-5">
+        <div class="container">
+          <div class="row" id="in-action">
+            <div class="col-lg-6">
+              <h3><i class="bi-play-circle"></i> Demo Video</h3>
+
+              <p>
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
+                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
+                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
+                voluptatibus fugit.
+              </p>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="ratio ratio-16x9 video-container">
+                <iframe
+                  src="https://www.youtube-nocookie.com/embed/g2YqYYo_ZVI?modestbranding=1&rel=0&iv_load_policy=3&theme=light&color=white"
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen></iframe>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section pt-5 pb-5">
+        <div class="container">
+          <div class="row" id="paper">
+            <div class="col-lg-6">
+              <h3><i class="bi-journal-text"></i> Research Paper</h3>
+
+              <p>
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
+                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
+                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
+                voluptatibus fugit.
+              </p>
+            </div>
+
+            <div class="col-lg-6">
+              <a href="data/r2e2-paper.pdf">
+                <div class="ratio ratio-16x9" id="paper-first-page"></div>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section pt-5 pb-5">
+        <div class="container">
+          <div class="row" id="tech-video">
+            <div class="col-lg-6">
+              <h3><i class="bi-person-video"></i> Tech Video</h3>
+
+              <p>
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
+                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
+                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
+                voluptatibus fugit.
+              </p>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="ratio ratio-16x9 video-container">
+                <iframe
+                  src="https://www.youtube-nocookie.com/embed/g2YqYYo_ZVI?modestbranding=1&rel=0&iv_load_policy=3&theme=light&color=white"
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen></iframe>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section pt-5 pb-5">
+        <div class="container">
+          <div class="row" id="faq">
+            <div class="col-lg-9">
+              <h3>
+                <i class="bi-patch-question"></i> Frequently Asked Questions
+              </h3>
+
+              <h5 class="pt-4">
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit?
+              </h5>
+
+              <p>
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
+                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
+                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
+                voluptatibus fugit. Lorem ipsum dolor sit amet consectetur
+                adipisicing elit. Soluta illum laudantium, doloribus iusto
+                aperiam vel, unde quaerat sunt cumque fugiat eum recusandae
+                sequi at quis. Voluptatem inventore obcaecati architecto alias?
+              </p>
+
+              <h5 class="pt-4">
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit?
+              </h5>
+
+              <p>
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
+                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
+                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
+                voluptatibus fugit. Lorem ipsum dolor sit amet consectetur
+                adipisicing elit. Soluta illum laudantium, doloribus iusto
+                aperiam vel, unde quaerat sunt cumque fugiat eum recusandae
+                sequi at quis. Voluptatem inventore obcaecati architecto alias?
+              </p>
+
+              <h5 class="pt-4">
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit?
+              </h5>
+
+              <p>
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
+                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
+                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
+                voluptatibus fugit. Lorem ipsum dolor sit amet consectetur
+                adipisicing elit. Soluta illum laudantium, doloribus iusto
+                aperiam vel, unde quaerat sunt cumque fugiat eum recusandae
+                sequi at quis. Voluptatem inventore obcaecati architecto alias?
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+      crossorigin="anonymous"></script>
+  </body>
+</html>
