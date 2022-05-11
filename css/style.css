@@ -1,0 +1,108 @@
+html {
+  scroll-padding-top: 80px;
+}
+
+body {
+  position: relative;
+}
+
+#header {
+  background: linear-gradient(
+    135deg,
+    rgb(255, 195, 18) 0%,
+    rgb(255, 195, 18) 80px,
+    rgb(255, 190, 0) 100%
+  );
+
+  background: url(../img/moana.jpg) bottom center;
+  background-size: cover;
+  color: white;
+  padding-top: 80px;
+}
+
+#header h1 {
+  backdrop-filter: saturate(0%) brightness(50%) blur(4px);
+}
+
+#header #summary {
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(32px) brightness(80%);
+}
+
+#header #summary,
+#header h1 {
+  border-radius: 8px;
+}
+
+#header #summary a {
+  text-decoration: none;
+  color: rgba(255, 195, 18, 1);
+}
+
+#header #summary a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+}
+
+.nav-menu {
+  background: rgb(255, 195, 18);
+}
+
+.navbar-logo img {
+  height: 22px;
+}
+
+.nav-link {
+  color: black;
+  position: relative;
+}
+
+.nav-link.active {
+  font-weight: bold;
+}
+
+.nav-link.active:after {
+  content: "";
+  border-bottom: 2px solid black;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 5px;
+  height: 1px;
+  position: absolute;
+}
+
+#content .section:nth-child(even) {
+  background: rgba(255, 195, 18, 0.1);
+}
+
+.video-container {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#paper-first-page {
+  background: url(../img/firstpage.png) 0px -30px;
+  background-size: 100%;
+  border-radius: 8px;
+  box-shadow: 0px 0px 0px 3px rgba(255, 195, 18, 0.2);
+}
+
+.section h3 i {
+  display: inline-block;
+  color: rgb(255, 195, 18);
+  padding: 8px 10px;
+  border-radius: 5px;
+}
+
+#content .section:nth-child(even) h3 i {
+  background: white;
+}
+
+#moana-image-copyright {
+  font-size: 13px;
+}
+
+#moana-image-copyright a {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+}
