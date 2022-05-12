@@ -6,14 +6,6 @@ body {
   position: relative;
 }
 
-a {
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
 #header {
   background: linear-gradient(
     135deg,
@@ -27,10 +19,14 @@ a:hover {
   padding-top: 80px;
 }
 
+a.btn:hover {
+  text-decoration: none !important;
+}
+
 #header h1 {
   color: white;
   text-shadow: 3px 3px 4px black;
-  font-weight:bold;
+  font-weight: bold;
 }
 
 #header #summary {
@@ -38,9 +34,11 @@ a:hover {
   backdrop-filter: brightness(100%) blur(4px);
 }
 
-#header #summary,
-#header h1 {
-  border-radius: 8px;
+@media (min-width: 576px) {
+  #header #summary,
+  #header h1 {
+    border-radius: 8px;
+  }
 }
 
 #header #summary a {
@@ -53,7 +51,7 @@ a:hover {
 }
 
 #header #summary p.lead {
-  font-weight:normal;
+  font-weight: normal;
 }
 
 .nav-menu {
@@ -106,7 +104,7 @@ a:hover {
   color: rgb(199, 158, 36);
   padding: 8px 12px;
   padding-left: 0;
-  border-radius: 6px;
+  border-radius: 0px;
 }
 
 #content .section:nth-child(odd) h3 {
