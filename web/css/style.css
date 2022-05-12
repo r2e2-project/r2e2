@@ -121,6 +121,7 @@ a.btn:hover {
 
 #moana-image-copyright {
   font-size: 13px;
+  text-align: center;
 }
 
 #moana-image-copyright a {
@@ -133,4 +134,10 @@ a.btn:hover {
 #moana-image-copyright a:hover {
   color: white;
   background: rgba(0, 0, 0, 0.3);
+}
+
+@media (min-width: 576px) {
+  #moana-image-copyright {
+    text-align: right;
+  }
 }
