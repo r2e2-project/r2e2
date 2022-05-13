@@ -122,6 +122,11 @@ a.btn:hover {
   align-self:flex-end;
 }
 
+#intro .intro-title {
+  line-height: 110%;
+  color:black;
+}
+
 /* #content .section:nth-child(odd) h3 {} */
 
 .section h3 i {
@@ -151,14 +156,21 @@ a.btn:hover {
   }
 }
 
-.number-circle {
-  padding:3px 16px;
-  border-radius:10px;
-  background: #eee;
-  border: 0px solid #000;
-  border-top:0;
-  border-bottom:0;
-  align-items:baseline;
-  justify-content: center;
+#intro h2 {
+  display: flex;
+  align-items: top;
+  font-weight:400;
+}
+
+#intro h2>.number-circle {
+  font-size:110%;
+  flex: 0 0 1.5em;
+  height:1.5em;
   display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  border-radius:50%;
+  float: left;
+  margin-right:0.5em;
+  border:2px solid #000;
 }
