@@ -30,7 +30,7 @@ a.btn:hover {
 #header h1 {
   color: white;
   text-shadow: 2px 2px 4px black;
-  font-weight:700;
+  font-weight:600;
 }
 
 #header #summary {
@@ -107,6 +107,7 @@ a.btn:hover {
   display: inline-block;
   color: rgb(199, 158, 36);
   padding: 8px 12px;
+  padding-top:0;
   padding-left: 0;
   border-radius: 0px;
 }
