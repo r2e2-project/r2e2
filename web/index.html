@@ -119,15 +119,24 @@
             </p>
 
             <p>
-              <a href="#" role="button" class="btn btn-lg btn-primary mt-1">
+              <a
+                href="#paper"
+                role="button"
+                class="btn btn-lg btn-primary mt-1">
                 <i class="bi bi-journal-text"></i> Research Paper
               </a>
 
-              <a href="#" role="button" class="btn btn-lg btn-secondary mt-1">
+              <a
+                href="#in-action"
+                role="button"
+                class="btn btn-lg btn-secondary mt-1">
                 <i class="bi bi-play-circle"></i> Demo Video
               </a>
 
-              <a href="#" role="button" class="btn btn-lg btn-secondary mt-1">
+              <a
+                href="https://github.com/r2t2-project/r2t2"
+                role="button"
+                class="btn btn-lg btn-secondary mt-1">
                 <i class="bi bi-github"></i> Source Code
               </a>
             </p>
@@ -143,8 +152,11 @@
 
       <div id="moana-image-copyright" class="pe-2 pb-2 pt-3">
         <a href="https://www.disneyanimation.com/resources/moana-island-scene/">
-          <i class="bi-info-circle"></i> Moana Island Scene. &copy;2017-2022
-          Disney Enterprises, Inc. All rights reserved.
+          <i class="bi-info-square"></i>
+          <span class="hidden-text">
+            Moana Island Scene. &copy;2017-2022 Disney Enterprises, Inc. All
+            rights reserved.
+          </span>
         </a>
       </div>
     </div>
@@ -202,7 +214,7 @@
     <div id="content">
       <div class="section pt-5 pb-5">
         <div class="container">
-          <div class="row" id="in-action">
+          <div class="row g-lg-5" id="in-action">
             <div class="col-lg-6">
               <h3><i class="bi-play-circle"></i> Demo Video</h3>
 
@@ -229,19 +241,36 @@
 
       <div class="section pt-5 pb-5">
         <div class="container">
-          <div class="row" id="paper">
+          <div class="row g-lg-5" id="paper">
             <div class="col-lg-6">
               <h3><i class="bi-journal-text"></i> Research Paper</h3>
 
               <p>
                 <a class="link-dark" href="https://sadjad.org">Sadjad Fouladi</a
-                >, <a class="link-dark" href="">Brennan Shacklett</a>,
-                <a class="link-dark" href="">Fait Poms</a>,
-                <a class="link-dark" href="">Arjun Arora</a>,
-                <a class="link-dark" href="">Alex Ozdemir</a>,
-                <a class="link-dark" href="">Deepti Raghavan</a>,
-                <a class="link-dark" href="">Pat Hanrahan</a>,
-                <a class="link-dark" href="">Kayvon Fatahalian</a>,
+                >,
+                <a class="link-dark" href="https://cs.stanford.edu/~bps"
+                  >Brennan Shacklett</a
+                >,
+                <a class="link-dark" href="https://faitpoms.com/">Fait Poms</a>,
+                <a class="link-dark" href="https://github.com/Arjun-Arora"
+                  >Arjun Arora</a
+                >,
+                <a class="link-dark" href="https://cs.stanford.edu/~aozdemir/"
+                  >Alex Ozdemir</a
+                >,
+                <a class="link-dark" href="https://deeptir.me/"
+                  >Deepti Raghavan</a
+                >,
+                <a
+                  class="link-dark"
+                  href="https://graphics.stanford.edu/~hanrahan/"
+                  >Pat Hanrahan</a
+                >,
+                <a
+                  class="link-dark"
+                  href="http://graphics.stanford.edu/~kayvonf/"
+                  >Kayvon Fatahalian</a
+                >,
                 <a class="link-dark" href="https://keithw.org">Keith Winstein</a
                 >,
                 <strong
@@ -253,8 +282,29 @@
               </p>
 
               <p>
-                <button type="button" class="btn btn-primary">BibTeX</button>
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#bibtex-collapse"
+                  aria-expanded="false"
+                  aria-controls="bibtex-collapse">
+                  BibTeX
+                </button>
               </p>
+
+              <pre class="collapse" id="bibtex-collapse">
+@article{fouladi2022r2e2,
+  title={{R2E2}: Low-Latency Path Tracing of Terabyte-Scale Scenes using Thousands of Cloud CPUs},
+  author={Fouladi, Sadjad and Shacklett, Brennan and Poms, Fait and Arora, Arjun and Ozdemir, Alex and Raghavan, Deepti and Hanrahan, Pat and Fatahalian, Kayvon and Winstein, Keith},
+  journal={ACM Transactions on Graphics (TOG)},
+  volume={41},
+  number={4},
+  pages={1--16},
+  year={2022},
+  publisher={ACM New York, NY}
+}</pre
+              >
             </div>
 
             <div class="col-lg-6">
@@ -268,7 +318,7 @@
 
       <div class="section pt-5 pb-5">
         <div class="container">
-          <div class="row" id="tech-video">
+          <div class="row g-lg-5" id="tech-video">
             <div class="col-lg-6">
               <h3><i class="bi-person-video"></i> Tech Video</h3>
 
@@ -351,30 +401,32 @@
                 successfully booted worker fails mid-computation.
               </p>
 
-              <h5 class="pt-4">
-                What's in a name?
-              </h5>
+              <h5 class="pt-4">What's in a name?</h5>
 
-              <p>
-                <table>
-                  <tr>
-                    <td>Really Elastic Ray Engine</td>
-                    <td>= <em>R</em> &middot; <em>E</em> &middot; <em>R</em> &middot; <em>E</em></td>
-                  </tr>
-                  <tr>
-                    <td></td>
-                    <td>= (<em>R</em> &middot; <em>E</em>)(<em>R</em> &middot; <em>E</em>) </td>
-                  </tr>
-                  <tr>
-                    <td></td>
-                    <td>= (<em>R</em> &middot; <em>E</em>)&sup2; </td>
-                  </tr>
-                  <tr>
-                    <td></td>
-                    <td>= <em>R</em>&sup2; &middot; <em>E</em>&sup2; </td>
-                  </tr>
-                </table>
-              </p>
+              <table>
+                <tr>
+                  <td>Really Elastic Ray Engine</td>
+                  <td>
+                    = <em>R</em> &middot; <em>E</em> &middot;
+                    <em>R</em> &middot; <em>E</em>
+                  </td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td>
+                    = (<em>R</em> &middot; <em>E</em>)(<em>R</em> &middot;
+                    <em>E</em>)
+                  </td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td>= (<em>R</em> &middot; <em>E</em>)&sup2;</td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td>= <em>R</em>&sup2; &middot; <em>E</em>&sup2;</td>
+                </tr>
+              </table>
             </div>
           </div>
         </div>
@@ -382,7 +434,7 @@
 
       <div class="section pt-5 pb-5">
         <div class="container">
-          <div class="row" id="acks">
+          <div class="row g-lg-5" id="acks">
             <div class="col-lg-6">
               <h3><i class="bi bi-hand-thumbs-up"></i> Acknowledgements</h3>
 
@@ -396,13 +448,7 @@
                 Amazon, and Meta Platforms.
               </p>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <div class="section pt-5 pb-5">
-        <div class="container">
-          <div class="row" id="contact-us">
             <div class="col-lg-6">
               <h3><i class="bi bi-envelope"></i> Contact Us</h3>
 
@@ -425,7 +471,7 @@
           class="d-flex flex-wrap justify-content-between align-items-center">
           <p class="col-md-4 mb-0 text-muted">
             <img src="img/logo.svg" height="40" style="opacity: 0.5" />
-            &copy;2022 Copyright held by authors.
+            &copy;2022 Copyright held by the authors.
           </p>
         </footer>
       </div>

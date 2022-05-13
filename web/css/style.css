@@ -6,6 +6,10 @@ body {
   position: relative;
 }
 
+a {
+  text-decoration: none;
+}
+
 #header {
   background: linear-gradient(
     135deg,
@@ -25,12 +29,12 @@ a.btn:hover {
 
 #header h1 {
   color: white;
-  text-shadow: 3px 3px 4px black;
+  text-shadow: 2px 2px 4px black;
   font-weight: bold;
 }
 
 #header #summary {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: brightness(100%) blur(4px);
 }
 
@@ -109,7 +113,7 @@ a.btn:hover {
 
 #intro h1 {
   /* color: rgb(199, 158, 36); */
-  font-weight:bold;
+  font-weight: bold;
 }
 
 #intro h1 img {
@@ -117,14 +121,14 @@ a.btn:hover {
   vertical-align: baseline;
 }
 
-#intro div>img {
+#intro div > img {
   display: inline-block;
-  align-self:flex-end;
+  align-self: flex-end;
 }
 
 #intro .intro-title {
   line-height: 110%;
-  color:black;
+  color: black;
 }
 
 /* #content .section:nth-child(odd) h3 {} */
@@ -134,8 +138,7 @@ a.btn:hover {
 }
 
 #moana-image-copyright {
-  font-size: 13px;
-  text-align: center;
+  text-align: left;
 }
 
 #moana-image-copyright a {
@@ -145,32 +148,42 @@ a.btn:hover {
   border-radius: 4px;
 }
 
-#moana-image-copyright a:hover {
-  color: white;
-  background: rgba(0, 0, 0, 0.3);
+#moana-image-copyright .hidden-text {
+  display:none;
 }
 
-@media (min-width: 576px) {
-  #moana-image-copyright {
-    text-align: right;
-  }
+#moana-image-copyright a:hover {
+  color: white;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+#moana-image-copyright a:hover .hidden-text {
+  display:inline;
 }
 
 #intro h2 {
   display: flex;
   align-items: top;
-  font-weight:400;
+  font-weight: 400;
 }
 
-#intro h2>.number-circle {
-  font-size:110%;
+#intro h2 > .number-circle {
+  font-size: 110%;
   flex: 0 0 1.5em;
-  height:1.5em;
-  display:inline-flex;
-  justify-content:center;
-  align-items:center;
-  border-radius:50%;
+  height: 1.5em;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
   float: left;
-  margin-right:0.5em;
-  border:2px solid #000;
+  margin-right: 0.5em;
+  border: 2px solid #000;
+}
+
+#bibtex-collapse {
+  border-radius: 5px;
+  border: 1px solid #eee;
+  background:#f9f9f9;
+  padding:8px 12px;
+  overflow:hidden;
 }
