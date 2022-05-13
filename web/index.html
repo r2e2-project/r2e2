@@ -301,46 +301,54 @@
                 <i class="bi-patch-question"></i> Frequently Asked Questions
               </h3>
 
-              <h5 class="pt-4">
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit?
-              </h5>
+              <h5 class="pt-2">Is R2E2's design specific to AWS Lambda?</h5>
 
               <p>
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
-                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
-                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
-                voluptatibus fugit. Lorem ipsum dolor sit amet consectetur
-                adipisicing elit. Soluta illum laudantium, doloribus iusto
-                aperiam vel, unde quaerat sunt cumque fugiat eum recusandae
-                sequi at quis. Voluptatem inventore obcaecati architecto alias?
+                R2E2's architecture makes few assumptions about the underlying
+                cloud platform. Our implementation would be portable with little
+                effort to other elastic compute services such as Google Cloud
+                Run or a cluster of traditional cloud VMs (using bulk insert
+                APIs). Porting would require replacing the subroutine to launch
+                Lambda workers with code to start workers using other
+                platform-specific APIs.
               </p>
 
               <h5 class="pt-4">
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit?
+                Will the architecture generalize to other texture formats?
               </h5>
 
               <p>
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
-                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
-                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
-                voluptatibus fugit. Lorem ipsum dolor sit amet consectetur
-                adipisicing elit. Soluta illum laudantium, doloribus iusto
-                aperiam vel, unde quaerat sunt cumque fugiat eum recusandae
-                sequi at quis. Voluptatem inventore obcaecati architecto alias?
+                R2E2 only requires that the texture data assigned to a single
+                service fits in the memory of a worker. Any texture
+                representation that can partition a scene’s texture data into
+                small worker-sized chunks is viable. While our current
+                implementation uses Ptex, other texture partitioning schemes
+                like UDIM (which by design partitions an object’s texture data
+                into smaller images) would work as well. An implementation would
+                pack individual UDIM images into service-sized partitions, just
+                as R2E2 packs Ptex textures into partitions. Regardless of
+                texture format, if any texture image exceeds worker memory
+                footprint, the image must be broken into subimages and divided
+                among services. The current R2E2 implementation supports this
+                for large environment light textures: Moana’s 1.6 GB environment
+                map image is chunked into smaller tiles, with each tile assigned
+                to a different service.
               </p>
 
               <h5 class="pt-4">
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit?
+                What if AWS does not provide the required nodes?
               </h5>
 
               <p>
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
-                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
-                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
-                voluptatibus fugit. Lorem ipsum dolor sit amet consectetur
-                adipisicing elit. Soluta illum laudantium, doloribus iusto
-                aperiam vel, unde quaerat sunt cumque fugiat eum recusandae
-                sequi at quis. Voluptatem inventore obcaecati architecto alias?
+                R2E2 allocates workers to services and then assigns work to
+                these workers as soon as they boot. (It does not wait for all
+                workers to boot before computation begins.) R2E2 periodically
+                attempts to boot more workers if prior requests fail. If fewer
+                than requested workers are obtained, the computation still runs
+                to completion, provided there are enough workers for each
+                service to have at least one worker. Our current implementation
+                <em>does not</em> implement resiliency in the event a
+                successfully booted worker fails mid-computation.
               </p>
             </div>
           </div>
