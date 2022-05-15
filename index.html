@@ -39,8 +39,8 @@
               <button
                 class="navbar-toggler"
                 type="button"
-                data-toggle="collapse"
-                data-target="#navbar"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbar"
                 aria-controls="navbar"
                 aria-expanded="false"
                 aria-label="Toggle navigation">
@@ -52,7 +52,7 @@
                     <a class="nav-link active" href="#home">Home</a>
                   </li>
                   <li class="nav-item">
-                    <a class="nav-link active" href="#intro">At a Glance</a>
+                    <a class="nav-link" href="#intro">At a Glance</a>
                   </li>
                   <li class="nav-item">
                     <a class="nav-link" href="#in-action">Demo</a>
@@ -86,19 +86,20 @@
         <div class="row" id="home">
           <div class="col-lg-8">
             <h1 class="pb-3 display-5">
-              Low-Latency Path Tracing of Terabyte-Scale Scenes using Thousands
-              of Cloud CPUs
+              Path Tracing of Terabyte-Scale Scenes using Thousands of Cloud
+              CPUs
             </h1>
           </div>
         </div>
 
         <div class="row">
-          <div class="col-lg-10 px-4 pt-3 pb-2" id="summary">
+          <div class="col-xl-10 px-4 pt-3 pb-2" id="summary">
             <p class="h4">
-              R2E2 explores the viability of path tracing massive scenes using a
+              R2E2 is a research project that explores the viability of path
+              tracing <em>massive scenes</em> using a
               &OpenCurlyDoubleQuote;supercomputer&CloseCurlyDoubleQuote;
-              constructed on-the-fly from thousands of small cloud computing
-              nodes.
+              constructed on-the-fly from
+              <em>thousands of small cloud computing nodes</em>.
             </p>
 
             <p class="lead">
@@ -106,12 +107,9 @@
               acquires thousands of cloud CPU cores, loads scene geometry from a
               pre-built scene BVH into the aggregate memory of these nodes in
               parallel, and performs full path traced global illumination.
-            </p>
-
-            <p class="lead">
               Scenes with up to a terabyte of geometry and texture data can be
-              path traced in tens of seconds using thousands of tiny serverless
-              nodes on the AWS Lambda platform.
+              path traced in tens of seconds using thousands of tiny compute
+              nodes.
             </p>
 
             <p class="lead">
@@ -175,9 +173,10 @@
 
       <div class="row g-lg-5">
         <div class="col-lg-6 pb-5 d-flex flex-column justify-content-between">
-          <h2 class="intro-title">
+          <h2 class="intro-title pb-2">
             <div class="number-circle">1</div>
-            The scene geomtery and textures are decomposed into small units
+            R2E2 decomposes the scene geometry and textures into tiny (100s of
+            MB) objects, and puts them in a blob store.
           </h2>
 
           <img src="img/intro/slide0.svg" class="img-fluid" />
@@ -186,7 +185,7 @@
           <h2 class="intro-title">
             <div class="number-circle">2</div>
             At artist's request, the system quickly boots up thousands of tiny
-            workers
+            compute nodes.
           </h2>
 
           <img src="img/intro/slide1.svg" class="img-fluid" />
@@ -197,7 +196,8 @@
         <div class="col-lg-6 pb-5 d-flex flex-column justify-content-between">
           <h2 class="intro-title">
             <div class="number-circle">3</div>
-            Workers fetch scene objects in parallel from the object store
+            Nodes fetch scene objects from the blob store, and become
+            responsible for servicing thier objects.
           </h2>
 
           <img src="img/intro/slide2.svg" class="img-fluid" />
@@ -206,10 +206,21 @@
         <div class="col-lg-6 pb-5 d-flex flex-column justify-content-between">
           <h2 class="intro-title">
             <div class="number-circle">4</div>
-            Workers cooperate to perform standard fire-and-forget path tracing
+            Nodes cooperate and move rays among each other to perform standard
+            fire-and-forget path tracing.
           </h2>
 
           <img src="img/intro/slide3.svg" class="img-fluid" />
+        </div>
+      </div>
+
+      <div class="row g-lg-5 justify-content-center">
+        <div class="col-lg-6 pb-5 d-flex flex-column justify-content-between">
+          <h2 class="intro-title">
+            <div class="number-circle">5</div>
+            R2E2 architecture can scale to terabyte-scale scenes and thousands
+            of compute nodes,
+          </h2>
         </div>
       </div>
     </div>
@@ -284,7 +295,7 @@
                 <em>ACM Transactions on Graphics, July 2022.</em>
               </p>
 
-              <p>
+              <div class="mb-2">
                 <button
                   type="button"
                   class="btn btn-secondary"
@@ -294,9 +305,9 @@
                   aria-controls="bibtex-collapse">
                   BibTeX
                 </button>
-              </p>
+              </div>
 
-              <pre class="collapse" id="bibtex-collapse">
+              <pre class="collapse" id="bibtex-collapse" onclick="clip(this)">
 @article{fouladi2022r2e2,
   title={{R2E2}: Low-Latency Path Tracing of Terabyte-Scale Scenes using Thousands of Cloud CPUs},
   author={Fouladi, Sadjad and Shacklett, Brennan and Poms, Fait and Arora, Arjun and Ozdemir, Alex and Raghavan, Deepti and Hanrahan, Pat and Fatahalian, Kayvon and Winstein, Keith},
@@ -323,24 +334,23 @@
         <div class="container">
           <div class="row g-lg-5" id="tech-video">
             <div class="col-lg-6">
-              <h3><i class="bi-person-video"></i> Tech Video</h3>
+              <h3><i class="bi-person-video3"></i> Tech Video</h3>
 
               <p>
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
-                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
-                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
-                voluptatibus fugit.
+                Tech video will be available during the week of
+                <a href="https://s2022.siggraph.org/">SIGGRAPH 2022</a> (Aug
+                8&ndash;11).
               </p>
             </div>
 
             <div class="col-lg-6">
-              <div class="ratio ratio-16x9 video-container">
+              <!--<div class="ratio ratio-16x9 video-container">
                 <iframe
                   src="https://www.youtube-nocookie.com/embed/g2YqYYo_ZVI?modestbranding=1&rel=0&iv_load_policy=3&theme=light&color=white"
                   frameborder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowfullscreen></iframe>
-              </div>
+              </div>-->
             </div>
           </div>
         </div>
@@ -427,7 +437,9 @@
                 </tr>
                 <tr>
                   <td></td>
-                  <td>= <em>R</em>&sup2; &middot; <em>E</em>&sup2;</td>
+                  <td>
+                    = <em>R</em>&sup2; &middot; <em>E</em>&sup2; &nbsp; &#9633;
+                  </td>
                 </tr>
               </table>
             </div>
@@ -484,5 +496,15 @@
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
       crossorigin="anonymous"></script>
+
+    <script>
+      function clip(el) {
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    </script>
   </body>
 </html>

@@ -76,16 +76,6 @@ a.btn:hover {
   font-weight: bold;
 }
 
-.nav-link.active:after {
-  content: "";
-  border-bottom: 2px solid black;
-  left: 0.5rem;
-  right: 0.5rem;
-  bottom: 5px;
-  height: 1px;
-  position: absolute;
-}
-
 #content .section:nth-child(odd) {
   background: rgba(255, 195, 18, 0.1);
   box-shadow: 0px 0px 0px 2px rgba(255, 195, 18, 0.2);
