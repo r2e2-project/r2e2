@@ -233,11 +233,33 @@
               <h3><i class="bi-play-circle"></i> Demo Video</h3>
 
               <p>
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Nulla
-                eius est, eos fugiat labore possimus ipsam. Totam, sint impedit
-                obcaecati nam architecto, voluptate, ut autem soluta nemo esse
-                voluptatibus fugit.
+                The video shows a real-time screen capture of rendering
+                <a href="">the Moana Island scene</a> using R2E2 on 2,000 tiny
+                nodes on AWS Lambda.
               </p>
+
+              <ul class="list-group pb-4">
+                <li class="list-group-item">
+                  <span><i class="bi bi-info-circle"></i></span>
+                  Each node features 4 GB of memory and 3 vCPUs; an aggergate of
+                  8 TB of memory and 6,000 vCPUs.
+                </li>
+                <li class="list-group-item">
+                  <span><i class="bi bi-info-circle"></i></span>
+                  The scene is decomposed into &Tilde;1 GB objects and is stored
+                  on S3 object store.
+                </li>
+                <li class="list-group-item">
+                  <span><i class="bi bi-info-circle"></i></span>
+                  For demo purposes, the upfront preprocessing has already been
+                  done and has generated the weights for scene objects.
+                </li>
+                <li class="list-group-item">
+                  <span><i class="bi bi-info-circle"></i></span>
+                  When the job is invoked, R2E2 immediately boots up thousands
+                  of nodes from zero.
+                </li>
+              </ul>
             </div>
 
             <div class="col-lg-6">
