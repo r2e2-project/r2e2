@@ -30,7 +30,7 @@ a.btn:hover {
 #header h1 {
   color: white;
   text-shadow: 2px 2px 4px black;
-  font-weight:600;
+  font-weight: 600;
 }
 
 #header #summary {
@@ -97,7 +97,7 @@ a.btn:hover {
   display: inline-block;
   color: rgb(199, 158, 36);
   padding: 8px 12px;
-  padding-top:0;
+  padding-top: 0;
   padding-left: 0;
   border-radius: 0px;
 }
@@ -140,7 +140,7 @@ a.btn:hover {
 }
 
 #moana-image-copyright .hidden-text {
-  display:none;
+  display: none;
 }
 
 #moana-image-copyright a:hover {
@@ -149,7 +149,7 @@ a.btn:hover {
 }
 
 #moana-image-copyright a:hover .hidden-text {
-  display:inline;
+  display: inline;
 }
 
 #intro h2 {
@@ -174,7 +174,7 @@ a.btn:hover {
 #bibtex-collapse {
   border-radius: 5px;
   border: 1px solid #eee;
-  background:#f9f9f9;
-  padding:8px 12px;
-  overflow:hidden;
+  background: #f9f9f9;
+  padding: 8px 12px;
+  overflow: hidden;
 }
