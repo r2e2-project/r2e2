@@ -51,6 +51,9 @@ add_library( r2e2 STATIC
     ${SOURCE}
 )
 
+# Force generating protobuf headers first
+add_dependencies( r2e2 r2e2_messages )
+
 set ( ALL_LIBS
     r2e2
     r2e2_messages
