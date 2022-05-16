@@ -122,7 +122,7 @@ private:
   const std::string aws_region;
   const Address aws_address;
   const std::string lambda_function_name {
-    safe_getenv_or( "R2T2_LAMBDA_FUNCTION", "r2e2-lambda-function" )
+    safe_getenv_or( "R2E2_LAMBDA_FUNCTION", "r2e2-lambda-function" )
   };
 
   std::string output_preview_url {};

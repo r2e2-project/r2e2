@@ -8,7 +8,7 @@ using namespace std;
 using namespace chrono;
 using namespace r2e2;
 
-static const bool R2T2_POWERLINE = ( getenv( "R2T2_POWERLINE" ) != nullptr );
+static const bool R2E2_POWERLINE = ( getenv( "R2E2_POWERLINE" ) != nullptr );
 
 void LambdaMaster::record_enqueue( Worker& worker, const RayBagInfo& info )
 {
@@ -407,7 +407,7 @@ void LambdaMaster::print_job_summary() const
   };
 
   auto box_start = []( const string& color ) {
-    if ( R2T2_POWERLINE ) {
+    if ( R2E2_POWERLINE ) {
       return "\x1B[38;5;" + color + "m\ue0b6\x1B[0m\x1B[1;48;5;" + color + "m";
     } else {
       return "\x1B[48;5;" + color + "m ";
@@ -415,7 +415,7 @@ void LambdaMaster::print_job_summary() const
   };
 
   auto box_end = []( const string& color ) {
-    if ( R2T2_POWERLINE ) {
+    if ( R2E2_POWERLINE ) {
       return "\x1B[0m\x1B[38;5;" + color + "m\ue0b4\x1B[0m";
     } else {
       return " \x1B[0m"s;
