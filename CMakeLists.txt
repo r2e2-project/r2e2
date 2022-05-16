@@ -1,6 +1,6 @@
-cmake_minimum_required ( VERSION 2.8.5 )
+cmake_minimum_required ( VERSION 3.0.0 )
 cmake_policy ( SET CMP0054 NEW )
-project ( R2T2 )
+project ( R2E2 )
 
 add_subdirectory ( lib/pbrt )
 
@@ -33,7 +33,7 @@ include_directories ( "${CMAKE_CURRENT_BINARY_DIR}/src/messages" )
 add_definitions ( -D PBRT_CONSTEXPR=constexpr )
 add_definitions ( -D PBRT_THREAD_LOCAL=thread_local )
 
-file ( GLOB R2T2_SOURCE
+file ( GLOB SOURCE
     src/common/*
     src/master/*
     src/messages/*
@@ -47,13 +47,13 @@ file ( GLOB R2T2_SOURCE
 
 include_directories ( src )
 
-add_library( r2t2 STATIC
-    ${R2T2_SOURCE}
+add_library( r2e2 STATIC
+    ${SOURCE}
 )
 
-set ( ALL_R2T2_LIBS
-    r2t2
-    r2t2_messages
+set ( ALL_LIBS
+    r2e2
+    r2e2_messages
     pbrt
     pbrt_messages
     atomic
@@ -69,8 +69,8 @@ set ( ALL_R2T2_LIBS
     ${OPENSSL_LIBRARIES}
 )
 
-add_executable ( r2t2-lambda-master src/frontend/lambda-master.cc )
-target_link_libraries( r2t2-lambda-master ${ALL_R2T2_LIBS} )
+add_executable ( r2e2-lambda-master src/frontend/lambda-master.cc )
+target_link_libraries( r2e2-lambda-master ${ALL_LIBS} )
 
 set ( WORKER_LINK_FLAGS dl z unwind lzma -static -Wl,-allow-multiple-definition
                         -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
@@ -81,20 +81,20 @@ if ( CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES ASan
   set( WORKER_LINK_FLAGS "" )
 endif()
 
-add_executable ( r2t2-lambda-worker src/frontend/lambda-worker.cc )
-target_link_libraries( r2t2-lambda-worker ${ALL_R2T2_LIBS} ${WORKER_LINK_FLAGS} )
+add_executable ( r2e2-lambda-worker src/frontend/lambda-worker.cc )
+target_link_libraries( r2e2-lambda-worker ${ALL_LIBS} ${WORKER_LINK_FLAGS} )
 
-add_executable ( r2t2-aggregate src/frontend/aggregate.cc )
-target_link_libraries( r2t2-aggregate ${ALL_R2T2_LIBS} )
+add_executable ( r2e2-aggregate src/frontend/aggregate.cc )
+target_link_libraries( r2e2-aggregate ${ALL_LIBS} )
 
 add_executable ( aggregate-timelapse src/frontend/aggregate-timelapse.cc )
-target_link_libraries( aggregate-timelapse ${ALL_R2T2_LIBS} )
+target_link_libraries( aggregate-timelapse ${ALL_LIBS} )
 
 add_executable ( load-treelet src/frontend/load-treelet.cc )
-target_link_libraries( load-treelet ${ALL_R2T2_LIBS} )
+target_link_libraries( load-treelet ${ALL_LIBS} )
 
 add_executable ( camera-generator src/frontend/camera-generator.cc )
-target_link_libraries( camera-generator ${ALL_R2T2_LIBS} )
+target_link_libraries( camera-generator ${ALL_LIBS} )
 
 add_executable( memcached_test src/tests/memcached_test.cc )
-target_link_libraries( memcached_test ${ALL_R2T2_LIBS} )
+target_link_libraries( memcached_test ${ALL_LIBS} )
