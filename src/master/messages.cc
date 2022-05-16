@@ -59,6 +59,10 @@ void LambdaMaster::process_message( const uint64_t worker_id,
         const RayBagInfo info = from_protobuf( item );
         record_enqueue( worker, info );
 
+        LOG( INFO ) << "ENQ " << info.str( "" ) << " " << info.bag_size << " "
+                    << info.ray_count << " T"
+                    << worker.treelet.value_or( 9999ul );
+
         if ( info.sample_bag ) {
           // sample bag
           if ( not accumulators ) {
@@ -107,6 +111,10 @@ void LambdaMaster::process_message( const uint64_t worker_id,
       for ( const auto& item : proto.items() ) {
         const RayBagInfo info = from_protobuf( item );
         record_dequeue( worker, info );
+
+        LOG( INFO ) << "DEQ " << info.str( "" ) << " " << info.bag_size << " "
+                    << info.ray_count << " T"
+                    << worker.treelet.value_or( 9999ul );
       }
 
       if ( worker.role == Worker::Role::Accumulator ) {
