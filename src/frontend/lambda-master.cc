@@ -282,7 +282,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   // clang-format off
   auto preview_url = [&] {
-    return "https://r2t2-project.github.io/r2t2/preview/"s
+    return "https://r2e2.dev/preview/"s
       + "?job_id="s + job_id 
       + "&bucket="s + storage_backend_info.bucket 
       + "&region="s + storage_backend_info.region
