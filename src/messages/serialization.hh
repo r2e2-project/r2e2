@@ -8,10 +8,10 @@
 #include <stdexcept>
 #include <string>
 
-#include "r2t2.pb.h"
+#include "r2e2.pb.h"
 #include "util/file_descriptor.hh"
 
-namespace r2t2 {
+namespace r2e2 {
 namespace protobuf {
 
 class RecordWriter

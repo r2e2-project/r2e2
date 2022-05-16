@@ -6,7 +6,7 @@
 #include "util/exception.hh"
 
 using namespace std;
-using namespace r2t2;
+using namespace r2e2;
 
 StaticMultiScheduler::StaticMultiScheduler( const string& path )
 {

@@ -3,7 +3,7 @@
 #include <iterator>
 #include <random>
 
-namespace r2t2::random {
+namespace r2e2::random {
 
 template<typename Iter, typename RandomGenerator>
 Iter sample( Iter start, Iter end, RandomGenerator& g )
@@ -21,4 +21,4 @@ Iter sample( Iter start, Iter end )
   return sample( start, end, gen );
 }
 
-} // namespace r2t2::random
+} // namespace r2e2::random

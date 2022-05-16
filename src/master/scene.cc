@@ -5,7 +5,7 @@
 #include "messages/utils.hh"
 
 using namespace std;
-using namespace r2t2;
+using namespace r2e2;
 using namespace pbrt;
 using namespace meow;
 using namespace protoutil;

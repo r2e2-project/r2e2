@@ -35,7 +35,7 @@
 #include <functional>
 #include <glog/logging.h>
 
-namespace r2t2 {
+namespace r2e2 {
 namespace parallel {
 
 extern thread_local int ThreadIndex;

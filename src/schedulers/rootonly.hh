@@ -2,7 +2,7 @@
 
 #include "scheduler.hh"
 
-namespace r2t2 {
+namespace r2e2 {
 
 class RootOnlyScheduler : public Scheduler
 {
@@ -27,4 +27,4 @@ public:
   }
 };
 
-} // namespace r2t2
+} // namespace r2e2

@@ -40,7 +40,7 @@
 
 using namespace std;
 
-namespace r2t2 {
+namespace r2e2 {
 namespace parallel {
 
 class Barrier

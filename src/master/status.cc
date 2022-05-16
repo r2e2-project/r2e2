@@ -7,7 +7,7 @@
 
 using namespace std;
 using namespace std::chrono;
-using namespace r2t2;
+using namespace r2e2;
 
 void LambdaMaster::handle_status_message()
 {

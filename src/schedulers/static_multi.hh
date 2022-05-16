@@ -3,7 +3,7 @@
 #include "allocator.hh"
 #include "scheduler.hh"
 
-namespace r2t2 {
+namespace r2e2 {
 
 class StaticMultiScheduler : public Scheduler
 {
@@ -19,4 +19,4 @@ public:
                                     const size_t ) override;
 };
 
-} // namespace r2t2
+} // namespace r2e2

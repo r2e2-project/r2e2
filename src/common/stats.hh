@@ -7,7 +7,7 @@
 
 #include "lambda.hh"
 
-namespace r2t2 {
+namespace r2e2 {
 
 /* timing utility functions */
 using timepoint_t = std::chrono::time_point<std::chrono::system_clock>;
@@ -48,4 +48,4 @@ struct WorkerStats
   WorkerStats operator-( const WorkerStats& other ) const;
 };
 
-} // namespace r2t2
+} // namespace r2e2

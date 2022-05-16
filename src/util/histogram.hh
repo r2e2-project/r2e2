@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "r2t2.pb.h"
+#include "r2e2.pb.h"
 
 template<class T>
 class Histogram
@@ -22,7 +22,7 @@ private:
   T squares_sum_ = 0;
 
 public:
-  Histogram( const r2t2::protobuf::HistogramUInt64& proto );
+  Histogram( const r2e2::protobuf::HistogramUInt64& proto );
   Histogram( const T width, const T lower_bound, const T upper_bound );
 
   void add( const T value );
@@ -38,5 +38,5 @@ public:
   T squares_sum() const { return squares_sum_; }
 
   std::string str() const;
-  r2t2::protobuf::HistogramUInt64 to_protobuf() const;
+  r2e2::protobuf::HistogramUInt64 to_protobuf() const;
 };

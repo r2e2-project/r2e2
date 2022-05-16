@@ -14,7 +14,7 @@
 
 using namespace std;
 using namespace chrono;
-using namespace r2t2;
+using namespace r2e2;
 using namespace pbrt;
 using namespace meow;
 
@@ -25,7 +25,7 @@ LambdaWorker::LambdaWorker( const string& coordinator_ip,
                             const string& storage_uri,
                             const WorkerConfiguration& user_config )
   : config( user_config )
-  , working_directory( "/tmp/r2t2-worker" )
+  , working_directory( "/tmp/r2e2-worker" )
   , coordinator_addr( coordinator_ip, coordinator_port )
   , master_connection( [this] {
     TCPSocket socket;

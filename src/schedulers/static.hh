@@ -4,7 +4,7 @@
 
 #include "scheduler.hh"
 
-namespace r2t2 {
+namespace r2e2 {
 
 class StaticScheduler : public Scheduler
 {
@@ -24,4 +24,4 @@ public:
                                     const size_t ) override;
 };
 
-} // namespace r2t2
+} // namespace r2e2

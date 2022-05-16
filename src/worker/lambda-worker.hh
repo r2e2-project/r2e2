@@ -39,7 +39,7 @@
 
 #define TLOG( tag ) LOG( INFO ) << "[" #tag "] "
 
-namespace r2t2 {
+namespace r2e2 {
 
 constexpr std::chrono::milliseconds SAMPLE_BAGS_INTERVAL { 1'000 };
 constexpr std::chrono::milliseconds WORKER_STATS_INTERVAL { 1'000 };
@@ -314,7 +314,7 @@ private:
 
   void log_bag( const BagAction action, const RayBagInfo& info );
 
-  const std::string log_base { "r2t2-worker" };
+  const std::string log_base { "r2e2-worker" };
   const std::string info_log_name { log_base + ".INFO" };
   std::string log_prefix { "logs/" };
   const bool track_rays { config.ray_log_rate > 0 };
@@ -353,4 +353,4 @@ private:
   CPUStats cpu_stats {};
 };
 
-} // namespace r2t2
+} // namespace r2e2

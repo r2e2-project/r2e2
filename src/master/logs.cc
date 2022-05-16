@@ -6,7 +6,7 @@
 
 using namespace std;
 using namespace chrono;
-using namespace r2t2;
+using namespace r2e2;
 
 static const bool R2T2_POWERLINE = ( getenv( "R2T2_POWERLINE" ) != nullptr );
 

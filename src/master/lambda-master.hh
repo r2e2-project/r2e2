@@ -20,7 +20,7 @@
 #include "net/http_client.hh"
 #include "net/http_request.hh"
 #include "net/session.hh"
-#include "r2t2.pb.h"
+#include "r2e2.pb.h"
 #include "schedulers/scheduler.hh"
 #include "storage/backend_s3.hh"
 #include "util/eventfd.hh"
@@ -32,7 +32,7 @@
 #include <pbrt/core/geometry.h>
 #include <pbrt/main.h>
 
-namespace r2t2 {
+namespace r2e2 {
 
 constexpr std::chrono::milliseconds STATUS_PRINT_INTERVAL { 1'000 };
 constexpr std::chrono::milliseconds RESCHEDULE_INTERVAL { 1'000 };
@@ -105,7 +105,7 @@ private:
   ////////////////////////////////////////////////////////////////////////////
 
   MasterConfiguration config;
-  const UniqueDirectory scene_dir { "/tmp/r2t2-lambda-master" };
+  const UniqueDirectory scene_dir { "/tmp/r2e2-lambda-master" };
   const std::string job_id;
 
   ////////////////////////////////////////////////////////////////////////////
@@ -122,7 +122,7 @@ private:
   const std::string aws_region;
   const Address aws_address;
   const std::string lambda_function_name {
-    safe_getenv_or( "R2T2_LAMBDA_FUNCTION", "r2t2-lambda-function" )
+    safe_getenv_or( "R2T2_LAMBDA_FUNCTION", "r2e2-lambda-function" )
   };
 
   std::string output_preview_url {};
@@ -438,4 +438,4 @@ private:
   std::mt19937 rand_engine { std::random_device {}() };
 };
 
-} // namespace r2t2
+} // namespace r2e2

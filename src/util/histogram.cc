@@ -6,7 +6,7 @@
 #include "messages/utils.hh"
 
 using namespace std;
-using namespace r2t2;
+using namespace r2e2;
 
 template<class T>
 Histogram<T>::Histogram( const T width,

@@ -46,7 +46,7 @@
 using namespace std;
 using namespace chrono;
 using namespace meow;
-using namespace r2t2;
+using namespace r2e2;
 using namespace pbrt;
 
 using OpCode = Message::OpCode;
@@ -1038,7 +1038,7 @@ int main( int argc, char* argv[] )
     }
   }
 
-  TempFile static_file { "/tmp/r2t2-lambda-master.STATIC0" };
+  TempFile static_file { "/tmp/r2e2-lambda-master.STATIC0" };
 
   if ( scheduler_name == "uniform" ) {
     scheduler = make_unique<UniformScheduler>();

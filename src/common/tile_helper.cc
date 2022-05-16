@@ -6,7 +6,7 @@
 
 using namespace std;
 
-namespace r2t2 {
+namespace r2e2 {
 
 TileHelper::TileHelper( const uint32_t accumulators,
                         const pbrt::Bounds2i& sample_bounds,

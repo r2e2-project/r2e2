@@ -6,7 +6,7 @@
 #include "scheduler.hh"
 #include "static.hh"
 
-namespace r2t2 {
+namespace r2e2 {
 
 class DynamicScheduler : public Scheduler
 {
@@ -22,4 +22,4 @@ public:
                                     const size_t total_paths ) override;
 };
 
-} // namespace r2t2
+} // namespace r2e2

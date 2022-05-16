@@ -7,7 +7,7 @@
 using namespace std;
 using namespace chrono;
 
-namespace r2t2 {
+namespace r2e2 {
 
 TreeletStats TreeletStats::operator-( const TreeletStats& other ) const
 {
@@ -49,4 +49,4 @@ WorkerStats WorkerStats::operator-( const WorkerStats& other ) const
   return res;
 }
 
-} // namespace r2t2
+} // namespace r2e2

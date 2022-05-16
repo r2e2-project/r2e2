@@ -8,7 +8,7 @@
 
 using namespace std;
 
-namespace r2t2 {
+namespace r2e2 {
 
 protobuf::SceneObject to_protobuf( const SceneObject& object )
 {
@@ -201,4 +201,4 @@ pbrt::AccumulatedStats from_protobuf( const protobuf::AccumulatedStats& proto )
   return obj;
 }
 
-} // namespace r2t2
+} // namespace r2e2

@@ -2,7 +2,7 @@
 
 using namespace std;
 
-namespace r2t2 {
+namespace r2e2 {
 
 void LambdaWorker::handle_accumulation_queue()
 {

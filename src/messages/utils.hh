@@ -5,7 +5,7 @@
 
 #include "common/lambda.hh"
 #include "common/stats.hh"
-#include "r2t2.pb.h"
+#include "r2e2.pb.h"
 
 namespace protoutil {
 
@@ -50,7 +50,7 @@ void from_json( const std::string& data, ProtobufType& dest )
 
 } // namespace protoutil
 
-namespace r2t2 {
+namespace r2e2 {
 
 protobuf::SceneObject to_protobuf( const SceneObject& obj );
 protobuf::RayBagInfo to_protobuf( const RayBagInfo& obj );
@@ -62,4 +62,4 @@ RayBagInfo from_protobuf( const protobuf::RayBagInfo& proto );
 WorkerStats from_protobuf( const protobuf::WorkerStats& proto );
 pbrt::AccumulatedStats from_protobuf( const protobuf::AccumulatedStats& proto );
 
-} // namespace r2t2
+} // namespace r2e2

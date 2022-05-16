@@ -1,6 +1,6 @@
 syntax = 'proto3';
 
-package r2t2.protobuf;
+package r2e2.protobuf;
 
 message InvocationPayload {
     string storage_backend = 1;

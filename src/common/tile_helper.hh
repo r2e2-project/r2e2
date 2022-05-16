@@ -23,7 +23,7 @@
 
 #include "concurrentqueue/blockingconcurrentqueue.h"
 
-namespace r2t2 {
+namespace r2e2 {
 
 class TileHelper
 {

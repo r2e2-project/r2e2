@@ -7,7 +7,7 @@
 #include "common/lambda.hh"
 #include "common/stats.hh"
 
-namespace r2t2 {
+namespace r2e2 {
 
 /* Schedule is a {TreeletId -> Worker Count} mapping */
 using Schedule = std::vector<size_t>;
@@ -25,4 +25,4 @@ public:
   virtual ~Scheduler() {}
 };
 
-} // namespace r2t2
+} // namespace r2e2
