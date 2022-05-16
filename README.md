@@ -1,18 +1,18 @@
-R2T2 &mdash; Real-Time Ray Tracer
+R2E2 &mdash; Really Elastic Ray Engine
 ===============
 
-Building R2T2
+Building R2E2
 -------------
 
-To check out R2T2 together with all source dependencies, be sure to use the
-`--recursive` flag when cloning the repository, i.e.
+To check out R2E2 together with all source dependencies, be sure to use the
+`--recursive` flag when cloning the repository, i.e.,
 
 ```bash
-$ git clone --recursive https://github.com/r2t2-project/r2t2
+$ git clone --recursive https://github.com/r2e2-project/r2e2
 ```
 
-If you accidentally already cloned R2T2 without this flag (or to update an
-R2T2 source tree after a new submodule has been added, run the following
+If you accidentally already cloned R2E2 without this flag (or to update an
+R2E2 source tree after a new submodule has been added, run the following
 command to also fetch the dependencies:
 
 ```bash
@@ -21,7 +21,7 @@ $ git submodule update --init --recursive
 
 ### Dependencies
 
-Our version of R2T2 is dependent on the following libraries and tools (listed by their
+Our version of R2E2 is dependent on the following libraries and tools (listed by their
 apt package name):
 
 * `g++`
@@ -38,21 +38,21 @@ Before building, you'll need to install each of these using your package manager
 On Ubuntu this is done by running something of the form:
 
 ```bash
-$ apt install <package-name>
+$ sudo apt-get install <package-name>
 ```
 
-Running R2T2
+Running R2E2
 ------------------------
 
 ### Environmental Variables
 
-Before running the distributed version of R2T2, you must have the following
+Before running the distributed version of R2E2, you must have the following
 environmental variables set:
 
    * `AWS_ACCESS_KEY_ID`
    * `AWS_SECRET_ACCESS_KEY`
    * `AWS_REGION`
-   * `R2T2_LAMBDA_ROLE`
+   * `R2E2_LAMBDA_ROLE`
 
 ### Network
 
@@ -60,17 +60,17 @@ Your machine must have a public IP.
 
 ### Storage
 
-You must (in advance) create a R2T2 dump of a scene, and copy that dump to an s3 bucket.
+You must (in advance) create a R2E2 dump of a scene, and copy that dump to an S3 bucket.
 
 You can copy folders to buckets using `aws s3 cp --recursive <path-to-folder>
 s3://<s3-bucket-name>`
 
 ### Runnning
 
-Distributed R2T2 has two programs, a master and a worker. The master can be invoked as
+Distributed R2E2 has two programs, a master and a worker. The master can be invoked as
 
 ```
-r2t2-lambda-master --scene-path <path-to-pdrt-scene-dump> \
+r2e2-lambda-master --scene-path <path-to-pbrt-scene-dump> \
                    --ip <public-ip-of-machine> \
                    --port <port> \
                    --lambdas <number-of-workers> \
@@ -81,7 +81,7 @@ r2t2-lambda-master --scene-path <path-to-pdrt-scene-dump> \
 And the worker as
 
 ```
-r2t2-lambda-worker --ip <master-ip> \
+r2e2-lambda-worker --ip <master-ip> \
                    --port <master-port> \
                    --storage-backend s3://<s3-bucket-name>?region=<aws-region>
 ```
@@ -106,5 +106,5 @@ The master also support a few important options:
 To change the binary that the AWS Lambda workers run, you must execute:
 
 ```
-./src/remote/create-function.py --r2t2-lambda-worker <path-to-r2t2-lambda-worker> --delete
+./src/remote/create-function.py --r2e2-lambda-worker <path-to-r2e2-lambda-worker> --delete
 ```
