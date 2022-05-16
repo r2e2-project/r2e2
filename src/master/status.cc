@@ -130,7 +130,7 @@ void LambdaMaster::handle_progress_report()
                  : 0.0;
   };
 
-  constexpr double ALPHA = 2.0 / ( 7 + 1 );
+  constexpr double ALPHA = 0.8;
 
   const auto& s1 = aggregated_stats;
   const auto& s0 = last_reported_stats;
@@ -145,7 +145,7 @@ void LambdaMaster::handle_progress_report()
   progress_report_proto.set_workers(
     Worker::active_count[Worker::Role::Tracer] );
   progress_report_proto.set_workers_max( max_workers );
-  progress_report_proto.set_bytes_downloaded( aggregated_stats.dequeued.bytes );
+  progress_report_proto.set_bytes_downloaded( aggregated_stats.dequeued.bytes + aggregated_stats.bytes_downloaded );
   progress_report_proto.set_bytes_uploaded( aggregated_stats.enqueued.bytes );
   progress_report_proto.set_paths_finished( s1.finished_paths );
   progress_report_proto.set_total_paths( scene.total_paths );
@@ -153,7 +153,7 @@ void LambdaMaster::handle_progress_report()
 
   const auto current_throughput
     = ( s1.enqueued.bytes + s1.dequeued.bytes + s1.bytes_downloaded )
-      - ( s0.dequeued.bytes + s0.enqueued.bytes - s0.bytes_downloaded );
+      - ( s0.dequeued.bytes + s0.enqueued.bytes + s0.bytes_downloaded );
   const auto current_paths_finished = s1.finished_paths - s0.finished_paths;
 
   const auto last_throughput
