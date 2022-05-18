@@ -4,6 +4,8 @@ R2E2 &mdash; Really Elastic Ray Engine
 Building R2E2
 -------------
 
+### Get the source
+
 To check out R2E2 together with all source dependencies, be sure to use the
 `--recursive` flag when cloning the repository, i.e.,
 
@@ -12,7 +14,7 @@ $ git clone --recursive https://github.com/r2e2-project/r2e2
 ```
 
 If you accidentally already cloned R2E2 without this flag (or to update an
-R2E2 source tree after a new submodule has been added, run the following
+R2E2 source tree after a new submodule has been added), run the following
 command to also fetch the dependencies:
 
 ```bash
@@ -22,13 +24,16 @@ $ git submodule update --init --recursive
 ### Dependencies
 
 Our version of R2E2 is dependent on the following libraries and tools (listed by their
-apt package name):
+Ubuntu package name):
 
-* `g++`
-* `gcc`
-* `cmake`
-* `protobuf-compiler`
-* `libprotobuf-dev`
+* `cmake` >= 3.0.0
+* `g++` >= 9.0.0
+* `gcc` >= 9.0.0
+* `pkg-config`
+* `zlib1g-dev`
+* `protobuf-compiler` >= 3.0.0
+* `libprotobuf-dev` >= 3.0.0
+* `libgoogle-perftools-dev` (for [`tcmalloc`](https://github.com/google/tcmalloc))
 * `libssl-dev`
 * `libunwind-dev`
 * `liblzma-dev`
@@ -38,7 +43,21 @@ Before building, you'll need to install each of these using your package manager
 On Ubuntu this is done by running something of the form:
 
 ```bash
-$ sudo apt-get install <package-name>
+$ sudo apt-get install cmake gcc g++ pkg-config zlib1g-dev protobuf-compiler \
+                       libprotobuf-dev libgoogle-perftools-dev libssl-dev \
+                       libunwind-dev liblzma-dev liblz4-dev
+```
+
+### Building R2E2
+
+Build R2E2 like a normal 
+
+```
+cd r2e2
+mkdir build
+cd build
+cmake ..
+make -j$(nproc)
 ```
 
 Running R2E2
