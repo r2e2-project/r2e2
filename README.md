@@ -26,6 +26,7 @@ $ git submodule update --init --recursive
 Our version of R2E2 is dependent on the following libraries and tools (listed by their
 Ubuntu package name):
 
+* `python3`
 * `cmake` >= 3.0.0
 * `g++` >= 9.0.0
 * `gcc` >= 9.0.0
@@ -45,7 +46,7 @@ On Ubuntu this is done by running something of the form:
 ```bash
 $ sudo apt-get install cmake gcc g++ pkg-config zlib1g-dev protobuf-compiler \
                        libprotobuf-dev libgoogle-perftools-dev libssl-dev \
-                       libunwind-dev liblzma-dev liblz4-dev
+                       libunwind-dev liblzma-dev liblz4-dev python3
 ```
 
 ### Building R2E2
