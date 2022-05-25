@@ -72,20 +72,20 @@ set ( ALL_LIBS
     ${OPENSSL_LIBRARIES}
 )
 
-add_executable ( r2e2-lambda-master src/frontend/lambda-master.cc )
-target_link_libraries( r2e2-lambda-master ${ALL_LIBS} )
+set( STATIC_LINK_FLAGS "" )
 
-set ( WORKER_LINK_FLAGS dl z unwind lzma -static -Wl,-allow-multiple-definition
-                        -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
-                        -s )
-
-if ( CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES ASan
-     OR CMAKE_BUILD_TYPE MATCHES RelWithDebInfo )
-  set( WORKER_LINK_FLAGS "" )
+# In Release mode, always build the main binaries statically
+if ( CMAKE_BUILD_TYPE MATCHES Release )
+  set ( STATIC_LINK_FLAGS dl z unwind lzma -static -Wl,-allow-multiple-definition
+                          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
+                          -s )
 endif()
 
+add_executable ( r2e2-lambda-master src/frontend/lambda-master.cc )
+target_link_libraries( r2e2-lambda-master ${ALL_LIBS} ${STATIC_LINK_FLAGS} )
+
 add_executable ( r2e2-lambda-worker src/frontend/lambda-worker.cc )
-target_link_libraries( r2e2-lambda-worker ${ALL_LIBS} ${WORKER_LINK_FLAGS} )
+target_link_libraries( r2e2-lambda-worker ${ALL_LIBS} ${STATIC_LINK_FLAGS} )
 
 add_executable ( r2e2-aggregate src/frontend/aggregate.cc )
 target_link_libraries( r2e2-aggregate ${ALL_LIBS} )
