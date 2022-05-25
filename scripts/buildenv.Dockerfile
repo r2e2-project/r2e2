@@ -21,7 +21,7 @@ WORKDIR /root
 RUN curl -L https://tukaani.org/xz/xz-5.2.5.tar.gz --output - | tar xzf -
 WORKDIR /root/xz-5.2.5
 RUN ./configure --prefix=/usr --enable-static
-RUN make j$(nproc)
+RUN make -j$(nproc)
 RUN make install
 
 # Build and install libunwind
