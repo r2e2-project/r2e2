@@ -11,7 +11,9 @@ include ( etc/cflags.cmake )
 include ( etc/clang_format.cmake )
 include ( etc/clang_tidy.cmake )
 
+set( Protobuf_USE_STATIC_LIBS ON )
 include ( FindProtobuf )
+
 find_package ( Protobuf REQUIRED )
 find_library ( PTHREAD pthread )
 
@@ -101,3 +103,10 @@ target_link_libraries( camera-generator ${ALL_LIBS} )
 
 add_executable( memcached_test src/tests/memcached_test.cc )
 target_link_libraries( memcached_test ${ALL_LIBS} )
+
+install( TARGETS
+  r2e2-lambda-master
+  r2e2-lambda-worker
+  DESTINATION
+  bin
+)
