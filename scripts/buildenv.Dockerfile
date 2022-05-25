@@ -39,6 +39,6 @@ WORKDIR /root/protobuf-3.12.4/cmake
 RUN mkdir build
 WORKDIR /root/protobuf-3.12.4/cmake/build
 RUN cmake3 -DCMAKE_BUILD_TYPE=Release -Dprotobuf_BUILD_TESTS=OFF \
-           -Dprotobuf_BUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr ..
+           -DCMAKE_INSTALL_PREFIX=/usr ..
 RUN make -j$(nproc)
 RUN make install
