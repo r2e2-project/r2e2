@@ -4,6 +4,9 @@ R2E2 &mdash; Really Elastic Ray Engine
 Building R2E2
 -------------
 
+>⚠️ The following instructions have only been tested on the newest version of
+Ubuntu.
+
 ### Get the source
 
 To check out R2E2 together with all source dependencies, be sure to use the
@@ -21,7 +24,45 @@ command to also fetch the dependencies:
 $ git submodule update --init --recursive
 ```
 
-### Dependencies
+### Route A: Docker
+
+1. Make sure you have [Docker](https://docs.docker.com/engine/install/)
+installed. In addition, you will need `python3`.
+
+>❗ By default, the provided scripts **doesn't** run `docker` with `sudo`. This
+requires your current user to be a member of `docker` group. If you want to run
+it with `sudo`, pass `--sudo` to the script.
+
+
+2. Create two empty directories (anywhere on your machine):
+   * one for build artifacts (defaults to `build/`)
+   * one for outputs (defaults to `dist/`)
+
+3. Create the build environment container image by running the following
+command (which will build [this Dockerfile](scripts/buildenv.Dockerfile)).
+
+```bash
+./scripts/dev.py image build
+```
+
+Alternatively, you can pull [the
+image](https://github.com/orgs/r2e2-project/packages/container/package/buildenv)
+from our container repository by running
+
+```bash
+./scripts/dev.py image pull
+```
+
+4. Build the project by running
+```bash
+./scripts/dev.py build --build-dir <PATH-TO-BUILD-DIR>
+                       --dist-dir <PATH-TO-DIST-DIR>
+```
+
+
+### Route B: Building from scratch
+
+#### Dependencies
 
 Our version of R2E2 is dependent on the following libraries and tools (listed by their
 Ubuntu package name):
@@ -49,9 +90,9 @@ $ sudo apt-get install cmake gcc g++ pkg-config zlib1g-dev protobuf-compiler \
                        libunwind-dev liblzma-dev liblz4-dev python3
 ```
 
-### Building R2E2
+#### Building R2E2
 
-Build R2E2 like a normal 
+Build R2E2 like a normal CMake project.
 
 ```
 cd r2e2
@@ -60,6 +101,10 @@ cd build
 cmake ..
 make -j$(nproc)
 ```
+
+>❗ You may have problems running the worker binary on AWS Lambda. In that case,
+>you need to go down the Docker road. Our experience is that some static binaries
+>built on recent versions of Ubuntu doesn't run in Lambda environment.
 
 Running R2E2
 ------------------------
