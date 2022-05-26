@@ -18,4 +18,4 @@ cmake3 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${DIST_DIR} \
 
 cd ${BUILD_DIR}
 make -j$(nproc) r2e2-lambda-{worker,master}
-cp r2e2-lambda-{master,worker} ${DIST_DIR}
+cp r2e2-lambda-{master,worker} lib/pbrt/pbrt ${DIST_DIR}
