@@ -12,7 +12,7 @@ import pprint
 import argparse
 import subprocess as sub
 
-FILE_DIR = os.path.dirname(__file__)
+FILE_DIR = os.path.dirname(os.path.abspath(__file__))
 SOURCE_DIR = os.path.join(FILE_DIR, '..')
 DEFAULT_BUILD_DIR = 'build/'
 DEFAULT_DIST_DIR = 'dist/'
@@ -34,7 +34,7 @@ def requires_docker(func):
 
     def inner(*args, **kwargs):
         try:
-            sub.check_call('docker --version', shell=True)
+            sub.check_call('docker version', shell=True, stdout=sub.DEVNULL)
         except sub.CalledProcessError:
             sys.exit('Could not run `docker --version`. '
                      'Please make sure Docker is installed.')
@@ -119,7 +119,7 @@ def main():
 
     parser.add_argument('--image-name',
                         help='name of the build environment docker image',
-                        default=DEFAULT_IMAGE_NAME)  
+                        default=DEFAULT_IMAGE_NAME)
 
     parser.add_argument('--sudo',
                         help='run docker commands with sudo',
