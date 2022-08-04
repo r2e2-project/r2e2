@@ -32,7 +32,7 @@ void LambdaMaster::invoke_workers( const size_t n_workers )
       HTTPRequest invocation_request
         = LambdaInvocationRequest(
             aws_credentials,
-            aws_region,
+            aws_regions.at( 0 ).name,
             lambda_function_name,
             invocation_payload,
             LambdaInvocationRequest::InvocationType::EVENT,
@@ -41,7 +41,7 @@ void LambdaMaster::invoke_workers( const size_t n_workers )
 
       TCPSocket socket;
       socket.set_blocking( false );
-      socket.connect( aws_address );
+      socket.connect( aws_regions.at( 0 ).address );
       https_clients.emplace_back(
         SSLSession { ssl_context.make_SSL_handle(), move( socket ) } );
 

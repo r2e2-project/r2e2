@@ -19,6 +19,7 @@
 #include "net/aws.hh"
 #include "net/http_client.hh"
 #include "net/http_request.hh"
+#include "net/lambda.hh"
 #include "net/session.hh"
 #include "r2e2.pb.h"
 #include "schedulers/scheduler.hh"
@@ -71,7 +72,7 @@ public:
                 const uint32_t accumulators,
                 const std::string& public_address,
                 const std::string& storage_backend,
-                const std::string& aws_region,
+                const std::vector<std::string>& aws_region,
                 std::unique_ptr<Scheduler>&& scheduler,
                 const MasterConfiguration& config );
 
@@ -112,6 +113,18 @@ private:
   // Cloud                                                                  //
   ////////////////////////////////////////////////////////////////////////////
 
+  struct AWSRegion
+  {
+    std::string name;
+    Address address;
+
+    AWSRegion( const std::string& region_name )
+      : name( region_name )
+      , address( LambdaInvocationRequest::endpoint( name ), "https" )
+    {
+    }
+  };
+
   const AWSCredentials aws_credentials {};
 
   const std::string public_address;
@@ -119,8 +132,7 @@ private:
   const Storage storage_backend_info;
   S3StorageBackend scene_storage_backend;
   S3StorageBackend job_storage_backend;
-  const std::string aws_region;
-  const Address aws_address;
+  const std::vector<AWSRegion> aws_regions;
   const std::string lambda_function_name {
     safe_getenv_or( "R2E2_LAMBDA_FUNCTION", "r2e2-lambda-function" )
   };
@@ -230,7 +242,8 @@ private:
 
     Treelet( const TreeletId treelet_id )
       : id( treelet_id )
-    {}
+    {
+    }
   };
 
   size_t treelet_count {};
@@ -333,7 +346,7 @@ private:
 
   std::unique_ptr<TransferAgent> progress_report_transfer_agent {};
   protobuf::ProgressReport progress_report_proto {};
-  size_t current_report_id {0};
+  size_t current_report_id { 0 };
   WorkerStats last_reported_stats {};
 
   /*** Timepoints ***********************************************************/

@@ -75,7 +75,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
                             const uint32_t accumulators_,
                             const string& public_address_,
                             const string& storage_backend_uri_,
-                            const string& aws_region_,
+                            const vector<string>& aws_regions_,
                             unique_ptr<Scheduler>&& scheduler_,
                             const MasterConfiguration& user_config )
   : config( user_config )
@@ -91,8 +91,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   , job_storage_backend( aws_credentials,
                          storage_backend_info.bucket,
                          storage_backend_info.region )
-  , aws_region( aws_region_ )
-  , aws_address( LambdaInvocationRequest::endpoint( aws_region ), "https" )
+  , aws_regions( aws_regions_.begin(), aws_regions_.end() )
   , max_workers( max_workers_ )
   , ray_generators( ray_generators_ )
   , accumulators( accumulators_ )
@@ -905,7 +904,7 @@ int main( int argc, char* argv[] )
   int32_t accumulators = 0;
   string public_ip;
   string storage_backend_uri;
-  string region { "us-west-2" };
+  vector<string> regions;
   bool collect_debug_logs = false;
   bool write_stat_logs = false;
   float ray_log_rate = 0.0;
@@ -984,7 +983,7 @@ int main( int argc, char* argv[] )
       case 'p': listen_port = stoi(optarg); break;
       case 'P': client_port = stoi(optarg); break;
       case 'i': public_ip = optarg; break;
-      case 'r': region = optarg; break;
+      case 'r': regions.push_back(optarg); break;
       case 'b': storage_backend_uri = optarg; break;
       case 'm': max_workers = stoi(optarg); break;
       case 'G': ray_generators = stoi(optarg); break;
@@ -1082,7 +1081,7 @@ int main( int argc, char* argv[] )
        || ray_generators < 0 || accumulators < 0 || samples_per_pixel < 0
        || max_path_depth < 0 || bagging_delay <= 0s || ray_log_rate < 0
        || ray_log_rate > 1.0 || bag_log_rate < 0 || bag_log_rate > 1.0
-       || public_ip.empty() || storage_backend_uri.empty() || region.empty()
+       || public_ip.empty() || storage_backend_uri.empty() || regions.empty()
        || new_tile_threshold == 0
        || ( crop_window.has_value() && pixels_per_tile != 0
             && pixels_per_tile
@@ -1116,7 +1115,7 @@ int main( int argc, char* argv[] )
                                         accumulators,
                                         public_address.str(),
                                         storage_backend_uri,
-                                        region,
+                                        regions,
                                         move( scheduler ),
                                         config );
 
