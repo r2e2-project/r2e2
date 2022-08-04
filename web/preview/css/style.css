@@ -21,7 +21,7 @@ body {
 
 #sidebar {
   border-radius: 5px;
-  width: 250px;
+  width: 300px;
   margin-left:1em;
   display: flex;
   flex-direction: column;
@@ -30,7 +30,7 @@ body {
 #stats {
   flex: 1 auto;
   line-height: 105%;
-  font-size:120%;
+  font-size:175%;
 }
 
 #stats .chart {
