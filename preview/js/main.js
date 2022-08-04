@@ -340,7 +340,7 @@ let _status_version = -1;
 let _status = {
   'progress': document.getElementById("data-progress"),
   'workers': document.getElementById("data-workers"),
-  'workers_max': document.getElementById("data-workers-max"),
+  'memory': document.getElementById("data-memory"),
   'downloaded': document.getElementById("data-downloaded"),
   'uploaded': document.getElementById("data-uploaded"),
   'elapsed_time': document.getElementById("data-elapsed-time"),
@@ -368,8 +368,8 @@ let load_status = (url) => {
             .toFixed(1)
             .replace(/[.,]0$/, "");
 
-        _status.workers.innerHTML = json_data['workers'];
-        _status.workers_max.innerHTML = json_data['workersMax'];
+        _status.workers.innerHTML = `${3 * json_data['workers']}`;
+        _status.memory.innerHTML = nFormatter(4096 * 1024 * 1024 * json_data['workers'], 1);
         _status.downloaded.innerHTML =
           nFormatter(parseInt(json_data['bytesDownloaded'])
                    + parseInt(json_data['bytesUploaded']), 1);
