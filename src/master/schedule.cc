@@ -31,7 +31,11 @@ void LambdaMaster::invoke_workers( const size_t n_workers )
 
   if ( config.engines.empty() ) {
     for ( size_t i = 0; i < n_workers; i++ ) {
-      const auto region_idx = region_selector( rand_engine );
+      // launch all ray generators & accumulators in the first region
+      const auto region_idx = ( finished_ray_generators == this->ray_generators
+                                and started_accumulators == this->accumulators )
+                                ? region_selector( rand_engine )
+                                : 0;
 
       HTTPRequest invocation_request
         = LambdaInvocationRequest(
