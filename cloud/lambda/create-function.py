@@ -12,7 +12,7 @@ import boto3
 def create_function_package(output, r2e2_lambda_worker):
     PACKAGE_FILES = {
         "r2e2-lambda-worker": r2e2_lambda_worker,
-        "main.py": "lambda-function/main.py",
+        "main.py": os.path.join(os.path.dirname(__file__), "lambda-function/main.py"),
     }
 
     with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as funczip:
