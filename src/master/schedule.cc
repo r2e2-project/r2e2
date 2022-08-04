@@ -27,12 +27,16 @@ void LambdaMaster::invoke_workers( const size_t n_workers )
   if ( n_workers == 0 )
     return;
 
+  uniform_int_distribution<size_t> region_selector( 0, aws_regions.size() - 1 );
+
   if ( config.engines.empty() ) {
     for ( size_t i = 0; i < n_workers; i++ ) {
+      const auto region_idx = region_selector( rand_engine );
+
       HTTPRequest invocation_request
         = LambdaInvocationRequest(
             aws_credentials,
-            aws_regions.at( 0 ).name,
+            aws_regions.at( region_idx ).name,
             lambda_function_name,
             invocation_payload,
             LambdaInvocationRequest::InvocationType::EVENT,
@@ -41,7 +45,7 @@ void LambdaMaster::invoke_workers( const size_t n_workers )
 
       TCPSocket socket;
       socket.set_blocking( false );
-      socket.connect( aws_regions.at( 0 ).address );
+      socket.connect( aws_regions.at( region_idx ).address );
       https_clients.emplace_back(
         SSLSession { ssl_context.make_SSL_handle(), move( socket ) } );
 
