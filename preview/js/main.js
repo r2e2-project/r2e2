@@ -62,6 +62,7 @@ class TileHelper {
 const url_params = new URLSearchParams(window.location.search);
 
 const _replay = (url_params.get('replay') === "1");
+const _profiling_run = (url_params.get('profiling') === "1");
 
 const _job = new JobInfo(url_params.get('job_id'),
   url_params.get('bucket'),
@@ -202,12 +203,14 @@ let get_version = (tile_id, url) => {
   xhr.send(null);
 }
 
-for (let i = 0; i < _tiles.n_tiles.x * _tiles.n_tiles.y; i++) {
-  const bounds = _tiles.bounds(i);
-  const tile_url = _job.tile_url(i);
-  const tile_ver_url = _job.tile_version_url(i);
+if (!_profiling_run) {
+  for (let i = 0; i < _tiles.n_tiles.x * _tiles.n_tiles.y; i++) {
+    const bounds = _tiles.bounds(i);
+    const tile_url = _job.tile_url(i);
+    const tile_ver_url = _job.tile_version_url(i);
 
-  get_version(i, tile_ver_url);
+    get_version(i, tile_ver_url);
+  }
 }
 
 let save_btn = document.getElementById("save-button");
