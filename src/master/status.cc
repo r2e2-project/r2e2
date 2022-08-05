@@ -206,6 +206,11 @@ void LambdaMaster::handle_progress_report()
     for ( size_t i = 0; i < treelet_count; i++ ) {
       progress_report_proto.mutable_rays_traced_per_treelet()->at( i )
         = treelet_stats[i].enqueued.rays;
+
+      if ( i == 0 ) {
+        progress_report_proto.mutable_rays_traced_per_treelet()->at( i )
+          += scene.sample_bounds.Area() * scene.base.samplesPerPixel;
+      }
     }
   }
 
