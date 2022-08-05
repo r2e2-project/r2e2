@@ -188,6 +188,10 @@ message ProgressReport {
     uint64 time_elapsed = 4;
     uint64 bytes_uploaded = 5;
     uint64 bytes_downloaded = 6;
+
+    uint64 paths_finished = 13;
+    uint64 total_paths = 14;
+    uint64 rays_traced = 15;
     
     uint64 throughputs_peak = 7;
     repeated uint64 throughputs_x = 8;
@@ -196,4 +200,6 @@ message ProgressReport {
     uint64 paths_finished_peak = 10;
     repeated uint64 paths_finished_x = 11;
     repeated uint64 paths_finished_y = 12;
+
+    repeated uint64 rays_traced_per_treelet = 16;
 }

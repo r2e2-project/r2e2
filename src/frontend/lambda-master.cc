@@ -311,7 +311,11 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   cout << endl;
 
-  if ( accumulators ) {
+  if ( config.profiling_run ) {
+    cerr << "\u2192 PROFILING RUN" << endl;
+  }
+
+  if ( accumulators or config.profiling_run ) {
     output_preview_url = preview_url();
     cout << "\u2192 Real-time preview is available at\n"
          << "  \x1B[1m" << output_preview_url << "\x1B[0m\n"

@@ -147,6 +147,9 @@ void LambdaMaster::handle_progress_report()
   progress_report_proto.set_workers_max( max_workers );
   progress_report_proto.set_bytes_downloaded( aggregated_stats.dequeued.bytes );
   progress_report_proto.set_bytes_uploaded( aggregated_stats.enqueued.bytes );
+  progress_report_proto.set_paths_finished( s1.finished_paths );
+  progress_report_proto.set_total_paths( scene.total_paths );
+  progress_report_proto.set_rays_traced( s1.samples.rays );
 
   const auto current_throughput = ( s1.enqueued.bytes + s1.dequeued.bytes )
                                   - ( s0.dequeued.bytes + s0.enqueued.bytes );
@@ -191,6 +194,19 @@ void LambdaMaster::handle_progress_report()
     auto y = progress_report_proto.mutable_paths_finished_y();
     x->erase( x->begin() );
     y->erase( y->begin() );
+  }
+
+  if ( config.profiling_run ) {
+    if ( progress_report_proto.rays_traced_per_treelet().empty() ) {
+      for ( size_t i = 0; i < treelet_count; i++ ) {
+        progress_report_proto.add_rays_traced_per_treelet( 0 );
+      }
+    }
+
+    for ( size_t i = 0; i < treelet_count; i++ ) {
+      progress_report_proto.mutable_rays_traced_per_treelet()->at( i )
+        = treelet_stats[i].enqueued.rays;
+    }
   }
 
   const string key_base = "jobs/" + job_id + "/out/status";
