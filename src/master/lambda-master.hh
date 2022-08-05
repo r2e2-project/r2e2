@@ -60,6 +60,8 @@ struct MasterConfiguration
 
   std::vector<std::string> memcached_servers;
   std::vector<std::pair<std::string, uint32_t>> engines;
+
+  bool profiling_run;
 };
 
 class LambdaMaster

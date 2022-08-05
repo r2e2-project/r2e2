@@ -869,6 +869,7 @@ void usage( const char* argv0, int exit_code )
        << endl
        << "  -d --memcached-server      address for memcached" << endl
        << "                             (can be repeated)" << endl
+       << "  -R --profile               profiling run" << endl
        << "  -h --help                  show help information" << endl;
 
   exit( exit_code );
@@ -916,6 +917,7 @@ int main( int argc, char* argv[] )
   uint32_t pixels_per_tile = 0;
   uint64_t new_tile_threshold = 10000;
   string job_summary_path;
+  bool profiling_run = false;
 
   optional<filesystem::path> alt_scene_file = nullopt;
 
@@ -962,6 +964,7 @@ int main( int argc, char* argv[] )
     { "memcached-server", required_argument, nullptr, 'd' },
     { "engine", required_argument, nullptr, 'E' },
     { "auto-name", required_argument, nullptr, 'A' },
+    { "profile", no_argument, nullptr, 'R' },
     { "help", no_argument, nullptr, 'h' },
     { nullptr, 0, nullptr, 0 },
   };
@@ -970,7 +973,7 @@ int main( int argc, char* argv[] )
     const int opt
       = getopt_long( argc,
                      argv,
-                     "p:P:i:r:b:m:G:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:q:B:A:wgh",
+                     "p:P:i:r:b:m:G:D:a:F:S:M:s:L:c:C:t:j:T:n:J:d:E:q:B:A:wghR",
                      long_options,
                      nullptr );
 
@@ -1008,6 +1011,7 @@ int main( int argc, char* argv[] )
       case 'A': auto_name_log_dir_tag = optarg; break;
       case 'h': usage(argv[0], EXIT_SUCCESS); break;
       case 'C': alt_scene_file = optarg; break;
+      case 'R': profiling_run = true; break;
         // clang-format on
 
       case 'T': {
@@ -1105,7 +1109,7 @@ int main( int argc, char* argv[] )
                                  tile_size,         seconds { timeout },
                                  job_summary_path,  new_tile_threshold,
                                  alt_scene_file,    move( memcached_servers ),
-                                 move( engines ) };
+                                 move( engines ),   profiling_run };
 
   try {
     master = make_unique<LambdaMaster>( listen_port,
