@@ -79,6 +79,11 @@ let canvas = document.getElementById("output");
 canvas.width = _tiles.width;
 canvas.height = _tiles.height;
 
+if (_profiling_run) {
+  canvas.width = 1280;
+  canvas.height = 720;
+}
+
 // should we resize?
 const MARGIN = 200;
 let ideal_width = _tiles.width + MARGIN + sidebar.offsetWidth;
@@ -288,10 +293,14 @@ const bandwidthChart = new Chart(bandwidthChartCtx, {
     scales: {
       grid: { display: false },
       x: { ticks: { color: 'rgb(0,191,255)' }, display: false },
-      y: { position:'right',
-           ticks: { font: { family: 'Work Sans', weight: 600 },
-                    color: 'rgb(0,191,255)',
-                    callback: (label, index, labels) => nFormatter(8 * label, 1) + "bps" } }
+      y: {
+        position: 'right',
+        ticks: {
+          font: { family: 'Work Sans', weight: 600 },
+          color: 'rgb(0,191,255)',
+          callback: (label, index, labels) => nFormatter(8 * label, 1) + "bps"
+        }
+      }
     },
   },
   data: {
@@ -321,10 +330,14 @@ const finishedChart = new Chart(finishedChartCtx, {
     scales: {
       grid: { display: false },
       x: { ticks: { color: 'rgb(255,56,0)' }, display: false },
-      y: { position:'right',
-           ticks: { font: { family: 'Work Sans', weight: 600 },
-                    color: 'rgb(255,56,0)',
-                    callback: (label, index, labels) => nFormatter(label, 1) } }
+      y: {
+        position: 'right',
+        ticks: {
+          font: { family: 'Work Sans', weight: 600 },
+          color: 'rgb(255,56,0)',
+          callback: (label, index, labels) => nFormatter(label, 1)
+        }
+      }
     },
   },
   data: {
@@ -337,6 +350,87 @@ const finishedChart = new Chart(finishedChartCtx, {
     }]
   }
 });
+
+let treeletChart;
+
+if (_profiling_run) {
+  let treeletChartCtx = document.getElementById("output");
+  treeletChartCtx.style.borderWidth = 0;
+  treeletChart = new Chart(treeletChartCtx, {
+    type: 'bar',
+    options: {
+      responsive: false,
+      maintainAspectRatio: true,
+      //animation: { duration: 0.2 },
+      color: 'rgb(255,255,255)',
+      borderColor: 'rgb(255,255,255)',
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          type: 'category',
+          title: {
+            display: true,
+            text: 'Scene Object',
+            color: 'rgb(255,255,255)',
+            font: { family: 'Work Sans', weight: 600, size: 22 },
+            padding: { top: 15 }
+          },
+          ticks: { color: 'rgb(255,255,255)' }, display: true
+        },
+        y: {
+          grid: { 
+            display: true,
+            drawTicks: true,
+            drawBorder: false,
+            drawOnChartArea: true,
+            color: 'rgba(255, 255, 255, 0.2)' },
+          type: 'logarithmic',
+          title: {
+            display: true,
+            text: 'Rays Processed',
+            color: 'rgb(255,255,255)',
+            font: { family: 'Work Sans', weight: 600, size: 22 },
+            padding: { bottom:15 }
+          },
+          beginAtZero: true,
+          position: 'left',
+          ticks: {
+            font: { family: 'Work Sans', size: 18 },
+            color: 'rgb(255,255,255)',
+            callback: (tickValue, index, ticks) => {
+              if (tickValue === 0) {
+                return '0';
+              }
+              const remain = tickValue / (Math.pow(10, Math.floor(Math.log10(tickValue))));
+              if (remain === 1 || remain === 2 || remain === 5) {
+                return nFormatter(tickValue, 0);
+              }
+              return '';
+            }
+          }
+        }
+      },
+      layout: {
+        padding: {right: 40}
+      }
+    },
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'test',
+        data: [],
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        barPercentage: 0.99,
+        categoryPercentage: 1,
+        borderWidth: 0
+      }]
+    }
+  });
+}
 
 let _status_version = -1;
 
@@ -375,7 +469,7 @@ let load_status = (url) => {
         _status.memory.innerHTML = nFormatter(4096 * 1024 * 1024 * json_data['workers'], 1);
         _status.downloaded.innerHTML =
           nFormatter(parseInt(json_data['bytesDownloaded'])
-                   + parseInt(json_data['bytesUploaded']), 1);
+            + parseInt(json_data['bytesUploaded']), 1);
 
         bandwidthChart.data.labels = json_data['throughputsX'].map((x) => parseInt(x));
         bandwidthChart.data.datasets[0].data = json_data['throughputsY'].map((x) => parseInt(x));
@@ -389,12 +483,12 @@ let load_status = (url) => {
 
         bandwidthChart.update();
 
-        _status.throughput.innerHTML = 
+        _status.throughput.innerHTML =
           nFormatter(8 * json_data['throughputsY'][json_data['throughputsY'].length - 1], 1);
         _status.peak_throughput.innerHTML =
           nFormatter(8 * json_data['throughputsPeak'], 1);
 
-        _status.traced.innerHTML = 
+        _status.traced.innerHTML =
           nFormatter(json_data['pathsFinishedY'][json_data['pathsFinishedY'].length - 1], 0);
         _status.peak_traced.innerHTML =
           nFormatter(json_data['pathsFinishedPeak'], 0)
@@ -403,13 +497,34 @@ let load_status = (url) => {
         finishedChart.data.datasets[0].data = json_data['pathsFinishedY'].map((x) => parseInt(x));
 
         while (finishedChart.data.labels.length > 0 &&
-               finishedChart.data.labels.length < 30) {
+          finishedChart.data.labels.length < 30) {
           finishedChart.data.labels.push(
             finishedChart.data.labels[finishedChart.data.labels.length - 1] + 1);
           finishedChart.data.datasets[0].data.push(null);
         }
 
         finishedChart.update();
+
+        if (_profiling_run) {
+          if (treeletChart.data.labels.length == 0) {
+            for (let i = 0; i < json_data['raysTracedPerTreelet'].length; i++) {
+              treeletChart.data.labels.push(i);
+            }
+          }
+
+          if (treeletChart.data.datasets[0].data.length == 0) {
+            for (let i = 0; i < json_data['raysTracedPerTreelet'].length; i++) {
+              treeletChart.data.datasets[0].data.push(i);
+            }
+          }
+
+          //const total = 1.0 * json_data['raysTracedPerTreelet'].reduce((partialSum, a) => partialSum + parseInt(a), 0);
+          for (let i = 0; i < json_data['raysTracedPerTreelet'].length; i++) {
+            treeletChart.data.datasets[0].data[i] = json_data['raysTracedPerTreelet'][i];
+          }
+
+          treeletChart.update();
+        }
       }
     }
   };
