@@ -287,7 +287,8 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
       + "&region="s + storage_backend_info.region
       + "&width="s + to_string( scene.sample_extent.x )
       + "&height="s + to_string( scene.sample_extent.y )
-      + "&tiles="s + to_string( accumulators );
+      + "&tiles="s + to_string( accumulators )
+      + "&profiling=" + to_string( config.profiling_run );
   };
   // clang-format on
 
