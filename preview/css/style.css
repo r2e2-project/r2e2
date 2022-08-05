@@ -22,7 +22,7 @@ body {
 #sidebar {
   border-radius: 5px;
   width: 300px;
-  margin-left:1em;
+  margin-left:2em;
   display: flex;
   flex-direction: column;
 }

@@ -79,7 +79,7 @@ canvas.width = _tiles.width;
 canvas.height = _tiles.height;
 
 // should we resize?
-const MARGIN = 100;
+const MARGIN = 200;
 let ideal_width = _tiles.width + MARGIN + sidebar.offsetWidth;
 let ideal_height = _tiles.height + MARGIN;
 let actual_width = window.innerWidth;
