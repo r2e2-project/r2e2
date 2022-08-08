@@ -68,21 +68,18 @@ const _job = new JobInfo(url_params.get('job_id'),
   url_params.get('bucket'),
   url_params.get('region'));
 
-const _tiles = new TileHelper(parseInt(url_params.get('width')),
-  parseInt(url_params.get('height')),
-  parseInt(url_params.get('tiles')));
+const _tiles = new TileHelper(
+  _profiling_run ? 1920 : parseInt(url_params.get('width')),
+  _profiling_run ? 1080 : parseInt(url_params.get('height')),
+  _profiling_run ? 1 : parseInt(url_params.get('tiles')));
 
 let ctx = document.getElementById("output").getContext('2d');
 
 let sidebar = document.getElementById("sidebar");
 let canvas = document.getElementById("output");
+
 canvas.width = _tiles.width;
 canvas.height = _tiles.height;
-
-if (_profiling_run) {
-  canvas.width = 1280;
-  canvas.height = 720;
-}
 
 // should we resize?
 const MARGIN = 200;
@@ -216,7 +213,13 @@ if (!_profiling_run) {
 
     get_version(i, tile_ver_url);
   }
+} else {
+  document.getElementById("extra-information").style.display = "none";
+  document.getElementById("profiling-information").style.display = "block";
 }
+
+const allocation_table = document.querySelector("table#allocation tbody");
+allocation_table.innerHTML = "<tr><td>&nbsp;</td><td></td></tr>";
 
 let save_btn = document.getElementById("save-button");
 save_btn.onclick = () => {
@@ -518,12 +521,44 @@ let load_status = (url) => {
             }
           }
 
-          //const total = 1.0 * json_data['raysTracedPerTreelet'].reduce((partialSum, a) => partialSum + parseInt(a), 0);
           for (let i = 0; i < json_data['raysTracedPerTreelet'].length; i++) {
             treeletChart.data.datasets[0].data[i] = json_data['raysTracedPerTreelet'][i];
           }
 
           treeletChart.update();
+
+          let allocData = "";
+          const total = 1.0 * json_data['raysTracedPerTreelet'].reduce((partialSum, a) => partialSum + parseInt(a), 0);
+          let probs = json_data['raysTracedPerTreelet'].map((e) => 1.0 * parseInt(e) / total);
+          let indexes = Array(probs.length).fill().map((e, i) => i);
+          indexes.sort((a, b) => probs[a] - probs[b]);
+          let alloc = Array(probs.length).fill(0);
+          console.log(indexes);
+
+          let max_workers = 2000;
+          for (let i = 0; i < probs.length; i++) {
+            const prob_sum = probs.reduce((partialSum, a) => partialSum + a, 0);
+            let worker_count = Math.ceil(probs[indexes[i]] / prob_sum * max_workers);
+            worker_count = worker_count > 0 ? worker_count : 1;
+            max_workers -= worker_count;
+            probs[indexes[i]] = 0;
+            alloc[indexes[i]] = worker_count;
+
+            
+          }
+
+          indexes.sort((a, b) => alloc[b] - alloc[a]);
+          let allocated = 0;
+          for (let i = 0; i < Math.min(alloc.length, 10); i++) {
+            allocated += alloc[indexes[i]];
+            allocData += `<tr><td>${indexes[i]}</td><td>${alloc[indexes[i]]}</td></tr>\n`;
+          }
+
+          if (alloc.length > 10) {
+            allocData += `<tr><td>Others</td><td>${2000 - allocated}</td></tr>\n`;
+          }
+
+          allocation_table.innerHTML = allocData; 
         }
       }
     }
