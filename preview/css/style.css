@@ -19,6 +19,10 @@ body {
   border-radius: 5px;
 }
 
+#profiling-information {
+  display: none;
+}
+
 #sidebar {
   border-radius: 5px;
   width: 300px;
@@ -117,4 +121,49 @@ body {
   float:right;
   height:32px;
   border:0;
+}
+
+table.tbl {
+  color: #fff;
+  width: 100%;
+  margin-top:1em;
+  font-size:90%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+table.tbl th {
+  font-weight: bold;
+  border-top:1px solid white;
+  text-align: center;
+}
+
+table.tbl td, table.tbl th {
+  padding:8px 16px;
+  border-bottom:1px solid white;
+}
+
+table.tbl td:first-child, table.tbl th:first-child {
+  border-left:1px solid white;
+  border-right:1px solid white;
+}
+
+table.tbl td:last-child, table.tbl th:last-child {
+  border-right:1px solid white;
+}
+
+table.tbl th:first-of-type {
+  border-top-left-radius: 20px;
+}
+
+table.tbl th:last-of-type {
+  border-top-right-radius: 20px;
+}
+
+table.tbl tr:last-of-type td:first-of-type {
+  border-bottom-left-radius: 20px;
+}
+
+table.tbl tr:last-of-type td:last-of-type {
+  border-bottom-right-radius: 20px;
 }
