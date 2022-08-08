@@ -52,20 +52,20 @@
                     <a class="nav-link active" href="#home">Home</a>
                   </li>
                   <li class="nav-item">
+                    <a class="nav-link" href="#paper">Paper</a>
+                  </li>
+                  <li class="nav-item">
                     <a class="nav-link" href="#intro">At a Glance</a>
                   </li>
                   <li class="nav-item">
                     <a class="nav-link" href="#in-action">Demo</a>
                   </li>
                   <li class="nav-item">
-                    <a class="nav-link" href="#paper">Paper</a>
-                  </li>
-                  <li class="nav-item">
                     <a class="nav-link" href="#tech-video">Tech Video</a>
                   </li>
-                  <li class="nav-item">
+                  <!--<li class="nav-item">
                     <a class="nav-link" href="#faq">FAQ</a>
-                  </li>
+                  </li>-->
                   <li class="nav-item">
                     <a
                       class="nav-link"
@@ -159,6 +159,95 @@
             rights reserved.
           </span>
         </a>
+      </div>
+    </div>
+
+    <div class="section pt-4 pb-4 bgbg">
+      <div class="container">
+        <div class="row g-lg-5" id="paper">
+          <div class="col-lg-6">
+            <h3><i class="bi-journal-text"></i> Research Paper</h3>
+
+            <p>
+              <a class="link-dark" href="https://sadjad.org">Sadjad Fouladi</a
+              >,
+              <a class="link-dark" href="https://cs.stanford.edu/~bps"
+                >Brennan Shacklett</a
+              >,
+              <a class="link-dark" href="https://faitpoms.com/">Fait Poms</a>,
+              <a class="link-dark" href="https://github.com/Arjun-Arora"
+                >Arjun Arora</a
+              >,
+              <a class="link-dark" href="https://cs.stanford.edu/~aozdemir/"
+                >Alex Ozdemir</a
+              >,
+              <a class="link-dark" href="https://deeptir.me/"
+                >Deepti Raghavan</a
+              >,
+              <a
+                class="link-dark"
+                href="https://graphics.stanford.edu/~hanrahan/"
+                >Pat Hanrahan</a
+              >,
+              <a
+                class="link-dark"
+                href="http://graphics.stanford.edu/~kayvonf/"
+                >Kayvon Fatahalian</a
+              >,
+              <a class="link-dark" href="https://keithw.org">Keith Winstein</a
+              >,
+              <strong
+                >&OpenCurlyDoubleQuote;R2E2: Low-Latency Path Tracing of
+                Terabyte-Scale Scenes using Thousands of Cloud
+                CPUs,&CloseCurlyDoubleQuote;</strong
+              >
+              <em>ACM Transactions on Graphics, July 2022.</em>
+            </p>
+
+            <div class="mb-2">
+              <a href="data/r2e2-paper.pdf" class="btn btn-outline-primary">
+                <i class="bi bi-filetype-pdf"></i>
+              </a>
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                data-bs-toggle="collapse"
+                data-bs-target="#bibtex-collapse"
+                aria-expanded="false"
+                aria-controls="bibtex-collapse">
+                BibTeX
+              </button>
+            </div>
+
+            <pre class="collapse" id="bibtex-collapse" onclick="clip(this)">
+@article{fouladi2022r2e2,
+author = {Fouladi, Sadjad and Shacklett, Brennan and Poms, Fait and Arora, Arjun and Ozdemir, Alex and Raghavan, Deepti and Hanrahan, Pat and Fatahalian, Kayvon and Winstein, Keith},
+title = {R2E2: Low-Latency Path Tracing of Terabyte-Scale Scenes Using Thousands of Cloud CPUs},
+year = {2022},
+issue_date = {July 2022},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {41},
+number = {4},
+issn = {0730-0301},
+url = {https://doi.org/10.1145/3528223.3530171},
+doi = {10.1145/3528223.3530171},
+abstract = {In this paper we explore the viability of path tracing massive scenes using a "supercomputer" constructed on-the-fly from thousands of small, serverless cloud computing nodes. We present R2E2 (Really Elastic Ray Engine) a scene decomposition-based parallel renderer that rapidly acquires thousands of cloud CPU cores, loads scene geometry from a pre-built scene BVH into the aggregate memory of these nodes in parallel, and performs full path traced global illumination using an inter-node messaging service designed for communicating ray data. To balance ray tracing work across many nodes, R2E2 adopts a service-oriented design that statically replicates geometry and texture data from frequently traversed scene regions onto multiple nodes based on estimates of load, and dynamically assigns ray tracing work to lightly loaded nodes holding the required data. We port pbrt's ray-scene intersection components to the R2E2 architecture, and demonstrate that scenes with up to a terabyte of geometry and texture data (where as little as 1/250th of the scene can fit on any one node) can be path traced at 4K resolution, in tens of seconds using thousands of tiny serverless nodes on the AWS Lambda platform.},
+journal = {ACM Trans. Graph.},
+month = {jul},
+articleno = {76},
+numpages = {12},
+keywords = {lambda computing, ray tracing}
+}</pre
+            >
+          </div>
+
+          <div class="col-lg-6">
+            <a href="data/r2e2-paper.pdf">
+              <div class="ratio ratio-16x9" id="paper-first-page"></div>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -280,94 +369,12 @@
 
       <div class="section pt-4 pb-4">
         <div class="container">
-          <div class="row g-lg-5" id="paper">
-            <div class="col-lg-6">
-              <h3><i class="bi-journal-text"></i> Research Paper</h3>
-
-              <p>
-                <a class="link-dark" href="https://sadjad.org">Sadjad Fouladi</a
-                >,
-                <a class="link-dark" href="https://cs.stanford.edu/~bps"
-                  >Brennan Shacklett</a
-                >,
-                <a class="link-dark" href="https://faitpoms.com/">Fait Poms</a>,
-                <a class="link-dark" href="https://github.com/Arjun-Arora"
-                  >Arjun Arora</a
-                >,
-                <a class="link-dark" href="https://cs.stanford.edu/~aozdemir/"
-                  >Alex Ozdemir</a
-                >,
-                <a class="link-dark" href="https://deeptir.me/"
-                  >Deepti Raghavan</a
-                >,
-                <a
-                  class="link-dark"
-                  href="https://graphics.stanford.edu/~hanrahan/"
-                  >Pat Hanrahan</a
-                >,
-                <a
-                  class="link-dark"
-                  href="http://graphics.stanford.edu/~kayvonf/"
-                  >Kayvon Fatahalian</a
-                >,
-                <a class="link-dark" href="https://keithw.org">Keith Winstein</a
-                >,
-                <strong
-                  >&OpenCurlyDoubleQuote;R2E2: Low-Latency Path Tracing of
-                  Terabyte-Scale Scenes using Thousands of Cloud
-                  CPUs,&CloseCurlyDoubleQuote;</strong
-                >
-                <em>ACM Transactions on Graphics, July 2022.</em>
-              </p>
-
-              <div class="mb-2">
-                <a href="data/r2e2-paper.pdf" class="btn btn-outline-primary">
-                  <i class="bi bi-filetype-pdf"></i>
-                </a>
-                <button
-                  type="button"
-                  class="btn btn-outline-secondary"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#bibtex-collapse"
-                  aria-expanded="false"
-                  aria-controls="bibtex-collapse">
-                  BibTeX
-                </button>
-              </div>
-
-              <pre class="collapse" id="bibtex-collapse" onclick="clip(this)">
-@article{fouladi2022r2e2,
-  title={{R2E2}: Low-Latency Path Tracing of Terabyte-Scale Scenes using Thousands of Cloud CPUs},
-  author={Fouladi, Sadjad and Shacklett, Brennan and Poms, Fait and Arora, Arjun and Ozdemir, Alex and Raghavan, Deepti and Hanrahan, Pat and Fatahalian, Kayvon and Winstein, Keith},
-  journal={ACM Transactions on Graphics (TOG)},
-  volume={41},
-  number={4},
-  pages={1--16},
-  year={2022},
-  publisher={ACM New York, NY}
-}</pre
-              >
-            </div>
-
-            <div class="col-lg-6">
-              <a href="data/r2e2-paper.pdf">
-                <div class="ratio ratio-16x9" id="paper-first-page"></div>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="section pt-4 pb-4">
-        <div class="container">
           <div class="row g-lg-5" id="tech-video">
             <div class="col-lg-6">
               <h3><i class="bi-person-video3"></i> Tech Video</h3>
 
               <p>
-                Tech video will be available during the week of
-                <a href="https://s2022.siggraph.org/">SIGGRAPH 2022</a> (Aug
-                8&ndash;11).
+                Tech video will be available late August!
               </p>
             </div>
 
@@ -384,7 +391,7 @@
         </div>
       </div>
 
-      <div class="section pt-4 pb-4">
+      <!--<div class="section pt-4 pb-4">
         <div class="container">
           <div class="row" id="faq">
             <div class="col-lg-9">
@@ -473,7 +480,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </div>-->
 
       <div class="section pt-4 pb-4">
         <div class="container">
