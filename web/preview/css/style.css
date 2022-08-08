@@ -153,17 +153,17 @@ table.tbl td:last-child, table.tbl th:last-child {
 }
 
 table.tbl th:first-of-type {
-  border-top-left-radius: 20px;
+  border-top-left-radius: 10px;
 }
 
 table.tbl th:last-of-type {
-  border-top-right-radius: 20px;
+  border-top-right-radius: 10px;
 }
 
 table.tbl tr:last-of-type td:first-of-type {
-  border-bottom-left-radius: 20px;
+  border-bottom-left-radius: 10px;
 }
 
 table.tbl tr:last-of-type td:last-of-type {
-  border-bottom-right-radius: 20px;
+  border-bottom-right-radius: 10px;
 }

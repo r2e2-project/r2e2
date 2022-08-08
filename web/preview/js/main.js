@@ -448,6 +448,8 @@ let _status = {
   'peak_throughput': document.getElementById("data-peak-throughput"),
   'traced': document.getElementById("data-traced"),
   'peak_traced': document.getElementById("data-peak-traced"),
+  'rays_traced': document.getElementById("data-rays-traced"),
+  'paths_traced': document.getElementById("data-paths-traced"),
 };
 
 let load_status = (url) => {
@@ -467,6 +469,9 @@ let load_status = (url) => {
           parseFloat(json_data['completion'])
             .toFixed(1)
             .replace(/[.,]0$/, "");
+
+        _status.rays_traced.innerHTML = nFormatter(json_data['raysTraced'], 1);
+        _status.paths_traced.innerHTML = nFormatter(json_data['pathsFinished'], 1);
 
         _status.workers.innerHTML = `${3 * json_data['workers']}`;
         _status.memory.innerHTML = nFormatter(4096 * 1024 * 1024 * json_data['workers'], 1);
@@ -547,14 +552,16 @@ let load_status = (url) => {
             
           }
 
+          const TABLE_SIZE = 8;
+
           indexes.sort((a, b) => alloc[b] - alloc[a]);
           let allocated = 0;
-          for (let i = 0; i < Math.min(alloc.length, 10); i++) {
+          for (let i = 0; i < Math.min(alloc.length, TABLE_SIZE); i++) {
             allocated += alloc[indexes[i]];
             allocData += `<tr><td>${indexes[i]}</td><td>${alloc[indexes[i]]}</td></tr>\n`;
           }
 
-          if (alloc.length > 10) {
+          if (alloc.length > TABLE_SIZE) {
             allocData += `<tr><td>Others</td><td>${2000 - allocated}</td></tr>\n`;
           }
 
