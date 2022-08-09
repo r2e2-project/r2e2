@@ -548,8 +548,6 @@ let load_status = (url) => {
             max_workers -= worker_count;
             probs[indexes[i]] = 0;
             alloc[indexes[i]] = worker_count;
-
-            
           }
 
           const TABLE_SIZE = 8;
@@ -558,11 +556,11 @@ let load_status = (url) => {
           let allocated = 0;
           for (let i = 0; i < Math.min(alloc.length, TABLE_SIZE); i++) {
             allocated += alloc[indexes[i]];
-            allocData += `<tr><td>${indexes[i]}</td><td>${alloc[indexes[i]]}</td></tr>\n`;
+            allocData += `<tr><td>${indexes[i]}</td><td>${3 * alloc[indexes[i]]}</td></tr>\n`;
           }
 
           if (alloc.length > TABLE_SIZE) {
-            allocData += `<tr><td>Others</td><td>${2000 - allocated}</td></tr>\n`;
+            allocData += `<tr><td>Others</td><td>${3 * (2000 - allocated)}</td></tr>\n`;
           }
 
           allocation_table.innerHTML = allocData; 
