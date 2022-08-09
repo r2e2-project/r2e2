@@ -377,7 +377,7 @@ if (_profiling_run) {
           type: 'category',
           title: {
             display: true,
-            text: 'Scene Object',
+            text: 'Treelet',
             color: 'rgb(255,255,255)',
             font: { family: 'Work Sans', weight: 600, size: 22 },
             padding: { top: 15 }
