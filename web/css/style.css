@@ -18,8 +18,8 @@ a {
     rgb(255, 190, 0) 100%
   );
 
-  background: url(../img/moana.jpg) bottom center;
-  background-size: cover;
+  /*background: url(../img/moana.jpg) bottom center;
+  background-size: cover;*/
   padding-top: 80px;
 }
 
@@ -28,8 +28,8 @@ a.btn:hover {
 }
 
 #header h1 {
-  color: white;
-  text-shadow: 2px 2px 4px black;
+  color: black;
+  text-shadow: 1px 1px 1px white;
   font-weight: 600;
 }
 
