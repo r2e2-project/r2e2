@@ -14,7 +14,7 @@ provider "aws" {
     region = var.region
 }
 
-resource "aws_security_group" "allow_all" {
+resource "aws_security_group" "r2e2_allow_all" {
     name = "allow_all"
     description = "Allow all traffic"
 
@@ -26,7 +26,7 @@ resource "aws_security_group" "allow_all" {
     }
 
     tags = {
-        Project = "r2t2"
+        Project = "r2e2"
     }
 }
 
@@ -38,20 +38,20 @@ resource "aws_instance" "memcached" {
 
     user_data = <<-EOT
         #!/bin/bash
-        echo "N=${var.servers_per_instance}" >/home/ubuntu/memcached-servers.env
-        echo "THREADS=${var.threads_per_server}" >>/home/ubuntu/memcached-servers.env
-        echo "MEMORY=${var.memory_per_server}" >>/home/ubuntu/memcached-servers.env
-        echo "MAXOBJ=${var.max_object_size}" >>/home/ubuntu/memcached-servers.env
-        echo "FLAGS=${var.additional_flags}" >>/home/ubuntu/memcached-servers.env
-        chmod 644 /home/ubuntu/memcached-servers.env
-        systemctl restart r2t2-memcached.service
+        echo "N=${var.servers_per_instance}" >/home/ubuntu/r2e2-memcached.env
+        echo "THREADS=${var.threads_per_server}" >>/home/ubuntu/r2e2-memcached.env
+        echo "MEMORY=${var.memory_per_server}" >>/home/ubuntu/r2e2-memcached.env
+        echo "MAXOBJ=${var.max_object_size}" >>/home/ubuntu/r2e2-memcached.env
+        echo "FLAGS=${var.additional_flags}" >>/home/ubuntu/r2e2-memcached.env
+        chmod 644 /home/ubuntu/r2e2-memcached.env
+        systemctl restart r2e2-memcached.service
         EOT
 
-    vpc_security_group_ids = ["${aws_security_group.allow_all.id}"]
+    vpc_security_group_ids = ["${aws_security_group.r2e2_allow_all.id}"]
 
     tags = {
-        Name    = "r2t2-memcached-server"
-        Project = "r2t2"
+        Name    = "r2e2-memcached-server"
+        Project = "r2e2"
     }
 }
 
