@@ -1,17 +1,5 @@
 #!/bin/bash
 
 cd "${0%/*}"
-
-terraform output -json  | python3 -c '
-import sys
-import json
-
-data = json.loads(sys.stdin.read())
-
-servers = data["ip_addresses"]["value"]
-count = data["servers_per_instance"]["value"]
-
-for port in range(11211, 11211 + count):
-    for server in servers:
-        print("-d {}:{}".format(server, port), end=" ")
-print()'
+./get-servers | awk '{print "-d " $1}' ORS=" "
+echo
