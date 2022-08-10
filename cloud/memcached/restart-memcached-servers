@@ -2,4 +2,4 @@
 
 cd "${0%/*}"
 
-./get-servers | xargs -I{} -P$(nproc) -- ssh -o "StrictHostKeyChecking no" ubuntu@{} sudo systemctl restart r2t2-memcached.service
+./get-servers | xargs -I{} -P$(nproc) -- ssh -o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null" ubuntu@{} sudo systemctl restart r2t2-memcached.service
