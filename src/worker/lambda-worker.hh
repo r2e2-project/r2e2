@@ -24,7 +24,7 @@
 #include "messages/message.hh"
 #include "net/address.hh"
 #include "net/s3.hh"
-#include "net/transfer.hh"
+#include "transfer/transfer.hh"
 #include "storage/backend_s3.hh"
 #include "util/cpu.hh"
 #include "util/eventfd.hh"

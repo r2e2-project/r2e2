@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "net/transfer_mcd.hh"
+#include "transfer/memcached.hh"
 #include "util/file_descriptor.hh"
 #include "util/timerfd.hh"
 

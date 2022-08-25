@@ -24,6 +24,7 @@
 #include "r2e2.pb.h"
 #include "schedulers/scheduler.hh"
 #include "storage/backend_s3.hh"
+#include "transfer/transfer.hh"
 #include "util/eventfd.hh"
 #include "util/signalfd.hh"
 #include "util/temp_dir.hh"

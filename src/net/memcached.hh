@@ -1,11 +1,11 @@
 #pragma once
 
 #include <cstring>
+#include <queue>
 #include <string_view>
 
 #include "client.hh"
 #include "session.hh"
-#include "transfer.hh"
 
 namespace memcached {
 

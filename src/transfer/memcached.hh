@@ -2,8 +2,8 @@
 
 #include <vector>
 
-#include "address.hh"
-#include "memcached.hh"
+#include "net/address.hh"
+#include "net/memcached.hh"
 #include "transfer.hh"
 #include "util/eventloop.hh"
 

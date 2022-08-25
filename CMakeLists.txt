@@ -40,6 +40,7 @@ file ( GLOB SOURCE
     src/master/*
     src/messages/*
     src/net/*
+    src/transfer/*
     src/remote/*
     src/schedulers/*
     src/storage/*

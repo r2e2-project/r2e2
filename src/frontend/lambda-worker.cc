@@ -9,8 +9,8 @@
 #include <sys/mman.h>
 
 #include "messages/utils.hh"
-#include "net/transfer_mcd.hh"
-#include "net/transfer_s3.hh"
+#include "transfer/memcached.hh"
+#include "transfer/s3.hh"
 
 using namespace std;
 using namespace chrono;
