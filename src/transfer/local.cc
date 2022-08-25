@@ -25,11 +25,6 @@ LocalTransferAgent::~LocalTransferAgent()
     t.join();
 }
 
-string normalize_key( const string& k )
-{
-  return digest::sha256_base58( k );
-}
-
 void LocalTransferAgent::worker_thread( const size_t )
 {
   deque<Action> actions;
@@ -54,8 +49,10 @@ void LocalTransferAgent::worker_thread( const size_t )
 
       switch ( action.task ) {
         case Task::Upload:
-          roost::atomic_create( action.data,
-                                _directory / normalize_key( action.key ) );
+          filesystem::create_directories(
+            ( _directory / action.key ).parent_path() );
+
+          roost::atomic_create( action.data, _directory / action.key );
 
           {
             unique_lock<mutex> lock { _results_mutex };
@@ -66,15 +63,14 @@ void LocalTransferAgent::worker_thread( const size_t )
 
         case Task::Download: {
           unique_lock<mutex> lock { _results_mutex };
-          _results.emplace(
-            actions.front().id,
-            roost::read_file( _directory / normalize_key( action.key ) ) );
+          _results.emplace( actions.front().id,
+                            roost::read_file( _directory / action.key ) );
         }
 
         break;
 
         case Task::Delete:
-          filesystem::remove( _directory / normalize_key( action.key ) );
+          filesystem::remove( _directory / action.key );
           break;
 
         case Task::FlushAll:
