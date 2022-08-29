@@ -30,7 +30,7 @@ int main( int argc, char* argv[] )
     stringstream ss;
     ss << fin.rdbuf();
 
-    pbrt::scene::DumpSceneObjects( ss.str(), argv[2] );
+    pbrt::DumpSceneObjects( ss.str(), argv[2] );
   } catch ( const exception& ex ) {
     print_exception( argv[0], ex );
     return EXIT_FAILURE;

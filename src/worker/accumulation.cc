@@ -30,7 +30,7 @@ void LambdaWorker::handle_accumulation_queue()
         offset += len;
       }
 
-      pbrt::graphics::AccumulateImage( scene.base.camera, s );
+      scene.base.AccumulateImage( s ); 
       new_samples_accumulated = true;
     } while ( sample_queue.try_dequeue( sample_bag ) );
   }
@@ -44,7 +44,7 @@ void LambdaWorker::handle_render_output()
     return;
 
   new_samples_accumulated = false;
-  pbrt::graphics::WriteImage( scene.base.camera, render_output_filename );
+  scene.base.WriteImage( render_output_filename );
 
   string buffer;
   ifstream fin { render_output_filename, ios::binary | ios::ate };

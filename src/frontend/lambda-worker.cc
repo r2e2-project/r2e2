@@ -228,7 +228,7 @@ void LambdaWorker::handle_scene_object_results()
 
     if ( obj.key.type != ObjectType::Treelet ) {
       // let's write this object to disk
-      ofstream fout { scene::GetObjectName( obj.key.type, obj.key.id ),
+      ofstream fout { pbrt::GetObjectName( obj.key.type, obj.key.id ),
                       ios::binary };
       fout.write( action.second.data(), action.second.length() );
     } else {
@@ -241,11 +241,11 @@ void LambdaWorker::handle_scene_object_results()
 
   if ( pending_scene_objects.empty() ) { /* everything is loaded */
     scene.base = { working_directory.name(), scene.samples_per_pixel };
-    scene.base.maxPathDepth = scene.max_depth;
+    scene.base.SetPathDepth( scene.max_depth );
 
     for ( auto& [id, data] : downloaded_treelets ) {
       treelets.emplace(
-        id, scene::LoadTreelet( ".", id, data.data(), data.size() ) );
+        id, pbrt::LoadTreelet( ".", id, data.data(), data.size() ) );
     }
 
     downloaded_treelets.clear();
@@ -255,7 +255,7 @@ void LambdaWorker::handle_scene_object_results()
     scene_loaded = true;
 
     tile_helper = { static_cast<uint32_t>( config.accumulators ),
-                    scene.base.sampleBounds,
+                    scene.base.SampleBounds(),
                     static_cast<uint32_t>( scene.samples_per_pixel ) };
 
     if ( is_accumulator ) {
@@ -267,7 +267,7 @@ void LambdaWorker::handle_scene_object_results()
 
       samples_transfer_agent.reset();
 
-      scene.base.camera->film->SetCroppedPixelBounds(
+      scene.base.Camera()->film->SetCroppedPixelBounds(
         static_cast<pbrt::Bounds2i>( tile_helper.bounds( *tile_id ) ) );
 
       for ( size_t i = 0; i < thread::hardware_concurrency(); i++ ) {

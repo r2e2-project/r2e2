@@ -62,7 +62,7 @@ int main( int argc, char const* argv[] )
     cout << "Duration: " << ( filenames.back().first - filenames.front().first )
          << endl;
 
-    pbrt::scene::Base scene_base { argv[1], 0 };
+    pbrt::SceneBase scene_base { argv[1], 0 };
 
     const size_t start_time = filenames.front().first;
 
@@ -104,10 +104,11 @@ int main( int argc, char const* argv[] )
       const string output_name = to_string( t - start_time ) + ".png";
 
       cerr << "Aggregating " << samples.size() << " samples... ";
-      pbrt::graphics::AccumulateImage( scene_base.camera, samples );
+      scene_base.AccumulateImage( samples );
       cerr << "done." << endl;
+      
       cerr << "Writing output " << output_name << "...";
-      pbrt::graphics::WriteImage( scene_base.camera, output_name );
+      scene_base.WriteImage( output_name );
       cerr << "done." << endl;
     }
   } catch ( const exception& e ) {

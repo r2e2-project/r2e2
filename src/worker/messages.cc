@@ -91,7 +91,7 @@ void LambdaWorker::process_message( const Message& message )
         const auto id = scene_transfer_agent->request_download(
           scene_storage_backend.prefix()
           + ( obj.alt_name.empty()
-                ? scene::GetObjectName( obj.key.type, obj.key.id )
+                ? pbrt::GetObjectName( obj.key.type, obj.key.id )
                 : obj.alt_name ) );
 
         pending_scene_objects.insert( make_pair( id, move( obj ) ) );

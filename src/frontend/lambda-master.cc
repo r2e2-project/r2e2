@@ -124,7 +124,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     }();
 
     const auto output_path = filesystem::path( scene_path );
-    scene::DumpSceneObjects( alt_scene_data, output_path );
+    pbrt::DumpSceneObjects( alt_scene_data, output_path );
 
     auto get_file_hash = []( const filesystem::path& p ) {
       ifstream fin { p };
@@ -136,7 +136,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     vector<storage::PutRequest> upload_requests;
 
     for ( const auto scene_obj : SceneData::base_object_types ) {
-      const auto base_name = scene::GetObjectName( scene_obj, 0 );
+      const auto base_name = pbrt::GetObjectName( scene_obj, 0 );
       const auto p = output_path / base_name;
       if ( filesystem::exists( p ) ) {
         const auto object_hash = get_file_hash( p ).substr( 0, 8 );
@@ -165,9 +165,9 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   /* download required scene objects from the bucket */
   auto get_scene_object_request = [&scene_path]( const ObjectType type ) {
-    return storage::GetRequest { scene::GetObjectName( type, 0 ),
+    return storage::GetRequest { pbrt::GetObjectName( type, 0 ),
                                  filesystem::path( scene_path )
-                                   / scene::GetObjectName( type, 0 ) };
+                                   / pbrt::GetObjectName( type, 0 ) };
   };
 
   vector<storage::GetRequest> scene_obj_reqs;
@@ -188,15 +188,15 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
 
   /* initializing tile helper used for *accumulation* */
   tile_helper = { static_cast<uint32_t>( accumulators ),
-                  scene.base.sampleBounds,
-                  static_cast<uint32_t>( scene.base.samplesPerPixel ) };
+                  scene.base.SampleBounds(),
+                  static_cast<uint32_t>( scene.base.SamplesPerPixel() ) };
 
   accumulators = tile_helper.active_accumulators();
 
   /* initializing tile helper used for *ray generation* */
   tiles = Tiles { config.tile_size,
                   scene.sample_bounds,
-                  scene.base.samplesPerPixel,
+                  scene.base.SamplesPerPixel(),
                   ray_generators ? ray_generators : max_workers };
 
   /* create the invocation payload */
@@ -218,7 +218,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   invocation_payload = protoutil::to_json( invocation_proto );
 
   /* initializing the treelets array */
-  treelet_count = scene.base.GetTreeletCount();
+  treelet_count = scene.base.TreeletCount();
   treelets.reserve( treelet_count );
   treelet_stats.reserve( treelet_count );
 
@@ -235,7 +235,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
     // setting the directory name based on job info
     string dir_name = ParsedURI( storage_backend_uri ).path + "_w"
                       + to_string( max_workers ) + "_"
-                      + to_string( scene.base.samplesPerPixel ) + "spp_d"
+                      + to_string( scene.base.SamplesPerPixel() ) + "spp_d"
                       + to_string( config.max_path_depth );
 
     if ( not config.auto_name_log_dir_tag->empty() ) {
@@ -307,7 +307,7 @@ LambdaMaster::LambdaMaster( const uint16_t listen_port,
   print_info( "Output dimensions",
               to_string( scene.sample_extent.x ) + "\u00d7"
                 + to_string( scene.sample_extent.y ) );
-  print_info( "Samples per pixel", scene.base.samplesPerPixel );
+  print_info( "Samples per pixel", scene.base.SamplesPerPixel() );
   print_info( "Total paths", scene.total_paths );
   print_info( "Logs directory", config.logs_directory.c_str() );
 
@@ -1058,7 +1058,7 @@ int main( int argc, char* argv[] )
       cout << "\u2198 Downloading static assignment file to "
            << static_file.name() << "... ";
 
-      storage->get( { { scene::GetObjectName( ObjectType::StaticAssignment, 0 ),
+      storage->get( { { pbrt::GetObjectName( ObjectType::StaticAssignment, 0 ),
                         static_file.name() } } );
       cout << "done." << endl;
 

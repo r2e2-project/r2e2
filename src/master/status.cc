@@ -209,7 +209,7 @@ void LambdaMaster::handle_progress_report()
 
       if ( i == 0 ) {
         progress_report_proto.mutable_rays_traced_per_treelet()->at( i )
-          += scene.sample_bounds.Area() * scene.base.samplesPerPixel;
+          += scene.sample_bounds.Area() * scene.base.SamplesPerPixel();
       }
     }
   }

@@ -378,7 +378,8 @@ private:
       pbrt::ObjectType::AreaLights,    pbrt::ObjectType::Sampler,
       pbrt::ObjectType::InfiniteLights
     };
-    pbrt::scene::Base base {};
+
+    pbrt::SceneBase base {};
 
     pbrt::Bounds2i sample_bounds {};
     pbrt::Vector2i sample_extent {};

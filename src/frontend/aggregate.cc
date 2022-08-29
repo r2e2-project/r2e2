@@ -31,7 +31,7 @@ int main( int argc, char const* argv[] )
       return EXIT_FAILURE;
     }
 
-    pbrt::scene::Base scene_base { argv[1], 0 };
+    pbrt::SceneBase scene_base { argv[1], 0 };
 
     for ( string line; getline( cin, line ); ) {
       cerr << "Processing " << line << "... ";
@@ -52,12 +52,12 @@ int main( int argc, char const* argv[] )
         offset += len;
       }
 
-      pbrt::graphics::AccumulateImage( scene_base.camera, samples );
+      scene_base.AccumulateImage( samples );
       cerr << "done." << endl;
     }
 
     /* Create the final output */
-    pbrt::graphics::WriteImage( scene_base.camera );
+    scene_base.WriteImage();
   } catch ( const exception& e ) {
     print_exception( argv[0], e );
     return EXIT_FAILURE;

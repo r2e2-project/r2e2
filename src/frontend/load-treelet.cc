@@ -28,8 +28,7 @@ int main( int argc, char* argv[] )
   const auto treelet_id = static_cast<pbrt::TreeletId>( stoul( argv[2] ) );
 
   const string treelet_path
-    = path + "/"
-      + pbrt::scene::GetObjectName( pbrt::ObjectType::Treelet, treelet_id );
+    = path + "/" + pbrt::GetObjectName( pbrt::ObjectType::Treelet, treelet_id );
 
   vector<char> buffer;
   {
@@ -47,8 +46,8 @@ int main( int argc, char* argv[] )
   pbrt::PbrtOptions.nThreads = 1;
   {
     GlobalScopeTimer<Timer::Category::LoadingTreelet> _;
-    auto treelet = pbrt::scene::LoadTreelet(
-      path, treelet_id, buffer.data(), buffer.size() );
+    auto treelet
+      = pbrt::LoadTreelet( path, treelet_id, buffer.data(), buffer.size() );
   }
 
   cout << timer.summary() << endl;

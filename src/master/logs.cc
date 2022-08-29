@@ -209,10 +209,10 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
   proto.set_job_id( job_id );
   proto.set_num_lambdas( max_workers );
   proto.set_num_generators( ray_generators );
-  proto.set_treelet_count( scene.base.GetTreeletCount() );
+  proto.set_treelet_count( scene.base.TreeletCount() );
   proto.mutable_output_size()->set_x( scene.sample_extent.x );
   proto.mutable_output_size()->set_y( scene.sample_extent.y );
-  proto.set_spp( scene.base.samplesPerPixel );
+  proto.set_spp( scene.base.SamplesPerPixel() );
   proto.mutable_tile_size()->set_x( tiles.tile_size );
   proto.mutable_tile_size()->set_y( tiles.tile_size );
   proto.set_max_depth( config.max_path_depth );
@@ -221,8 +221,7 @@ protobuf::JobSummary LambdaMaster::get_job_summary() const
   proto.set_storage_backend( storage_backend_uri );
 
   for ( const auto& [k, v] : alternative_object_names ) {
-    ( *proto.mutable_alt_scene_objects() )[pbrt::scene::GetObjectName( k, 0 )]
-      = v;
+    ( *proto.mutable_alt_scene_objects() )[pbrt::GetObjectName( k, 0 )] = v;
   }
 
   proto.set_total_time( total_time );
@@ -262,7 +261,8 @@ private:
 public:
   Value( T v )
     : value( v )
-  {}
+  {
+  }
   T get() const { return value; }
 };
 

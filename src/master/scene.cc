@@ -27,7 +27,7 @@ void LambdaMaster::assign_treelet( Worker& worker, Treelet& treelet )
   worker.treelet = treelet.id;
   treelet.workers.insert( worker.id );
 
-  auto& dependencies = scene.base.GetTreeletDependencies( treelet.id );
+  auto& dependencies = scene.base.TreeletDependencies( treelet.id );
 
   for ( const auto& obj : dependencies ) {
     assign_object( worker, { obj } );
@@ -62,10 +62,12 @@ LambdaMaster::SceneData::SceneData( const std::string& scene_path,
                                     const int samples_per_pixel,
                                     const optional<Bounds2i>& crop_window )
   : base( scene_path, samples_per_pixel )
-  , sample_bounds( crop_window.has_value() ? *crop_window : base.sampleBounds )
+  , sample_bounds( crop_window.has_value() ? *crop_window
+                                           : base.SampleBounds() )
   , sample_extent( sample_bounds.Diagonal() )
-  , total_paths( sample_extent.x * sample_extent.y * base.samplesPerPixel )
-{}
+  , total_paths( sample_extent.x * sample_extent.y * base.SamplesPerPixel() )
+{
+}
 
 int default_tile_size( int spp )
 {

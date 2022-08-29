@@ -17,15 +17,9 @@ void LambdaWorker::generate_rays( const Bounds2i& bounds )
   /* for ray tracking */
   bernoulli_distribution bd { config.ray_log_rate };
 
-  for ( int sample = 0; sample < scene.base.samplesPerPixel; sample++ ) {
+  for ( int sample = 0; sample < scene.base.SamplesPerPixel(); sample++ ) {
     for ( const Point2i pixel : bounds ) {
-      RayStatePtr state_ptr
-        = graphics::GenerateCameraRay( scene.base.camera,
-                                       pixel,
-                                       sample,
-                                       scene.base.maxPathDepth,
-                                       scene.base.sampleExtent,
-                                       scene.base.sampler );
+      RayStatePtr state_ptr = scene.base.GenerateCameraRay( pixel, sample );
 
       state_ptr->trackRay = track_rays ? bd( rand_engine ) : false;
       const TreeletId next_treelet = state_ptr->CurrentTreelet();
@@ -71,8 +65,8 @@ void LambdaWorker::handle_trace_queue( const size_t idx )
 
       ray_counters.terminated++;
 
-      pbrt::graphics::ProcessRayOutput out;
-      graphics::ProcessRay( move( ray_ptr ), treelet, scene.base, arena, out );
+      pbrt::ProcessRayOutput out;
+      scene.base.ProcessRay( move( ray_ptr ), treelet, arena, out );
       processed_queue_size++;
       processed_queue.enqueue( move( out ) );
     } while ( trace_queue.try_dequeue( ray_ptr ) );
@@ -106,7 +100,7 @@ void LambdaWorker::handle_processed_queue()
     ray_counters.generated++;
   };
 
-  pbrt::graphics::ProcessRayOutput output;
+  pbrt::ProcessRayOutput output;
   while ( processed_queue.try_dequeue( output ) ) {
     processed_queue_size--;
 
@@ -123,5 +117,9 @@ void LambdaWorker::handle_processed_queue()
     if ( output.pathFinished ) {
       finished_path_ids.push( output.pathId );
     }
+
+    output.rays[0] = nullptr;
+    output.rays[1] = nullptr;
+    output.rays[2] = nullptr;
   }
 }
