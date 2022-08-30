@@ -90,6 +90,9 @@ target_link_libraries( r2e2-lambda-master ${ALL_LIBS} ${STATIC_LINK_FLAGS} )
 add_executable ( r2e2-lambda-worker src/frontend/lambda-worker.cc )
 target_link_libraries( r2e2-lambda-worker ${ALL_LIBS} ${STATIC_LINK_FLAGS} )
 
+add_executable( r2e2-local-render src/frontend/local-render.cc )
+target_link_libraries( r2e2-local-render ${ALL_LIBS} )
+
 add_executable ( r2e2-aggregate src/frontend/aggregate.cc )
 target_link_libraries( r2e2-aggregate ${ALL_LIBS} )
 
