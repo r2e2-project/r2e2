@@ -170,6 +170,8 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 
         if ( this_rule.interest() ) {
           if ( iterations > 128 ) {
+            iterations = 0;
+            continue;
             throw runtime_error(
               "EventLoop: busy wait detected: rule \""
               + _rule_categories.at( this_rule.category_id ).name
